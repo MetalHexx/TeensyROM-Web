@@ -1,9 +1,13 @@
 using MediatR;
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Serial.Commands.LaunchFile;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Commands.Behaviors
@@ -12,12 +16,27 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// Serial/TCP pipeline to manage cross-cutting behaviors for all commands.
 	///
 	/// <remarks>
-	/// Handles general connectivity and manages scenarios where TeensyROM is busy
-	/// or needs to revert to the Full TeeensyROM firmware.  It also ensures only
-	/// one command at a time (per device) can be executed.
+	/// Ensures only one command at a time (per device) can be executed, keeps the port open for the
+	/// command's own exchange, and reacts to what the exchange actually reports instead of probing the
+	/// firmware first: a device believed to be in minimal is reset back to full before any command runs,
+	/// launches included - minimal is a separate firmware image that cannot run files at all, and there is
+	/// nothing to be gained by sending a launch to it. A device believed busy is reset the same way before
+	/// any non-launch command (a handler-swapping launch leaves the firmware answering <c>Busy!</c> to
+	/// every non-always-available command until something resets it), but a launch is exempt from that
+	/// reset: the firmware dispatches <c>LaunchFileToken</c> above the busy gate (<c>SerUSBIO.ino:549</c>,
+	/// alongside reset, version, and firmware-check - "only these commands are available when busy"), so a
+	/// cart-running device accepts a launch by design and resetting first would cost a reboot and drop the
+	/// user to the menu for nothing. Either reset's own outcome is read, not assumed: a menu that never
+	/// comes back up (no recovery routine runs here - the port/socket stay open) fails the command with a
+	/// legible reason instead of sending it into a still-booting device. A <see cref="TeensyBusyException"/>
+	/// from the command's own reply earns one reset and one re-send, and a transport drop hands the device
+	/// to <see cref="IDeviceRecovery"/>. A
+	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
+	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
+	/// way; the simplicity is worth the redundant reset.
 	/// </remarks>
 	/// </summary>
-	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
+	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log, IDeviceConnectionManager devices, IDeviceRecovery recovery) : IPipelineBehavior<TRequest, TResponse>
 		where TRequest : ITeensyCommand<TResponse>
 		where TResponse : TeensyCommandResult, new()
 	{
@@ -36,56 +55,104 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
 			try
 			{
-				TResponse response = default!;
 				var port = request.CommunicationPort;
+				var device = request.DeviceId is null ? null : devices.GetAvailableDevice(request.DeviceId);
 
-				if (!port.IsOpen)
+				try
 				{
-					port.ClosePort();
-					port.OpenPort();
-				}
-				else
-				{
-					port.ClearBuffers();
-				}	
-
-				if (port.SendFwCheckCommand(log) != TeensyToken.FWFullToken)
-				{
-					if (!port.ReconnectToFullFw(log))
+					if (!port.IsOpen)
 					{
-						return new()
-						{
-							IsSuccess = false,
-							Error = "SerialBehavior: Command Failed. Cart was in Minimal and was unable to reset to full FW."
-						};
+						port.OpenPort();
+					}
+					else
+					{
+						port.ClearBuffers();
 					}
 				}
-				else if (request is not IBusyTolerant)
+				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
 				{
-					if (port.PingDevice().IsTeensyRomBusy())
+					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
+					throw;
+				}
+
+				if (device is not null)
+				{
+					if (device.Connection.Mode == DeviceMode.Minimal)
 					{
-						if (!port.ForceResetAndReconnectToFullFw(log))
+						port.ResetFromMinimal(log);
+						var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, cancellationToken);
+
+						if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
 						{
 							return new()
 							{
 								IsSuccess = false,
-								Error = "SerialBehavior: Command Failed. Cart was busy and was unable to reset."
+								Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
 							};
 						}
 					}
+					else if (device.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
+					{
+						var resetOk = port.ResetDevice(log);
+						port.ClearBuffers();
+
+						if (!resetOk)
+						{
+							return new()
+							{
+								IsSuccess = false,
+								Error = "Command Failed. The menu did not come back up after the reset."
+							};
+						}
+
+						device.MarkIdle();
+					}
 				}
+
+				var busyRetries = 0;
+
+				async Task<TResponse> SendAsync()
+				{
+					var response = await next();
+
+					// A launch owns its own end state - a handler-swapping launch deliberately leaves the
+					// record busy - so only a non-launch command's success proves the device is idle again.
+					if (device?.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
+					{
+						device.MarkIdle();
+					}
+					return response;
+				}
+
 				try
 				{
-					port.ClearBuffers();
-					response = await next();
+					try
+					{
+						return await SendAsync();
+					}
+					catch (TeensyBusyException) when (busyRetries++ == 0)
+					{
+						device?.MarkBusy();
+						var resetOk = port.ResetDevice(log);
+						port.ClearBuffers();
+
+						if (!resetOk)
+						{
+							return new()
+							{
+								IsSuccess = false,
+								Error = "Command Failed. The menu did not come back up after the reset."
+							};
+						}
+
+						return await SendAsync();
+					}
 				}
-				catch
+				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
 				{
-					port?.ClosePort();
-					log.InternalError("Closing port due to an error during communication port command.");
+					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
 					throw;
 				}
-				return response;
 			}
 			finally
 			{

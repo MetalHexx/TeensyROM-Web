@@ -8,8 +8,9 @@ namespace TeensyRom.Api.Endpoints.FindCarts
     public class FindDevicesRequest
     {
         /// <summary>
-        /// If true, performs a full network/port scan. If false (default), uses cached TCP endpoints for faster discovery.
-        /// Serial COM ports are always fully scanned regardless of this setting.
+        /// If true, runs a full discovery sweep (every COM port and the local subnet), disconnecting every
+        /// currently connected device while it runs. If false (default), returns the devices already
+        /// listed by the manager without contacting any device.
         /// </summary>
         [FromQuery] public bool FullScan { get; set; } = false;
     }

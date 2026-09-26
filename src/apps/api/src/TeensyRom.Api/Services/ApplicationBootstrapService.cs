@@ -71,8 +71,8 @@ namespace TeensyRom.Api.Services
 
             try
             {
-                // 1. Discover all devices (don't auto-connect yet)
-                var devices = await _deviceManager.FindDevices(autoConnect: false, cancellationToken);
+                // 1. Confirm cached devices by chip id, falling back to a full discovery sweep
+                var devices = await _deviceManager.ConnectAtStartAsync(cancellationToken);
 
                 if (devices.Count == 0)
                 {

@@ -328,6 +328,18 @@ namespace TeensyRom.Api.Transfers
                 return Task.CompletedTask;
             }
 
+            if (outcome.DeviceLost)
+            {
+                // This file's own handshake is what discovered the device was gone - unlike the
+                // never-attempted files behind it (handled above), there is no "remaining" file in this
+                // batch to abort the job via. Without this branch a batch that ends on this file falls
+                // through to the plain OnFileFailed path below, which only records a failure: once the
+                // job's PendingCount later reaches zero it completes normally instead of aborting,
+                // silently dropping the very error this outcome carries.
+                AbortPendingFile(job, staged, outcome.Error ?? "Device is no longer available");
+                return Task.CompletedTask;
+            }
+
             job.SetCurrentFile(staged.RelativePath);
 
             if (outcome.Saved)

@@ -44,6 +44,9 @@ namespace TeensyRom.Core.Serial
             @"^C(?<machine>64|128)\s+(?<video>NTSC|PAL)\s+Vid\s+(?<tod>\d{1,3})\s+Hz$",
             RegexOptions.NonBacktracking);
 
+        private static readonly Regex BootLineRegex = new(
+            @"^Boot:\s*(?<state>complete|in progress)$", RegexOptions.NonBacktracking);
+
         private static readonly Regex BuildLabelStripRegex = new(
             @"^FW:\s*", RegexOptions.NonBacktracking);
 
@@ -79,6 +82,7 @@ namespace TeensyRom.Core.Serial
                 var (cpuMhz, temperatureC, chipId) = ParseTeensyLine(lines);
                 var (machine, videoStandard, todClockHz) = ParseMachineLine(lines);
                 var buildTimestamp = ParseBuildLine(lines);
+                var bootComplete = ParseBootLine(lines);
 
                 return new VersionReply
                 {
@@ -93,6 +97,7 @@ namespace TeensyRom.Core.Serial
                     Machine = machine,
                     VideoStandard = videoStandard,
                     TodClockHz = todClockHz,
+                    BootComplete = bootComplete,
                     RawText = rawText
                 };
             }
@@ -202,6 +207,23 @@ namespace TeensyRom.Core.Serial
             }
 
             return (MachineType.Unknown, VideoStandard.Unknown, null);
+        }
+
+        /// <summary>The last "Boot:" line wins: a reply that ran into the next one carries the newer state last.</summary>
+        private static bool? ParseBootLine(List<string> lines)
+        {
+            bool? bootComplete = null;
+
+            foreach (var line in lines)
+            {
+                var match = BootLineRegex.Match(line);
+                if (match.Success)
+                {
+                    bootComplete = match.Groups["state"].Value == "complete";
+                }
+            }
+
+            return bootComplete;
         }
 
         private static string ParseBuildLine(List<string> lines)

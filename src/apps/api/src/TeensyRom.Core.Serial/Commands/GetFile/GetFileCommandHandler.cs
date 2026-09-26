@@ -73,7 +73,7 @@ namespace TeensyRom.Core.Commands.GetFile
             {
                 throw new TeensyException("Checksum Mismatch");
             }
-            return new GetFileResult 
+            return new GetFileResult
             {
                 FileData = buffer
             };

@@ -26,10 +26,10 @@ namespace TeensyRom.Core.Serial
             };
         }
 
-        public ICommunicationPort CreateSerial(string portName)
+        public ICommunicationPort CreateSerial(string portName, bool isTeensyRomPort = false)
         {
             var serialPort = new SerialCommunicationPort(_log);
-            serialPort.SetPort(portName);
+            serialPort.SetPort(portName, isTeensyRomPort);
             return serialPort;
         }
 

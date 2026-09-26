@@ -1,64 +1,156 @@
 using MediatR;
-using System.Reactive.Linq;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Serial.Routines;
+using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
-	public class LaunchFileHandler(ILoggingService log) : IRequestHandler<LaunchFileCommand, LaunchFileResult>
+	public class LaunchFileHandler(
+		ILoggingService log,
+		IDeviceRecovery recovery,
+		IDeviceConnectionManager devices,
+		IDeviceInterrogator interrogator,
+		ConnectionOptions options) : IRequestHandler<LaunchFileCommand, LaunchFileResult>
 	{
 		public async Task<LaunchFileResult> Handle(LaunchFileCommand r, CancellationToken cancellationToken)
 		{
-			var result = TryLaunchCommand(r);
+			var device = r.DeviceId is null ? null : devices.GetAvailableDevice(r.DeviceId);
 
-			if (r.LaunchItem.Size >= 575000)
-			{
-				await Task.Delay(1000);
+			log.Internal($"LaunchFileHandler: {r.LaunchItem.Path} ({r.LaunchItem.Size} bytes)");
 
-				var isMinimalFwReady = r.CommunicationPort.ConnectToMinimalFw(log);
-				if (!isMinimalFwReady)
-				{
-					return new()
-					{
-						IsSuccess = false,
-						Error = "Failed to connect to minimal FW.",
-						LaunchResult = LaunchFileResultType.Error
-					};
-				}
-				log.Internal($"LaunchFileHandler: Reconnecting to TR after large file launch.");
-			}
+			var ack = TryLaunchCommand(r);
 
-			if (result.Value == TeensyToken.Fail)
+			if (ack == TeensyToken.RetryLaunch)
 			{
 				return new()
 				{
 					IsSuccess = false,
-					Error = "Failed to launch file - Received FAIL token",
-					LaunchResult = LaunchFileResultType.Error
+					Error = "TeensyROM declined the launch.",
+					LaunchResult = LaunchFileResultType.Declined
 				};
 			}
-			return GetFinalResult(PollResponse(r));
+
+			var (final, dropped) = Watch(r.CommunicationPort);
+
+			if (final is not null)
+			{
+				return GetFinalResult(final.Value);
+			}
+
+			if (!dropped)
+			{
+				var reply = interrogator.ReadVersion(r.CommunicationPort);
+
+				if (reply.IsTeensyRom && !reply.IsMinimalFirmware)
+				{
+					MarkLaunched(device, r.LaunchItem);
+					return new() { LaunchResult = LaunchFileResultType.Success };
+				}
+			}
+
+			if (device is null)
+			{
+				return new()
+				{
+					IsSuccess = false,
+					Error = "Disconnected from TeensyROM during launch.",
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
+			}
+
+			var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
+
+			return BuildRecoveryResult(outcome);
 		}
 
-		public bool ExecuteMinimalCheck(ICommunicationPort communicationPort)
+		/// <summary>
+		/// Records what the launched item left the full firmware doing. Anything that swaps the firmware's
+		/// IO handler - a cart, a PRG, an image - answers <c>Busy!</c> to every non-always-available command
+		/// until something resets it, so its record is marked busy and the gate resets before the next
+		/// non-launch command. A SID plays under the TeensyROM handler, which keeps answering, so it stays
+		/// idle. The item's type decides this rather than what the port echoed: the firmware's
+		/// "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
+		/// </summary>
+		private static void MarkLaunched(TeensyRomDevice? device, LaunchableItem item)
 		{
-			log.Internal("FW Check Command");
-			communicationPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
-			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);
-			byte[] recBuf = new byte[2];
-			communicationPort.Read(recBuf, 0, 2);
-			ushort result = BitConverter.ToUInt16(recBuf, 0);
-			string firmware = result switch
+			if (device is null)
 			{
-				var _ when result == TeensyToken.FWFullToken.Value => "Full FW",
-				var _ when result == TeensyToken.FWMinimalToken.Value => "Minimal FW",
-				_ => "Unknown FW"
+				return;
+			}
+
+			if (item.FileType == TeensyFileType.Sid)
+			{
+				device.MarkIdle();
+				return;
+			}
+
+			device.MarkBusy();
+		}
+
+		private static LaunchFileResult BuildRecoveryResult(RecoveryOutcome outcome)
+		{
+			if (!outcome.Reachable)
+			{
+				return new()
+				{
+					IsSuccess = false,
+					Error = "Disconnected from TeensyROM during launch.",
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
+			}
+
+			if (outcome.Mode == DeviceMode.Minimal)
+			{
+				return new() { LaunchResult = LaunchFileResultType.Success };
+			}
+
+			return new()
+			{
+				IsSuccess = false,
+				Error = "The launch did not take: the device came back in full firmware.",
+				LaunchResult = LaunchFileResultType.Error
 			};
-			log.External($"Response: {result} ({firmware})");
-			return result == TeensyToken.FWMinimalToken.Value;
+		}
+
+		/// <summary>
+		/// Watches the port until a final reply arrives or <see cref="ConnectionOptions.LaunchSettleMs"/>
+		/// elapses. Returns the final result type when one is seen. Otherwise returns
+		/// <c>Dropped = true</c> when a read threw an exception <see cref="TransportDrop"/> classifies as
+		/// the transport being gone - skipping the version confirm, since serial already gave a definitive
+		/// answer - or <c>Dropped = false</c> for silence/"Loading" the whole window, which is ambiguous
+		/// (a TCP drop never throws) and needs the version command to resolve it.
+		/// </summary>
+		private (LaunchFileResultType? Final, bool Dropped) Watch(ICommunicationPort port)
+		{
+			var bytesRead = new List<byte>();
+			var iterations = options.LaunchSettleMs / 25;
+
+			for (var i = 0; i < iterations; i++)
+			{
+				byte[] responseBytes;
+
+				try
+				{
+					responseBytes = port.ReadSerialBytes(25);
+				}
+				catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
+				{
+					return (null, true);
+				}
+
+				bytesRead.AddRange(responseBytes);
+				var resultType = ParseResponse([.. bytesRead]);
+
+				if (resultType is not (LaunchFileResultType.NoResponse or LaunchFileResultType.Loading))
+				{
+					return (resultType, false);
+				}
+			}
+
+			return (null, false);
 		}
 
 		private TeensyToken TryLaunchCommand(LaunchFileCommand command)
@@ -80,36 +172,6 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			var result = command.CommunicationPort.HandleAck();
 
 			return result;
-		}
-
-		private LaunchFileResultType PollResponse(LaunchFileCommand command)
-		{
-			try
-			{
-				var resultType = LaunchFileResultType.NoResponse;
-				List<byte> bytesRead = [];
-
-				for (int i = 0; i < 40; i++)
-				{
-					var responseBytes = command.CommunicationPort.ReadSerialBytes(25);
-					bytesRead.AddRange(responseBytes);
-					resultType = ParseResponse([.. bytesRead]);
-
-					if (resultType != LaunchFileResultType.NoResponse)
-					{
-						return resultType;
-					}
-				}
-				return LaunchFileResultType.Success;
-			}
-			catch (Exception ex)
-			{
-				if (ex.Message.Contains("port is closed", StringComparison.OrdinalIgnoreCase))
-				{
-					return LaunchFileResultType.Disconnected;
-				}
-				throw;
-			}
 		}
 
 		private LaunchFileResultType ParseResponse(byte[] responseBytes)
@@ -134,7 +196,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			if (resultString.Contains("Loading IO handler:", StringComparison.OrdinalIgnoreCase))
 			{
 				log.External(resultString);
-				return LaunchFileResultType.Success;
+				return LaunchFileResultType.Loading;
 			}
 			var programError = new[] { "Not enough room", "Unsupported HW Type" };
 
@@ -150,6 +212,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			return resultType switch
 			{
 				LaunchFileResultType.Success => new() { LaunchResult = LaunchFileResultType.Success },
+				LaunchFileResultType.Loading => new() { LaunchResult = LaunchFileResultType.Success },
 				LaunchFileResultType.SidError => new() { IsSuccess = false, LaunchResult = LaunchFileResultType.SidError },
 				LaunchFileResultType.ProgramError => new() { IsSuccess = false, LaunchResult = LaunchFileResultType.ProgramError },
 				LaunchFileResultType.NoResponse => new() { IsSuccess = false, LaunchResult = LaunchFileResultType.NoResponse },

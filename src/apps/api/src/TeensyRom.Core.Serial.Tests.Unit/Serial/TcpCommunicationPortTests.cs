@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -554,6 +555,22 @@ public class TcpCommunicationPortTests : IDisposable
 
         // Assert
         act.Should().Throw<SocketException>();
+    }
+
+    [Fact]
+    public void OpenPort_BoundedAgainstNonRoutableAddress_ThrowsWithinTheBoundInsteadOfTheOsSynRetry()
+    {
+        // Arrange - a non-routable address with no listener, so the OS would otherwise hold the
+        // connect attempt open for its own multi-second SYN retry.
+        _port.SetPort("10.255.255.1:2112");
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act
+        var act = () => _port.OpenPort(connectTimeoutMs: 200);
+
+        // Assert
+        act.Should().Throw<TimeoutException>();
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
     }
 
     #endregion

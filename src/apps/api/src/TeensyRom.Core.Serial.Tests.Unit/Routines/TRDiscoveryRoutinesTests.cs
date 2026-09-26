@@ -111,14 +111,28 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         }
 
         [Fact]
-        public void ProbeStorageRoot_FailBusyOnFirstAck_ReturnsUnknown()
+        public void ProbeStorageRoot_FailBusyOnFirstAck_ReturnsBusy()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Fail).EnqueueText("Busy!");
 
             var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
 
-            result.Should().Be(StoragePresence.Unknown);
+            result.Should().Be(StoragePresence.Busy);
+        }
+
+        [Fact]
+        public void ProbeStorageRoot_AckThenFailBusyOnSecondReply_LogsAndReturnsBusy()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack)
+                .EnqueueToken(TeensyToken.Fail)
+                .EnqueueText("Busy!");
+
+            var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
+
+            result.Should().Be(StoragePresence.Busy);
+            _log.Received(1).Internal(Arg.Is<string>(m => m.Contains("busy") && m.Contains("Busy!")), Arg.Any<string?>());
         }
 
         [Fact]
@@ -135,7 +149,21 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         }
 
         [Fact]
-        public void ProbeStorageRoot_TimeoutAfterParameters_ReturnsUnknown()
+        public void ProbeStorageRoot_NonAckNonFailReply_LogsReplyHexAndDrainedText_ReturnsUnknown()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack)
+                .EnqueueToken(TeensyToken.StartDirectoryList)
+                .EnqueueText("garbage");
+
+            var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
+
+            result.Should().Be(StoragePresence.Unknown);
+            _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains("non-Ack") && m.Contains("garbage")), Arg.Any<string?>());
+        }
+
+        [Fact]
+        public void ProbeStorageRoot_TimeoutAfterParameters_LogsExceptionTypeAndReturnsUnknown()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack); // only the first ack is scripted; nothing follows
@@ -143,10 +171,11 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
 
             result.Should().Be(StoragePresence.Unknown);
+            _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains(nameof(TimeoutException))), Arg.Any<string?>());
         }
 
         [Fact]
-        public void ProbeStorageRoot_AckAckThenUnexpectedPair_ReturnsUnknown()
+        public void ProbeStorageRoot_AckAckThenUnexpectedPair_LogsBothTokensAndReturnsUnknown()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack)
@@ -157,6 +186,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
 
             result.Should().Be(StoragePresence.Unknown);
+            _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains("unexpected list tokens")), Arg.Any<string?>());
         }
 
         [Fact]

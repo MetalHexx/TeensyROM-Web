@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.IO.Ports;
+using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Common;
@@ -7,6 +7,7 @@ using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial.Routines
@@ -14,6 +15,19 @@ namespace TeensyRom.Core.Serial.Routines
 	public static class TRStreamExtensions
 	{
 		private const string _logClass = $"{nameof(TRStreamExtensions)}:";
+
+		/// <summary>Bench: the menu's SID token lands about 650 ms after the reset text; this is headroom over that, not a wait anyone expects to spend.</summary>
+		private const int _menuBootTimeoutMs = 3000;
+
+		/// <summary>
+		/// Bench (TR+, flag firmware): "Boot: complete" ~0.9-1.0 s after a reset in full, ~3.4 s when the
+		/// menu's network time sync stalls (about 1 reset in 20), and ~4.3-6.8 s after a reset out of
+		/// minimal on serial. Headroom over the worst of those.
+		/// </summary>
+		private const int _bootCompleteTimeoutMs = 8000;
+
+		/// <summary>Pause between answered version polls while the menu boots.</summary>
+		private const int _bootPollIntervalMs = 100;
 
 		public static byte[] GetFile(this ICommunicationPort communicationPort, string filePath, TeensyStorageType storageType)
 		{
@@ -110,48 +124,178 @@ namespace TeensyRom.Core.Serial.Routines
 			communicationPort.HandleAck();
 		}
 
-		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
+		/// <summary>
+		/// Sends the raw reset token to a device in full firmware and reads the reply through to the C64
+		/// menu being ready for a command. Nothing is sent until the menu's SID token (see
+		/// <see cref="WaitForMenuBootToken"/>): the menu copies itself into C64 RAM right after the reset,
+		/// and a request answered then can corrupt the copy. The token only says the menu has started: it
+		/// then syncs the network time and lists its items, and a command sent in that window can be lost,
+		/// so this goes on to <see cref="WaitForBootComplete"/>. Together with <see cref="ResetFromMinimal"/>
+		/// this is the only writer of the reset token, so every caller (the gate, <c>CartFinder</c>, the
+		/// reset command) gets that guarantee without a guard of its own. Never throws on a transport drop -
+		/// the caller decides whether recovery follows.
+		/// </summary>
+		/// <returns>
+		/// True when the menu announced itself, its token was consumed, and it reported its boot complete;
+		/// false when either did not happen inside its bound, or the transport dropped first - in which case
+		/// the next command may still meet the token or the booting menu.
+		/// </returns>
+		public static bool ResetDevice(this ICommunicationPort communicationPort, ILoggingService log, int menuBootTimeoutMs = _menuBootTimeoutMs)
 		{
 			log.Internal($"{_logClass} Resetting TeensyROM");
-			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-			var response = communicationPort.ReadAndLogSerialAsString(200);
-			Thread.Sleep(1000);
-			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
+			try
+			{
+				communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+				return communicationPort.WaitForMenuBootToken(log, menuBootTimeoutMs) && communicationPort.WaitForBootComplete(log);
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
+			{
+				log.Internal($"{_logClass} reset sent; transport dropped during the reply (expected when the device was in minimal)");
+				return false;
+			}
 		}
 
-		//public static bool ResetDevice(this ICommunicationPort communicationPort)
-		//{
-		//	communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+		/// <summary>
+		/// Sends the reset token to a device in minimal firmware and returns at once. The Teensy reboots, so
+		/// the transport drops and the C64 menu only comes up on the next connection: waiting for it here
+		/// only runs out a clock (on TCP the dead socket just reads as silence). Leaving-minimal recovery
+		/// waits for the menu once the device is back.
+		/// </summary>
+		public static void ResetFromMinimal(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			log.Internal($"{_logClass} Resetting TeensyROM out of minimal firmware");
+			try
+			{
+				communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
+			{
+				log.Internal($"{_logClass} reset sent; transport dropped with it (expected: minimal reboots the Teensy)");
+			}
+		}
 
-		//	var response = string.Empty;
-		//	try
-		//	{
-		//		for (int i = 0; i < 10; i++)
-		//		{
-		//			response += $"{communicationPort.ReadAndLogSerialAsString(1000)}";
+		/// <summary>
+		/// Polls the version command until the firmware reports <c>Boot: complete</c> - the C64 menu has
+		/// listed its items and takes commands again - bounded by <paramref name="timeoutMs"/>. Only after the
+		/// menu's SID token: before it, a request can corrupt the menu's copy of itself into C64 RAM. One
+		/// request at a time: each waits for its own answer up to the
+		/// remaining bound (the menu's time sync can hold the Teensy for seconds), so no reply is left in
+		/// flight to land on the next command. A reply that does not parse - the menu's SID token arriving
+		/// in its place, boot text on serial - is just another poll.
+		/// </summary>
+		/// <returns>True once "complete" was reported; false when the bound passed or the port closed.</returns>
+		public static bool WaitForBootComplete(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = _bootCompleteTimeoutMs)
+		{
+			var stopwatch = Stopwatch.StartNew();
+			var polls = 0;
 
-		//			if (response.Contains("Resetting C64"))
-		//			{
-		//				return true;
-		//			}
-		//			Thread.Sleep(100);
-		//		}
-		//	}
-		//	catch (Exception ex)
-		//	{
-		//		if (ex.Message.Contains("port is closed") || communicationPort.GetConnectionType() is ConnectionType.Tcp)
-		//		{
-		//			Thread.Sleep(1000);
-		//			communicationPort.ClosePort();
-		//			communicationPort.OpenPort();
-		//			Thread.Sleep(1000);
-		//			communicationPort.ClearBuffers();
-		//			return true;
-		//		}
-		//		throw;
-		//	}
-		//	return false;
-		//}
+			while (communicationPort.IsOpen)
+			{
+				var remainingMs = timeoutMs - (int)stopwatch.ElapsedMilliseconds;
+
+				if (remainingMs <= 0)
+				{
+					break;
+				}
+
+				polls++;
+				var reply = VersionReplyParser.Parse(communicationPort.ReadVersionReply(log, ackTimeoutMs: remainingMs));
+
+				if (reply.BootComplete == true)
+				{
+					log.Internal($"{_logClass} C64 menu boot complete after {stopwatch.ElapsedMilliseconds} ms ({polls} version polls)");
+					return true;
+				}
+
+				Thread.Sleep(_bootPollIntervalMs);
+			}
+
+			log.InternalWarning($"{_logClass} the C64 menu did not report its boot complete within {timeoutMs} ms ({polls} version polls)");
+			return false;
+		}
+
+		/// <summary>
+		/// Reads the device's post-reset output until the C64 menu's boot-time SID load answers with
+		/// <see cref="TeensyToken.GoodSIDToken"/> or <see cref="TeensyToken.BadSIDToken"/>, bounded by
+		/// <paramref name="timeoutMs"/>. Every reset boots the menu, and the menu asks the firmware for its
+		/// default SID unconditionally; the firmware answers on the same channel commands use, roughly
+		/// 650 ms after the reset text. Left there, that token is read as the next command's Ack, so this
+		/// waits for the firmware's own signal - no fixed sleep - and clears the buffers behind it.
+		/// </summary>
+		/// <returns>
+		/// True when the token arrived. False is a timeout, not a quiet success: the menu never came up
+		/// within the bound, and it is logged as such.
+		/// </returns>
+		public static bool WaitForMenuBootToken(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = _menuBootTimeoutMs)
+		{
+			var received = new List<byte>();
+			var stopwatch = Stopwatch.StartNew();
+
+			while (true)
+			{
+				var remainingMs = timeoutMs - (int)stopwatch.ElapsedMilliseconds;
+
+				if (remainingMs <= 0)
+				{
+					break;
+				}
+
+				try
+				{
+					communicationPort.WaitForSerialData(numBytes: 1, timeoutMs: remainingMs);
+				}
+				catch (TimeoutException)
+				{
+					break;
+				}
+
+				var toRead = communicationPort.BytesToRead;
+
+				if (toRead <= 0)
+				{
+					break;
+				}
+
+				var buffer = new byte[toRead];
+				var bytesRead = communicationPort.Read(buffer, 0, toRead);
+
+				if (bytesRead <= 0)
+				{
+					break;
+				}
+
+				received.AddRange(bytesRead == buffer.Length ? buffer : buffer.Take(bytesRead));
+
+				if (ContainsMenuBootToken(received))
+				{
+					log.External($"{_logClass} TR Response: '{AsText(received)}'");
+					communicationPort.ClearBuffers();
+					return true;
+				}
+			}
+
+			log.InternalWarning($"{_logClass} the C64 menu did not come up within {timeoutMs} ms - no SID token after the reset. TR Response: '{AsText(received)}'");
+			return false;
+		}
+
+		/// <summary>Scans every byte offset, not just even ones: the token can follow an odd-length run of menu text.</summary>
+		private static bool ContainsMenuBootToken(List<byte> received)
+		{
+			for (var i = 0; i + 1 < received.Count; i++)
+			{
+				var value = (ushort)(received[i] | (received[i + 1] << 8));
+
+				if (value == TeensyToken.GoodSIDToken.Value || value == TeensyToken.BadSIDToken.Value)
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		private static string AsText(List<byte> received) =>
+			Encoding.Latin1.GetString([.. received]).Replace("\0", string.Empty).Trim();
 
 		public static void ToggleSid(this ICommunicationPort communicationPort)
 		{
@@ -300,201 +444,23 @@ namespace TeensyRom.Core.Serial.Routines
 			}
 		}
 
-		public static TeensyToken SendFwCheckCommand(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			communicationPort.ClearBuffers();
-			log.Internal($"{_logClass} TRStreamExtensions: Checking for Minimal FW");
-			communicationPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
-			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);  // Reduced from 20000 for faster discovery
-			byte[] recBuf = new byte[2];
-			communicationPort.Read(recBuf, 0, 2);
-			ushort result = BitConverter.ToUInt16(recBuf, 0);
-			var token = TeensyToken.FromValue(result);
-			string fwType = token.Name switch
-			{
-				nameof(TeensyToken.FWMinimalToken) => "Minimal FW",
-				nameof(TeensyToken.FWFullToken) => "Full FW",
-				_ => $"Unknown ({result})"
-			};
-			log.Internal($"{_logClass} FW Response: {fwType}");
-			return token;
-		}
-
-		public static bool ExecuteMinimalCheck(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			var result = SendFwCheckCommand(communicationPort, log);
-
-			if (result == TeensyToken.FWMinimalToken) return true;
-
-			if (result == TeensyToken.FWFullToken) return false;
-
-			throw new TeensyException("Unexpected response from Minimal Check command.");
-		}
-
 		public static string PingDevice(this ICommunicationPort communicationPort, int waitMs = 30)
 		{
 			communicationPort.SendIntBytes(TeensyToken.Ping, 2);
 			return communicationPort.ReadAndLogSerialAsString(waitMs);
 		}
 
-		public static bool ResetAndReconnectToFullFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			communicationPort.ResetDevice(log);
-			communicationPort.ClosePort();
-			communicationPort.OpenPort();
-
-			var isMinimal = communicationPort.ExecuteMinimalCheck(log);
-
-			if (!isMinimal)
-			{
-				return true;
-			}
-			return false;
-		}
-
+		/// <summary>
+		/// A reset in full firmware keeps the transport, and a device in minimal never reaches this
+		/// handler (the gate resets it back to full first) - so there is nothing left to reconnect or
+		/// hunt for. Kept as a facade over <see cref="ResetDevice"/> for its existing callers. A menu that
+		/// never announced itself is reported by <see cref="ResetDevice"/>'s own log rather than failing
+		/// the reset: the device was still reset, which is all this command promises.
+		/// </summary>
 		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
-			{
-				communicationPort.ResetDevice(log);
-			}
-			return communicationPort.ReconnectToFullFw(log);
-		}
-
-		public static bool ReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
-			{
-				return communicationPort.ReconnectToFullFwSerial(log);
-			}
-			else
-			{
-				return communicationPort.ReconnectToFullFwTcp(log);
-			}			
-		}
-
-		private static bool ReconnectToFullFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
-		{
 			communicationPort.ResetDevice(log);
-			communicationPort.ClosePort();
-			communicationPort.OpenPort();
-			return !communicationPort.ExecuteMinimalCheck(log);
-		}
-
-		public static bool ReconnectToFullFwSerial(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			log.Internal("Reconnecting Serial to Default FW.");
-			var stopwatch = Stopwatch.StartNew();
-
-			while (stopwatch.ElapsedMilliseconds < 30000)
-			{
-				var ports = SerialPort.GetPortNames().Distinct();
-
-				foreach (var port in ports)
-				{
-					try
-					{
-						log.Internal($"{_logClass} Closing Port.");
-						communicationPort.ClosePort();
-						communicationPort.SetPort(port);
-						log.Internal($"{_logClass} Opening Port: {port}");
-						communicationPort.OpenPort(useRetryLoop: false);
-						communicationPort.ReadAndLogSerialAsString(500);
-
-						var minimalResult = communicationPort.SendFwCheckCommand(log);
-
-						if (minimalResult == TeensyToken.FWMinimalToken)
-						{
-							communicationPort.ResetDevice(log);
-							Thread.Sleep(4000);
-							continue;
-						}
-						if (minimalResult == TeensyToken.FWFullToken)
-						{
-							log.InternalSuccess($"{_logClass} Successfully reconnected to Default TeensyROM FW");
-							communicationPort.ReadAndLogSerialAsString(500);
-							return true;
-						}					
-					}
-					catch
-					{
-						continue;
-					}
-				}								
-			}
-			log.InternalError($"{_logClass} There was an error reconnecting to TeensyROM after minimal mode reset.");
-			return false;
-		}
-
-		public static bool ConnectToMinimalFw(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
-			{
-				return communicationPort.ConnectToMinimalFWSerial(log);
-			}
-			else
-			{
-				return communicationPort.ConnectToMinimalFwTcp(log);
-			}
-		}
-
-		public static bool ConnectToMinimalFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			communicationPort.ClosePort();
-
-			//Note to future self:
-			//If there are any bug reports of flaky minimal boot issues, try increasing this delay.
-			Thread.Sleep(500);
-			communicationPort.OpenPort();
-
-			var isMinimal = ExecuteMinimalCheck(communicationPort, log);
-
-			if (isMinimal)
-			{
-				log.Internal($"{_logClass} LaunchFileHandler: Successfully reconnected to minimal mode.");
-			}
-
-			return isMinimal;
-		}
-
-		public static bool ConnectToMinimalFWSerial(this ICommunicationPort communicationPort,ILoggingService log)
-		{
-			Thread.Sleep(3000);
-
-			var stopwatch = Stopwatch.StartNew();
-
-			while (stopwatch.ElapsedMilliseconds < 30000)
-			{
-				var ports = SerialPort.GetPortNames().Distinct();
-
-				foreach (var port in ports)
-				{
-					Thread.Sleep(200);
-
-					try
-					{
-						communicationPort.ClosePort();
-						communicationPort.SetPort(port);
-						communicationPort.OpenPort(useRetryLoop: false);
-						communicationPort.ClearBuffers();
-						Thread.Sleep(200);
-
-						var minimalResult = communicationPort.SendFwCheckCommand(log);
-
-				if (minimalResult == TeensyToken.FWMinimalToken)
-						{
-							log.InternalSuccess($"{_logClass} Successfully reconnected to Minimal TeensyROM FW");
-							return true;
-						}
-					}
-					catch
-					{
-						continue;
-					}
-				}
-				log.InternalError($"{_logClass} There was an error reconnecting to TeensyROM after minimal mode reset.");
-			}
-			return false;
+			return true;
 		}
 	}
 }

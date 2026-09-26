@@ -103,6 +103,32 @@ namespace TeensyRom.Core.Serial.Tests.Unit
             parsed.Should().BeEquivalentTo(expected, options => options.Excluding(r => r.RawText));
         }
 
+        [Theory]
+        [InlineData("  Boot: complete\n", true)]
+        [InlineData("  Boot: in progress\n", false)]
+        [InlineData("", null)]
+        public void Parse_BootLine_ReportsTheMenuBootState(string bootLine, bool? expected)
+        {
+            var parsed = VersionReplyParser.Parse(FullReply + bootLine);
+
+            parsed.BootComplete.Should().Be(expected);
+            parsed.ChipId.Should().Be("19307720");
+        }
+
+        [Fact]
+        public void Parse_TwoBootLines_TheLastOneWins()
+        {
+            var parsed = VersionReplyParser.Parse(FullReply + "  Boot: in progress\n" + FullReply + "  Boot: complete\n");
+
+            parsed.BootComplete.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Parse_MinimalReply_HasNoBootState()
+        {
+            VersionReplyParser.Parse(MinimalReply).BootComplete.Should().BeNull();
+        }
+
         [Fact]
         public void Parse_Null_ReturnsNotTeensyRomWithoutThrowing()
         {

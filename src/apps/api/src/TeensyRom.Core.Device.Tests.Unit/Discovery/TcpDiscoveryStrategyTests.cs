@@ -1,372 +1,107 @@
 using System.Net;
-using System.Text.Json;
-using NSubstitute;
-using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Device;
+using System.Net.Sockets;
 using TeensyRom.Core.Entities.Serial;
-using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Core.Device.Tests.Unit.Discovery;
 
 /// <summary>
-/// Unit tests for TcpDiscoveryStrategy covering caching, known endpoint discovery, and fallback logic.
-/// Tests verify the fast discovery path using cached IPs and fallback to full subnet scans.
+/// Unit tests for <see cref="TcpDiscoveryStrategy"/>'s per-address probe, isolated from the subnet
+/// sweep via a fake <see cref="ITcpProbe"/> so no test opens a real socket.
 /// </summary>
-public class TcpDiscoveryStrategyTests : IDisposable
+public class TcpDiscoveryStrategyTests
 {
-    private readonly ILoggingService _mockLog;
-    private readonly IDeviceTransportFactory _mockTransportFactory;
-    private readonly TcpDiscoveryStrategy _sut;
-    private readonly string _testCacheDirectory;
-    private readonly string _testCachePath;
+    private static readonly IPAddress Address = IPAddress.Parse("192.168.1.42");
+    private const int Port = 2112;
+
+    private readonly ILoggingService _log;
+    private readonly IDeviceInterrogator _interrogator;
+    private readonly ITcpProbe _probe;
 
     public TcpDiscoveryStrategyTests()
     {
-        _mockLog = Substitute.For<ILoggingService>();
-        _mockTransportFactory = Substitute.For<IDeviceTransportFactory>();
-        
-        // Create a temporary test directory for cache files
-        _testCacheDirectory = Path.Combine(Path.GetTempPath(), $"TeensyRom_Tests_{Guid.NewGuid()}");
-        Directory.CreateDirectory(_testCacheDirectory);
-        _testCachePath = Path.Combine(_testCacheDirectory, "DeviceIps.json");
-        
-        _sut = new TcpDiscoveryStrategy(_mockLog, _mockTransportFactory);
+        _log = Substitute.For<ILoggingService>();
+        _interrogator = Substitute.For<IDeviceInterrogator>();
+        _probe = Substitute.For<ITcpProbe>();
     }
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_testCacheDirectory))
-        {
-            Directory.Delete(_testCacheDirectory, true);
-        }
-    }
+    private TcpDiscoveryStrategy CreateSut(IDeviceInterrogator? interrogator = null) =>
+        new(_log, interrogator ?? _interrogator, _probe);
 
-    #region IDiscoveryStrategy Interface Tests
+    private static VersionReply TeensyRomReply() => VersionReply.Empty with { IsTeensyRom = true };
 
     [Fact]
-    public void TcpDiscoveryStrategy_ShouldImplementIDiscoveryStrategy()
+    public async Task ProbeAddress_WhenConnectedAndVersionReplyIsTeensyRom_ReturnsOpenEndpointWithVersion()
     {
-        // Assert
-        _sut.Should().BeAssignableTo<IDiscoveryStrategy>();
-    }
+        var port = Substitute.For<ICommunicationPort>();
+        port.IsOpen.Returns(true);
+        _probe.Connect(Address, Port).Returns(port);
+        var reply = TeensyRomReply();
+        _interrogator.ReadVersion(port).Returns(reply);
 
-    [Fact]
-    public async Task FindEndpoints_ShouldReturnList()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
+        var endpoint = await CreateSut().ProbeAddress(Address, Port);
 
-        // Act
-        var result = await _sut.FindEndpoints(ct);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.Should().BeOfType<List<DiscoveredEndpoint>>();
+        endpoint.Should().NotBeNull();
+        endpoint!.Version.IsTeensyRom.Should().BeTrue();
+        endpoint.ConnectionType.Should().Be(ConnectionType.Tcp);
+        endpoint.Address.Should().Be(Address.ToString());
+        endpoint.Port.Should().Be(Port);
+        endpoint.CommunicationPort.Should().BeSameAs(port);
+        endpoint.CommunicationPort.IsOpen.Should().BeTrue();
     }
 
     [Fact]
-    public async Task FindEndpoints_ShouldReturnEndpointsWithConnectionTypeTcp()
+    public async Task ProbeAddress_WhenConnectedButNoVersionReply_ReturnsNullDisposesPortAndLogsAddress()
     {
-        // Arrange
-        var ct = CancellationToken.None;
+        var port = Substitute.For<ICommunicationPort>();
+        _probe.Connect(Address, Port).Returns(port);
+        _interrogator.ReadVersion(port).Returns(VersionReply.Empty);
 
-        // Act
-        var result = await _sut.FindEndpoints(ct);
+        var endpoint = await CreateSut().ProbeAddress(Address, Port);
 
-        // Assert
-        result.Should().NotBeNull();
-        // Only assert on items if any were found
-        if (result.Count > 0)
-        {
-            result.Should().AllSatisfy(endpoint =>
-                endpoint.ConnectionType.Should().Be(ConnectionType.Tcp));
-        }
-    }
-
-    #endregion
-
-    #region Cache Loading Tests
-
-    [Fact]
-    public async Task FindEndpoints_WhenNoCacheExists_ShouldPerformFullScan()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct);
-
-        // Assert
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("No cached devices found") || 
-            s.Contains("performing full subnet scan")));
+        endpoint.Should().BeNull();
+        port.Received(1).Dispose();
+        _log.Received(1).Internal(Arg.Is<string>(s =>
+            s.Contains(Address.ToString()) && s.Contains("connected but no version reply") && s.Contains("empty")));
     }
 
     [Fact]
-    public async Task FindEndpoints_WhenCacheFileIsInvalid_ShouldLogErrorAndPerformFullScan()
+    public async Task ProbeAddress_WhenConnectRefused_PropagatesSocketExceptionForSweepToClassify()
     {
-        // Arrange
-        var ct = CancellationToken.None;
-        // Note: Without access to modify the internal cache path, 
-        // this test verifies error handling behavior conceptually
+        _probe.Connect(Address, Port).Returns(Task.FromException<ICommunicationPort>(new SocketException((int)SocketError.ConnectionRefused)));
 
-        // Act
-        await _sut.FindEndpoints(ct);
+        var act = () => CreateSut().ProbeAddress(Address, Port);
 
-        // Assert - Should complete without throwing
-        _mockLog.Received().Internal(Arg.Any<string>());
-    }
-
-    #endregion
-
-    #region Known Endpoint Discovery Tests
-
-    [Fact]
-    public async Task FindEndpoints_WhenCacheEmpty_ShouldAttemptFastDiscovery()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct);
-
-        // Assert
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("fast discovery") && s.Contains("cached endpoints")));
+        await act.Should().ThrowAsync<SocketException>();
     }
 
     [Fact]
-    public async Task FindEndpoints_ShouldLogKnownEndpointScanAttempt()
+    public async Task ProbeAddress_WhenConnectTimesOut_PropagatesTimeoutExceptionForSweepToClassify()
     {
-        // Arrange
-        var ct = CancellationToken.None;
+        _probe.Connect(Address, Port).Returns(Task.FromException<ICommunicationPort>(new TimeoutException("connect timed out")));
 
-        // Act
-        await _sut.FindEndpoints(ct);
+        var act = () => CreateSut().ProbeAddress(Address, Port);
 
-        // Assert
-        _mockLog.Received().Internal(Arg.Is<string>(s => s.Contains("TcpDiscoveryStrategy")));
+        await act.Should().ThrowAsync<TimeoutException>();
     }
 
-    #endregion
-
-    #region Fallback Logic Tests
-
+    /// <summary>
+    /// Runs the real <see cref="DeviceInterrogator"/> against a scripted port so the bytes actually
+    /// written can be inspected: the version probe must write only VersionInfo (0x64, 0x76), never the
+    /// retired FwCheckToken (0x64E0) or Ping (0x6455).
+    /// </summary>
     [Fact]
-    public async Task FindEndpoints_WithFullScanTrue_ShouldSkipCacheAndPerformFullScan()
+    public async Task ProbeAddress_WritesOnlyVersionInfoToken_NeverFwCheckOrPingTokens()
     {
-        // Arrange
-        var ct = CancellationToken.None;
+        var scriptedPort = new ScriptedCommunicationPort();
+        scriptedPort.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText("FW: TeensyROM+ v0.8.0.9\n");
+        _probe.Connect(Address, Port).Returns(scriptedPort);
 
-        // Act
-        await _sut.FindEndpoints(ct, fullScan: true);
+        var sut = CreateSut(new DeviceInterrogator(_log));
 
-        // Assert - Should skip cache and go straight to full scan
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("fullScan=true") && s.Contains("skipping cache")));
+        var endpoint = await sut.ProbeAddress(Address, Port);
+
+        endpoint.Should().NotBeNull();
+        endpoint!.Version.IsTeensyRom.Should().BeTrue();
+        scriptedPort.Written.Should().Equal((byte)0x64, (byte)0x76);
     }
-
-    [Fact]
-    public async Task FindEndpoints_WithFullScanTrue_ShouldLogRangeScanning()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct, fullScan: true);
-
-        // Assert - Verify full scan was initiated
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("Scanning range") || (s.Contains("Scanning") && s.Contains("IP addresses"))));
-    }
-
-    #endregion
-
-    #region Cancellation Tests
-
-    [Fact]
-    public async Task FindEndpoints_ShouldRespectCancellationToken()
-    {
-        // Arrange
-        var cts = new CancellationTokenSource();
-        var ct = cts.Token;
-
-        // Act
-        var task = _sut.FindEndpoints(ct);
-        cts.Cancel();
-
-        // Assert - Should complete without hanging
-        try
-        {
-            var result = await task;
-            result.Should().NotBeNull();
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected behavior - cancellation is valid
-            true.Should().BeTrue();
-        }
-    }
-
-    #endregion
-
-    #region Endpoint Format Tests
-
-    [Fact]
-    public async Task FindEndpoints_DiscoveredEndpoints_ShouldHaveValidFormat()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        var result = await _sut.FindEndpoints(ct);
-
-        // Assert
-        result.Should().NotBeNull();
-        // Only validate format if devices were found
-        if (result.Count > 0)
-        {
-            result.Should().AllSatisfy(endpoint =>
-            {
-                endpoint.Address.Should().NotBeNullOrEmpty();
-                endpoint.Port.Should().Be(80);
-                endpoint.ConnectionType.Should().Be(ConnectionType.Tcp);
-                endpoint.Display.Should().MatchRegex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$");
-            });
-        }
-    }
-
-    #endregion
-
-    #region Logging Behavior Tests
-
-    [Fact]
-    public async Task FindEndpoints_ShouldLogDiscoveryActivity()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct);
-
-        // Assert
-        _mockLog.Received().Internal(Arg.Is<string>(s => s.Contains("TcpDiscoveryStrategy")));
-    }
-
-    #endregion
-
-    #region Cache Model Tests
-
-    [Fact]
-    public void DeviceIpCache_ShouldInitializeWithDefaults()
-    {
-        // Arrange & Act
-        var cache = new DeviceIpCache();
-
-        // Assert
-        cache.LastUpdated.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-        cache.KnownEndpoints.Should().NotBeNull();
-        cache.KnownEndpoints.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void CachedDeviceIp_ShouldRequireIpAddress()
-    {
-        // Arrange & Act
-        var cachedIp = new CachedDeviceIp
-        {
-            IpAddress = "192.168.1.100",
-            Port = 80
-        };
-
-        // Assert
-        cachedIp.IpAddress.Should().Be("192.168.1.100");
-        cachedIp.Port.Should().Be(80);
-        cachedIp.LastSeen.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-    }
-
-    [Fact]
-    public void DeviceIpCache_ShouldSerializeToJson()
-    {
-        // Arrange
-        var cache = new DeviceIpCache
-        {
-            LastUpdated = new DateTime(2026, 1, 3, 10, 30, 0, DateTimeKind.Utc),
-            KnownEndpoints = new List<CachedDeviceIp>
-            {
-                new() { IpAddress = "192.168.1.100", Port = 80, LastSeen = DateTime.UtcNow }
-            }
-        };
-
-        // Act
-        var json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
-
-        // Assert
-        json.Should().Contain("192.168.1.100");
-        json.Should().Contain("LastUpdated");
-        json.Should().Contain("KnownEndpoints");
-    }
-
-    [Fact]
-    public void DeviceIpCache_ShouldDeserializeFromJson()
-    {
-        // Arrange
-        var json = """
-        {
-          "LastUpdated": "2026-01-03T10:30:00Z",
-          "KnownEndpoints": [
-            {
-              "IpAddress": "192.168.1.100",
-              "Port": 80,
-              "LastSeen": "2026-01-03T10:30:00Z"
-            }
-          ]
-        }
-        """;
-
-        // Act
-        var cache = JsonSerializer.Deserialize<DeviceIpCache>(json);
-
-        // Assert
-        cache.Should().NotBeNull();
-        cache!.KnownEndpoints.Should().HaveCount(1);
-        cache.KnownEndpoints[0].IpAddress.Should().Be("192.168.1.100");
-        cache.KnownEndpoints[0].Port.Should().Be(80);
-    }
-
-    #endregion
-
-    #region FullScan Parameter Tests
-
-    [Fact]
-    public async Task FindEndpoints_WithFullScanFalse_ShouldTryCacheThenFallbackToFullScan()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct, fullScan: false);
-
-        // Assert - Should try cache first, then fallback to full scan
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("fullScan=false") && s.Contains("attempting fast discovery")));
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("falling back to full subnet scan")));
-    }
-
-    [Fact]
-    public async Task FindEndpoints_WithDefaultFullScan_ShouldUseCacheWithFallback()
-    {
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _sut.FindEndpoints(ct); // Default is fullScan=false
-
-        // Assert - Should try cache first
-        _mockLog.Received().Internal(Arg.Is<string>(s => 
-            s.Contains("fullScan=false") && s.Contains("attempting fast discovery")));
-    }
-
-    #endregion
 }

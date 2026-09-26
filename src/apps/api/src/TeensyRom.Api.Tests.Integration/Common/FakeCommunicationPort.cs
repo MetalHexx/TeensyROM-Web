@@ -14,8 +14,8 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
     /// <summary>
     /// A hardware-free <see cref="ICommunicationPort"/> that speaks just enough of the wire protocol to
-    /// satisfy <c>CommunicationPortBehavior</c>'s pre-handler firmware/busy checks and the SendFile /
-    /// DeleteFile handshake, recording every file it "receives" for test assertions.
+    /// satisfy the SendFile / DeleteFile handshake, recording every file it "receives" for test
+    /// assertions.
     /// </summary>
     public sealed class FakeCommunicationPort : ICommunicationPort
     {
@@ -32,19 +32,33 @@ namespace TeensyRom.Api.Tests.Integration.Common
         private List<byte> _pendingBody = [];
         private ushort _nextTwoByteResponse = TeensyToken.Ack.Value;
 
+        /// <summary>
+        /// True from the moment a command response is queued until <see cref="Read(byte[], int, int)"/>
+        /// delivers it - the seam <see cref="BytesToRead"/> reads to report "no more data" once that one
+        /// reply has been consumed, the same as a real port going idle. Without it, a caller polling for
+        /// idle (<c>TRDiscoveryRoutines.ReadTextUntilIdle</c>) sees a permanently nonzero backlog and
+        /// spins for its full timeout on every call instead of returning as soon as the reply is read.
+        /// </summary>
+        private bool _hasUnreadResponse;
+
         /// <summary>Applied while a file body is being written - the knob the concurrency proof turns.</summary>
         public TimeSpan PerFileDelay { get; set; } = TimeSpan.Zero;
 
         /// <summary>When set, invoked with the target path of an incoming SendFile write; a non-null result is thrown.</summary>
         public Func<string, Exception?>? FailFor { get; set; }
 
-        /// <summary>When true, every command the device would otherwise acknowledge fails as if the device vanished mid-command.</summary>
+        /// <summary>
+        /// When true, every command the device would otherwise acknowledge fails as if the device
+        /// vanished mid-command - <see cref="IsOpen"/> reports closed from that point on too, the same
+        /// as a real transport drop, since callers (the command pipeline's gate, <c>TransferFilesCommandHandler</c>)
+        /// key their own "device is gone" branch off it rather than the exception alone.
+        /// </summary>
         public bool SimulateDeviceLoss { get; set; }
 
         public IReadOnlyList<FakeReceivedFile> Received => [.. _received];
 
-        public bool IsOpen => true;
-        public int BytesToRead => 2;
+        public bool IsOpen => !SimulateDeviceLoss;
+        public int BytesToRead => _hasUnreadResponse ? 2 : 0;
 
         public void ClearBuffers() { }
 
@@ -60,6 +74,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                 if (numBytes == 2 && intToSend == TeensyToken.FwCheckToken.Value)
                 {
                     _nextTwoByteResponse = TeensyToken.FWFullToken.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.Ping.Value)
@@ -70,12 +85,14 @@ namespace TeensyRom.Api.Tests.Integration.Common
                 {
                     _stage = Stage.AwaitLength;
                     _nextTwoByteResponse = TeensyToken.Ack.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.DeleteFile.Value)
                 {
                     _stage = Stage.AwaitDeleteStorageToken;
                     _nextTwoByteResponse = TeensyToken.Ack.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
 
@@ -98,6 +115,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                         break;
                 }
                 _nextTwoByteResponse = TeensyToken.Ack.Value;
+                _hasUnreadResponse = true;
             }
         }
 
@@ -169,6 +187,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
             lock (_gate)
             {
                 response = _nextTwoByteResponse;
+                _hasUnreadResponse = false;
             }
             var bytes = BitConverter.GetBytes(response);
             var toCopy = Math.Min(count, bytes.Length);
@@ -189,10 +208,6 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public Unit SetPort(string port) => Unit.Default;
         public string GetEndpoint() => "FAKE0";
 
-        // Reports Tcp rather than Serial: TRStreamExtensions.ReconnectToFullFwSerial (used by
-        // ResetCommand's reconnect path) enumerates real OS SerialPort.GetPortNames() and loops for up
-        // to 30 seconds looking for actual hardware - nothing this fake can satisfy. The Tcp reconnect
-        // path only calls port lifecycle methods this fake already implements.
         public ConnectionType GetConnectionType() => ConnectionType.Tcp;
 
         public void Dispose() { }
