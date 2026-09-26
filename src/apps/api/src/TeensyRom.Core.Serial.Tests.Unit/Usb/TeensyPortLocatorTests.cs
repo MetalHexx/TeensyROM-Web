@@ -112,7 +112,7 @@ public class TeensyPortLocatorTests
     }
 
     [Fact]
-    public void FindByChipId_ReturnsNoCandidates_WhenChipIsNotAmongPresentPorts()
+    public void FindByChipId_ReturnsUnavailable_WhenAnotherChipIsClassified_ButThisChipHasNeverBeenSeen()
     {
         var rows = new[]
         {
@@ -122,7 +122,7 @@ public class TeensyPortLocatorTests
 
         var result = locator.FindByChipId("14470230");
 
-        result.FilterAvailable.Should().BeTrue();
+        result.FilterAvailable.Should().BeFalse("this chip has never been classified, even though the reader classified a different one this round");
         result.Candidates.Should().BeEmpty();
     }
 

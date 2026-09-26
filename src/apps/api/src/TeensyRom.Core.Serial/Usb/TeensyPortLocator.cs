@@ -46,23 +46,30 @@ namespace TeensyRom.Core.Serial.Usb
         {
             var outcome = ReadPorts();
 
-            if (outcome.ReaderFunctional && outcome.UnavailableReason is null)
+            if (!outcome.ReaderFunctional)
             {
-                var matches = outcome.Ports
-                    .Where(p => string.Equals(p.ChipId, chipId, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                return new PortLookup([], false, outcome.UnavailableReason);
+            }
 
+            var matches = outcome.Ports
+                .Where(p => string.Equals(p.ChipId, chipId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (matches.Count > 0)
+            {
                 return new PortLookup(matches, true, null);
             }
 
-            if (outcome.ReaderFunctional && _classifiedChipIds.Contains(chipId))
+            if (_classifiedChipIds.Contains(chipId))
             {
                 // The reader worked and simply found no port for this chip this round. Since this chip
                 // has been classified before, that is "not present right now", not "cannot tell".
                 return new PortLookup([], true, null);
             }
 
-            return new PortLookup([], false, outcome.UnavailableReason);
+            // The reader worked and classified other chips this round (or none at all), but this chip has
+            // never been classified in this process - that is "cannot tell", not "not present right now".
+            return new PortLookup([], false, outcome.UnavailableReason ?? "this chip has not been seen yet");
         }
 
         /// <summary>
