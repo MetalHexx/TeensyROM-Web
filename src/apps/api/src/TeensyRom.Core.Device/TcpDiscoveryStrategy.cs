@@ -51,19 +51,29 @@ public class TcpDiscoveryStrategy : IDiscoveryStrategy
     }
 
     /// <summary>
-    /// Sweeps the local /24 subnet in parallel, probing only the addresses that accept a TCP connection.
+    /// Sweeps the /24 subnet of every real local network adapter at the same time, probing only the
+    /// addresses that accept a TCP connection.
     /// </summary>
     public async Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct)
     {
-        var subnetRange = NetworkHelper.GetLocalSubnetRange();
+        var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
-        if (!subnetRange.HasValue)
+        if (subnetRanges.Count == 0)
         {
             _log.InternalError("TcpDiscoveryStrategy: Unable to detect local subnet range");
             return [];
         }
 
-        var (startIp, endIp) = subnetRange.Value;
+        var sweeps = await Task.WhenAll(subnetRanges.Select(range => SweepRange(range.Start, range.End, ct)));
+
+        return sweeps.SelectMany(endpoints => endpoints).ToList();
+    }
+
+    /// <summary>
+    /// Sweeps one subnet range in parallel, probing only the addresses that accept a TCP connection.
+    /// </summary>
+    private async Task<List<DiscoveredEndpoint>> SweepRange(IPAddress startIp, IPAddress endIp, CancellationToken ct)
+    {
         var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp);
 
         var discovered = new ConcurrentBag<DiscoveredEndpoint>();
