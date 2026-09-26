@@ -11,10 +11,16 @@ namespace TeensyRom.Core.Serial
 {
   public class SerialCommunicationPort(ILoggingService log) : ICommunicationPort
   {
+    /// <remarks>
+    /// DTR on, as a terminal would. Both firmware images call Teensy 4's <c>Serial.begin()</c> at boot,
+    /// which blocks until the host asserts DTR (up to 2 s once USB is enumerated), so a port opened with
+    /// DTR off holds the boot - twice on a reboot out of minimal, once in each image.
+    /// </remarks>
     private readonly SerialPort _serialPort = new()
     {
       Encoding = Encoding.UTF8,
-      BaudRate = 115200
+      BaudRate = 115200,
+      DtrEnable = true
     };
 
     public int BytesToRead => _serialPort.BytesToRead;

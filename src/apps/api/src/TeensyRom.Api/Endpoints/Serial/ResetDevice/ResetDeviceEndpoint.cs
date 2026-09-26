@@ -12,6 +12,8 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
             Put("/api/devices/{deviceId}/reset")
                 .Produces<ResetDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
+                .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("ResetDevice")
                 .WithSummary("Reset Device")
                 .WithTags("Devices")
@@ -30,11 +32,18 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
                 SendNotFound($"The device {r.DeviceId} was not found.");
                 return;
             }
-            await mediator.Send(new ResetCommand
+            var result = await mediator.Send(new ResetCommand
             {
                 DeviceId = device.Cart.DeviceId,
                 CommunicationPort = device.CommunicationPort
             });
+
+            if (!result.IsSuccess)
+            {
+                SendExternalError(result.Error);
+                return;
+            }
+
             Response = new();
 
             Send();

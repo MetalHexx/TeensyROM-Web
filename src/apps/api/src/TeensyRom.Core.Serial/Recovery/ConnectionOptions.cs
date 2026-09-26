@@ -1,3 +1,5 @@
+using TeensyRom.Core.Entities.Serial;
+
 namespace TeensyRom.Core.Serial.Recovery
 {
     /// <summary>How long recovery waits for a device to answer on one transport, at each firmware image.</summary>
@@ -20,5 +22,12 @@ namespace TeensyRom.Core.Serial.Recovery
         public TransportCeilings Serial { get; set; } = new() { ToMinimalMs = 15_000, ToFullMs = 15_000 }; // seeded from the 13.7 s serial round trip; tuned in P04-T02
         public int LaunchSettleMs { get; set; } = 2_000;        // how long the launch handler watches for a recognizable reply before confirming with the version command (P02-T03)
         public int ConnectTimeoutMs { get; set; } = 2_000;      // one TCP connect attempt inside recovery / start confirm; the poll loop repeats it until the ceiling
+
+        /// <summary>
+        /// The transport a device is driven over when discovery confirms it on both USB serial and TCP.
+        /// TCP by default; the other endpoint stays on the device's record either way. A cached start
+        /// reconfirms the transport it cached, so a change takes effect at the next full discovery.
+        /// </summary>
+        public ConnectionType PreferredTransport { get; set; } = ConnectionType.Tcp;
     }
 }

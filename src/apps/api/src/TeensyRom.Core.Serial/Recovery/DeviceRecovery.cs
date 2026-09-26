@@ -24,6 +24,13 @@ namespace TeensyRom.Core.Serial.Recovery
     {
         private const string _logClass = $"{nameof(DeviceRecovery)}:";
 
+        /// <summary>
+        /// Bench (TR+): once the menu has asked for its SID the Teensy answers nothing while the menu brings
+        /// the network up - ~2 s with a static IP, ~4.2 s when the time sync stalls. The first version
+        /// request after the token waits that out rather than timing out into a close and reopen.
+        /// </summary>
+        private const int _versionAfterMenuTokenAckTimeoutMs = 8000;
+
         public async Task<RecoveryOutcome> RecoverAsync(TeensyRomDevice device, RecoveryReason reason, CancellationToken ct)
         {
             var port = device.CommunicationPort;
@@ -39,6 +46,7 @@ namespace TeensyRom.Core.Serial.Recovery
             DeviceMode? lastSeenMode = null;
             VersionReply? lastCorrectReply = null;
             var fallbackLogged = false;
+            var menuTokenSeen = false;
 
             while (sw.Elapsed < ceiling)
             {
@@ -53,7 +61,7 @@ namespace TeensyRom.Core.Serial.Recovery
                     }
                     else
                     {
-                        reply = ReacquireSerial(chipId, port, ref fallbackLogged);
+                        reply = ReacquireSerial(chipId, port, expected, ref fallbackLogged, ref menuTokenSeen);
                     }
                 }
 
@@ -68,7 +76,10 @@ namespace TeensyRom.Core.Serial.Recovery
 
                     if (expected is null || expected == mode)
                     {
-                        return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, MenuBootFailure(reason, port));
+                        // Argument evaluation order matters here: the boot wait inside MenuBootFailure has
+                        // to run before sw.Elapsed is read, or the logged recovery time excludes it.
+                        var menuBootFailure = MenuBootFailure(reason, port, reply);
+                        return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, menuBootFailure);
                     }
                     else
                     {
@@ -79,7 +90,7 @@ namespace TeensyRom.Core.Serial.Recovery
                 {
                     // A collision on TCP or a sibling's port on serial is not this device.
                     log.Internal($"{_logClass} wrong chip {reply.ChipId} at {port.GetEndpoint()}");
-                    if (port.IsOpen) port.ClosePort();
+                    Close(port);
                     lastProbeAnswered = false;
                 }
                 else
@@ -99,31 +110,33 @@ namespace TeensyRom.Core.Serial.Recovery
             }
 
             device.MarkUnreachable();
-            if (port.IsOpen) port.ClosePort();
+            Close(port);
             log.InternalError($"{_logClass} Recovery {reason} on {transport} for {chipId} failed after {sw.Elapsed.TotalMilliseconds} ms (ceiling {ceiling.TotalMilliseconds} ms)");
             return new RecoveryOutcome(DeviceMode.Unreachable, sw.Elapsed, ceiling, $"no correct-chip reply from {chipId} within {ceiling.TotalMilliseconds} ms");
         }
 
         /// <summary>
-        /// Leaving minimal is the one reset <c>TRStreamExtensions.ResetDevice</c> cannot finish for itself:
-        /// the Teensy reboots and drops the transport mid-reply, so the reset never sees the C64 menu's
-        /// boot-time SID token, and the version poll here can answer before the menu is even up - leaving
-        /// the token to land on the next command as a bogus Ack. Wait it out on the firmware's own signal
-        /// before the device is declared full. A miss is not swallowed: it comes back as the outcome's
-        /// <see cref="RecoveryOutcome.Failure"/> and a warning, since the next command may still meet it.
+        /// Leaving minimal is the one reset <c>TRStreamExtensions.ResetFromMinimal</c> cannot finish for
+        /// itself: the Teensy reboots and drops the transport, so the reply that ended the poll can come
+        /// before the C64 menu is done, and the firmware says so in that very reply. "complete" (TCP only
+        /// comes back at the end of the boot, so this is the usual case there) needs no wait; anything else
+        /// is polled until complete - on serial only ever after the menu's SID token, which the reacquire
+        /// listened for. A miss is not swallowed: it comes back as the outcome's
+        /// <see cref="RecoveryOutcome.Failure"/> and a warning, since the next command may still meet the
+        /// booting menu.
         /// </summary>
-        private string? MenuBootFailure(RecoveryReason reason, ICommunicationPort port)
+        private string? MenuBootFailure(RecoveryReason reason, ICommunicationPort port, VersionReply reply)
         {
-            if (reason != RecoveryReason.LeaveMinimal)
+            if (reason != RecoveryReason.LeaveMinimal || reply.BootComplete == true)
             {
                 return null;
             }
 
             try
             {
-                return port.WaitForMenuBootToken(log)
+                return port.WaitForBootComplete(log)
                     ? null
-                    : "the C64 menu never announced itself after the reset";
+                    : "the C64 menu did not report its boot complete after the reset";
             }
             catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
             {
@@ -134,7 +147,7 @@ namespace TeensyRom.Core.Serial.Recovery
         /// <summary>TCP: close if open, then a single bounded connect attempt. A failed or timed-out connect is a miss, not an error - swallowed so the caller reads it from the port staying closed.</summary>
         private void ReacquireTcp(TeensyRomDevice device, ICommunicationPort port)
         {
-            if (port.IsOpen) port.ClosePort();
+            Close(port);
 
             var endpoint = device.Connection.TcpEndpoint;
             if (string.IsNullOrEmpty(endpoint)) return;
@@ -160,13 +173,13 @@ namespace TeensyRom.Core.Serial.Recovery
         /// version-probing each in turn, returning the matching reply directly since the scan already
         /// obtained it.
         /// </summary>
-        private VersionReply? ReacquireSerial(string chipId, ICommunicationPort port, ref bool fallbackLogged)
+        private VersionReply? ReacquireSerial(string chipId, ICommunicationPort port, DeviceMode? expected, ref bool fallbackLogged, ref bool menuTokenSeen)
         {
             var lookup = locator.FindByChipId(chipId);
 
             if (lookup.FilterAvailable && lookup.Candidates.Count > 0)
             {
-                return ReacquireCandidates(chipId, port, lookup.Candidates);
+                return ReacquireCandidates(chipId, port, InProbeOrder(lookup.Candidates, expected), expected, ref menuTokenSeen);
             }
 
             if (lookup.FilterAvailable)
@@ -188,12 +201,22 @@ namespace TeensyRom.Core.Serial.Recovery
         /// Opens each candidate in turn and accepts the first whose version reply proves it is this chip;
         /// a candidate that opens but answers wrong or not at all is closed and the loop moves on.
         /// Exhausting the list is a miss - the outer poll retries within the unchanged ceiling.
+        /// <para>
+        /// Waiting for full, a port that may be the full image is only listened to until the C64 menu asks
+        /// for its SID, and asked for its version after that. The full port appears just before the
+        /// firmware resets the C64 and the menu copies itself into C64 RAM; a request answered in that
+        /// window can make the Teensy miss a C64 bus cycle and corrupt the copy (bench: every failed boot -
+        /// menu never started, hung, or dropping remote launches - came from a round that polled then;
+        /// none from 26 silent rounds). The menu's SID request is its first act once running, so after it
+        /// the version request is safe. No token within the listen bound (port opened late, or a menu that
+        /// never started) falls through to the version request.
+        /// </para>
         /// </summary>
-        private VersionReply? ReacquireCandidates(string chipId, ICommunicationPort port, IReadOnlyList<TeensyRomPort> candidates)
+        private VersionReply? ReacquireCandidates(string chipId, ICommunicationPort port, IEnumerable<TeensyRomPort> candidates, DeviceMode? expected, ref bool menuTokenSeen)
         {
             foreach (var candidate in candidates)
             {
-                if (port.IsOpen) port.ClosePort();
+                Close(port);
 
                 try
                 {
@@ -205,15 +228,74 @@ namespace TeensyRom.Core.Serial.Recovery
                     continue;
                 }
 
-                var reply = interrogator.ReadVersion(port);
+                var ackTimeoutMs = TRDiscoveryRoutines.VersionAckTimeoutMs;
+
+                if (expected == DeviceMode.FullIdle && candidate.Image != TeensyRomImage.Minimal && !menuTokenSeen)
+                {
+                    try
+                    {
+                        menuTokenSeen = port.WaitForMenuBootToken(log);
+                    }
+                    catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+                    {
+                        // The port went away while listening - the transient minimal image jumping to full
+                        // (macOS cannot tell it from full by descriptor), or a stale entry. A miss.
+                        log.Internal($"{_logClass} {candidate.PortName} went away while listening for the C64 menu: {ex.Message}");
+                        continue;
+                    }
+
+                    if (menuTokenSeen) ackTimeoutMs = _versionAfterMenuTokenAckTimeoutMs;
+                }
+
+                var reply = interrogator.ReadVersion(port, ackTimeoutMs);
                 if (reply.IsTeensyRom && reply.ChipId == chipId)
                 {
                     return reply;
                 }
             }
 
-            if (port.IsOpen) port.ClosePort();
+            Close(port);
             return null;
+        }
+
+        /// <summary>
+        /// Every Teensy boot passes through the minimal image before it jumps to full, so a device leaving
+        /// minimal shows its minimal port again, and that port never answers: the image is only waiting in
+        /// <c>Serial.begin()</c> for DTR before it jumps. Opening it (DTR on) releases that wait, so it is
+        /// still worth opening (bench, serial: minimal port back ~800 ms after the reset, gone ~1390 ms, full
+        /// port up ~1600 ms; ~2 s later when nobody opens it). Ports of the image the reason expects are
+        /// probed first, the other image last - still probed, so a device that really stayed in the other
+        /// image is reported in that mode, not as unreachable.
+        /// </summary>
+        private static IEnumerable<TeensyRomPort> InProbeOrder(IReadOnlyList<TeensyRomPort> candidates, DeviceMode? expected)
+        {
+            if (expected is null)
+            {
+                return candidates;
+            }
+
+            var wanted = expected == DeviceMode.Minimal ? TeensyRomImage.Minimal : TeensyRomImage.Full;
+            return candidates.OrderBy(c => c.Image == wanted ? 0 : c.Image == TeensyRomImage.Unknown ? 1 : 2);
+        }
+
+        /// <summary>
+        /// Closes the port if it is open. Closing a serial port whose USB device has just gone away throws
+        /// ("A device attached to the system is not functioning") after .NET has already released the
+        /// handle, so the port reads closed and can be reopened: during recovery that is a miss for the
+        /// poll to retry, not a failure to escape with.
+        /// </summary>
+        private void Close(ICommunicationPort port)
+        {
+            if (!port.IsOpen) return;
+
+            try
+            {
+                port.ClosePort();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                log.Internal($"{_logClass} {port.GetEndpoint()} went away before it closed: {ex.Message}");
+            }
         }
 
         private VersionReply ScanSerialPortsForChip(string chipId, ICommunicationPort port)
@@ -222,7 +304,7 @@ namespace TeensyRom.Core.Serial.Recovery
 
             foreach (var candidate in SerialHelper.GetComPorts().Where(name => name != currentPortName))
             {
-                if (port.IsOpen) port.ClosePort();
+                Close(port);
 
                 try
                 {
@@ -241,7 +323,7 @@ namespace TeensyRom.Core.Serial.Recovery
                 }
             }
 
-            if (port.IsOpen) port.ClosePort();
+            Close(port);
             return VersionReply.Empty;
         }
 

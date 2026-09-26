@@ -17,11 +17,13 @@ namespace TeensyRom.Core.Serial.Routines
     {
         private const string _logClass = $"{nameof(TRDiscoveryRoutines)}:";
 
+        public const int VersionAckTimeoutMs = 3000;
+
         /// <summary>
         /// Sends VersionInfo (0x6476), consumes the 2-byte Ack, and returns the reply text. Returns
         /// <see cref="string.Empty"/> on anything unexpected (non-Ack bytes, timeout). Never throws.
         /// </summary>
-        public static string ReadVersionReply(this ICommunicationPort port, ILoggingService log, int ackTimeoutMs = 3000, int idleTimeoutMs = 200)
+        public static string ReadVersionReply(this ICommunicationPort port, ILoggingService log, int ackTimeoutMs = VersionAckTimeoutMs, int idleTimeoutMs = 200)
         {
             try
             {

@@ -13,6 +13,8 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
     public sealed class RecoveryScriptedPort : ICommunicationPort
     {
         private readonly Queue<Action> _openOutcomes = new();
+        private readonly Queue<Action> _closeOutcomes = new();
+        private readonly Queue<Action> _waitOutcomes = new();
         private readonly Queue<byte> _incoming = new();
 
         public List<string> Calls { get; } = [];
@@ -31,6 +33,26 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         public RecoveryScriptedPort ThenTimeOut()
         {
             _openOutcomes.Enqueue(() => throw new TimeoutException("connect timed out"));
+            return this;
+        }
+
+        /// <summary>
+        /// Scripts the next <c>ClosePort</c> as a port whose USB device has gone: the port ends closed (the
+        /// handle is released) and the close still throws, as <c>SerialPort.Close</c> does on the bench.
+        /// </summary>
+        public RecoveryScriptedPort ThenCloseVanishes()
+        {
+            _closeOutcomes.Enqueue(() => throw new IOException("A device attached to the system is not functioning."));
+            return this;
+        }
+
+        /// <summary>
+        /// Scripts the next wait for incoming bytes as a serial port whose USB device has gone: .NET throws
+        /// an <see cref="IOException"/> while the port still reads open.
+        /// </summary>
+        public RecoveryScriptedPort ThenWaitVanishes()
+        {
+            _waitOutcomes.Enqueue(() => throw new IOException("A device attached to the system is not functioning."));
             return this;
         }
 
@@ -74,6 +96,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         {
             Calls.Add("Close");
             IsOpen = false;
+            if (_closeOutcomes.Count > 0) _closeOutcomes.Dequeue()();
             return System.Reactive.Unit.Default;
         }
 
@@ -97,6 +120,9 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         /// <summary>Throws immediately (no real waiting) when fewer than <paramref name="numBytes"/> scripted bytes are pending.</summary>
         public void WaitForSerialData(int numBytes, int timeoutMs)
         {
+            Calls.Add("Wait");
+            if (_waitOutcomes.Count > 0) _waitOutcomes.Dequeue()();
+
             if (_incoming.Count < numBytes)
             {
                 throw new TimeoutException();

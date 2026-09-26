@@ -55,7 +55,7 @@ export interface ResetDeviceRequest {
 export class DevicesApiService extends runtime.BaseAPI {
 
     /**
-     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.
+     * Returns all available and connected TeensyROM devices.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
      * Find Devices
      */
     async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
@@ -85,7 +85,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.
+     * Returns all available and connected TeensyROM devices.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
      * Find Devices
      */
     async findDevices(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {

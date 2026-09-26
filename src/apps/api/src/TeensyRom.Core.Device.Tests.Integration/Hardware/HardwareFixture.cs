@@ -16,7 +16,8 @@ namespace TeensyRom.Core.Device.Tests.Integration;
 /// tests exercises it.
 ///
 /// Reads <c>TEENSYROM_BENCH_TRANSPORT</c> ("Serial" or "Tcp", default "Tcp") to pick which transport's
-/// device the tests drive, and <c>TEENSYROM_BENCH_CHIP_IDS</c> (comma-separated) to prefer a specific
+/// device the tests drive - it is also the discovery's <see cref="ConnectionOptions.PreferredTransport"/>,
+/// so a chip that answers on both transports is driven over the one named - and <c>TEENSYROM_BENCH_CHIP_IDS</c> (comma-separated) to prefer a specific
 /// chip when more than one device answers on that transport. Neither variable being set does not fail
 /// construction - <see cref="HasHardware"/> is simply false and every test skips.
 /// </summary>
@@ -66,6 +67,7 @@ public sealed class HardwareFixture : IAsyncLifetime
         Transport = Enum.TryParse<ConnectionType>(Environment.GetEnvironmentVariable("TEENSYROM_BENCH_TRANSPORT"), ignoreCase: true, out var transport)
             ? transport
             : ConnectionType.Tcp;
+        Options.PreferredTransport = Transport;
 
         ExpectedChipIds = (Environment.GetEnvironmentVariable("TEENSYROM_BENCH_CHIP_IDS") ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -94,7 +96,7 @@ public sealed class HardwareFixture : IAsyncLifetime
             Substitute.For<ISidMetadataService>(),
             Log);
 
-        _finder = new CartFinder(Log, storageFactory, Interrogator, alert, Recovery, discoveryStrategies, Substitute.For<IDeviceSettingsProvider>());
+        _finder = new CartFinder(Log, storageFactory, Interrogator, alert, Recovery, discoveryStrategies, Substitute.For<IDeviceSettingsProvider>(), Options);
 
         Manager = BuildManager();
 

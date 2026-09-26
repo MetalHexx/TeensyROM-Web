@@ -76,7 +76,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 				{
 					if (device.Connection.Mode == DeviceMode.Minimal)
 					{
-						port.ResetDevice(log);
+						port.ResetFromMinimal(log);
 						var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, cancellationToken);
 
 						if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))

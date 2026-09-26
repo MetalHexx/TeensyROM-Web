@@ -64,7 +64,7 @@ public class CartFinderIntegrationTests
         _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), Arg.Any<TeensyStorageType>()).Returns(StoragePresence.Present);
         _storageFactory.Create(Arg.Any<CartStorage>(), Arg.Any<ICommunicationPort>()).Returns(Substitute.For<IStorageService>());
 
-        var finder = new CartFinder(_log, _storageFactory, _interrogator, _alert, _recovery, strategies, _settingsProvider);
+        var finder = new CartFinder(_log, _storageFactory, _interrogator, _alert, _recovery, strategies, _settingsProvider, new ConnectionOptions());
 
         var result = await finder.FindDevices(CancellationToken.None);
 

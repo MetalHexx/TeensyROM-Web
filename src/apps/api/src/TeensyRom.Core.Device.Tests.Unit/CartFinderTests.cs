@@ -20,6 +20,7 @@ public class CartFinderTests
     private readonly IAlertService _mockAlert;
     private readonly IDeviceRecovery _mockRecovery;
     private readonly IDeviceSettingsProvider _mockSettingsProvider;
+    private readonly ConnectionOptions _options = new();
     private readonly List<IDiscoveryStrategy> _mockDiscoveryStrategies;
     private readonly CartFinder _sut;
 
@@ -43,7 +44,8 @@ public class CartFinderTests
             _mockAlert,
             _mockRecovery,
             _mockDiscoveryStrategies,
-            _mockSettingsProvider
+            _mockSettingsProvider,
+            _options
         );
     }
 
@@ -219,6 +221,31 @@ public class CartFinderTests
         serialPort.Received(1).Dispose();
         tcpPort.DidNotReceive().Dispose();
         _mockSettingsProvider.Received(1).GetOrCreateDeviceSettings(ChipId);
+    }
+
+    [Fact]
+    public async Task FindDevices_WithSameChipIdOnSerialAndTcp_AndSerialPreferred_KeepsSerialAndDisposesTcpPort()
+    {
+        _options.PreferredTransport = ConnectionType.Serial;
+        var serialPort = CreatePort();
+        var tcpPort = CreatePort(ConnectionType.Tcp);
+        SetupDiscoveryStrategy(
+            CreateTestEndpoint(tcpPort, FullReply(), "192.168.1.10:80", connectionType: ConnectionType.Tcp),
+            CreateTestEndpoint(serialPort, FullReply(), "COM3"));
+        SetupProbes(
+            new Queue<StoragePresence>([StoragePresence.Present, StoragePresence.Present]),
+            new Queue<StoragePresence>([StoragePresence.Present, StoragePresence.Present]));
+
+        var result = await _sut.FindDevices(CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        var device = result.Single();
+        device.ConnectionType.Should().Be(ConnectionType.Serial);
+        device.Connection.TransportInUse.Should().Be(ConnectionType.Serial);
+        device.Connection.SerialPortName.Should().Be("COM3");
+        device.Connection.TcpEndpoint.Should().NotBeNull();
+        tcpPort.Received(1).Dispose();
+        serialPort.DidNotReceive().Dispose();
     }
 
     [Theory]

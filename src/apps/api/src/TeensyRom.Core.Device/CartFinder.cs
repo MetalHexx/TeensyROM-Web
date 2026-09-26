@@ -30,7 +30,8 @@ namespace TeensyRom.Core.Device
 		IAlertService alert,
 		IDeviceRecovery recovery,
 		IEnumerable<IDiscoveryStrategy> discoveryStrategies,
-		IDeviceSettingsProvider settingsProvider) : ICartFinder
+		IDeviceSettingsProvider settingsProvider,
+		ConnectionOptions options) : ICartFinder
 	{
 		private const string _unknownDeviceIdBase = "Unknown";
 		private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
@@ -144,7 +145,7 @@ namespace TeensyRom.Core.Device
 				if (reply.IsMinimalFirmware)
 				{
 					log.Internal($"{methodName} device is in minimal firmware; resetting and waiting for it to leave");
-					port.ResetDevice(log);
+					port.ResetFromMinimal(log);
 					var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, ct);
 
 					if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
@@ -255,10 +256,11 @@ namespace TeensyRom.Core.Device
 
 		/// <summary>
 		/// Deduplicates devices discovered on multiple transports. When the same chip is found via Serial
-		/// and TCP, TCP wins: the serial port is disposed and its port name is written onto the surviving
-		/// device's record, so the one record carries both endpoints while <c>TransportInUse</c> ends as
-		/// TCP. <see cref="DeviceConnectionRecord.Confirm"/> rejects <see cref="DeviceMode.FullBusy"/>, so
-		/// a busy survivor is confirmed as idle and then re-marked busy to preserve its actual state.
+		/// and TCP, <see cref="ConnectionOptions.PreferredTransport"/> wins: the other port is disposed and
+		/// its endpoint is written onto the surviving device's record, so the one record carries both
+		/// endpoints while <c>TransportInUse</c> ends as the preferred transport.
+		/// <see cref="DeviceConnectionRecord.Confirm"/> rejects <see cref="DeviceMode.FullBusy"/>, so a busy
+		/// survivor is confirmed as idle and then re-marked busy to preserve its actual state.
 		/// </summary>
 		private List<TeensyRomDevice> DeduplicateByDeviceId(List<TeensyRomDevice> devices)
 		{
@@ -274,9 +276,9 @@ namespace TeensyRom.Core.Device
 					continue;
 				}
 
-				// Multiple transports for same device - prefer TCP over Serial
-				var tcp = group.FirstOrDefault(d => d.ConnectionType == ConnectionType.Tcp);
-				var preferred = tcp ?? group.First();
+				// Multiple transports for same device - keep the preferred one
+				var match = group.FirstOrDefault(d => d.ConnectionType == options.PreferredTransport);
+				var preferred = match ?? group.First();
 
 				result.Add(preferred);
 
@@ -285,14 +287,14 @@ namespace TeensyRom.Core.Device
 				// Dispose non-preferred transports
 				foreach (var device in group.Where(d => d != preferred))
 				{
-					if (tcp is not null && device.ConnectionType == ConnectionType.Serial && device.Connection.SerialPortName is { } serialPortName)
+					if (match is not null && device.ConnectionType != preferred.ConnectionType && device.Connection.EndpointFor(device.ConnectionType) is { } otherEndpoint)
 					{
 						var wasBusy = preferred.Connection.Mode == DeviceMode.FullBusy;
 						var confirmMode = wasBusy ? DeviceMode.FullIdle : preferred.Connection.Mode;
-						var tcpEndpoint = preferred.Connection.TcpEndpoint ?? preferred.ComPort;
+						var preferredEndpoint = preferred.Connection.EndpointFor(preferred.ConnectionType) ?? preferred.ComPort;
 
-						preferred.Confirm(ConnectionType.Serial, serialPortName, confirmMode);
-						preferred.Confirm(ConnectionType.Tcp, tcpEndpoint, confirmMode);
+						preferred.Confirm(device.ConnectionType, otherEndpoint, confirmMode);
+						preferred.Confirm(preferred.ConnectionType, preferredEndpoint, confirmMode);
 
 						if (wasBusy)
 						{

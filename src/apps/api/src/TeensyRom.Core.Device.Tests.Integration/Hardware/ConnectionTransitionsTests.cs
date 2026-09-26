@@ -71,7 +71,7 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
 
         var (listing, listingElapsed) = await fixture.MeasureAsync(output, "Minimal -> Full (directory listing)", async () =>
         {
-            device.CommunicationPort.ResetDevice(fixture.Log);
+            device.CommunicationPort.ResetFromMinimal(fixture.Log);
             var outcome = await fixture.Recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
             outcome.Reachable.Should().BeTrue("the device must leave minimal before a listing can be attempted");
             return await listingHandler.Handle(listingCommand, CancellationToken.None);
@@ -162,7 +162,7 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
     {
         if (device.Connection.Mode is DeviceMode.FullIdle or DeviceMode.FullBusy) return;
 
-        device.CommunicationPort.ResetDevice(fixture.Log);
+        device.CommunicationPort.ResetFromMinimal(fixture.Log);
         var outcome = await fixture.Recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
         outcome.Reachable.Should().BeTrue("a later phase needs the device to start from a known state");
     }
