@@ -65,6 +65,10 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             return this;
         }
 
+        /// <summary>Late-arriving device->host text - see <see cref="EnqueueAfterQuiet"/>.</summary>
+        public ScriptedCommunicationPort EnqueueTextAfterQuiet(int quietMs, string text) =>
+            EnqueueAfterQuiet(quietMs, Encoding.Latin1.GetBytes(text));
+
         /// <summary>Late-arriving device->host token, low byte first - see <see cref="EnqueueAfterQuiet"/>.</summary>
         public ScriptedCommunicationPort EnqueueTokenAfterQuiet(int quietMs, TeensyToken token) =>
             EnqueueAfterQuiet(quietMs, (byte)(token.Value & 0xFF), (byte)(token.Value >> 8));
@@ -77,6 +81,10 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         }
 
         public int BytesToRead => _currentSegment?.Count ?? 0;
+
+        /// <summary>Scripted bytes nobody has read yet: the current segment, every queued one and every late arrival.</summary>
+        public int Unread =>
+            (_currentSegment?.Count ?? 0) + _segments.Sum(segment => segment.Count) + _lateArrivals.Sum(arrival => arrival.Bytes.Length);
 
         /// <summary>Defaults to an open/connected port; a test scripts <see langword="false"/> to model an already-dropped transport.</summary>
         public bool IsOpen { get; set; } = true;

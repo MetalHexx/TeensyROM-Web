@@ -53,7 +53,11 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             return device;
         }
 
-        private LaunchFileHandler BuildHandler() => new(_log, _recovery, _devices, _interrogator, FastOptions());
+        private LaunchFileHandler BuildHandler() => BuildHandler(FastOptions());
+
+        private LaunchFileHandler BuildHandler(ConnectionOptions options) => new(_log, _recovery, _devices, _interrogator, options);
+
+        private const string ResetLine = "Resetting C64\r\n";
 
         [Fact]
         public async Task Handle_SidLaunch_GoodSIDTokenOnSecondRead_ReturnsSuccessWithoutInterrogatorOrRecovery()
@@ -203,6 +207,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         /// and none of them can drop the transport - so the launch is done at the ack, with no watch window
         /// and no version confirm (bench: a .kla answered after 2.77 s, the firmware was done in 1 ms).
         /// This case and the next cover both halves: a program ends busy, an image or text ends idle.
+        /// From the menu nothing more is owed, so the handler reads nothing after the ack.
         /// </summary>
         [Theory]
         [InlineData("/games/game.prg")]
@@ -211,6 +216,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.NewSegment().EnqueueText("next command's reply");
             var device = BuildDevice(port, DeviceMode.FullIdle);
             var handler = BuildHandler();
 
@@ -219,13 +225,36 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             device.Connection.Mode.Should().Be(DeviceMode.FullBusy, "a running program owns the IO handler, as a cart does");
+            port.Unread.Should().Be("next command's reply".Length, "a launch from the menu owes no reset line, so nothing is waited for");
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
 
         /// <summary>
+        /// Launched while a cart runs, a program first sends the C64 back to the menu, and the firmware
+        /// prints the reset line a moment after the ack: the launch reads it, so the next command does
+        /// not take it for its ack.
+        /// </summary>
+        [Fact]
+        public async Task Handle_ProgramLaunchWhileACartRuns_ReadsTheBackToMenuResetLine()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.EnqueueTextAfterQuiet(10, ResetLine);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/demos/demo.prg"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            port.Unread.Should().Be(0);
+        }
+
+        /// <summary>
         /// The C64 menu shows an image or text under the TeensyROM handler, so the firmware keeps answering:
-        /// the record ends idle, even when a running game had left it busy.
+        /// the record ends idle, even when a running game had left it busy. Leaving that game costs the
+        /// back-to-menu reset line, which the launch reads.
         /// </summary>
         [Theory]
         [InlineData("/images/HA_Sugar_Skull.kla")]
@@ -239,6 +268,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.EnqueueTextAfterQuiet(10, ResetLine);
             var device = BuildDevice(port, DeviceMode.FullBusy);
             var handler = BuildHandler();
 
@@ -247,6 +277,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+            port.Unread.Should().Be(0);
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
@@ -276,7 +307,8 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         /// <summary>
         /// A CRT of at most 128 KB of chips plus its 64-byte header always fits the firmware's RAM1 cart
         /// buffer, so it can never reboot into minimal: the launch is done at the ack and the running cart
-        /// leaves the device busy. 8,272 bytes is an 8 KB cart; 131,136 is the limit itself.
+        /// leaves the device busy. 8,272 bytes is an 8 KB cart; 131,136 is the limit itself. From the menu
+        /// the firmware prints one reset line once the cart has loaded, and the launch reads it.
         /// </summary>
         [Theory]
         [InlineData(8_272)]
@@ -285,10 +317,60 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.EnqueueTextAfterQuiet(10, ResetLine);
             var device = BuildDevice(port, DeviceMode.FullIdle);
             var handler = BuildHandler();
 
             var result = await handler.Handle(BuildCommand(port, DeviceId, "/games/Ace 2088.crt", size), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            port.Unread.Should().Be(0);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>
+        /// The reported 502: launched while a cart runs, a cart owes two reset lines - back to the menu
+        /// at once, and again once it has loaded (bench: +10 ms and +735 ms) - and the second used to
+        /// reach the next launch as its ack. Both are read here, the line ending included, which can
+        /// trail its text by ~50 ms.
+        /// </summary>
+        [Fact]
+        public async Task Handle_CertainFitCrtLaunchWhileACartRuns_ReadsBothResetLines()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.EnqueueTextAfterQuiet(10, "Resetting C64");
+            port.EnqueueTextAfterQuiet(10, "\r\n");
+            port.EnqueueTextAfterQuiet(10, ResetLine);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/games/Ace 2088.crt", 82_144), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            port.Unread.Should().Be(0);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+        }
+
+        /// <summary>
+        /// The record said a cart ran, but only one reset line comes (the C64 was reset by hand, so the
+        /// firmware was already in the menu): the launch stops waiting at the settle time and still
+        /// succeeds - a cart this size cannot drop the transport, so there is nothing to confirm.
+        /// </summary>
+        [Fact]
+        public async Task Handle_CertainFitCrtLaunch_FewerResetLinesThanOwed_StillSucceedsWithoutConfirm()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.EnqueueTextAfterQuiet(10, ResetLine);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/games/Ace 2088.crt", 82_144), CancellationToken.None);
 
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);

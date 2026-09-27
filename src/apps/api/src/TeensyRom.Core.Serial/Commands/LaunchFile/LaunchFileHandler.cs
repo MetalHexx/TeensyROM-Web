@@ -1,4 +1,5 @@
 using MediatR;
+using System.Diagnostics;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
@@ -35,6 +36,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 			if (IsDoneAtAck(r.LaunchItem))
 			{
+				AwaitResetLines(r.CommunicationPort, ResetLinesOwed(device, r.LaunchItem));
 				MarkLaunched(device, r.LaunchItem);
 				return new() { LaunchResult = LaunchFileResultType.Success };
 			}
@@ -83,8 +85,9 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		/// flashed and rebooted (<c>DoFlashUpdate</c> runs inside its main loop), so a version confirm goes
 		/// unanswered and the recovery that followed reported a disconnect in the middle of the update. It
 		/// is left busy instead. A CRT no larger than <see cref="CertainFitCrtBytes"/> always loads in place,
-		/// so it too is done at the ack (bench, TCP: Ace 2088, 82 KB, answered after 2.73 s). SID and a
-		/// larger CRT still report or drop, so they keep the watch.
+		/// so it needs no watch or confirm either (bench, TCP: Ace 2088, 82 KB, answered after 2.73 s). SID
+		/// and a larger CRT still report or drop, so they keep the watch. Before returning, the handler
+		/// reads the "Resetting C64" lines the launch still owes (<see cref="AwaitResetLines"/>).
 		/// </summary>
 		private static bool IsDoneAtAck(LaunchableItem item) => item.FileType is
 			TeensyFileType.Kla or TeensyFileType.Koa or TeensyFileType.Art or TeensyFileType.Aas or TeensyFileType.Hpi or
@@ -105,6 +108,99 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 		private static bool IsCertainFitCrt(LaunchableItem item) =>
 			item.FileType == TeensyFileType.Crt && item.Size <= CertainFitCrtBytes;
+
+		private const string ResetLine = "Resetting C64\r\n";
+
+		/// <summary>
+		/// How many <see cref="ResetLine"/>s the firmware still sends for a done-at-ack launch after its ack.
+		/// A launch while a cart or program runs first sends the C64 back to the menu (<c>RemoteLaunch</c>
+		/// falls back to <c>SetUpMainMenuROM</c>), and the main loop prints the line as it resets
+		/// (<c>Teensy.ino:266</c>; bench, TCP: ~10 ms after the ack). A cart prints it again once it has
+		/// loaded and resets the C64 into it (+186 ms from the menu, +735 ms while a cart ran). A program,
+		/// an image or text starts without a reset. A HEX goes on to flash and is left alone. Whether
+		/// something runs is the record's word, as it is for the gate.
+		/// </summary>
+		private static int ResetLinesOwed(TeensyRomDevice? device, LaunchableItem item)
+		{
+			if (item.FileType == TeensyFileType.Hex)
+			{
+				return 0;
+			}
+
+			var backToMenu = device?.Connection.Mode == DeviceMode.FullBusy ? 1 : 0;
+
+			return item.FileType == TeensyFileType.Crt ? backToMenu + 1 : backToMenu;
+		}
+
+		/// <summary>
+		/// Reads the lines <see cref="ResetLinesOwed"/> counted, so none is left for the next command. A
+		/// launch that followed within a cart's load read the leftover line as its own ack and failed
+		/// (bench, TCP: three 502s at 0.65-0.76 s; the firmware holds the next launch until the load is done
+		/// and sends the old line first). Counts whole lines, since the line ending can trail its text by
+		/// ~50 ms, and gives up after <see cref="ConnectionOptions.LaunchSettleMs"/>: a count the record got
+		/// wrong - the C64 reset by hand, so nothing ran - costs that wait, never the launch, because none
+		/// of these types can drop the transport. Reads as the data lands, like
+		/// <c>WaitForMenuBootToken</c>: a timed <c>ReadSerialBytes</c> takes one byte per call on TCP while
+		/// the rest is still in the socket, which made a 15-byte line cost ~450 ms.
+		/// </summary>
+		private void AwaitResetLines(ICommunicationPort port, int owed)
+		{
+			if (owed == 0)
+			{
+				return;
+			}
+
+			var received = string.Empty;
+			var stopwatch = Stopwatch.StartNew();
+
+			while (CountResetLines(received) < owed)
+			{
+				var remainingMs = options.LaunchSettleMs - (int)stopwatch.ElapsedMilliseconds;
+
+				if (remainingMs <= 0)
+				{
+					break;
+				}
+
+				try
+				{
+					port.WaitForSerialData(numBytes: 1, timeoutMs: remainingMs);
+				}
+				catch (TimeoutException)
+				{
+					break;
+				}
+
+				var buffer = new byte[Math.Max(1, port.BytesToRead)];
+				var bytesRead = port.Read(buffer, 0, buffer.Length);
+
+				if (bytesRead <= 0)
+				{
+					break;
+				}
+
+				received += buffer[..bytesRead].ToUtf8();
+			}
+
+			var seen = CountResetLines(received);
+
+			if (seen < owed)
+			{
+				log.Internal($"LaunchFileHandler: expected {owed} reset line(s) after the launch, saw {seen}");
+			}
+		}
+
+		private static int CountResetLines(string text)
+		{
+			var count = 0;
+
+			for (var at = text.IndexOf(ResetLine, StringComparison.Ordinal); at >= 0; at = text.IndexOf(ResetLine, at + ResetLine.Length, StringComparison.Ordinal))
+			{
+				count++;
+			}
+
+			return count;
+		}
 
 		/// <summary>
 		/// Records what the launched item left the full firmware doing. A cart or a program swaps the
