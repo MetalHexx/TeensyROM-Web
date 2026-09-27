@@ -61,6 +61,8 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 				if (final is not null)
 				{
+					// A good or a bad SID both leave the C64 in the menu, so a cart that ran before is gone.
+					MarkLaunched(device, r.LaunchItem);
 					return GetFinalResult(final.Value);
 				}
 			}

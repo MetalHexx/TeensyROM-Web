@@ -125,6 +125,45 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
 
+        /// <summary>
+        /// A SID launched while a cart runs: the firmware resets back to the menu and plays it there, so
+        /// the busy record the cart left must not survive - the next pause would reset the C64.
+        /// </summary>
+        [Fact]
+        public async Task Handle_SidLaunchWhileACartRuns_GoodSIDToken_MarksDeviceIdle()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.NewSegment().EnqueueText(ResetLine).EnqueueToken(TeensyToken.GoodSIDToken);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/music/tune.sid"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+        }
+
+        /// <summary>A SID the player rejects still leaves the C64 in the menu, so a cart's busy record goes too.</summary>
+        [Fact]
+        public async Task Handle_SidLaunchWhileACartRuns_BadSIDToken_ReturnsSidErrorAndMarksDeviceIdle()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            port.NewSegment().EnqueueText(ResetLine).EnqueueToken(TeensyToken.BadSIDToken);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/music/tune.sid"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeFalse();
+            result.LaunchResult.Should().Be(LaunchFileResultType.SidError);
+            device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+        }
+
         /// <summary>A SID keeps playing under the TeensyROM handler, so the device stays reachable and idle.</summary>
         [Fact]
         public async Task Handle_SidLaunch_SilenceThenFullVersionReply_MarksDeviceIdle()
