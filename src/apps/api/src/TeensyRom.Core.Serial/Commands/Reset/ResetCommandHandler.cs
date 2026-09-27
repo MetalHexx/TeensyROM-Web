@@ -1,14 +1,15 @@
 using MediatR;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
 {
-    public class ResetCommandHandler(ILoggingService log) : IRequestHandler<ResetCommand, ResetResult>
-    {        
+    public class ResetCommandHandler(ILoggingService log, ConnectionOptions options) : IRequestHandler<ResetCommand, ResetResult>
+    {
         public async Task<ResetResult> Handle(ResetCommand request, CancellationToken cancellationToken)
         {
-			var resetResult = request.CommunicationPort.ForceResetAndReconnectToFullFw(log);
+			var resetResult = request.CommunicationPort.ForceResetAndReconnectToFullFw(log, options.MenuBootTimeoutMs);
 			await Task.CompletedTask;
 
             return resetResult

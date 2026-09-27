@@ -22,6 +22,7 @@ namespace TeensyRom.Api.Startup
             options.Serial.ToFullMs = Math.Max(1, options.Serial.ToFullMs);
             options.LaunchSettleMs = Math.Max(1, options.LaunchSettleMs);
             options.ConnectTimeoutMs = Math.Max(1, options.ConnectTimeoutMs);
+            options.MenuBootTimeoutMs = Math.Max(1, options.MenuBootTimeoutMs);
 
             return options;
         }

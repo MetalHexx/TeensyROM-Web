@@ -12,19 +12,25 @@ using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial.Routines
 {
+	/// <summary>Where a reset in full firmware left the C64 menu.</summary>
+	public enum MenuBootOutcome
+	{
+		/// <summary>The menu announced itself and reported its boot complete: ready for any command.</summary>
+		Complete,
+
+		/// <summary>
+		/// The menu announced itself (the reset took - the C64 runs nothing but the menu) but had not
+		/// reported its boot complete within the bound.
+		/// </summary>
+		StillBooting,
+
+		/// <summary>No SID token within the bound, or the transport dropped: nothing says the reset took.</summary>
+		NotStarted
+	}
+
 	public static class TRStreamExtensions
 	{
 		private const string _logClass = $"{nameof(TRStreamExtensions)}:";
-
-		/// <summary>Bench: the menu's SID token lands about 650 ms after the reset text; this is headroom over that, not a wait anyone expects to spend.</summary>
-		private const int _menuBootTimeoutMs = 3000;
-
-		/// <summary>
-		/// Bench (TR+, flag firmware): "Boot: complete" ~0.9-1.0 s after a reset in full, ~3.4 s when the
-		/// menu's network time sync stalls (about 1 reset in 20), and ~4.3-6.8 s after a reset out of
-		/// minimal on serial. Headroom over the worst of those.
-		/// </summary>
-		private const int _bootCompleteTimeoutMs = 8000;
 
 		/// <summary>Pause between answered version polls while the menu boots.</summary>
 		private const int _bootPollIntervalMs = 100;
@@ -133,25 +139,31 @@ namespace TeensyRom.Core.Serial.Routines
 		/// so this goes on to <see cref="WaitForBootComplete"/>. Together with <see cref="ResetFromMinimal"/>
 		/// this is the only writer of the reset token, so every caller (the gate, <c>CartFinder</c>, the
 		/// reset command) gets that guarantee without a guard of its own. Never throws on a transport drop -
-		/// the caller decides whether recovery follows.
+		/// the caller decides whether recovery follows. <paramref name="menuBootTimeoutMs"/> bounds the
+		/// whole menu boot from the reset (<see cref="ConnectionOptions.MenuBootTimeoutMs"/>): the token
+		/// wait and the boot wait share it, since the delays before the token (NFC setup) and after it
+		/// (network time sync) can come together.
 		/// </summary>
-		/// <returns>
-		/// True when the menu announced itself, its token was consumed, and it reported its boot complete;
-		/// false when either did not happen inside its bound, or the transport dropped first - in which case
-		/// the next command may still meet the token or the booting menu.
-		/// </returns>
-		public static bool ResetDevice(this ICommunicationPort communicationPort, ILoggingService log, int menuBootTimeoutMs = _menuBootTimeoutMs)
+		public static MenuBootOutcome ResetDevice(this ICommunicationPort communicationPort, ILoggingService log, int menuBootTimeoutMs = ConnectionOptions.DefaultMenuBootTimeoutMs)
 		{
 			log.Internal($"{_logClass} Resetting TeensyROM");
 			try
 			{
+				var stopwatch = Stopwatch.StartNew();
 				communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-				return communicationPort.WaitForMenuBootToken(log, menuBootTimeoutMs) && communicationPort.WaitForBootComplete(log);
+
+				if (!communicationPort.WaitForMenuBootToken(log, menuBootTimeoutMs))
+				{
+					return MenuBootOutcome.NotStarted;
+				}
+
+				var remainingMs = Math.Max(1, menuBootTimeoutMs - (int)stopwatch.ElapsedMilliseconds);
+				return communicationPort.WaitForBootComplete(log, remainingMs) ? MenuBootOutcome.Complete : MenuBootOutcome.StillBooting;
 			}
 			catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
 			{
 				log.Internal($"{_logClass} reset sent; transport dropped during the reply (expected when the device was in minimal)");
-				return false;
+				return MenuBootOutcome.NotStarted;
 			}
 		}
 
@@ -178,28 +190,24 @@ namespace TeensyRom.Core.Serial.Routines
 		/// Polls the version command until the firmware reports <c>Boot: complete</c> - the C64 menu has
 		/// listed its items and takes commands again - bounded by <paramref name="timeoutMs"/>. Only after the
 		/// menu's SID token: before it, a request can corrupt the menu's copy of itself into C64 RAM. One
-		/// request at a time: each waits for its own answer up to the
-		/// remaining bound (the menu's time sync can hold the Teensy for seconds), so no reply is left in
-		/// flight to land on the next command. A reply that does not parse - the menu's SID token arriving
-		/// in its place, boot text on serial - is just another poll.
+		/// request at a time, and no new request once the bound has passed - but a request already sent is
+		/// always waited out for its own answer, up to the whole bound however late in it the request went
+		/// out. An answer given up on is not lost: it arrives later and is read as the next command's reply
+		/// (bench, no internet: the menu's network time sync held every reply for ~8.5 s, and the late
+		/// "Boot: in progress" became the storage probe's answer). The worst case is just under twice the
+		/// bound, and only when the menu answers "in progress" and then stalls. A reply that does not
+		/// parse - the menu's SID token arriving in its place, boot text on serial - is just another poll.
 		/// </summary>
 		/// <returns>True once "complete" was reported; false when the bound passed or the port closed.</returns>
-		public static bool WaitForBootComplete(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = _bootCompleteTimeoutMs)
+		public static bool WaitForBootComplete(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = ConnectionOptions.DefaultMenuBootTimeoutMs)
 		{
 			var stopwatch = Stopwatch.StartNew();
 			var polls = 0;
 
-			while (communicationPort.IsOpen)
+			while (communicationPort.IsOpen && stopwatch.ElapsedMilliseconds < timeoutMs)
 			{
-				var remainingMs = timeoutMs - (int)stopwatch.ElapsedMilliseconds;
-
-				if (remainingMs <= 0)
-				{
-					break;
-				}
-
 				polls++;
-				var reply = VersionReplyParser.Parse(communicationPort.ReadVersionReply(log, ackTimeoutMs: remainingMs));
+				var reply = VersionReplyParser.Parse(communicationPort.ReadVersionReply(log, ackTimeoutMs: timeoutMs));
 
 				if (reply.BootComplete == true)
 				{
@@ -226,7 +234,7 @@ namespace TeensyRom.Core.Serial.Routines
 		/// True when the token arrived. False is a timeout, not a quiet success: the menu never came up
 		/// within the bound, and it is logged as such.
 		/// </returns>
-		public static bool WaitForMenuBootToken(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = _menuBootTimeoutMs)
+		public static bool WaitForMenuBootToken(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = ConnectionOptions.DefaultMenuBootTimeoutMs)
 		{
 			var received = new List<byte>();
 			var stopwatch = Stopwatch.StartNew();
@@ -457,9 +465,9 @@ namespace TeensyRom.Core.Serial.Routines
 		/// never announced itself is reported by <see cref="ResetDevice"/>'s own log rather than failing
 		/// the reset: the device was still reset, which is all this command promises.
 		/// </summary>
-		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
+		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log, int menuBootTimeoutMs = ConnectionOptions.DefaultMenuBootTimeoutMs)
 		{
-			communicationPort.ResetDevice(log);
+			communicationPort.ResetDevice(log, menuBootTimeoutMs);
 			return true;
 		}
 	}

@@ -49,7 +49,7 @@ internal static class TransferPumpHarness
     {
         Program.LogHeader("Reset (unconditional, once per job - mirrors TransferPump.ResetDeviceAsync)");
 
-        var handler = new ResetCommandHandler(log);
+        var handler = new ResetCommandHandler(log, new TeensyRom.Core.Serial.Recovery.ConnectionOptions());
         var sw = Stopwatch.StartNew();
 
         var result = await handler.Handle(new ResetCommand

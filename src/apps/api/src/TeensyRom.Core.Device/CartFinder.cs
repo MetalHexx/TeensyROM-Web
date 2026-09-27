@@ -169,7 +169,12 @@ namespace TeensyRom.Core.Device
 				if (sd == StoragePresence.Busy || usb == StoragePresence.Busy)
 				{
 					log.Internal($"{methodName} storage busy (SD {sd}, USB {usb}); resetting and re-probing once");
-					port.ResetDevice(log);
+
+					if (port.ResetDevice(log, options.MenuBootTimeoutMs) == MenuBootOutcome.StillBooting)
+					{
+						device.MarkMenuBootPending();
+					}
+
 					sd = interrogator.ProbeStorage(port, TeensyStorageType.SD);
 					usb = interrogator.ProbeStorage(port, TeensyStorageType.USB);
 
@@ -181,8 +186,11 @@ namespace TeensyRom.Core.Device
 					}
 				}
 
-				cart.SdStorage.Available = sd == StoragePresence.Present;
-				cart.UsbStorage.Available = usb == StoragePresence.Present;
+				// Unknown is "could not tell", not "missing" - the probe's own log line says why. Listing the
+				// storage keeps a slow or confused reply from hiding an SD card the user can see; a storage
+				// that is really missing is reported by its own commands.
+				cart.SdStorage.Available = sd != StoragePresence.Absent;
+				cart.UsbStorage.Available = usb != StoragePresence.Absent;
 
 				log.Internal($"{methodName} SD probe {sd}, USB probe {usb}");
 				log.InternalSuccess($"{methodName} {reply.HardwareVariant} fw {cart.FwVersion} chip {cart.DeviceId} on {reply.Machine} {reply.VideoStandard} {reply.TodClockHz?.ToString() ?? "unknown"} Hz");

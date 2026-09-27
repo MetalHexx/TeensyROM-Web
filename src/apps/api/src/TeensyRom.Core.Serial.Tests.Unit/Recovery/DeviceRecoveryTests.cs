@@ -27,13 +27,14 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
             return (device, port);
         }
 
-        private static ConnectionOptions FastOptions(int toMinimalMs = 2000, int toFullMs = 2000, int launchSettleMs = 5) => new()
+        private static ConnectionOptions FastOptions(int toMinimalMs = 2000, int toFullMs = 2000, int launchSettleMs = 5, int menuBootTimeoutMs = ConnectionOptions.DefaultMenuBootTimeoutMs) => new()
         {
             PollIntervalMs = 1,
             Tcp = new TransportCeilings { ToMinimalMs = toMinimalMs, ToFullMs = toFullMs },
             Serial = new TransportCeilings { ToMinimalMs = toMinimalMs, ToFullMs = toFullMs },
             LaunchSettleMs = launchSettleMs,
-            ConnectTimeoutMs = 50
+            ConnectTimeoutMs = 50,
+            MenuBootTimeoutMs = menuBootTimeoutMs
         };
 
         private static VersionReply CorrectChip(bool minimal) => VersionReply.Empty with
@@ -100,13 +101,46 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         {
             var (device, port) = BuildDevice();
             _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(CorrectChip(minimal: true));
-            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toFullMs: 15), _log);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toFullMs: 15, menuBootTimeoutMs: 15), _log);
 
             var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
 
             outcome.Mode.Should().Be(DeviceMode.Minimal);
             outcome.Failure.Should().NotBeNull();
             device.Connection.Mode.Should().Be(DeviceMode.Minimal);
+        }
+
+        /// <summary>
+        /// Over TCP the full image answers only once the C64 menu has booted, so the menu's boot - held up by
+        /// a time sync with no internet, or an NFC reader's setup with none plugged in - is inside the wait to
+        /// leave minimal (bench: 19.4 s with NFC on, past the 15 s restart allowance alone).
+        /// </summary>
+        [Fact]
+        public async Task RecoverAsync_Tcp_LeaveMinimal_FullAnswersAfterTheRestartAllowance_StillWithinTheMenuBoot_Succeeds()
+        {
+            var (device, _) = BuildDevice();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>())
+                .Returns(_ => clock.ElapsedMilliseconds < 150 ? Miss : BootedFull());
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toFullMs: 50, menuBootTimeoutMs: 5000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            outcome.Ceiling.Should().Be(TimeSpan.FromMilliseconds(5050), "the restart allowance plus the menu's boot");
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Serial_LeaveMinimal_CeilingIsTheRestartAllowanceAlone()
+        {
+            var (device, _) = BuildDevice(endpoint: "COM7", connectionType: ConnectionType.Serial);
+            _locator.FindByChipId(ChipId).Returns(new PortLookup([], true, null));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toFullMs: 15, menuBootTimeoutMs: 5000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.Unreachable);
+            outcome.Ceiling.Should().Be(TimeSpan.FromMilliseconds(15), "serial answers before the menu starts and waits on the menu separately");
         }
 
         [Fact]

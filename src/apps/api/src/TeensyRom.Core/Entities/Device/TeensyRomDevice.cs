@@ -75,6 +75,12 @@ namespace TeensyRom.Core.Entities.Device
 
         public void MarkUnreachable() => Connection.MarkUnreachable();
 
+        public void MarkMenuBootPending()
+        {
+            Connection.MarkMenuBootPending();
+            Cart.IsMinimalFirmware = false;
+        }
+
         public IStorageService? GetStorage(TeensyStorageType storageType)
         {
             if (storageType is TeensyStorageType.SD) 

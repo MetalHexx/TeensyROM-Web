@@ -131,8 +131,8 @@ public class CommunicationPortBehaviorTests
             var log = Substitute.For<ILoggingService>();
             var devices = Substitute.For<IDeviceConnectionManager>();
             var recovery = Substitute.For<IDeviceRecovery>();
-            var behaviorA = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery);
-            var behaviorB = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery);
+            var behaviorA = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery, new ConnectionOptions());
+            var behaviorB = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery, new ConnectionOptions());
             var deviceId = Guid.NewGuid().ToString("N");
             var commandA = new FakeCommand { DeviceId = deviceId, CommunicationPort = new StubCommunicationPort() };
             var commandB = new FakeCommand { DeviceId = deviceId, CommunicationPort = new StubCommunicationPort() };
@@ -171,7 +171,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -196,7 +196,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -225,7 +225,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
 
         Func<Task> act = () => behavior.Handle(command, () => throw new TeensyBusyException("busy"), CancellationToken.None);
@@ -249,7 +249,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -277,7 +277,7 @@ public class CommunicationPortBehaviorTests
         recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
             .Returns(new RecoveryOutcome(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "dropped"));
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
 
         Func<Task> act = () => behavior.Handle(command, () =>
@@ -307,7 +307,7 @@ public class CommunicationPortBehaviorTests
         devices.GetAvailableDevice(deviceId).Returns(device);
         var recovery = Substitute.For<IDeviceRecovery>();
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
         var modeWhenHandlerRan = default(DeviceMode?);
@@ -344,7 +344,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -358,6 +358,72 @@ public class CommunicationPortBehaviorTests
         response.Error.Should().Be("Command Failed. The menu did not come back up after the reset.");
         invocations.Should().Be(0);
         device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+    }
+
+    /// <summary>
+    /// Bench, no internet: the menu came back after every reset but took ~9.5 s to finish booting. Left
+    /// busy, the record made every following command reset the C64 again - which was already sitting in
+    /// the menu - and fail the same way. The SID token proves the reset took, so the record is idle with
+    /// its boot pending.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FullBusyRecordNonLaunchCommand_MenuBackButStillBooting_FailsAndLeavesTheRecordIdleWithBootPending()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new ScriptedCommunicationPort();
+        port.EnqueueTokenAfterQuiet(650, TeensyToken.GoodSIDToken);
+        port.NewSegment(); // the gate's own buffer clear
+        port.NewSegment(); // the token wait's buffer clear
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText("Boot: in progress\n");
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions { MenuBootTimeoutMs = 1000 });
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Contain("has not finished booting");
+        invocations.Should().Be(0);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Connection.MenuBootPending.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_MenuBootPendingRecord_ChecksTheBootInsteadOfResetting_ThenRunsTheCommand()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new ScriptedCommunicationPort();
+        port.NewSegment(); // the gate's own buffer clear
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText("Boot: complete\n");
+        var device = BuildDevice(port, deviceId);
+        device.MarkMenuBootPending();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.Written.Should().Equal(0x64, 0x76); // one version request, no reset token
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Connection.MenuBootPending.Should().BeFalse();
     }
 
     /// <summary>
@@ -376,7 +442,7 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
         var command = new LaunchFileCommand
         {
             StorageType = TeensyStorageType.SD,
@@ -411,7 +477,7 @@ public class CommunicationPortBehaviorTests
         recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
             .Returns(new RecoveryOutcome(DeviceMode.Minimal, TimeSpan.Zero, TimeSpan.Zero, "still minimal"));
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -441,7 +507,7 @@ public class CommunicationPortBehaviorTests
         recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
             .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.Zero, null));
         var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new LaunchFileCommand
         {
             StorageType = TeensyStorageType.SD,
@@ -482,7 +548,7 @@ public class CommunicationPortBehaviorTests
         recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
             .Returns(new RecoveryOutcome(DeviceMode.Minimal, TimeSpan.Zero, TimeSpan.Zero, "still minimal"));
         var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new LaunchFileCommand
         {
             StorageType = TeensyStorageType.SD,
@@ -521,7 +587,7 @@ public class CommunicationPortBehaviorTests
         recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
             .Returns(new RecoveryOutcome(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "dropped"));
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
 
@@ -546,7 +612,7 @@ public class CommunicationPortBehaviorTests
         devices.GetAvailableDevice(deviceId).Returns(device);
         var recovery = Substitute.For<IDeviceRecovery>();
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, recovery);
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
 
         var response = await behavior.Handle(command, () => Task.FromResult(new TeensyCommandResult()), CancellationToken.None);

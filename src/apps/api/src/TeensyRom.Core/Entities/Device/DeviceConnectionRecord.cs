@@ -39,6 +39,13 @@ namespace TeensyRom.Core.Entities.Device
 
         public DateTime? LastConfirmedUtc { get; private set; }
 
+        /// <summary>
+        /// A reset brought the C64 menu back (its boot-time SID token arrived) but the menu had not reported
+        /// its boot complete when the wait ran out. The C64 is in the menu, running nothing, so the mode is
+        /// <see cref="DeviceMode.FullIdle"/> - the next command checks the boot instead of resetting again.
+        /// </summary>
+        public bool MenuBootPending { get; private set; }
+
         public DeviceConnectionRecord(string chipId)
         {
             ChipId = chipId;
@@ -65,13 +72,29 @@ namespace TeensyRom.Core.Entities.Device
 
             TransportInUse = transport;
             Mode = mode;
+            MenuBootPending = false;
             LastConfirmedUtc = DateTime.UtcNow;
         }
 
-        public void MarkBusy() => Mode = DeviceMode.FullBusy;
+        public void MarkBusy()
+        {
+            Mode = DeviceMode.FullBusy;
+            MenuBootPending = false;
+        }
 
         /// <summary>After a busy device is reset or a command succeeds.</summary>
-        public void MarkIdle() => Mode = DeviceMode.FullIdle;
+        public void MarkIdle()
+        {
+            Mode = DeviceMode.FullIdle;
+            MenuBootPending = false;
+        }
+
+        /// <summary>See <see cref="MenuBootPending"/>.</summary>
+        public void MarkMenuBootPending()
+        {
+            Mode = DeviceMode.FullIdle;
+            MenuBootPending = true;
+        }
 
         /// <summary>
         /// Endpoints and <see cref="LastConfirmedUtc"/> are kept so a later retry has something to try
@@ -80,6 +103,7 @@ namespace TeensyRom.Core.Entities.Device
         public void MarkUnreachable()
         {
             Mode = DeviceMode.Unreachable;
+            MenuBootPending = false;
             TransportInUse = null;
         }
 

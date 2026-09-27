@@ -121,7 +121,7 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
         await EnsureFullAsync(device);
         fixture.Log.ClearReceivedCalls();
 
-        var resetHandler = new ResetCommandHandler(fixture.Log);
+        var resetHandler = new ResetCommandHandler(fixture.Log, fixture.Options);
         var resetCommand = new ResetCommand { DeviceId = device.DeviceId, CommunicationPort = device.CommunicationPort };
 
         var (resetResult, _) = await fixture.MeasureAsync(output, "Reset (full)", () => resetHandler.Handle(resetCommand, CancellationToken.None));

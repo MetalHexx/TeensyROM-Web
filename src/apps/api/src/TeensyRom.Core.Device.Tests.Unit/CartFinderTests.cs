@@ -248,20 +248,36 @@ public class CartFinderTests
         serialPort.DidNotReceive().Dispose();
     }
 
-    [Theory]
-    [InlineData(StoragePresence.Unknown)]
-    [InlineData(StoragePresence.Absent)]
-    public async Task FindDevices_WithNonPresentProbeResult_MarksStorageUnavailable(StoragePresence presence)
+    [Fact]
+    public async Task FindDevices_WithAbsentProbeResult_MarksStorageUnavailable()
     {
         var port = CreatePort();
         SetupDiscoveryStrategy(CreateTestEndpoint(port, FullReply()));
-        SetupProbes(presence, presence);
+        SetupProbes(StoragePresence.Absent, StoragePresence.Absent);
 
         var result = await _sut.FindDevices(CancellationToken.None);
 
         var cart = result.Single().Cart;
         cart.SdStorage.Available.Should().BeFalse();
         cart.UsbStorage.Available.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Bench: a probe that read a late reply came back Unknown, and recording that as "no SD" hid a card
+    /// the user could see until the next scan. Unknown is "could not tell", not "missing".
+    /// </summary>
+    [Fact]
+    public async Task FindDevices_WithUnknownProbeResult_KeepsTheStorageListed()
+    {
+        var port = CreatePort();
+        SetupDiscoveryStrategy(CreateTestEndpoint(port, FullReply()));
+        SetupProbes(StoragePresence.Unknown, StoragePresence.Unknown);
+
+        var result = await _sut.FindDevices(CancellationToken.None);
+
+        var cart = result.Single().Cart;
+        cart.SdStorage.Available.Should().BeTrue();
+        cart.UsbStorage.Available.Should().BeTrue();
     }
 
     [Fact]

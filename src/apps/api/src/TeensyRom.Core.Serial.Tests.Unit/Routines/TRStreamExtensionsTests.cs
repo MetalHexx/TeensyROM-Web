@@ -36,7 +36,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
 
             var menuCameUp = port.ResetDevice(_log);
 
-            menuCameUp.Should().BeTrue();
+            menuCameUp.Should().Be(MenuBootOutcome.Complete);
             port.BytesToRead.Should().Be(0, "a token left in the buffer is read as the next command's Ack");
         }
 
@@ -61,7 +61,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
 
             var menuCameUp = port.ResetDevice(_log, menuBootTimeoutMs: 3000);
 
-            menuCameUp.Should().BeFalse();
+            menuCameUp.Should().Be(MenuBootOutcome.NotStarted);
             _log.Received().InternalWarning(Arg.Is<string>(m => m.Contains("menu did not come up")), Arg.Any<string?>());
         }
 
@@ -80,8 +80,41 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
 
             var ready = port.ResetDevice(_log);
 
-            ready.Should().BeTrue();
+            ready.Should().Be(MenuBootOutcome.Complete);
             port.Written.Should().Equal(0x64, 0xEE, 0x64, 0x76, 0x64, 0x76);
+        }
+
+        [Fact]
+        public void ResetDevice_MenuAnnouncesItselfButNeverFinishesBooting_ReportsStillBooting()
+        {
+            var port = PortEchoingResetText();
+            port.EnqueueTokenAfterQuiet(650, TeensyToken.GoodSIDToken);
+            port.NewSegment(); // what the token wait's own buffer clear moves onto
+            EnqueueVersionReply(port, "in progress");
+
+            var boot = port.ResetDevice(_log, menuBootTimeoutMs: 1000);
+
+            boot.Should().Be(MenuBootOutcome.StillBooting, "the token proves the reset took, so this is not the same as a menu that never came up");
+        }
+
+        /// <summary>
+        /// Bench, no internet: the menu's network time sync held the second poll's answer for ~8.5 s. A
+        /// poll's ack wait clipped to what was left of the bound gave up on it, and the late "Boot: in
+        /// progress" was then read as the storage probe's reply. A request already sent is waited out.
+        /// </summary>
+        [Fact]
+        public void WaitForBootComplete_AnswerComesAfterWhatWasLeftOfTheBound_WaitsItOutInsteadOfLeavingItInFlight()
+        {
+            var port = new ScriptedCommunicationPort();
+            EnqueueVersionReply(port, "in progress");
+            port.EnqueueAfterQuiet(950, [
+                (byte)(TeensyToken.Ack.Value & 0xFF), (byte)(TeensyToken.Ack.Value >> 8),
+                .. System.Text.Encoding.Latin1.GetBytes($"{VersionText}  Boot: complete\n")]);
+
+            var complete = port.WaitForBootComplete(_log, timeoutMs: 1000);
+
+            complete.Should().BeTrue();
+            port.BytesToRead.Should().Be(0, "an answer left behind is read as the next command's reply");
         }
 
         [Fact]
@@ -114,7 +147,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
 
             var menuCameUp = port.ResetDevice(_log);
 
-            menuCameUp.Should().BeFalse();
+            menuCameUp.Should().Be(MenuBootOutcome.NotStarted);
             _log.Received().InternalWarning(Arg.Is<string>(m => m.Contains("menu did not come up")), Arg.Any<string?>());
         }
     }

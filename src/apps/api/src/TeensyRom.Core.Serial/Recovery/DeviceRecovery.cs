@@ -24,13 +24,6 @@ namespace TeensyRom.Core.Serial.Recovery
     {
         private const string _logClass = $"{nameof(DeviceRecovery)}:";
 
-        /// <summary>
-        /// Bench (TR+): once the menu has asked for its SID the Teensy answers nothing while the menu brings
-        /// the network up - ~2 s with a static IP, ~4.2 s when the time sync stalls. The first version
-        /// request after the token waits that out rather than timing out into a close and reopen.
-        /// </summary>
-        private const int _versionAfterMenuTokenAckTimeoutMs = 8000;
-
         public async Task<RecoveryOutcome> RecoverAsync(TeensyRomDevice device, RecoveryReason reason, CancellationToken ct)
         {
             var port = device.CommunicationPort;
@@ -79,7 +72,16 @@ namespace TeensyRom.Core.Serial.Recovery
                         // Argument evaluation order matters here: the boot wait inside MenuBootFailure has
                         // to run before sw.Elapsed is read, or the logged recovery time excludes it.
                         var menuBootFailure = MenuBootFailure(reason, port, reply);
-                        return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, menuBootFailure);
+                        var outcome = Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, menuBootFailure);
+
+                        if (menuBootFailure is not null && outcome.Mode == DeviceMode.FullIdle)
+                        {
+                            // The menu came back but is slow to finish booting: the next command checks the
+                            // boot (CommunicationPortBehavior) rather than meeting a menu mid-boot.
+                            device.MarkMenuBootPending();
+                        }
+
+                        return outcome;
                     }
                     else
                     {
@@ -134,7 +136,7 @@ namespace TeensyRom.Core.Serial.Recovery
 
             try
             {
-                return port.WaitForBootComplete(log)
+                return port.WaitForBootComplete(log, options.MenuBootTimeoutMs)
                     ? null
                     : "the C64 menu did not report its boot complete after the reset";
             }
@@ -246,7 +248,11 @@ namespace TeensyRom.Core.Serial.Recovery
                         continue;
                     }
 
-                    if (menuTokenSeen) ackTimeoutMs = _versionAfterMenuTokenAckTimeoutMs;
+                    // Once the menu has asked for its SID the Teensy answers nothing while the menu brings the
+                    // network up (bench: ~2 s with a static IP, ~4.2 s when the time sync stalls, ~8.5 s with no
+                    // internet) - the first version request after the token waits that out rather than timing
+                    // out into a close and reopen.
+                    if (menuTokenSeen) ackTimeoutMs = options.MenuBootTimeoutMs;
                 }
 
                 var reply = interrogator.ReadVersion(port, ackTimeoutMs);
@@ -384,11 +390,25 @@ namespace TeensyRom.Core.Serial.Recovery
             return reason switch
             {
                 RecoveryReason.LargeLaunch => TimeSpan.FromMilliseconds(ceilings.ToMinimalMs),
-                RecoveryReason.LeaveMinimal => TimeSpan.FromMilliseconds(ceilings.ToFullMs),
+                RecoveryReason.LeaveMinimal => TimeSpan.FromMilliseconds(LeaveMinimalCeilingMs(transport, ceilings)),
                 RecoveryReason.Drop => TimeSpan.FromMilliseconds(Math.Max(ceilings.ToMinimalMs, ceilings.ToFullMs)),
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
             };
         }
+
+        /// <summary>
+        /// Over TCP the full image brings its network up only from the C64 menu, and answers only once the
+        /// menu has finished booting (bench: its first accepted connection already reports "Boot: complete").
+        /// So leaving minimal on TCP waits out the Teensy's restart - including its setup of an NFC reader or
+        /// TR Control device, ~5 s each when none is plugged in - and the whole menu boot: the restart
+        /// allowance plus <see cref="ConnectionOptions.MenuBootTimeoutMs"/> (bench, no internet: 14.3 s with
+        /// NFC off, 19.4 s with NFC on and no reader). Serial answers before the menu starts and waits on the
+        /// menu separately, so its restart allowance stands alone.
+        /// </summary>
+        private double LeaveMinimalCeilingMs(ConnectionType transport, TransportCeilings ceilings) =>
+            transport == ConnectionType.Tcp
+                ? (double)ceilings.ToFullMs + options.MenuBootTimeoutMs
+                : ceilings.ToFullMs;
 
         private static DeviceMode? Expectation(RecoveryReason reason) => reason switch
         {
