@@ -488,6 +488,42 @@ public class TcpCommunicationPortTests : IDisposable
         result.Should().Be(StoragePresence.Busy);
     }
 
+    [Fact]
+    public async Task ClearBuffers_ShouldDiscardStaleBytes_WithoutWaitingForAFullBuffer()
+    {
+        // Arrange - a launch that returns at the firmware's ack leaves late text on the socket, such as
+        // "Resetting C64" when the launch interrupted a running program.
+        using var listener = new TcpListenerScope();
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+        using var accepted = await listener.Accepted;
+        using var port = new TcpCommunicationPort(_mockLogger, client);
+
+        var stale = Encoding.ASCII.GetBytes("Resetting C64\r\n");
+        await accepted.GetStream().WriteAsync(stale);
+        await accepted.GetStream().FlushAsync();
+        var arrival = Stopwatch.StartNew();
+        while (client.Available < stale.Length && arrival.ElapsedMilliseconds < 5000) await Task.Delay(5);
+
+        // Act
+        var clearing = Stopwatch.StartNew();
+        var clear = Task.Run(port.ClearBuffers);
+        var finished = await Task.WhenAny(clear, Task.Delay(2000)) == clear;
+        clearing.Stop();
+
+        var fresh = Encoding.ASCII.GetBytes("ok");
+        await accepted.GetStream().WriteAsync(fresh);
+        await accepted.GetStream().FlushAsync();
+        port.WaitForSerialData(fresh.Length, 5000);
+        var buffer = new byte[16];
+        var bytesRead = port.Read(buffer, 0, buffer.Length);
+
+        // Assert - the old ReadExactly(4096) waited out the read timeout for bytes that never came.
+        finished.Should().BeTrue();
+        clearing.ElapsedMilliseconds.Should().BeLessThan(250);
+        buffer.Take(bytesRead).Should().Equal(fresh, "the stale text was discarded, the next reply is intact");
+    }
+
     /// <summary>
     /// A loopback listener on an OS-assigned port, exposing the connection it accepts.
     /// </summary>

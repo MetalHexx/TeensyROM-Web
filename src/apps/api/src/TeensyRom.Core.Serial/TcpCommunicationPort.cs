@@ -566,10 +566,12 @@ namespace TeensyRom.Core.Serial
       {
         if (_networkStream != null && _networkStream.DataAvailable)
         {
+          // Only what the socket already holds: ReadExactly waited out the read timeout for a full
+          // 4096 bytes whenever fewer were stale, and threw.
           var discardBuffer = new byte[4096];
           while (_networkStream.DataAvailable)
           {
-            _networkStream.ReadExactly(discardBuffer);
+            if (_networkStream.Read(discardBuffer, 0, discardBuffer.Length) == 0) break;
           }
         }
       }

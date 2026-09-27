@@ -33,6 +33,12 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
+			if (IsDoneAtAck(r.LaunchItem.FileType))
+			{
+				MarkLaunched(device, r.LaunchItem);
+				return new() { LaunchResult = LaunchFileResultType.Success };
+			}
+
 			var (final, dropped) = Watch(r.CommunicationPort);
 
 			if (final is not null)
@@ -65,6 +71,20 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 			return BuildRecoveryResult(outcome);
 		}
+
+		/// <summary>
+		/// Images, text and programs: once the firmware has accepted the path it says nothing more about
+		/// them on either transport - the C64 menu shows the image or text, or pulls the program in, by
+		/// itself - and none of them can drop the transport, since only an oversized CRT reboots into
+		/// minimal. Watching for a reply and confirming the version afterwards only ran out
+		/// <see cref="ConnectionOptions.LaunchSettleMs"/> (bench, TCP: the path acknowledged within 1 ms,
+		/// then silence; the launch answered after 2.77 s). SID, CRT and HEX still report or drop, so
+		/// they keep the watch.
+		/// </summary>
+		private static bool IsDoneAtAck(TeensyFileType fileType) => fileType is
+			TeensyFileType.Kla or TeensyFileType.Koa or TeensyFileType.Art or TeensyFileType.Aas or TeensyFileType.Hpi or
+			TeensyFileType.Txt or TeensyFileType.Seq or
+			TeensyFileType.Prg or TeensyFileType.P00;
 
 		/// <summary>
 		/// Records what the launched item left the full firmware doing. Anything that swaps the firmware's

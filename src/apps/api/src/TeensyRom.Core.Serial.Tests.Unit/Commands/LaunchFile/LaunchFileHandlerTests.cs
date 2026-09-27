@@ -23,7 +23,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         // without spending real test time - the fake port never actually sleeps.
         private static ConnectionOptions FastOptions() => new() { LaunchSettleMs = 50 };
 
-        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null, string path = "/games/game.prg") => new()
+        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null, string path = "/games/game.crt") => new()
         {
             StorageType = TeensyStorageType.SD,
             LaunchItem = new LaunchableItem { Path = new FilePath(path), Size = 900_000 },
@@ -63,7 +63,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             port.NewSegment().EnqueueToken(TeensyToken.GoodSIDToken);
             var handler = BuildHandler();
 
-            var result = await handler.Handle(BuildCommand(port), CancellationToken.None);
+            var result = await handler.Handle(BuildCommand(port, path: "/music/tune.sid"), CancellationToken.None);
 
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
@@ -72,7 +72,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         }
 
         [Fact]
-        public async Task Handle_PrgLaunch_LoadingTextThenFullVersionReply_ReturnsSuccessAndMarksDeviceBusy()
+        public async Task Handle_CartLaunch_LoadingTextThenFullVersionReply_ReturnsSuccessAndMarksDeviceBusy()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
@@ -196,6 +196,37 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.Received(1).RecoverAsync(device, RecoveryReason.LargeLaunch, Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>
+        /// The firmware says nothing more about an image, text or program once it has accepted the path,
+        /// and none of them can drop the transport - so the launch is done at the ack, with no watch window
+        /// and no version confirm (bench: a .kla answered after 2.77 s, the firmware was done in 1 ms).
+        /// </summary>
+        [Theory]
+        [InlineData("/images/HA_Sugar_Skull.kla")]
+        [InlineData("/images/pic.koa")]
+        [InlineData("/images/pic.art")]
+        [InlineData("/images/pic.aas")]
+        [InlineData("/images/pic.hpi")]
+        [InlineData("/docs/readme.txt")]
+        [InlineData("/docs/story.seq")]
+        [InlineData("/games/game.prg")]
+        [InlineData("/games/game.p00")]
+        public async Task Handle_FileTheFirmwareOnlyAcknowledges_ReturnsSuccessAtTheAckAndMarksDeviceBusy(string path)
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, path), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy, "the item owns the IO handler, as a cart does");
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
