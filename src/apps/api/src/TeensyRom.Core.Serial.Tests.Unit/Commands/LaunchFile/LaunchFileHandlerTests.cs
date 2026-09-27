@@ -251,6 +251,28 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
 
+        /// <summary>
+        /// A HEX starts a firmware update, and the firmware answers nothing until it has flashed and
+        /// rebooted: the launch is done at the ack and the device is left busy, with no version request
+        /// and no recovery to report a disconnect in the middle of the update.
+        /// </summary>
+        [Fact]
+        public async Task Handle_HexLaunch_ReturnsSuccessAtTheAckAndMarksDeviceBusy()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/firmware/TeensyROM+_0.8.0.11_full.hex"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
         [Fact]
         public async Task Handle_RetryLaunchToken_ReturnsDeclinedWithoutRecovery()
         {

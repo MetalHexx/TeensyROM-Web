@@ -78,13 +78,17 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		/// itself - and none of them can drop the transport, since only an oversized CRT reboots into
 		/// minimal. Watching for a reply and confirming the version afterwards only ran out
 		/// <see cref="ConnectionOptions.LaunchSettleMs"/> (bench, TCP: the path acknowledged within 1 ms,
-		/// then silence; the launch answered after 2.77 s). SID, CRT and HEX still report or drop, so
-		/// they keep the watch.
+		/// then silence; the launch answered after 2.77 s).
+		/// A HEX starts a firmware update: the firmware reads nothing from either transport until it has
+		/// flashed and rebooted (<c>DoFlashUpdate</c> runs inside its main loop), so a version confirm goes
+		/// unanswered and the recovery that followed reported a disconnect in the middle of the update. It
+		/// is left busy instead. SID and CRT still report or drop, so they keep the watch.
 		/// </summary>
 		private static bool IsDoneAtAck(TeensyFileType fileType) => fileType is
 			TeensyFileType.Kla or TeensyFileType.Koa or TeensyFileType.Art or TeensyFileType.Aas or TeensyFileType.Hpi or
 			TeensyFileType.Txt or TeensyFileType.Seq or
-			TeensyFileType.Prg or TeensyFileType.P00;
+			TeensyFileType.Prg or TeensyFileType.P00 or
+			TeensyFileType.Hex;
 
 		/// <summary>
 		/// Records what the launched item left the full firmware doing. A cart or a program swaps the
