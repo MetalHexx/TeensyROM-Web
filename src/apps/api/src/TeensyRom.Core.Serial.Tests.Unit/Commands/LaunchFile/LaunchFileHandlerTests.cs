@@ -23,10 +23,10 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         // without spending real test time - the fake port never actually sleeps.
         private static ConnectionOptions FastOptions() => new() { LaunchSettleMs = 50 };
 
-        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null, string path = "/games/game.crt") => new()
+        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null, string path = "/games/game.crt", long size = 900_000) => new()
         {
             StorageType = TeensyStorageType.SD,
-            LaunchItem = new LaunchableItem { Path = new FilePath(path), Size = 900_000 },
+            LaunchItem = new LaunchableItem { Path = new FilePath(path), Size = size },
             CommunicationPort = port,
             DeviceId = deviceId
         };
@@ -271,6 +271,50 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>
+        /// A CRT of at most 128 KB of chips plus its 64-byte header always fits the firmware's RAM1 cart
+        /// buffer, so it can never reboot into minimal: the launch is done at the ack and the running cart
+        /// leaves the device busy. 8,272 bytes is an 8 KB cart; 131,136 is the limit itself.
+        /// </summary>
+        [Theory]
+        [InlineData(8_272)]
+        [InlineData(131_136)]
+        public async Task Handle_CertainFitCrtLaunch_ReturnsSuccessAtTheAckAndMarksDeviceBusy(long size)
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/games/Ace 2088.crt", size), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>
+        /// One byte over the limit, the cart may spill into RAM2 and reboot into minimal, so the launch
+        /// keeps the watch and the version confirm.
+        /// </summary>
+        [Fact]
+        public async Task Handle_CrtLaunchOverTheCertainFit_KeepsTheWatchAndVersionConfirm()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty with { IsTeensyRom = true, IsMinimalFirmware = false });
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, size: 131_137), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            _interrogator.Received(1).ReadVersion(Arg.Any<ICommunicationPort>());
         }
 
         [Fact]

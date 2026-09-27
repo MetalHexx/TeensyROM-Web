@@ -33,7 +33,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			if (IsDoneAtAck(r.LaunchItem.FileType))
+			if (IsDoneAtAck(r.LaunchItem))
 			{
 				MarkLaunched(device, r.LaunchItem);
 				return new() { LaunchResult = LaunchFileResultType.Success };
@@ -82,13 +82,29 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		/// A HEX starts a firmware update: the firmware reads nothing from either transport until it has
 		/// flashed and rebooted (<c>DoFlashUpdate</c> runs inside its main loop), so a version confirm goes
 		/// unanswered and the recovery that followed reported a disconnect in the middle of the update. It
-		/// is left busy instead. SID and CRT still report or drop, so they keep the watch.
+		/// is left busy instead. A CRT no larger than <see cref="CertainFitCrtBytes"/> always loads in place,
+		/// so it too is done at the ack (bench, TCP: Ace 2088, 82 KB, answered after 2.73 s). SID and a
+		/// larger CRT still report or drop, so they keep the watch.
 		/// </summary>
-		private static bool IsDoneAtAck(TeensyFileType fileType) => fileType is
+		private static bool IsDoneAtAck(LaunchableItem item) => item.FileType is
 			TeensyFileType.Kla or TeensyFileType.Koa or TeensyFileType.Art or TeensyFileType.Aas or TeensyFileType.Hpi or
 			TeensyFileType.Txt or TeensyFileType.Seq or
 			TeensyFileType.Prg or TeensyFileType.P00 or
-			TeensyFileType.Hex;
+			TeensyFileType.Hex
+			|| IsCertainFitCrt(item);
+
+		/// <summary>
+		/// The largest CRT file that can never reboot the full firmware into minimal: the firmware's fixed
+		/// 128 KB RAM1 cart buffer (<c>MaxRAM_ImageSize</c>, <c>TeensyROM.h</c>) plus the file's 64-byte
+		/// header. Chips go into that buffer first and spill into free RAM2 - where running out reboots
+		/// into minimal - only once it is full (<c>FileParsers.ino</c> <c>ParseChipHeader</c>), so a file
+		/// this size or smaller holds at most 128 KB of chips and always loads in place. Above it, whether
+		/// the cart fits depends on the RAM2 left free at load time.
+		/// </summary>
+		private const long CertainFitCrtBytes = 128 * 1024 + 64;
+
+		private static bool IsCertainFitCrt(LaunchableItem item) =>
+			item.FileType == TeensyFileType.Crt && item.Size <= CertainFitCrtBytes;
 
 		/// <summary>
 		/// Records what the launched item left the full firmware doing. A cart or a program swaps the
