@@ -256,7 +256,9 @@ namespace TeensyRom.Core.Serial
           }
         }
 
-        if (bytesRead < count)
+        // Like SerialPort.Read: once buffered bytes are in hand, take only what the socket already
+        // holds. Blocking for the remainder would wait out the read timeout and discard what was read.
+        if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = _networkStream.Read(buffer, offset + bytesRead, count - bytesRead);
           bytesRead += streamRead;
@@ -278,8 +280,9 @@ namespace TeensyRom.Core.Serial
 
     /// <summary>
     /// Async counterpart of <see cref="Read"/>. Drains the receive buffer first and, exactly like
-    /// <see cref="Read"/>, performs at most a single stream read for the remainder - so it may return
-    /// fewer than <paramref name="count"/> bytes.
+    /// <see cref="Read"/>, goes to the socket for the remainder only when nothing was buffered or the
+    /// socket already holds more - at most a single stream read - so it may return fewer than
+    /// <paramref name="count"/> bytes.
     /// </summary>
     public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
     {
@@ -299,7 +302,7 @@ namespace TeensyRom.Core.Serial
           }
         }
 
-        if (bytesRead < count)
+        if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = await _networkStream.ReadAsync(buffer.AsMemory(offset + bytesRead, count - bytesRead), ct);
           bytesRead += streamRead;
