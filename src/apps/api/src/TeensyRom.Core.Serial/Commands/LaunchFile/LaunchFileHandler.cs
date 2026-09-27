@@ -41,11 +41,28 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				return new() { LaunchResult = LaunchFileResultType.Success };
 			}
 
-			var (final, dropped) = Watch(r.CommunicationPort);
+			bool dropped;
 
-			if (final is not null)
+			if (r.LaunchItem.FileType == TeensyFileType.Crt)
 			{
-				return GetFinalResult(final.Value);
+				var load = AwaitCartLoad(r.CommunicationPort, device);
+
+				if (load == CartLoad.Loaded)
+				{
+					MarkLaunched(device, r.LaunchItem);
+					return new() { LaunchResult = LaunchFileResultType.Success };
+				}
+
+				dropped = load == CartLoad.Dropped;
+			}
+			else
+			{
+				(var final, dropped) = Watch(r.CommunicationPort);
+
+				if (final is not null)
+				{
+					return GetFinalResult(final.Value);
+				}
 			}
 
 			if (!dropped)
@@ -85,9 +102,10 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		/// flashed and rebooted (<c>DoFlashUpdate</c> runs inside its main loop), so a version confirm goes
 		/// unanswered and the recovery that followed reported a disconnect in the middle of the update. It
 		/// is left busy instead. A CRT no larger than <see cref="CertainFitCrtBytes"/> always loads in place,
-		/// so it needs no watch or confirm either (bench, TCP: Ace 2088, 82 KB, answered after 2.73 s). SID
-		/// and a larger CRT still report or drop, so they keep the watch. Before returning, the handler
-		/// reads the "Resetting C64" lines the launch still owes (<see cref="AwaitResetLines"/>).
+		/// so it needs no watch or confirm either (bench, TCP: Ace 2088, 82 KB, answered after 2.73 s). A SID
+		/// still reports through the watch, and a larger CRT may drop, so it waits for its after-load line
+		/// (<see cref="AwaitCartLoad"/>). Before returning, the handler reads the "Resetting C64" lines the
+		/// launch still owes (<see cref="AwaitResetLines"/>).
 		/// </summary>
 		private static bool IsDoneAtAck(LaunchableItem item) => item.FileType is
 			TeensyFileType.Kla or TeensyFileType.Koa or TeensyFileType.Art or TeensyFileType.Aas or TeensyFileType.Hpi or
@@ -150,12 +168,74 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				return;
 			}
 
-			var received = string.Empty;
+			var received = ReadResetLines(port, string.Empty, owed, options.LaunchSettleMs, Stopwatch.StartNew());
+			var seen = CountResetLines(received);
+
+			if (seen < owed)
+			{
+				log.Internal($"LaunchFileHandler: expected {owed} reset line(s) after the launch, saw {seen}");
+			}
+		}
+
+		private enum CartLoad { Loaded, Silent, Dropped }
+
+		/// <summary>
+		/// How long after the ack a <see cref="ResetLine"/> can only be the back-to-menu one. It starts
+		/// ~10 ms after the ack (bench, TCP: +9 to +14 ms), while no cart larger than
+		/// <see cref="CertainFitCrtBytes"/> has loaded that soon (the smallest one tried: +277 ms from the
+		/// menu). Only applied to those larger carts: a small cart can load within it.
+		/// </summary>
+		private const int BackToMenuWindowMs = 100;
+
+		/// <summary>
+		/// Waits for a CRT larger than <see cref="CertainFitCrtBytes"/> to report that it loaded in place:
+		/// the firmware resets the C64 into the cart and prints <see cref="ResetLine"/> (bench, TCP:
+		/// +277 ms for 131 KB from the menu, +1,057 ms for 492 KB while a cart ran). A cart too big for the
+		/// full firmware reboots into minimal while its chips load, before that line, and the port goes
+		/// silent, so silence still falls back to the version confirm, and a serial port that drops goes
+		/// straight to recovery, as with <see cref="Watch"/>. Launched while a cart runs, the firmware
+		/// first prints the line going back to the menu, so two are owed. The record says whether a cart
+		/// ran, but a game started from the C64's own menu leaves it saying the menu: a line starting
+		/// within <see cref="BackToMenuWindowMs"/> is the back-to-menu one, so one more is owed then too. Taken for the after-load line, it would have skipped the recovery of a
+		/// cart that went on to drop; a misjudged window only ever costs the version confirm.
+		/// </summary>
+		private CartLoad AwaitCartLoad(ICommunicationPort port, TeensyRomDevice? device)
+		{
 			var stopwatch = Stopwatch.StartNew();
 
+			try
+			{
+				var received = ReadResetLines(port, string.Empty, int.MaxValue, Math.Min(BackToMenuWindowMs, options.LaunchSettleMs), stopwatch);
+				var wentBackToMenu = device?.Connection.Mode == DeviceMode.FullBusy || received.Contains(ResetLine.TrimEnd(), StringComparison.Ordinal);
+				var owed = wentBackToMenu ? 2 : 1;
+
+				received = ReadResetLines(port, received, owed, options.LaunchSettleMs, stopwatch);
+				var seen = CountResetLines(received);
+
+				if (seen >= owed)
+				{
+					return CartLoad.Loaded;
+				}
+
+				log.Internal($"LaunchFileHandler: expected {owed} reset line(s) after the cart launch, saw {seen}; confirming with the version");
+				return CartLoad.Silent;
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
+			{
+				return CartLoad.Dropped;
+			}
+		}
+
+		/// <summary>
+		/// Appends what the port sends to <paramref name="received"/> until it holds
+		/// <paramref name="owed"/> whole <see cref="ResetLine"/>s or <paramref name="untilMs"/> have passed
+		/// on <paramref name="stopwatch"/>. Reads as the data lands, like <c>WaitForMenuBootToken</c>.
+		/// </summary>
+		private static string ReadResetLines(ICommunicationPort port, string received, int owed, int untilMs, Stopwatch stopwatch)
+		{
 			while (CountResetLines(received) < owed)
 			{
-				var remainingMs = options.LaunchSettleMs - (int)stopwatch.ElapsedMilliseconds;
+				var remainingMs = untilMs - (int)stopwatch.ElapsedMilliseconds;
 
 				if (remainingMs <= 0)
 				{
@@ -182,12 +262,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				received += buffer[..bytesRead].ToUtf8();
 			}
 
-			var seen = CountResetLines(received);
-
-			if (seen < owed)
-			{
-				log.Internal($"LaunchFileHandler: expected {owed} reset line(s) after the launch, saw {seen}");
-			}
+			return received;
 		}
 
 		private static int CountResetLines(string text)

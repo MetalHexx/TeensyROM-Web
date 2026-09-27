@@ -73,7 +73,11 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         public ScriptedCommunicationPort EnqueueTokenAfterQuiet(int quietMs, TeensyToken token) =>
             EnqueueAfterQuiet(quietMs, (byte)(token.Value & 0xFF), (byte)(token.Value >> 8));
 
-        /// <summary>Arms a one-shot exception thrown by the next <see cref="ReadSerialBytes(int)"/> call, then clears itself.</summary>
+        /// <summary>
+        /// Arms a one-shot exception thrown by the next <see cref="ReadSerialBytes(int)"/> call, or by the
+        /// next <see cref="WaitForSerialData"/> call that has to wait - the port dies once the scripted
+        /// bytes run out - then clears itself.
+        /// </summary>
         public ScriptedCommunicationPort ThrowOnNextRead(Exception exception)
         {
             _scriptedReadException = exception;
@@ -143,12 +147,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         /// </summary>
         public byte[] ReadSerialBytes(int msToWait = 0)
         {
-            if (_scriptedReadException is not null)
-            {
-                var exception = _scriptedReadException;
-                _scriptedReadException = null;
-                throw exception;
-            }
+            ThrowScriptedReadException();
 
             if ((_currentSegment is null || _currentSegment.Count == 0) && _segments.Count > 0)
             {
@@ -179,6 +178,8 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
                 return;
             }
 
+            ThrowScriptedReadException();
+
             if (_lateArrivals.Count > 0 && _lateArrivals.Peek().QuietMs <= timeoutMs)
             {
                 var (_, bytes) = _lateArrivals.Dequeue();
@@ -205,6 +206,16 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         public ConnectionType GetConnectionType() => ConnectionType.Serial;
 
         public void Dispose() { }
+
+        private void ThrowScriptedReadException()
+        {
+            if (_scriptedReadException is not null)
+            {
+                var exception = _scriptedReadException;
+                _scriptedReadException = null;
+                throw exception;
+            }
+        }
 
         private string DrainCurrentSegmentAsText()
         {
