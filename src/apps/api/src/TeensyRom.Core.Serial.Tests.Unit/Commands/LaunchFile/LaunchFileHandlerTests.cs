@@ -202,18 +202,12 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         /// The firmware says nothing more about an image, text or program once it has accepted the path,
         /// and none of them can drop the transport - so the launch is done at the ack, with no watch window
         /// and no version confirm (bench: a .kla answered after 2.77 s, the firmware was done in 1 ms).
+        /// This case and the next cover both halves: a program ends busy, an image or text ends idle.
         /// </summary>
         [Theory]
-        [InlineData("/images/HA_Sugar_Skull.kla")]
-        [InlineData("/images/pic.koa")]
-        [InlineData("/images/pic.art")]
-        [InlineData("/images/pic.aas")]
-        [InlineData("/images/pic.hpi")]
-        [InlineData("/docs/readme.txt")]
-        [InlineData("/docs/story.seq")]
         [InlineData("/games/game.prg")]
         [InlineData("/games/game.p00")]
-        public async Task Handle_FileTheFirmwareOnlyAcknowledges_ReturnsSuccessAtTheAckAndMarksDeviceBusy(string path)
+        public async Task Handle_ProgramLaunch_ReturnsSuccessAtTheAckAndMarksDeviceBusy(string path)
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
@@ -224,7 +218,35 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
 
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
-            device.Connection.Mode.Should().Be(DeviceMode.FullBusy, "the item owns the IO handler, as a cart does");
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy, "a running program owns the IO handler, as a cart does");
+            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>
+        /// The C64 menu shows an image or text under the TeensyROM handler, so the firmware keeps answering:
+        /// the record ends idle, even when a running game had left it busy.
+        /// </summary>
+        [Theory]
+        [InlineData("/images/HA_Sugar_Skull.kla")]
+        [InlineData("/images/pic.koa")]
+        [InlineData("/images/pic.art")]
+        [InlineData("/images/pic.aas")]
+        [InlineData("/images/pic.hpi")]
+        [InlineData("/docs/readme.txt")]
+        [InlineData("/docs/story.seq")]
+        public async Task Handle_ImageOrTextLaunch_ReturnsSuccessAtTheAckAndMarksDeviceIdle(string path)
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, path), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+            device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
         }
