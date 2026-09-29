@@ -174,7 +174,7 @@ measured value plus margin, never the raw number.
 | 1. Minimal → full, non-launch reboot (Serial) | | 5.26 s (2026-09-26 session, run 1); reconfirmed 5.27 s (run 2) | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | unchanged — comfortably inside seed |
 | 1. SID launch from minimal, reset-and-recover (Serial) | | 5.40 s (run 1); reconfirmed 5.04 s (run 2) | `Serial.ToFullMs + LaunchSettleMs` | unchanged — comfortably inside seed |
 | 1. Large launch from minimal, reset-and-recover (Serial) | | 9.01 s (run 1); reconfirmed 9.05 s (run 2) | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | unchanged — comfortably inside seed |
-| 2. Full → minimal, listener off (Serial) | | 3.52 s (run 1); reconfirmed 3.93 s (run 2) — **listener left ON** (Ethernet reachable throughout; the fixture forces Serial regardless of Ethernet state), so TCP retry noise is not ruled out. A true listener-off isolation still needs a person at the C64 settings menu — see "Still needs a human" below | `Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip) | unchanged — comfortably inside seed even un-isolated |
+| 2. Full → minimal, listener off (Serial) | | 3.52 s (run 1); reconfirmed 3.93 s (run 2) — **listener left ON** (Ethernet reachable throughout; the fixture forces Serial regardless of Ethernet state), so TCP retry noise is not ruled out. A true listener-off isolation still needs a person at the C64 settings menu — see "Still needs a human" below | ~~`Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip)~~ `Serial.ToMinimalMs` = 30000 (`09b37179`, 2026-09-28 — DHCP with the cable unplugged; see "Corrective" below) | ~~unchanged — comfortably inside seed even un-isolated~~ superseded 2026-09-28: this session's own 3.52–3.93 s numbers stayed comfortably inside either seed, but a DHCP-blocked minimal answered at 17.2 s on a different bench setup, past the old 15000 ceiling — see "Corrective" below |
 | 3. Both units in minimal at once (Serial) | | not run — needs a second physical unit; only device `19277260` was attached and authorized this session — see "Still needs a human" below | n/a — sanity check, not a ceiling | |
 | 4. Serial-only cold start, two dead TCP rows | | not run — needs a second unit (the miss requires "both units' rows" to fail) plus the listener physically off — see "Still needs a human" below | `ConnectTimeoutMs` × dead rows + full discovery | |
 | 5. Listener on, unplugged (TCP) | | not run — needs a person to physically unplug the unit's Ethernet cable — see "Still needs a human" below | `ConnectTimeoutMs` = 2000 per attempt | |
@@ -384,6 +384,24 @@ Every number above lands well inside the existing `appsettings.json` ceilings (`
 `Serial.ToFullMs` = 15000) with the boot-complete-flag firmware; `appsettings.json` is unchanged by this
 task. `reset-launch.mjs`'s 10/10 on both transports is the direct proof the boot-complete wait holds at
 the tightest timing the API can produce — a reset immediately followed by a launch, no pause.
+
+## Corrective (`09b37179`, 2026-09-28): serial waits out DHCP with the cable unplugged
+
+A bench setup with DHCP on and no Ethernet cable found two ceilings too tight, both raised the same day:
+
+- **`Serial.ToMinimalMs` 15000 → 30000.** With DHCP on and no cable, minimal firmware answers on USB only
+  after its own DHCP timeout (15 s by default) — bench: minimal answered 17.2 s after a large launch,
+  past the old 15000 ms ceiling, so `LargeLaunch` recovery gave up and returned a 502 while the game had
+  actually loaded and was running fine.
+- **`MenuBootTimeoutMs` (compiled default, not in `appsettings.json`) 30000 → 45000.** The full menu pays
+  the same DHCP timeout twice on this setup — once to start its own network, once for its time sync —
+  so `Boot: complete` came 30.5 s and 30.7 s after the SID token, past the old 30 s limit: a `Stop`
+  (`PUT .../reset`) failed on the boot-complete wait even though the reset itself had worked.
+
+`Serial.ToFullMs` and the TCP ceilings are unchanged — this is a serial/minimal-firmware-Ethernet-setup
+finding, not a TCP or full-firmware one. A new unit test, `ConnectionOptionsBinderTests`, checks the
+shipped `appsettings.json` against the compiled defaults so the file can't drift from them silently, since
+the file's `Serial.ToMinimalMs` overrides the code but `MenuBootTimeoutMs` is left to the compiled default.
 
 ## Discovery/occasion after-numbers
 

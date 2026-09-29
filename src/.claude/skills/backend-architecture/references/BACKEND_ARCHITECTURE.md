@@ -373,6 +373,7 @@ Every command runs `Logging → Exception → CommunicationPort`:
   4. Drop → recovery — a transport drop (`TransportDrop.IsDrop`), whether at open or during the exchange, hands the device to `DeviceRecovery.RecoverAsync(..., RecoveryReason.Drop)` and rethrows
   5. Minimal → full, launches included — if the device is believed `Minimal`, resets it and recovers to full (`RecoveryReason.LeaveMinimal`) before letting *any* command through, a launch included; minimal firmware cannot run a file at all, and sending a launch to it left the device unreachable when the reboot-vs-jump outcome went wrong, so there is no exemption here
   6. Busy → idle for non-launch — if the device is believed `FullBusy` (a handler-swapping launch left a cart/PRG/image owning the firmware's IO handler, so every non-always-available command answers `Busy!`) and the command is not `LaunchFileCommand`, resets it and clears the buffers. No recovery routine and no sleep: a full-firmware reset keeps the port/socket open. When the reset's own signal says the menu came back up, the record is marked idle and the command proceeds; when it does not, the command fails with a legible reason instead of running against a device that may still be mid-boot — the same reset-outcome check the reactive-`Busy` retry below makes. A launch is again exempt — the firmware takes a launch directly, and reactive `Busy` is the backstop if it does not
+  7. A reset command the gate has just performed itself succeeds without its handler — branches 5 and 6 above both end in a reset; if that reset's own `MenuBootOutcome` was `Complete` and the incoming request is a `ResetCommand`, the C64 is already sitting in the menu the command asked for, so the gate returns success straight away (`GateResetWasTheReset`) rather than rebooting the same menu a second time (bench: one Stop used to cost two ~15 s resets). A reset the gate did *not* perform (an idle device, or one with `MenuBootPending` already set) still reaches `ResetCommandHandler` as before, and one that left minimal but answers busy also gets the handler's own reset — the firmware is saying the menu is not what's running. When a gate reset instead comes back `StillBooting`, no branch above marks the device idle/full: `MenuBootPending` is set (`DeviceConnectionRecord.MenuBootPending`) and the command fails with a legible "hasn't finished booting" reason; the *next* command sees the flag and checks the boot (another `WaitForBootComplete`) rather than resetting a C64 that's already up
 - **What it does not do**: it never closes the port itself — only `DeviceRecovery` closes and reopens one, and only while reacquiring
 
 ### The Reset Primitive
@@ -392,12 +393,24 @@ reply could matter.
   TR"). Only once that token is seen does it move on to waiting for the firmware's own `Boot: complete`
   flag: the menu still has its network time sync and item listing ahead of it, and a command sent in
   that window can be lost.
-- **Waits on signals, not the clock.** `WaitForMenuBootToken` reads until it sees either SID token,
-  bounded (3 s default), then clears the buffers; `WaitForBootComplete` polls the version command every
-  `PollIntervalMs` until the reply's `Boot:` line reads `complete`, bounded (8 s default — covers the
-  roughly 1-in-20 resets where the menu's network time sync stalls it). No fixed sleep either way.
-- **A timeout at either wait is reported, not swallowed**: `ResetDevice` returns `false` and logs which
-  wait failed. The reset command does not fail on it — the device was still reset — but the log says so.
+- **One shared ceiling, not two fixed waits.** The token wait and the boot-complete wait both spend from
+  the same budget, `ConnectionOptions.MenuBootTimeoutMs` (`Connection:MenuBootTimeoutMs`, 45 s default) —
+  a ceiling, not a delay, since either wait ends the moment the menu reports in (~1 s normally). The
+  TR's own settings can hold the menu up for many seconds that add up: NFC reader setup ahead of the menu
+  (up to 20 retries), the network time sync (5 s of DNS plus 2.5 s of NTP with no internet — bench: 8.5 s
+  of silence), DHCP with the cable out (15 s by default, user-configurable, and paid twice on some setups
+  — once to start the network, once for the time sync). `WaitForBootComplete` waits out every version
+  request it already sent for its own reply, even past the bound, rather than abandoning it to be misread
+  as the next command's answer.
+- **`ResetDevice` returns a three-way `MenuBootOutcome`, not a bool.** `NotStarted` — no SID token within
+  the bound (minimal never emits one, so a device still in minimal always reports this), or the transport
+  dropped. `StillBooting` — the menu announced itself (the reset took) but hadn't reported `Boot: complete`
+  within the shared bound. `Complete` — both signals landed. A `StillBooting` outcome (or a `LeaveMinimal`
+  recovery that meets the same state — see `MenuBootFailure` below) marks the device's
+  `DeviceConnectionRecord.MenuBootPending` instead of idle or full: the *next* command checks the boot
+  (another `WaitForBootComplete`) rather than resetting a C64 that's already sitting in the menu. Every
+  outcome is reported, not swallowed — the reset command does not fail on `StillBooting`/`NotStarted` (the
+  device was still reset), but the log, and for the gate's own resets the command's own reply, say so.
 - **`ResetFromMinimal` cannot wait at all**: the Teensy reboots immediately, so the transport drops
   before either signal could arrive. `DeviceRecovery`'s `LeaveMinimal` path does the equivalent wait once
   the device is reacquired (below).
@@ -406,8 +419,8 @@ reply could matter.
 
 | Occasion | Trigger | What it touches |
 |----------|---------|------------------|
-| **Start** | API boot — `ApplicationBootstrapService` calls `DeviceConnectionManager.ConnectAtStartAsync` | Loads `ConnectionRecords.json`; opens each cached endpoint bounded by `ConnectTimeoutMs`, confirms it by chip id (serial via `TeensyPortLocator`, TCP via a direct connect), hands the confirmed endpoint to `CartFinder.BuildDevice`. Any miss, or an empty/missing cache, falls back to a full discovery sweep. |
-| **Discover Devices** | `GET /api/devices/?FullScan=true` (`FindDevicesEndpoint`) | Disposes every currently open port, runs `SerialDiscoveryStrategy` and `TcpDiscoveryStrategy` in parallel via `CartFinder.FindDevices`, marks any chip missing from the new sweep `Unreachable`, replaces `ConnectionRecords.json` whole. |
+| **Start** | API boot — `ApplicationBootstrapService` calls `DeviceConnectionManager.ConnectAtStartAsync` | Loads `ConnectionRecords.json`; for each row, tries its cached transport first and, on a miss, the row's *other* cached endpoint once (`TryConfirmCachedRow`) before counting the row as a miss — each attempt bounded by `ConnectTimeoutMs`, confirmed by chip id (serial via `TeensyPortLocator`, TCP via a direct connect), and handed to `CartFinder.BuildDevice`. Any row miss, or an empty/missing cache, falls back to a full discovery sweep. |
+| **Discover Devices** | `GET /api/devices/?FullScan=true` (`FindDevicesEndpoint`) | Disposes every currently open port, runs `SerialDiscoveryStrategy` and `TcpDiscoveryStrategy` in parallel via `CartFinder.FindDevices`, marks any chip missing from the new sweep `Unreachable`. A device confirmed on one transport carries forward whatever endpoint it already held for the *other* transport (`CarryForwardEndpoint`) rather than losing it. **An empty sweep (0 devices found) leaves `ConnectionRecords.json` untouched** — the in-memory records already mark the absent chips `Unreachable`, and rewriting the file would drop a unit that is merely away right now, forcing a full scan on every later start; the file is only replaced whole when the sweep found at least one device. |
 | **Page load** | `GET /api/devices/` (`FullScan=false`, the default — this is also what the UI's own bootstrap call uses) | No device is contacted. Returns `GetAvailableDevices()` as already known; if a Start or Discover Devices occasion is in flight, it joins that occasion's result instead of returning an empty list, but starts nothing itself. |
 
 ### Device Recovery
@@ -416,30 +429,43 @@ reply could matter.
 
 - **Reacquire in place**: serial finds the device's current port by chip id via `TeensyPortLocator` (falling back to probing every present COM port when the descriptor filter is unavailable); TCP closes and reconnects to the device's last-known endpoint
 - **Poll version**: once reacquired, polls the version command every `ConnectionOptions.PollIntervalMs` (default 250 ms) until it answers with the reason's expected mode
-- **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal`, `LeaveMinimal` waits for full, `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`. There is no reason for a launch sent while already `Minimal`: the gate resets every `Minimal` device to full before a launch (or any other command) reaches the handler, so a launch's own recovery only ever runs `LargeLaunch`
+- **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal` within `ToMinimalMs`; `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`; `LeaveMinimal` waits for full, but its ceiling is **not** `ToFullMs` alone — over TCP the full firmware's network only comes up from the menu, so it is `ToFullMs + ConnectionOptions.MenuBootTimeoutMs` (the full menu boot, on top of the Teensy's own restart); over serial the menu answers before it finishes booting, so serial's `LeaveMinimal` ceiling is `ToFullMs` by itself. There is no reason for a launch sent while already `Minimal`: the gate resets every `Minimal` device to full before a launch (or any other command) reaches the handler, so a launch's own recovery only ever runs `LargeLaunch`
 - **Unreachable on ceiling**: no correct-chip reply within the ceiling marks the device `Unreachable` and closes the port; its record is kept so the next discovery occasion can find it again
 - **Menu-boot wait on `LeaveMinimal`**: the reset that started this recovery dropped the transport before it could consume the menu's boot SID token, so on serial the reacquire itself (`ReacquireCandidates`) listens for that token before asking a full candidate for its version at all — a request answered too early can make the Teensy miss a C64 bus cycle and corrupt the menu's copy of itself. Once reacquired, the version poll can still answer before the menu has finished booting (`Boot: in progress`); unless the reply already says `Boot: complete`, `MenuBootFailure` waits on `WaitForBootComplete` (same signal and bound as the reset primitive) before declaring the device full. A miss at either wait is recorded on `RecoveryOutcome.Failure` and logged as a warning rather than passed off as a clean recovery
 
-`appsettings.json`'s `Connection` section binds `ConnectionOptions`:
+`appsettings.json`'s `Connection` section binds `ConnectionOptions` (#file:apps/api/src/TeensyRom.Api/appsettings.json):
 
 ```json
 "Connection": {
   "PollIntervalMs": 250,
-  "Tcp": { "ToMinimalMs": 8000, "ToFullMs": 15000 },
-  "Serial": { "ToMinimalMs": 15000, "ToFullMs": 15000 },
+  "Tcp": {
+    "ToMinimalMs": 8000,
+    "ToFullMs": 15000
+  },
+  "Serial": {
+    "ToMinimalMs": 30000,
+    "ToFullMs": 15000
+  },
   "LaunchSettleMs": 2000,
-  "ConnectTimeoutMs": 2000
+  "ConnectTimeoutMs": 2000,
+  "PreferredTransport": "Tcp"
 }
 ```
 
+`Serial.ToMinimalMs` is 30 s, not 15 s: minimal only answers on serial after its own Ethernet setup, and with DHCP and no cable that setup waits out the whole DHCP timeout (15 s by default) first — the old 15 s ceiling turned a large launch into a 502 while the game had actually loaded. `MenuBootTimeoutMs` is not in the shipped file at all; it runs on `ConnectionOptions`'s compiled default (45 s) unless a deployment overrides `Connection:MenuBootTimeoutMs`.
+
 ### Launch's Drop-Expecting Flow
 
-`LaunchFileHandler` is the one handler written to expect a mid-command drop, because a large launch reboots the device. It never sees a `Minimal` device itself — the gate resets minimal to full before a launch reaches it, the same as every other command — so everything below runs from full:
+`LaunchFileHandler` is the one handler written to expect a mid-command drop, because a large launch reboots the device. It never sees a `Minimal` device itself — the gate resets minimal to full before a launch reaches it, the same as every other command — so everything below runs from full. How a launch finishes depends on the file type, not one universal wait:
 
 1. Sends the `LaunchFile` token and clears buffers, then reads the ack. If the device replies `TeensyToken.RetryLaunch` — a request to re-send, not a failure — the handler returns `Declined` immediately, no recovery involved.
-2. Sends the storage token and path, then **watches** the port for up to `ConnectionOptions.LaunchSettleMs`, reading in 25 ms slices. A recognizable final reply (success/SID error/program error) short-circuits the wait.
-3. A read that throws an exception `TransportDrop` classifies as a drop skips straight to recovery — serial already gave a definitive answer. Silence through the whole window (ambiguous; a TCP drop never throws) instead confirms with one version-command read: a full, non-minimal reply is treated as success without invoking recovery, and the record is marked from the launched item's type — `FullBusy` for anything that swaps the IO handler (cart, PRG, image), `FullIdle` only for a SID. The type decides it rather than the port's echo because the firmware's "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
-4. Otherwise it calls `DeviceRecovery.RecoverAsync` with `RecoveryReason.LargeLaunch` — the only reason a launch ever needs, since a large file is the one thing that reboots the device mid-launch — and maps the outcome via `BuildRecoveryResult`: unreachable → `Disconnected`; ending in `Minimal` → success (the large file rebooted the device to receive it); any other reachable mode → `Error` ("the launch did not take: the device came back in full firmware").
+2. Sends the storage token and path and reads its ack. **Done at the ack** for images, text, PRG/P00, and CRTs no larger than 131,136 bytes (128 KB of the firmware's fixed cart buffer plus a 64-byte header — always small enough to load in place): the firmware says nothing more about these once it has the path, so the handler just reads the "Resetting C64" line(s) the launch still owes (one if it interrupted a running cart, one more for a cart) and marks the item launched. A HEX is also done at the ack but left busy with no wait at all — it starts a firmware update and reads nothing from either transport until it has flashed and rebooted, so a version confirm would misread the flash as a disconnect.
+3. A **CRT larger than 131,136 bytes** may spill into free RAM2 and reboot into minimal to keep loading: `AwaitCartLoad` waits up to `ConnectionOptions.LaunchSettleMs` for the after-load "Resetting C64" line(s) instead. Loaded → success. A read that throws an exception `TransportDrop` classifies as a drop skips straight to recovery — serial already gave a definitive answer. Silent through the window (ambiguous; a TCP drop never throws) falls through to the version confirm below.
+4. A **SID** is the only type `Watch` actually polls: up to `ConnectionOptions.LaunchSettleMs`, reading in 25 ms slices, until a recognizable final reply (success/SID error/program error) short-circuits the wait. A drop skips straight to recovery the same as step 3; silence falls through to the version confirm.
+5. **The version confirm** (steps 3-4's silent path only): one version-command read. A full, non-minimal reply is treated as success without invoking recovery, and the record is marked from the launched item's type — `FullBusy` for anything that swaps the IO handler (cart, PRG, image), `FullIdle` only for a SID. The type decides it rather than the port's echo because the firmware's "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
+6. Otherwise it calls `DeviceRecovery.RecoverAsync` with `RecoveryReason.LargeLaunch` — the only reason a launch ever needs, since a large file is the one thing that reboots the device mid-launch — and maps the outcome via `BuildRecoveryResult`: unreachable → `Disconnected`; ending in `Minimal` → success (the large file rebooted the device to receive it); any other reachable mode → `Error` ("the launch did not take: the device came back in full firmware").
+
+`MarkLaunched` (steps 2, 3 and 5's success paths) leaves the record idle for a SID, an image, or text — the C64 menu plays or shows these itself, so the firmware keeps the TeensyROM handler — and busy for everything else (PRG, P00, HEX, CRT), which switch the firmware to a different handler until something resets it.
 
 ### Serial Locator
 
@@ -490,6 +516,7 @@ sequenceDiagram
         D-->>P: [RX] Ack
         H->>P: HandleAck()
 
+        Note over H: shown here for a SID (Watch) - images/text/PRG/P00/HEX/small CRTs finish at this ack instead, a larger CRT waits on AwaitCartLoad; see "Launch's Drop-Expecting Flow" above
         Note over H: Watch() — poll up to LaunchSettleMs in 25ms slices
         loop until a final reply or the settle window elapses
             H->>P: ReadSerialBytes(25)
