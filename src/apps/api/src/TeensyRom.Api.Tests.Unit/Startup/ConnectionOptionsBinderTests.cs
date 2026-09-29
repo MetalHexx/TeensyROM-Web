@@ -67,4 +67,20 @@ public class ConnectionOptionsBinderTests
 
         options.ConnectTimeoutMs.Should().Be(1);
     }
+
+    [Fact]
+    public void BindFrom_ShippedAppSettings_MatchesCompiledDefaults()
+    {
+        // appsettings.json overrides the compiled defaults, so a default raised in ConnectionOptions alone
+        // never takes effect (the serial ToMinimalMs raise to 30 s needed both).
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+        var defaults = new TeensyRom.Core.Serial.Recovery.ConnectionOptions();
+
+        var options = ConnectionOptionsBinder.BindFrom(configuration);
+
+        options.Should().BeEquivalentTo(defaults);
+    }
 }
