@@ -513,6 +513,63 @@ describe('PlayerToolbarComponent', () => {
     });
   });
 
+  describe('disabled play/pause for an incompatible file', () => {
+    it('disables play/pause in both layouts', () => {
+      const { fixture, currentFile, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, desktopPlayPause] = desktopButtons(fixture);
+      const [, tabletPlayPause] = tabletButtons(fixture);
+
+      expect(prop(desktopPlayPause, 'disabled')).toBe(true);
+      expect(prop(tabletPlayPause, 'disabled')).toBe(true);
+    });
+
+    it('re-enables play/pause once the file is compatible again', () => {
+      const { fixture, currentFile, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      fileCompatible.set(true);
+      fixture.detectChanges();
+
+      const [, desktopPlayPause] = desktopButtons(fixture);
+      expect(prop(desktopPlayPause, 'disabled')).toBe(false);
+    });
+
+    it('keeps Stop enabled for an incompatible non-song file that is still Playing', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, stopButton] = desktopButtons(fixture);
+
+      expect(isStopButton(stopButton)).toBe(true);
+      expect(prop(stopButton, 'disabled')).toBe(false);
+    });
+
+    it('disables the red Play that would no-op once an incompatible non-song file is stopped', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      const [, playButton] = desktopButtons(fixture);
+
+      expect(isStopButton(playButton)).toBe(false);
+      expect(prop(playButton, 'disabled')).toBe(true);
+    });
+  });
+
   describe('button click wiring', () => {
     it('triggers playPause() when the play/pause button is clicked', () => {
       const { fixture, component, currentFile } = render();

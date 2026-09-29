@@ -36,8 +36,9 @@
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
+          [class.stopping]="!isFileCompatible()"
           [color]="getPlayButtonColorComputed()"
-          [disabled]="disabled()"
+          [disabled]="isPlayPauseDisabledComputed()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -118,8 +119,9 @@
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
+          [class.stopping]="!isFileCompatible()"
           [color]="getPlayButtonColorComputed()"
-          [disabled]="disabled()"
+          [disabled]="isPlayPauseDisabledComputed()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>

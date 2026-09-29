@@ -87,15 +87,25 @@ export class PlayerToolbarComponent {
         }
   );
 
-  readonly playPauseTooltip = computed<TooltipConfig>(() => ({
-    title: this.getPlayPauseLabelComputed(),
-    // Play on a stopped non-song file relaunches it rather than resuming music.
-    body:
-      this.isPlayerLoadedComputed() && !this.isCurrentFileMusicTypeComputed()
-        ? 'Launches the stopped file again.'
-        : undefined,
-    position: TooltipPosition.Top,
-  }));
+  readonly playPauseTooltip = computed<TooltipConfig>(() => {
+    if (!this.isFileCompatible()) {
+      return {
+        title: this.getPlayPauseLabelComputed(),
+        body: "This file isn't compatible with this TeensyROM.",
+        position: TooltipPosition.Top,
+      };
+    }
+
+    return {
+      title: this.getPlayPauseLabelComputed(),
+      // Play on a stopped non-song file relaunches it rather than resuming music.
+      body:
+        this.isPlayerLoadedComputed() && !this.isCurrentFileMusicTypeComputed()
+          ? 'Launches the stopped file again.'
+          : undefined,
+      position: TooltipPosition.Top,
+    };
+  });
 
   timerState = computed(() => {
     const deviceId = this.deviceId();
@@ -134,6 +144,9 @@ export class PlayerToolbarComponent {
     if (!deviceId) return false;
     return this.playerContext.isStopping(deviceId)();
   });
+
+  /** Play/pause is disabled whenever the current file is incompatible - it would only no-op. */
+  isPlayPauseDisabledComputed = computed(() => this.disabled() || !this.isFileCompatible());
 
   canNavigateComputed = computed(() => {
     const deviceId = this.deviceId();

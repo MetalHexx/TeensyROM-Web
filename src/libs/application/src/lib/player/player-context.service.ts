@@ -366,9 +366,15 @@ export class PlayerContextService implements IPlayerContext {
       return;
     }
 
-    // Only a song resumes. Anything else was stopped by a reset that left the C64 in its menu,
-    // where toggling music would unpause the menu's own tune - so it is launched again instead.
-    if (!this.isCurrentFileMusicType(deviceId)) {
+    // A non-song always relaunches. A Stopped song relaunches too: resumeTimer has no timer
+    // left to resume, and the device (cleared by a reset or transfer) needs the file started
+    // again rather than a toggle that would unpause a menu tune that isn't this file. Only a
+    // Paused song resumes in place.
+    const isStoppedSong =
+      this.isCurrentFileMusicType(deviceId) &&
+      this.store.getPlayerStatus(deviceId)() === PlayerStatus.Stopped;
+
+    if (!this.isCurrentFileMusicType(deviceId) || isStoppedSong) {
       await this.relaunchCurrentFile(deviceId);
       return;
     }
@@ -403,8 +409,27 @@ export class PlayerContextService implements IPlayerContext {
 
     await this.store.stopPlayback({ deviceId });
 
-    // Phase 5: Stop timer
-    this.timerManager.stopTimer(deviceId);
+    // Phase 5: Stop the timer only when the reset actually succeeded. A failed reset leaves the
+    // file running on the device, so the timer must keep counting toward auto-advance and Stop
+    // stays available to retry.
+    if (this.store.getPlayerError(deviceId)() === null) {
+      this.timerManager.stopTimer(deviceId);
+    }
+  }
+
+  /**
+   * Reflects a device-view reset into that device's player. Local only - sends nothing to the
+   * device, since the reset itself already happened there. When a player entry exists for the
+   * device, its timer is torn down and its status set to Stopped with no error; a device with
+   * no player entry is left untouched.
+   */
+  reflectDeviceReset(deviceId: string): void {
+    if (!this.store.getDevicePlayer(deviceId)()) {
+      return;
+    }
+
+    this.cleanupTimer(deviceId);
+    this.store.reflectTransferStopped({ deviceId });
   }
 
   async next(deviceId: string): Promise<void> {

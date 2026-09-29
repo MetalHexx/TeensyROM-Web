@@ -12,8 +12,9 @@
   }
 }
 
-// A stop is a ~15 s device reset. The rounded-primary style keeps its colours when disabled, so the
-// button is dimmed like the disabled toolbar until the reset returns.
+// Shared faded/not-allowed look for a rounded-primary button that's disabled but must keep its
+// colour: Stop while its ~15 s device reset is in flight, and Play/Pause while the current file
+// is incompatible (rounded-primary would otherwise force normal colours on disabled).
 lib-icon-button.stopping {
   opacity: 0.4;
   cursor: not-allowed;

@@ -59,6 +59,13 @@ export interface IPlayerContext {
   previous(deviceId: string): Promise<void>;
   getPlayerStatus(deviceId: string): Signal<PlayerStatus>;
 
+  /**
+   * Reflects a device-view reset into that device's player: local only, sends nothing to the
+   * device. Stops the timer and sets the player Stopped with no error when a player entry
+   * exists for the device; a device with no player entry is left untouched.
+   */
+  reflectDeviceReset(deviceId: string): void;
+
   // Phase 5: Timer system
   getTimerState(deviceId: string): Signal<TimerState | null>;
 

@@ -39,6 +39,7 @@ export function createMockPlayerContext(
     next: vi.fn().mockResolvedValue(undefined),
     previous: vi.fn().mockResolvedValue(undefined),
     getPlayerStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
+    reflectDeviceReset: vi.fn(),
     getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
     getPlayTimerConfig: vi.fn().mockReturnValue(signal(null).asReadonly()),
     setCustomTimer: vi.fn(),

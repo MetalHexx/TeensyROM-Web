@@ -34,6 +34,7 @@ function render(deviceId = 'test-device-id') {
   const playerStatus = signal<PlayerStatus>(PlayerStatus.Stopped);
   const fileContext = signal<PlayerFileContext | null>(null);
   const launchMode = signal<LaunchMode>(LaunchMode.Directory);
+  const fileCompatible = signal(true);
   const stopping = signal(false);
   const audioStreamEnabled = signal(false);
 
@@ -42,6 +43,7 @@ function render(deviceId = 'test-device-id') {
     getPlayerStatus: vi.fn().mockReturnValue(playerStatus),
     getFileContext: vi.fn().mockReturnValue(fileContext),
     getLaunchMode: vi.fn().mockReturnValue(launchMode),
+    isCurrentFileCompatible: vi.fn().mockReturnValue(fileCompatible),
     isStopping: vi.fn().mockReturnValue(stopping),
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn().mockResolvedValue(undefined),
@@ -68,6 +70,7 @@ function render(deviceId = 'test-device-id') {
     playerStatus,
     fileContext,
     launchMode,
+    fileCompatible,
     stopping,
     audioStreamEnabled,
   };
@@ -276,6 +279,48 @@ describe('PlayerToolbarMiniComponent', () => {
       expect(prop(stop(), 'disabled')).toBe(true);
       expect(stop().nativeElement.classList.contains('stopping')).toBe(true);
       expect((prop(stop(), 'tooltip') as TooltipConfig).title).toBe('Stopping…');
+    });
+  });
+
+  describe('disabled play/pause for an incompatible file', () => {
+    it('disables play/pause', () => {
+      const { fixture, currentFile, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, playPause] = playbackButtons(fixture);
+
+      expect(prop(playPause, 'disabled')).toBe(true);
+    });
+
+    it('keeps Stop enabled for an incompatible non-song file that is still Playing', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, stopButton] = playbackButtons(fixture);
+
+      expect(stopButton.nativeElement.getAttribute('icon')).toBe('stop');
+      expect(prop(stopButton, 'disabled')).toBe(false);
+    });
+
+    it('disables the red Play that would no-op once an incompatible non-song file is stopped', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      const [, playButton] = playbackButtons(fixture);
+
+      expect(playButton.nativeElement.getAttribute('icon')).toBeNull();
+      expect(prop(playButton, 'disabled')).toBe(true);
     });
   });
 
