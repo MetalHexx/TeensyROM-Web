@@ -8,7 +8,7 @@ import path from 'node:path';
 const [, , exe, pidArg, portArg, logFile] = process.argv;
 const PID = Number(pidArg);
 const PORT = Number(portArg || 21300);
-const SRC_ROOT = 'C:\\dev\\src\\TeensyROM-Web\\src\\apps\\api\\src';
+const SRC_ROOT = path.win32.join(process.cwd(), 'apps', 'api', 'src');
 const ts = () => new Date().toISOString().slice(11, 23);
 const log = (line) => appendFileSync(logFile, `${ts()} ${line}\n`);
 
