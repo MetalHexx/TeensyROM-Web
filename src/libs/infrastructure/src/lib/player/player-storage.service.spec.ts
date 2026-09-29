@@ -75,6 +75,7 @@ describe('PlayerStorageService', () => {
       durationMs: 180000,
     },
     isLoading: false,
+    isStopping: false,
     error: null,
     lastUpdated: Date.now(),
   });
@@ -128,6 +129,7 @@ describe('PlayerStorageService', () => {
 
       const savedData = JSON.parse(localStorageSpy.setItem.mock.calls[0][1] as string);
       expect(savedData.isLoading).toBeUndefined();
+      expect(savedData.isStopping).toBeUndefined();
       expect(savedData.error).toBeUndefined();
       expect(savedData.status).toBeUndefined();
       expect(savedData.timerState).toBeUndefined();
@@ -213,6 +215,7 @@ describe('PlayerStorageService', () => {
       // Ephemeral fields are reset to defaults (not from any baseline)
       expect(result.status).toBe(PlayerStatus.Stopped);
       expect(result.isLoading).toBe(false);
+      expect(result.isStopping).toBe(false);
       expect(result.error).toBe(null);
     });
 

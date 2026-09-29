@@ -2,6 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Ensure Dependencies Installed",
+      "type": "shell",
+      "command": "node",
+      "args": ["${workspaceFolder}/.vscode/ensure-deps.mjs"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Ensure SIDablist Ready",
       "type": "shell",
       "command": "node",
@@ -16,7 +27,7 @@
       "label": "Serve Frontend",
       "type": "npm",
       "script": "start",
-      "dependsOn": ["Ensure SIDablist Ready"],
+      "dependsOn": ["Ensure Dependencies Installed", "Ensure SIDablist Ready"],
       "dependsOrder": "sequence",
       "isBackground": true,
       "presentation": {

@@ -131,7 +131,7 @@ namespace TeensyRom.Core.Commands
                     {
                         var lostError = $"Device connection lost while sending {file.TargetPath.FileName}: {ex.Message}";
                         logService.InternalError($"Save Failed: {lostError}", deviceId);
-                        return (new TransferFileOutcome(file, false, lostError, true), true);
+                        return (new TransferFileOutcome(file, false, lostError, true, DeviceLost: true), true);
                     }
 
                     var fileExistsParseMessage = "File already exists";

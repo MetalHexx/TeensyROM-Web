@@ -29,7 +29,10 @@ export interface IPlayerContext {
   getCurrentFile(deviceId: string): Signal<LaunchedFile | null>;
   getFileContext(deviceId: string): Signal<PlayerFileContext | null>;
   isLoading(deviceId: string): Signal<boolean>;
-  
+
+  /** True while a stop (device reset) is in flight for the device. */
+  isStopping(deviceId: string): Signal<boolean>;
+
   /**
    * Returns a global signal indicating if ANY device is slow loading (loading for more than 2 seconds).
    * This is used to show a busy dialog for slow file launches while avoiding flashing for quick operations.
@@ -55,6 +58,13 @@ export interface IPlayerContext {
   next(deviceId: string): Promise<void>;
   previous(deviceId: string): Promise<void>;
   getPlayerStatus(deviceId: string): Signal<PlayerStatus>;
+
+  /**
+   * Reflects a device-view reset into that device's player: local only, sends nothing to the
+   * device. Stops the timer and sets the player Stopped with no error when a player entry
+   * exists for the device; a device with no player entry is left untouched.
+   */
+  reflectDeviceReset(deviceId: string): void;
 
   // Phase 5: Timer system
   getTimerState(deviceId: string): Signal<TimerState | null>;

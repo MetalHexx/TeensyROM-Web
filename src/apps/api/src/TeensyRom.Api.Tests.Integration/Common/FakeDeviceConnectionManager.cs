@@ -56,6 +56,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public FakeCommunicationPort PortFor(string deviceId) => _portsByDeviceId[deviceId];
 
+        public Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct)
+            => Task.FromResult(_devices);
+
         public Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
             => Task.FromResult(_devices);
 

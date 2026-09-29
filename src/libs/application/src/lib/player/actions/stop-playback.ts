@@ -12,6 +12,19 @@ export function stopPlayback(store: WritableStore<PlayerState>, deviceService: I
 
       logInfo(LogType.Start, `Stopping playback for ${deviceId}`, { deviceId, actionMessage });
 
+      const statusBeforeStop = store.players()[deviceId]?.status ?? PlayerStatus.Stopped;
+
+      // The reset takes ~15 s on the device; flagged so a second Stop can't queue another one.
+      updateState(store, actionMessage, (state) => ({
+        players: {
+          ...state.players,
+          [deviceId]: {
+            ...state.players[deviceId],
+            isStopping: true,
+          },
+        },
+      }));
+
       try {
         logInfo(LogType.NetworkRequest, `Calling resetDevice API for ${deviceId}`);
         await firstValueFrom(deviceService.resetDevice(deviceId));
@@ -24,6 +37,7 @@ export function stopPlayback(store: WritableStore<PlayerState>, deviceService: I
             [deviceId]: {
               ...state.players[deviceId],
               status: PlayerStatus.Stopped,
+              isStopping: false,
               error: null,
               lastUpdated: Date.now(),
             },
@@ -38,7 +52,10 @@ export function stopPlayback(store: WritableStore<PlayerState>, deviceService: I
             ...state.players,
             [deviceId]: {
               ...state.players[deviceId],
-              status: PlayerStatus.Stopped, // Still set to stopped even on error
+              // A failed reset may have left the file running: keep its status so Stop stays
+              // available to retry, rather than offering a Play that would relaunch it.
+              status: statusBeforeStop,
+              isStopping: false,
               error: errorMessage,
               lastUpdated: Date.now(),
             },

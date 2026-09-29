@@ -1,11 +1,10 @@
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
-    public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>, IBusyTolerant
+    public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>
 	{
         public required TeensyStorageType StorageType { get; init; }
         public required LaunchableItem LaunchItem { get; init; }

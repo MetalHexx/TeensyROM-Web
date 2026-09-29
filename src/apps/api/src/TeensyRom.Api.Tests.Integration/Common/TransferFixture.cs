@@ -2,8 +2,10 @@ using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Storage;
+using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Api.Tests.Integration.Common
 {
@@ -131,6 +133,33 @@ namespace TeensyRom.Api.Tests.Integration.Common
                         services.AddSingleton<IDeviceConnectionManager>(sp =>
                             new FakeDeviceConnectionManager(sp.GetRequiredService<IStorageFactory>()));
 
+                        // A drop that FakeCommunicationPort.SimulateDeviceLoss induces (IOException from
+                        // SendIntBytes while IsOpen stays true) would otherwise send the recovery gate into
+                        // the real routine for the full ceiling on every transfer batch. Neither this fixture
+                        // nor FakeDeviceConnectionManager models a real reconnect, so recovery here is a
+                        // no-op that reports the device's current mode immediately, and the ceilings are
+                        // millisecond-scale in case anything still waits on them.
+                        var recoveryDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IDeviceRecovery));
+                        if (recoveryDescriptor != null)
+                        {
+                            services.Remove(recoveryDescriptor);
+                        }
+                        services.AddSingleton<IDeviceRecovery>(new NoOpDeviceRecovery());
+
+                        var connectionOptionsDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ConnectionOptions));
+                        if (connectionOptionsDescriptor != null)
+                        {
+                            services.Remove(connectionOptionsDescriptor);
+                        }
+                        services.AddSingleton(new ConnectionOptions
+                        {
+                            PollIntervalMs = 10,
+                            Tcp = new TransportCeilings { ToMinimalMs = 50, ToFullMs = 50 },
+                            Serial = new TransportCeilings { ToMinimalMs = 50, ToFullMs = 50 },
+                            LaunchSettleMs = 10,
+                            ConnectTimeoutMs = 50
+                        });
+
                         services.AddSingleton(Options);
                         configureServices?.Invoke(services);
                     });
@@ -185,6 +214,13 @@ namespace TeensyRom.Api.Tests.Integration.Common
             {
                 Directory.Delete(_scratchRoot, recursive: true);
             }
+        }
+
+        /// <summary>Reports the device's current mode immediately - no reconnect, no polling.</summary>
+        private sealed class NoOpDeviceRecovery : IDeviceRecovery
+        {
+            public Task<RecoveryOutcome> RecoverAsync(TeensyRomDevice device, RecoveryReason reason, CancellationToken ct) =>
+                Task.FromResult(new RecoveryOutcome(device.Connection.Mode, TimeSpan.Zero, TimeSpan.Zero, null));
         }
     }
 }

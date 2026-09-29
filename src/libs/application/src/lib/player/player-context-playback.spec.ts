@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { throwError } from 'rxjs';
-import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
+import { of, Subject, throwError } from 'rxjs';
+import { LaunchMode, PlayerStatus, FileItemType, type FileItem } from '@teensyrom-nx/domain';
 import { createPlayerHarness, type PlayerHarness } from './testing/player-context-harness';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 
@@ -16,15 +16,15 @@ describe('PlayerContextService - playback controls', () => {
   describe('play', () => {
     const musicFile = createTestFileItem({ type: FileItemType.Song });
 
-    it('invokes toggleMusic and transitions to Playing when stopped', async () => {
+    it('invokes toggleMusic and transitions to Playing when paused', async () => {
       await harness.service.launchFileWithContext({
         deviceId,
         file: musicFile,
         directoryPath: '/music',
         files: [musicFile],
       });
-      await harness.service.stop(deviceId);
-      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Stopped);
+      await harness.service.pause(deviceId);
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Paused);
 
       await harness.service.play(deviceId);
 
@@ -73,12 +73,33 @@ describe('PlayerContextService - playback controls', () => {
         directoryPath: '/music',
         files: [musicFile],
       });
-      await harness.service.stop(deviceId);
+      await harness.service.pause(deviceId);
       harness.playerService.toggleMusic = vi.fn(() => throwError(() => new Error('Play failed')));
 
       await harness.service.play(deviceId);
 
       expect(harness.service.getError(deviceId)()).toBeTruthy();
+    });
+
+    it('relaunches instead of toggling music when the song is stopped', async () => {
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: musicFile,
+        directoryPath: '/music',
+        files: [musicFile],
+      });
+      await harness.service.stop(deviceId);
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Stopped);
+
+      const launchFile = vi.fn((_deviceId: string, file: FileItem) => of(file));
+      harness.playerService.launchFile = launchFile;
+
+      await harness.service.play(deviceId);
+
+      expect(launchFile).toHaveBeenCalledWith(deviceId, musicFile);
+      expect(harness.playerService.toggleMusic).not.toHaveBeenCalled();
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getTimerState(deviceId)()?.totalTime).toBe(225000);
     });
   });
 
@@ -152,6 +173,157 @@ describe('PlayerContextService - playback controls', () => {
       await harness.service.stop(deviceId);
 
       expect(harness.service.getError(deviceId)()).toBeTruthy();
+    });
+
+    it('reports stopping while the reset is in flight and ignores a second stop', async () => {
+      const reset = new Subject<void>();
+      harness.deviceService.resetDevice = vi.fn(() => reset.asObservable());
+
+      const firstStop = harness.service.stop(deviceId);
+      expect(harness.service.isStopping(deviceId)()).toBe(true);
+
+      await harness.service.stop(deviceId);
+      expect(harness.deviceService.resetDevice).toHaveBeenCalledTimes(1);
+
+      reset.next();
+      reset.complete();
+      await firstStop;
+
+      expect(harness.service.isStopping(deviceId)()).toBe(false);
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Stopped);
+    });
+
+    it('keeps a running game Playing (so Stop can be retried) and clears the stopping flag when the reset fails', async () => {
+      const game = createTestFileItem({ path: '/games/game.prg', type: FileItemType.Game });
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: game,
+        directoryPath: '/games',
+        files: [game],
+      });
+      harness.deviceService.resetDevice = vi.fn(() =>
+        throwError(() => new Error('The menu did not come back up after the reset.'))
+      );
+
+      await harness.service.stop(deviceId);
+
+      expect(harness.service.isStopping(deviceId)()).toBe(false);
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getError(deviceId)()).toBeTruthy();
+    });
+
+    it('leaves the timer running when a failed reset keeps a song Playing', async () => {
+      const musicFile = createTestFileItem({ type: FileItemType.Song, playLength: '3:00' });
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: musicFile,
+        directoryPath: '/music',
+        files: [musicFile],
+      });
+      harness.deviceService.resetDevice = vi.fn(() =>
+        throwError(() => new Error('Device reset failed'))
+      );
+
+      await harness.service.stop(deviceId);
+
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getTimerState(deviceId)()?.isRunning).toBe(true);
+    });
+  });
+
+  describe('play on a stopped non-song file', () => {
+    const game = createTestFileItem({
+      name: 'game.prg',
+      path: '/games/game.prg',
+      parentPath: '/games',
+      type: FileItemType.Game,
+    });
+    const otherGame = createTestFileItem({
+      name: 'other.prg',
+      path: '/games/other.prg',
+      parentPath: '/games',
+      type: FileItemType.Game,
+    });
+
+    /** A fresh launch mock for the relaunch alone, answering with the launched file as the harness does. */
+    const relaunchSpy = () => {
+      const launchFile = vi.fn((_deviceId: string, file: FileItem) => of(file));
+      harness.playerService.launchFile = launchFile;
+      return launchFile;
+    };
+
+    it('relaunches the file instead of toggling music, keeping its file context', async () => {
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: game,
+        directoryPath: '/games',
+        files: [game, otherGame],
+      });
+      await harness.service.stop(deviceId);
+      const launchFile = relaunchSpy();
+
+      await harness.service.play(deviceId);
+
+      expect(launchFile).toHaveBeenCalledTimes(1);
+      expect(launchFile).toHaveBeenCalledWith(deviceId, game);
+      expect(harness.playerService.toggleMusic).not.toHaveBeenCalled();
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getCurrentFile(deviceId)()?.file).toEqual(game);
+
+      const fileContext = harness.service.getFileContext(deviceId)();
+      expect(fileContext?.directoryPath).toBe('/games');
+      expect(fileContext?.files.map((file) => file.path)).toEqual([game.path, otherGame.path]);
+      expect(fileContext?.currentIndex).toBe(0);
+    });
+
+    it('does not record a second history entry for the same file', async () => {
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: game,
+        directoryPath: '/games',
+        files: [game, otherGame],
+      });
+      expect(harness.service.getPlayHistory(deviceId)()?.entries).toHaveLength(1);
+      await harness.service.stop(deviceId);
+
+      await harness.service.play(deviceId);
+
+      expect(harness.service.getPlayHistory(deviceId)()?.entries).toHaveLength(1);
+    });
+
+    it('relaunches a random launch whose directory never loaded as a one-file context', async () => {
+      harness.playerService.launchRandom = vi.fn(() => of(game));
+      await harness.service.launchRandomFile(deviceId);
+      expect(harness.service.getFileContext(deviceId)()?.files).toEqual([]);
+      await harness.service.stop(deviceId);
+      const launchFile = relaunchSpy();
+
+      await harness.service.play(deviceId);
+
+      expect(launchFile).toHaveBeenCalledWith(deviceId, game);
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getLaunchMode(deviceId)()).toBe(LaunchMode.Shuffle);
+      const fileContext = harness.service.getFileContext(deviceId)();
+      expect(fileContext?.directoryPath).toBe('/games');
+      expect(fileContext?.files.map((file) => file.path)).toEqual([game.path]);
+    });
+
+    it('records the launch error, without toggling music, when the relaunch fails', async () => {
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: game,
+        directoryPath: '/games',
+        files: [game, otherGame],
+      });
+      await harness.service.stop(deviceId);
+      const launchFile = vi.fn(() => throwError(() => new Error('Relaunch failed')));
+      harness.playerService.launchFile = launchFile;
+
+      await harness.service.play(deviceId);
+
+      expect(launchFile).toHaveBeenCalledWith(deviceId, game);
+      expect(harness.service.getError(deviceId)()).toBe('Relaunch failed');
+      expect(harness.playerService.toggleMusic).not.toHaveBeenCalled();
     });
   });
 
@@ -445,5 +617,53 @@ describe('PlayerContextService - playback controls', () => {
       expect([PlayerStatus.Playing, PlayerStatus.Paused, PlayerStatus.Stopped]).toContain(status);
       expect(harness.service.getError(deviceId)()).toBeTruthy();
     });
+  });
+
+  describe('reflectDeviceReset', () => {
+    it('stops the timer and marks a running game Stopped with no error', async () => {
+      const game = createTestFileItem({ type: FileItemType.Game, path: '/games/game.prg' });
+      harness.service.setCustomTimer(deviceId, true, 60000);
+      await harness.service.launchFileWithContext({
+        deviceId,
+        file: game,
+        directoryPath: '/games',
+        files: [game],
+      });
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+      expect(harness.service.getTimerState(deviceId)()).not.toBeNull();
+
+      harness.service.reflectDeviceReset(deviceId);
+
+      expect(harness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Stopped);
+      expect(harness.service.getError(deviceId)()).toBeNull();
+      expect(harness.service.getTimerState(deviceId)()).toBeNull();
+    });
+
+    it('does nothing for a device with no player entry', () => {
+      const unknownDeviceId = 'device-without-a-player';
+
+      expect(() => harness.service.reflectDeviceReset(unknownDeviceId)).not.toThrow();
+      expect(harness.playerStore.getDevicePlayer(unknownDeviceId)()).toBeNull();
+    });
+
+    it('prevents a timer that would have completed from auto-advancing', async () => {
+      const fastCompletionHarness = createPlayerHarness({ timerTickMs: 1100 });
+      fastCompletionHarness.service.initializePlayer(deviceId);
+      const musicFile = createTestFileItem({ type: FileItemType.Song, playLength: '0:01' });
+
+      await fastCompletionHarness.service.launchFileWithContext({
+        deviceId,
+        file: musicFile,
+        directoryPath: '/music',
+        files: [musicFile],
+      });
+
+      fastCompletionHarness.service.reflectDeviceReset(deviceId);
+
+      await new Promise((resolve) => setTimeout(resolve, 1300));
+
+      expect(fastCompletionHarness.playerService.launchFile).toHaveBeenCalledTimes(1);
+      expect(fastCompletionHarness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Stopped);
+    }, 10000);
   });
 });

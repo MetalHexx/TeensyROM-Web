@@ -14,7 +14,9 @@ export function pingAllDevices(
   return {
     pingAllDevices: async () => {
       const devices = store.devices();
-      await Promise.all(
+      // allSettled: a failing ping (device service alerts and rethrows) must not leave the
+      // other devices' pings unhandled or the call rejected.
+      await Promise.allSettled(
         devices.map((device) => firstValueFrom(deviceService.pingDevice(device.deviceId)))
       );
     },

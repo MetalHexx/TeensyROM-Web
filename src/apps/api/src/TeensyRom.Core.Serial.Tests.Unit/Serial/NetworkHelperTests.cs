@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using FluentAssertions;
 
 namespace TeensyRom.Core.Serial.Tests.Unit;
@@ -9,25 +10,20 @@ namespace TeensyRom.Core.Serial.Tests.Unit;
 /// </summary>
 public class NetworkHelperTests
 {
-    #region GetLocalSubnetRange Tests
+    #region GetLocalSubnetRanges Tests
 
     [Fact]
-    public void GetLocalSubnetRange_ShouldReturnRange_WhenActiveNetworkInterfaceExists()
+    public void GetLocalSubnetRanges_ShouldReturnOnlySlash24Ranges()
     {
         // Act
-        var result = NetworkHelper.GetLocalSubnetRange();
+        var result = NetworkHelper.GetLocalSubnetRanges();
 
         // Assert
-        // Note: This test may fail on machines without active network interfaces
-        // In CI environments, this might return null
-        if (result.HasValue)
+        // Note: In CI environments without a real network adapter, this may be empty
+        foreach (var (start, end) in result)
         {
-            result.Value.Start.Should().NotBeNull();
-            result.Value.End.Should().NotBeNull();
-
-            // Verify it's a /24 subnet (last octet differs)
-            var startBytes = result.Value.Start.GetAddressBytes();
-            var endBytes = result.Value.End.GetAddressBytes();
+            var startBytes = start.GetAddressBytes();
+            var endBytes = end.GetAddressBytes();
 
             startBytes[0].Should().Be(endBytes[0]);
             startBytes[1].Should().Be(endBytes[1]);
@@ -38,25 +34,159 @@ public class NetworkHelperTests
     }
 
     [Fact]
-    public void GetLocalSubnetRange_ShouldNotThrow()
+    public void GetLocalSubnetRanges_ShouldNotThrow()
     {
         // Act & Assert
-        var act = () => NetworkHelper.GetLocalSubnetRange();
+        var act = () => NetworkHelper.GetLocalSubnetRanges();
         act.Should().NotThrow();
     }
 
+    #endregion
+
+    #region SelectSubnetRanges Tests
+
+    private static LocalAdapter Adapter(
+        string address,
+        string name = "Ethernet",
+        string description = "Intel(R) Ethernet Connection",
+        NetworkInterfaceType type = NetworkInterfaceType.Ethernet,
+        OperationalStatus status = OperationalStatus.Up,
+        bool hasGateway = true) =>
+        new(name, description, type, status, [IPAddress.Parse(address)], hasGateway);
+
     [Fact]
-    public void GetLocalSubnetRange_ShouldReturnTupleWithValidIpAddresses()
+    public void SelectSubnetRanges_ReturnsARangeForEveryRealAdapter_NotOnlyTheInternetOne()
     {
+        // Arrange - a wired LAN with the TeensyROM plus a phone hotspot carrying internet
+        var adapters = new[]
+        {
+            Adapter("192.168.1.113", name: "Ethernet 3"),
+            Adapter("10.84.215.225", name: "Wi-Fi", description: "Intel(R) Wi-Fi 6 AX200 160MHz", type: NetworkInterfaceType.Wireless80211)
+        };
+
         // Act
-        var result = NetworkHelper.GetLocalSubnetRange();
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
 
         // Assert
-        if (result.HasValue)
+        result.Should().BeEquivalentTo(new[]
         {
-            result.Value.Start.ToString().Should().MatchRegex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$");
-            result.Value.End.ToString().Should().MatchRegex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$");
-        }
+            (IPAddress.Parse("192.168.1.1"), IPAddress.Parse("192.168.1.254")),
+            (IPAddress.Parse("10.84.215.1"), IPAddress.Parse("10.84.215.254"))
+        });
+    }
+
+    [Theory]
+    [InlineData("vEthernet (Default Switch)", "Hyper-V Virtual Ethernet Adapter")]
+    [InlineData("vEthernet (WSLCore)", "Hyper-V Virtual Ethernet Adapter #2")]
+    [InlineData("VMware Network Adapter VMnet8", "VMware Virtual Ethernet Adapter for VMnet8")]
+    [InlineData("Ethernet 5", "VirtualBox Host-Only Ethernet Adapter")]
+    [InlineData("docker0", "docker0")]
+    [InlineData("br-3f2a1c", "br-3f2a1c")]
+    [InlineData("virbr0", "virbr0")]
+    public void SelectSubnetRanges_SkipsHostSideVirtualAdapters(string name, string description)
+    {
+        // Arrange
+        var adapters = new[] { Adapter("172.17.32.1", name: name, description: description, hasGateway: false) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_KeepsAVirtualAdapterWithAGateway_BecauseAHyperVExternalSwitchCarriesTheRealLan()
+    {
+        // Arrange
+        var adapters = new[] { Adapter("192.168.1.113", name: "vEthernet (External)", description: "Hyper-V Virtual Ethernet Adapter", hasGateway: true) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().ContainSingle().Which.Start.Should().Be(IPAddress.Parse("192.168.1.1"));
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_KeepsARealAdapterWithoutAGateway()
+    {
+        // Arrange - a direct cable to the TeensyROM with static addresses and no router
+        var adapters = new[] { Adapter("192.168.50.2", hasGateway: false) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().ContainSingle().Which.Start.Should().Be(IPAddress.Parse("192.168.50.1"));
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_SkipsAdaptersThatAreNotUp()
+    {
+        // Arrange
+        var adapters = new[] { Adapter("192.168.1.113", status: OperationalStatus.Down) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(NetworkInterfaceType.Loopback, "127.0.0.1")]
+    [InlineData(NetworkInterfaceType.Tunnel, "10.8.0.2")]
+    public void SelectSubnetRanges_SkipsLoopbackAndTunnelAdapters(NetworkInterfaceType type, string address)
+    {
+        // Arrange
+        var adapters = new[] { Adapter(address, type: type) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_SkipsSelfAssignedLinkLocalAddresses()
+    {
+        // Arrange - a disconnected adapter that gave itself 169.254.x.x
+        var adapters = new[] { Adapter("169.254.194.56", hasGateway: false) };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_ReturnsOneRange_WhenTwoAdaptersShareASubnet()
+    {
+        // Arrange
+        var adapters = new[]
+        {
+            Adapter("192.168.1.113", name: "Ethernet"),
+            Adapter("192.168.1.114", name: "Wi-Fi", type: NetworkInterfaceType.Wireless80211)
+        };
+
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges(adapters);
+
+        // Assert
+        result.Should().ContainSingle().Which.Start.Should().Be(IPAddress.Parse("192.168.1.1"));
+    }
+
+    [Fact]
+    public void SelectSubnetRanges_ReturnsEmpty_WhenThereAreNoAdapters()
+    {
+        // Act
+        var result = NetworkHelper.SelectSubnetRanges([]);
+
+        // Assert
+        result.Should().BeEmpty();
     }
 
     #endregion
@@ -369,22 +499,22 @@ public class NetworkHelperTests
     #region Integration Tests
 
     [Fact]
-    public void GetLocalSubnetRange_GenerateIpRange_ShouldWorkTogether()
+    public void GetLocalSubnetRanges_GenerateIpRange_ShouldWorkTogether()
     {
         // Arrange
-        var subnetRange = NetworkHelper.GetLocalSubnetRange();
+        var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
         // Act & Assert
-        if (subnetRange.HasValue)
+        foreach (var (start, end) in subnetRanges)
         {
-            var ipRange = NetworkHelper.GenerateIpRange(subnetRange.Value.Start, subnetRange.Value.End);
+            var ipRange = NetworkHelper.GenerateIpRange(start, end);
 
             // Should generate 254 addresses for a /24 subnet
             ipRange.Should().HaveCount(254);
 
             // First and last should match
-            ipRange.First().Should().Be(subnetRange.Value.Start);
-            ipRange.Last().Should().Be(subnetRange.Value.End);
+            ipRange.First().Should().Be(start);
+            ipRange.Last().Should().Be(end);
         }
     }
 
@@ -439,7 +569,7 @@ public class NetworkHelperTests
         {
             tasks.Add(Task.Run(() =>
             {
-                NetworkHelper.GetLocalSubnetRange();
+                NetworkHelper.GetLocalSubnetRanges();
                 NetworkHelper.GenerateIpRange(IPAddress.Parse("192.168.1.1"), IPAddress.Parse("192.168.1.10"));
                 NetworkHelper.FormatEndpoint("192.168.1.1", 8080);
                 NetworkHelper.TryParseEndpoint("192.168.1.1:8080", out var host, out var port);

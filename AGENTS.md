@@ -257,7 +257,8 @@ pnpm nx build teensyrom-ui --configuration=production
 - **TeensyROM Cartridge**: Primary hardware interface
 - **Commodore 64/128**: Target platforms
 - **Storage Media**: SD cards and USB drives
-- **Serial Connection**: USB micro-B cable required
+- **Firmware**: must report its boot state (the version reply's `Boot:` line — fork branch `boot-complete-flag`, pending upstream)
+- **Connection**: USB serial or Ethernet (TCP)
 
 ## Project-Specific Notes
 

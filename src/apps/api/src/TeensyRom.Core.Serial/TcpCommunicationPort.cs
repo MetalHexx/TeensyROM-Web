@@ -67,6 +67,56 @@ namespace TeensyRom.Core.Serial
       return _endpoint;
     }
 
+    /// <summary>
+    /// A single connect attempt bounded to <paramref name="connectTimeoutMs"/>, via <see cref="TcpClient.ConnectAsync(string, int, CancellationToken)"/>
+    /// awaited synchronously - this port is a synchronous object. A connect that does not complete in
+    /// time is cancelled and surfaces as a <see cref="TimeoutException"/> rather than the OS's own
+    /// multi-second SYN retry.
+    /// </summary>
+    public string? OpenPort(int connectTimeoutMs)
+    {
+      if (IsOpen) return _endpoint;
+
+      ClosePort();
+
+      if (!NetworkHelper.TryParseEndpoint(_endpoint!, out var host, out var port))
+      {
+        throw new TeensyException($"Invalid endpoint format: {_endpoint}");
+      }
+
+      _tcpClient = new TcpClient
+      {
+        ReceiveTimeout = _readTimeoutMs,
+        SendTimeout = _writeTimeoutMs
+      };
+
+      using var cts = new CancellationTokenSource(connectTimeoutMs);
+
+      try
+      {
+        log.Internal($"TcpObservablePort.OpenPort: Connecting to {_endpoint} (bounded, {connectTimeoutMs}ms)");
+        _tcpClient.ConnectAsync(host, port, cts.Token).AsTask().GetAwaiter().GetResult();
+        _networkStream = _tcpClient.GetStream();
+        _networkStream.ReadTimeout = _readTimeoutMs;
+        _networkStream.WriteTimeout = _writeTimeoutMs;
+        log.InternalSuccess($"TcpObservablePort.OpenPort: Successfully connected to {_endpoint}");
+      }
+      catch (OperationCanceledException)
+      {
+        log.Internal($"TcpObservablePort.OpenPort: Connect to {_endpoint} did not complete within {connectTimeoutMs}ms");
+        _tcpClient?.Close();
+        throw new TimeoutException($"Connection to {_endpoint} timed out after {connectTimeoutMs}ms");
+      }
+      catch (Exception)
+      {
+        log.Internal($"TcpObservablePort.OpenPort: There was an error trying to connect to {_endpoint}");
+        _tcpClient?.Close();
+        throw;
+      }
+
+      return _endpoint;
+    }
+
     public Unit ClosePort()
     {
       log.Internal($"Disconnecting from {_endpoint}.");
@@ -144,9 +194,11 @@ namespace TeensyRom.Core.Serial
         log.InternalSuccess($"TcpObservablePort.TryConnect: Successfully connected to {_endpoint}");
         return true;
       }
-      catch (Exception ex)
+      catch (Exception)
       {
-        log.InternalError($"TcpObservablePort.TryConnect: There was an error trying to connect to {_endpoint}");
+        // Polling connect misses are expected here (discovery's fast single-attempt scan and the
+        // retry loop both call this repeatedly), so a miss is not error-worthy on its own.
+        log.Internal($"TcpObservablePort.TryConnect: There was an error trying to connect to {_endpoint}");
         throw;
       }
     }
@@ -204,7 +256,9 @@ namespace TeensyRom.Core.Serial
           }
         }
 
-        if (bytesRead < count)
+        // Like SerialPort.Read: once buffered bytes are in hand, take only what the socket already
+        // holds. Blocking for the remainder would wait out the read timeout and discard what was read.
+        if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = _networkStream.Read(buffer, offset + bytesRead, count - bytesRead);
           bytesRead += streamRead;
@@ -226,8 +280,9 @@ namespace TeensyRom.Core.Serial
 
     /// <summary>
     /// Async counterpart of <see cref="Read"/>. Drains the receive buffer first and, exactly like
-    /// <see cref="Read"/>, performs at most a single stream read for the remainder - so it may return
-    /// fewer than <paramref name="count"/> bytes.
+    /// <see cref="Read"/>, goes to the socket for the remainder only when nothing was buffered or the
+    /// socket already holds more - at most a single stream read - so it may return fewer than
+    /// <paramref name="count"/> bytes.
     /// </summary>
     public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
     {
@@ -247,7 +302,7 @@ namespace TeensyRom.Core.Serial
           }
         }
 
-        if (bytesRead < count)
+        if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = await _networkStream.ReadAsync(buffer.AsMemory(offset + bytesRead, count - bytesRead), ct);
           bytesRead += streamRead;
@@ -511,10 +566,12 @@ namespace TeensyRom.Core.Serial
       {
         if (_networkStream != null && _networkStream.DataAvailable)
         {
+          // Only what the socket already holds: ReadExactly waited out the read timeout for a full
+          // 4096 bytes whenever fewer were stale, and threw.
           var discardBuffer = new byte[4096];
           while (_networkStream.DataAvailable)
           {
-            _networkStream.ReadExactly(discardBuffer);
+            if (_networkStream.Read(discardBuffer, 0, discardBuffer.Length) == 0) break;
           }
         }
       }

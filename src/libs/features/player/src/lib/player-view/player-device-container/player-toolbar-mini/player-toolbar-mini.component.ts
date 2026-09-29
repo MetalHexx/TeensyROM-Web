@@ -55,16 +55,39 @@ export class PlayerToolbarMiniComponent {
     position: TooltipPosition.Top,
   }));
 
-  readonly stopTooltip: TooltipConfig = {
-    title: 'Stop',
-    body: 'Stops the currently launched file by resetting TeensyROM.',
-    position: TooltipPosition.Top,
-  };
+  readonly stopTooltip = computed<TooltipConfig>(() =>
+    this.isStoppingComputed()
+      ? {
+          title: 'Stopping…',
+          body: 'Resetting TeensyROM. Play appears once the reset finishes.',
+          position: TooltipPosition.Top,
+        }
+      : {
+          title: 'Stop',
+          body: 'Stops the currently launched file by resetting TeensyROM.',
+          position: TooltipPosition.Top,
+        }
+  );
 
-  readonly playPauseTooltip = computed<TooltipConfig>(() => ({
-    title: this.getPlayPauseLabelComputed(),
-    position: TooltipPosition.Top,
-  }));
+  readonly playPauseTooltip = computed<TooltipConfig>(() => {
+    if (!this.isFileCompatible()) {
+      return {
+        title: this.getPlayPauseLabelComputed(),
+        body: "This file isn't compatible with this TeensyROM.",
+        position: TooltipPosition.Top,
+      };
+    }
+
+    return {
+      title: this.getPlayPauseLabelComputed(),
+      // Play on a stopped non-song file relaunches it rather than resuming music.
+      body:
+        this.isPlayerLoadedComputed() && !this.isCurrentFileMusicTypeComputed()
+          ? 'Launches the stopped file again.'
+          : undefined,
+      position: TooltipPosition.Top,
+    };
+  });
 
   isAudioStreamEnabled = computed(() => {
     const deviceId = this.deviceId();
@@ -90,6 +113,27 @@ export class PlayerToolbarMiniComponent {
     const currentFile = this.playerContext.getCurrentFile(deviceId)();
     return currentFile?.file?.type === FileItemType.Song;
   });
+
+  /**
+   * Songs keep Play/Pause. Any other file shows Stop only while it runs, and Play once it has
+   * stopped, which launches it again.
+   */
+  showPlayPauseButtonComputed = computed(() => {
+    if (this.isCurrentFileMusicTypeComputed()) return true;
+    const deviceId = this.deviceId();
+    if (!deviceId) return true;
+    return this.playerContext.getPlayerStatus(deviceId)() !== PlayerStatus.Playing;
+  });
+
+  /** A stop is a ~15 s device reset; its button stays disabled until it finishes. */
+  isStoppingComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.playerContext.isStopping(deviceId)();
+  });
+
+  /** Play/pause is disabled whenever the current file is incompatible - it would only no-op. */
+  isPlayPauseDisabledComputed = computed(() => this.disabled() || !this.isFileCompatible());
 
   canNavigateComputed = computed(() => {
     const deviceId = this.deviceId();
