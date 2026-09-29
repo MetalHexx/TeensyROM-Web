@@ -120,6 +120,9 @@ namespace TeensyRom.Api.Models
             return new CartDto
             {
                 DeviceId = device.DeviceId ?? string.Empty,
+                // Every listed device is reachable (GetAvailableDevices filters out Unreachable), so this is true
+                // for every row today; it would read false for an Unreachable device if one were ever listed.
+                IsConnected = device.Connection.Mode != DeviceMode.Unreachable,
                 ComPort = device.ComPort,
                 ConnectionType = device.ConnectionType,
                 IpAddress = device.IpAddress,

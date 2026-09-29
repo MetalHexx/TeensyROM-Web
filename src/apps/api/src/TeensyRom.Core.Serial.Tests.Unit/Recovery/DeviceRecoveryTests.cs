@@ -279,6 +279,27 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
             _interrogator.Received(1).ReadVersion(Arg.Any<ICommunicationPort>(), TRDiscoveryRoutines.VersionAckTimeoutMs);
         }
 
+        /// <summary>
+        /// A configured <c>Connection:MenuBootTimeoutMs</c> must reach the menu-token listen, not just the
+        /// post-token ack wait: a full candidate that never sends the token must not tie the listen to the
+        /// 45 s default.
+        /// </summary>
+        [Fact]
+        public async Task RecoverAsync_Serial_LeaveMinimal_MenuTokenNeverArrives_ListenGivesUpAtTheConfiguredBoundNotTheDefault()
+        {
+            var (device, port) = BuildDevice(endpoint: "COM7", connectionType: ConnectionType.Serial);
+            _locator.FindByChipId(ChipId).Returns(new PortLookup([new TeensyRomPort("COM4", ChipId, TeensyRomImage.Full)], true, null));
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(BootedFull());
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(menuBootTimeoutMs: 15), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            port.WaitForSerialDataTimeoutsMs.Should().NotBeEmpty();
+            port.WaitForSerialDataTimeoutsMs.Max().Should().BeLessThanOrEqualTo(15)
+                .And.BeLessThan(ConnectionOptions.DefaultMenuBootTimeoutMs, "the listen must honor the configured bound, not the 45 s default");
+        }
+
         [Fact]
         public async Task RecoverAsync_Serial_LeaveMinimal_PortVanishesWhileListening_IsAMissAndTheNextPollListensAgain()
         {

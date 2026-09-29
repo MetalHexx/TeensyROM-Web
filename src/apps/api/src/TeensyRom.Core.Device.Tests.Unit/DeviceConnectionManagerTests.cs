@@ -122,7 +122,7 @@ public class DeviceConnectionManagerTests
     }
 
     [Fact]
-    public async Task ConnectAtStartAsync_WithRowHoldingBothEndpoints_NarrowsTheRewrittenRowToTheConfirmedTransport()
+    public async Task ConnectAtStartAsync_WithRowHoldingBothEndpoints_KeepsTheOtherEndpointOnTheRewrittenRow()
     {
         var port = CreatePort(ConnectionType.Tcp);
         var device = CreateDevice("33333333", ConnectionType.Tcp, "10.0.0.9:80", port);
@@ -135,8 +135,9 @@ public class DeviceConnectionManagerTests
         var manager = CreateManager();
         await manager.ConnectAtStartAsync(CancellationToken.None);
 
+        device.Connection.SerialPortName.Should().Be("COM7");
         _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows =>
-            rows.Single().SerialPortName == null && rows.Single().TcpEndpoint == "10.0.0.9:80"));
+            rows.Single().SerialPortName == "COM7" && rows.Single().TcpEndpoint == "10.0.0.9:80"));
     }
 
     [Fact]
@@ -206,10 +207,13 @@ public class DeviceConnectionManagerTests
     {
         var port = CreatePort(ConnectionType.Serial);
         var device = CreateDevice("88888888", ConnectionType.Serial, "COM12", port);
+        var otherPort = CreatePort(ConnectionType.Serial);
+        var otherDevice = CreateDevice("99999999", ConnectionType.Serial, "COM13", otherPort);
 
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(
             new List<TeensyRomDevice> { device },
-            new List<TeensyRomDevice>());
+            new List<TeensyRomDevice>(),
+            new List<TeensyRomDevice> { otherDevice });
 
         var manager = CreateManager();
         await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
@@ -223,7 +227,66 @@ public class DeviceConnectionManagerTests
         manager.GetAvailableDevice("88888888").Should().BeNull();
         device.Connection.Mode.Should().Be(DeviceMode.Unreachable);
         device.Connection.SerialPortName.Should().Be("COM12");
-        _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows => !rows.Any()));
+        _cache.DidNotReceive().Save(Arg.Any<IEnumerable<CachedConnectionRecord>>());
+
+        // A later sweep that finds a different device still saves, excluding the chip that stayed absent.
+        var third = await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        third.Should().ContainSingle(d => d.DeviceId == "99999999");
+        manager.GetAvailableDevice("88888888").Should().BeNull();
+        _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows =>
+            rows.Count() == 1 && rows.Single().ChipId == "99999999"));
+    }
+
+    [Fact]
+    public async Task FindDevices_FullScan_WhenAKnownDeviceIsRediscoveredOnTheOtherTransport_CarriesForwardTheOldEndpoint()
+    {
+        var tcpPort = CreatePort(ConnectionType.Tcp);
+        var tcpDevice = CreateDevice("12345678", ConnectionType.Tcp, "10.0.0.9:80", tcpPort);
+        var serialPort = CreatePort(ConnectionType.Serial);
+        var serialDevice = CreateDevice("12345678", ConnectionType.Serial, "COM4", serialPort);
+
+        _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { tcpDevice },
+            new List<TeensyRomDevice> { serialDevice });
+
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        _cache.ClearReceivedCalls();
+        var second = await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        second.Should().ContainSingle(d => d.DeviceId == "12345678");
+        serialDevice.Connection.SerialPortName.Should().Be("COM4");
+        serialDevice.Connection.TcpEndpoint.Should().Be("10.0.0.9:80");
+        _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows =>
+            rows.Single().SerialPortName == "COM4" && rows.Single().TcpEndpoint == "10.0.0.9:80"));
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithCachedTransportMissing_ConfirmsOnTheOtherEndpointWithoutFullDiscovery()
+    {
+        var serialPort = CreatePort(ConnectionType.Serial);
+        serialPort.OpenPort(Arg.Any<int>()).Returns(_ => throw new TimeoutException("bounded connect timed out"));
+        var tcpPort = CreatePort(ConnectionType.Tcp);
+        var device = CreateDevice("44445555", ConnectionType.Tcp, "10.0.0.30:80", tcpPort);
+
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("44445555", "COM20", "10.0.0.30:80", ConnectionType.Serial) });
+        AllowSerialLookup("44445555", "COM20");
+        _transports.CreateSerial("COM20", true).Returns(serialPort);
+        _transports.CreateTcp("10.0.0.30:80").Returns(tcpPort);
+        _interrogator.ReadVersion(tcpPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "44445555" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+
+        var manager = CreateManager();
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle(d => d.DeviceId == "44445555");
+        await _finder.DidNotReceive().FindDevices(Arg.Any<CancellationToken>());
+        device.Connection.SerialPortName.Should().Be("COM20");
+        device.Connection.TcpEndpoint.Should().Be("10.0.0.30:80");
+        _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows =>
+            rows.Single().SerialPortName == "COM20" && rows.Single().TcpEndpoint == "10.0.0.30:80"));
     }
 
     [Fact]

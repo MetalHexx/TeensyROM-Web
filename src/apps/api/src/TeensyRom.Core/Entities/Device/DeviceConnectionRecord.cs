@@ -108,5 +108,25 @@ namespace TeensyRom.Core.Entities.Device
         }
 
         public string? EndpointFor(ConnectionType transport) => transport == ConnectionType.Serial ? SerialPortName : TcpEndpoint;
+
+        /// <summary>
+        /// A known address on a transport not in use, kept so it can be tried later; it is not a confirmation.
+        /// </summary>
+        public void RememberEndpoint(ConnectionType transport, string? endpoint)
+        {
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                return;
+            }
+
+            if (transport == ConnectionType.Serial)
+            {
+                SerialPortName = endpoint;
+            }
+            else
+            {
+                TcpEndpoint = endpoint;
+            }
+        }
     }
 }

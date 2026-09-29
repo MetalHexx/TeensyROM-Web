@@ -123,6 +123,12 @@ namespace TeensyRom.Core.Device
 
             foreach (var device in discovered)
             {
+                if (_byChip.TryGetValue(device.DeviceId, out var previous))
+                {
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Serial, previous.Connection.SerialPortName);
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, previous.Connection.TcpEndpoint);
+                }
+
                 _byChip[device.DeviceId] = device;
             }
 
@@ -134,7 +140,17 @@ namespace TeensyRom.Core.Device
                 }
             }
 
-            _cache.Save(BuildCacheRows());
+            if (discovered.Count == 0)
+            {
+                // The in-memory records already mark the absent chips unreachable; the saved file is left
+                // alone so a unit that's merely away right now doesn't get dropped and force a full scan
+                // on every later start.
+                _log.InternalSuccess("DeviceConnectionManager.FindDevices: Discovery found no devices; saved records kept.");
+            }
+            else
+            {
+                _cache.Save(BuildCacheRows());
+            }
 
             stopwatch.Stop();
             _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Discovery ({occasion}): {discovered.Count} device(s) ready in {stopwatch.ElapsedMilliseconds} ms");
@@ -163,9 +179,11 @@ namespace TeensyRom.Core.Device
                 return await RunFullDiscovery(DiscoveryOccasion.Start, ct);
             }
 
-            foreach (var device in results)
+            foreach (var (row, device) in cached.Zip(results))
             {
-                _byChip[device!.DeviceId] = device;
+                CarryForwardEndpoint(device!.Connection, ConnectionType.Serial, row.SerialPortName);
+                CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+                _byChip[device.DeviceId] = device;
             }
 
             _cache.Save(BuildCacheRows());
@@ -177,18 +195,31 @@ namespace TeensyRom.Core.Device
         }
 
         /// <summary>
-        /// Reacquires one cached row by chip id. TCP opens the remembered endpoint directly. Serial trusts
-        /// the cached port name as-is whenever the descriptor filter still lists it among this chip's
-        /// candidates - or the filter is unavailable, since "cannot tell" must not become "reject" - which
-        /// alone survives Windows holding a stale port entry for an image that just detached. When the
-        /// cached name is no longer among the candidates, the chip has genuinely moved (e.g. a mode switch
-        /// swaps minimal COM7 for full COM4): every remaining candidate is opened and version-confirmed in
-        /// order rather than paying for a full sweep, and the first that answers as this chip is adopted.
-        /// Every attempt is bounded by <see cref="ConnectionOptions.ConnectTimeoutMs"/> and hands its
-        /// confirmed endpoint to <see cref="ICartFinder.BuildDevice"/> - the same builder full discovery
-        /// uses. Returns null - every opened port disposed - on any miss.
+        /// Tries the row's <see cref="CachedConnectionRecord.TransportInUse"/> first. When that misses and
+        /// the row also holds an endpoint for the other transport, tries that once too before counting the
+        /// row as a miss. Every attempt is bounded by <see cref="ConnectionOptions.ConnectTimeoutMs"/>.
         /// </summary>
         private async Task<TeensyRomDevice?> TryConfirmCachedRow(CachedConnectionRecord row, CancellationToken ct)
+        {
+            var device = await TryConfirmCachedRowOnTransport(row, ct);
+
+            if (device is not null)
+            {
+                return device;
+            }
+
+            var other = row.TransportInUse == ConnectionType.Serial ? ConnectionType.Tcp : ConnectionType.Serial;
+            var otherEndpoint = other == ConnectionType.Serial ? row.SerialPortName : row.TcpEndpoint;
+
+            if (string.IsNullOrEmpty(otherEndpoint))
+            {
+                return null;
+            }
+
+            return await TryConfirmCachedRowOnTransport(row with { TransportInUse = other }, ct);
+        }
+
+        private async Task<TeensyRomDevice?> TryConfirmCachedRowOnTransport(CachedConnectionRecord row, CancellationToken ct)
         {
             if (row.TransportInUse == ConnectionType.Serial)
             {
@@ -204,6 +235,16 @@ namespace TeensyRom.Core.Device
             return await TryOpenAndConfirm(_transports.CreateTcp(row.TcpEndpoint), row.ChipId, row.TransportInUse, host, parsedPort, ct);
         }
 
+        /// <summary>
+        /// Trusts the cached port name as-is whenever the descriptor filter still lists it among this
+        /// chip's candidates - or the filter is unavailable, since "cannot tell" must not become "reject" -
+        /// which alone survives Windows holding a stale port entry for an image that just detached. When
+        /// the cached name is no longer among the candidates, the chip has genuinely moved (e.g. a mode
+        /// switch swaps minimal COM7 for full COM4): every remaining candidate is opened and
+        /// version-confirmed in order rather than paying for a full sweep, and the first that answers as
+        /// this chip is adopted. Hands its confirmed endpoint to <see cref="ICartFinder.BuildDevice"/> -
+        /// the same builder full discovery uses. Returns null - every opened port disposed - on any miss.
+        /// </summary>
         private async Task<TeensyRomDevice?> TryConfirmCachedSerialRow(CachedConnectionRecord row, CancellationToken ct)
         {
             if (string.IsNullOrEmpty(row.SerialPortName))
@@ -298,8 +339,9 @@ namespace TeensyRom.Core.Device
         }
 
         /// <summary>
-        /// Narrows any row that held both a serial name and a TCP address to the transport that was just
-        /// confirmed, since a freshly built device's record only carries the endpoint it was confirmed on.
+        /// Writes each available device's record as a cache row, both endpoints included when the record
+        /// holds them - a rediscovered or start-confirmed device carries forward whatever endpoint it held
+        /// for the transport it wasn't just confirmed on.
         /// </summary>
         private List<CachedConnectionRecord> BuildCacheRows() =>
             GetAvailableDevices()
@@ -309,5 +351,14 @@ namespace TeensyRom.Core.Device
                     d.Connection.TcpEndpoint,
                     d.Connection.TransportInUse ?? d.ConnectionType))
                 .ToList();
+
+        /// <summary>Fills <paramref name="transport"/>'s endpoint on <paramref name="target"/> from <paramref name="candidateEndpoint"/>, but only when the target doesn't already have one.</summary>
+        private static void CarryForwardEndpoint(DeviceConnectionRecord target, ConnectionType transport, string? candidateEndpoint)
+        {
+            if (target.EndpointFor(transport) is null)
+            {
+                target.RememberEndpoint(transport, candidateEndpoint);
+            }
+        }
     }
 }

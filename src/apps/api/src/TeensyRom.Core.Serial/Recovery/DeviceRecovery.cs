@@ -238,7 +238,7 @@ namespace TeensyRom.Core.Serial.Recovery
                 {
                     try
                     {
-                        menuTokenSeen = port.WaitForMenuBootToken(log);
+                        menuTokenSeen = port.WaitForMenuBootToken(log, options.MenuBootTimeoutMs);
                     }
                     catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
                     {

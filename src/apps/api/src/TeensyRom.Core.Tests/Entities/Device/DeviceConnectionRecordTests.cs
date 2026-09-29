@@ -124,4 +124,34 @@ public class DeviceConnectionRecordTests
         sut.EndpointFor(ConnectionType.Serial).Should().Be("COM12");
         sut.EndpointFor(ConnectionType.Tcp).Should().BeNull();
     }
+
+    [Fact]
+    public void RememberEndpoint_SetsOnlyThatTransportsEndpoint_LeavingEverythingElseUntouched()
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+        var confirmedAt = sut.LastConfirmedUtc;
+
+        sut.RememberEndpoint(ConnectionType.Tcp, "192.168.1.37:2112");
+
+        sut.TcpEndpoint.Should().Be("192.168.1.37:2112");
+        sut.SerialPortName.Should().Be("COM12");
+        sut.TransportInUse.Should().Be(ConnectionType.Serial);
+        sut.Mode.Should().Be(DeviceMode.FullIdle);
+        sut.MenuBootPending.Should().BeFalse();
+        sut.LastConfirmedUtc.Should().Be(confirmedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void RememberEndpoint_WithNullOrEmptyEndpoint_IsIgnored(string? endpoint)
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+
+        sut.RememberEndpoint(ConnectionType.Tcp, endpoint);
+
+        sut.TcpEndpoint.Should().BeNull();
+    }
 }

@@ -25,6 +25,9 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         /// <summary>Every <c>SetPort</c> call, in order, with the DTR (isTeensyRomPort) flag it was made with.</summary>
         public List<(string Port, bool IsTeensyRomPort)> SetPortCalls { get; } = [];
 
+        /// <summary>The <c>timeoutMs</c> passed to every <see cref="WaitForSerialData"/> call, in order.</summary>
+        public List<int> WaitForSerialDataTimeoutsMs { get; } = [];
+
         private string? _endpoint;
 
         public RecoveryScriptedPort ThenSucceed()
@@ -127,6 +130,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         public void WaitForSerialData(int numBytes, int timeoutMs)
         {
             Calls.Add("Wait");
+            WaitForSerialDataTimeoutsMs.Add(timeoutMs);
             if (_waitOutcomes.Count > 0) _waitOutcomes.Dequeue()();
 
             if (_incoming.Count < numBytes)
