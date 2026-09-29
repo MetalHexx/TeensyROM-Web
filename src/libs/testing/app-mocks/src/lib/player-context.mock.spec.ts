@@ -9,7 +9,7 @@ describe('createMockPlayerContext', () => {
   it('stubs every member of the contract with a defined default', () => {
     const mock = createMockPlayerContext();
 
-    expect(Object.keys(mock)).toHaveLength(36);
+    expect(Object.keys(mock)).toHaveLength(37);
     expect(Object.values(mock).every((member) => member !== undefined)).toBe(true);
   });
 

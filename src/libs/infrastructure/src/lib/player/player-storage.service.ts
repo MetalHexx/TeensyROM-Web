@@ -93,6 +93,7 @@ export class PlayerStorageService implements IPlayerStorage {
       lastUpdated: savedState.lastUpdated,
       status: PlayerStatus.Stopped,
       isLoading: false,
+      isStopping: false,
       error: null
     };
   }

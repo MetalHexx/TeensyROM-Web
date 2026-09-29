@@ -23,6 +23,7 @@ export function createMockPlayerContext(
     getCurrentFile: vi.fn().mockReturnValue(signal(null).asReadonly()),
     getFileContext: vi.fn().mockReturnValue(signal(null).asReadonly()),
     isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
+    isStopping: vi.fn().mockReturnValue(signal(false).asReadonly()),
     isSlowLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
     getError: vi.fn().mockReturnValue(signal(null).asReadonly()),
     getStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),

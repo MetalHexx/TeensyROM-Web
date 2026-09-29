@@ -12,6 +12,13 @@
   }
 }
 
+// A stop is a ~15 s device reset. The rounded-primary style keeps its colours when disabled, so the
+// button is dimmed like the disabled toolbar until the reset returns.
+lib-icon-button.stopping {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .mini-toolbar {
   display: flex;
   flex-direction: column;

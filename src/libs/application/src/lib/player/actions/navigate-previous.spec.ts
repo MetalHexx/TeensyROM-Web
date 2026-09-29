@@ -98,6 +98,7 @@ describe('navigatePrevious', () => {
           historyViewVisible: false,
           playTimerConfig: { enabled: false, durationMs: 0 },
           isLoading: false,
+          isStopping: false,
           lastUpdated: null,
           error: null,
         },

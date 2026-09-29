@@ -73,14 +73,27 @@ export class PlayerToolbarComponent {
     position: TooltipPosition.Top,
   }));
 
-  readonly stopTooltip: TooltipConfig = {
-    title: 'Stop',
-    body: 'Stops the currently launched file by resetting TeensyROM.',
-    position: TooltipPosition.Top,
-  };
+  readonly stopTooltip = computed<TooltipConfig>(() =>
+    this.isStoppingComputed()
+      ? {
+          title: 'Stopping…',
+          body: 'Resetting TeensyROM. Play appears once the reset finishes.',
+          position: TooltipPosition.Top,
+        }
+      : {
+          title: 'Stop',
+          body: 'Stops the currently launched file by resetting TeensyROM.',
+          position: TooltipPosition.Top,
+        }
+  );
 
   readonly playPauseTooltip = computed<TooltipConfig>(() => ({
     title: this.getPlayPauseLabelComputed(),
+    // Play on a stopped non-song file relaunches it rather than resuming music.
+    body:
+      this.isPlayerLoadedComputed() && !this.isCurrentFileMusicTypeComputed()
+        ? 'Launches the stopped file again.'
+        : undefined,
     position: TooltipPosition.Top,
   }));
 
@@ -102,6 +115,24 @@ export class PlayerToolbarComponent {
 
     const currentFile = this.playerContext.getCurrentFile(deviceId)();
     return currentFile?.file?.type === FileItemType.Song;
+  });
+
+  /**
+   * Songs keep Play/Pause. Any other file shows Stop only while it runs, and Play once it has
+   * stopped, which launches it again. A disabled toolbar keeps showing the (disabled) Play/Pause.
+   */
+  showPlayPauseButtonComputed = computed(() => {
+    if (this.disabled() || this.isCurrentFileMusicTypeComputed()) return true;
+    const deviceId = this.deviceId();
+    if (!deviceId) return true;
+    return this.playerContext.getPlayerStatus(deviceId)() !== PlayerStatus.Playing;
+  });
+
+  /** A stop is a ~15 s device reset; its button stays disabled until it finishes. */
+  isStoppingComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.playerContext.isStopping(deviceId)();
   });
 
   canNavigateComputed = computed(() => {

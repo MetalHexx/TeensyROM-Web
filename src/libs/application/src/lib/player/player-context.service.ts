@@ -7,6 +7,7 @@ import {
   PlayerScope,
   FileItemType,
   FileItem,
+  PlayerStatus,
   StorageType,
   StorageTypeUtil,
   ALERT_SERVICE,
@@ -175,6 +176,10 @@ export class PlayerContextService implements IPlayerContext {
 
   isLoading(deviceId: string) {
     return this.store.isPlayerLoading(deviceId);
+  }
+
+  isStopping(deviceId: string) {
+    return this.store.isPlayerStopping(deviceId);
   }
 
   /**
@@ -361,12 +366,17 @@ export class PlayerContextService implements IPlayerContext {
       return;
     }
 
+    // Only a song resumes. Anything else was stopped by a reset that left the C64 in its menu,
+    // where toggling music would unpause the menu's own tune - so it is launched again instead.
+    if (!this.isCurrentFileMusicType(deviceId)) {
+      await this.relaunchCurrentFile(deviceId);
+      return;
+    }
+
     await this.store.play({ deviceId });
 
     // Phase 5: Resume timer for music files
-    if (this.isCurrentFileMusicType(deviceId)) {
-      this.timerManager.resumeTimer(deviceId);
-    }
+    this.timerManager.resumeTimer(deviceId);
   }
 
   async pause(deviceId: string): Promise<void> {
@@ -385,6 +395,12 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async stop(deviceId: string): Promise<void> {
+    // A second stop while the reset is still running would only queue another full reset.
+    if (this.store.isPlayerStopping(deviceId)()) {
+      logWarn(`Stop ignored: device ${deviceId} is already stopping`);
+      return;
+    }
+
     await this.store.stopPlayback({ deviceId });
 
     // Phase 5: Stop timer
@@ -519,6 +535,48 @@ export class PlayerContextService implements IPlayerContext {
 
   isCurrentFileCompatible(deviceId: string) {
     return this.store.isCurrentFileCompatible(deviceId);
+  }
+
+  /**
+   * Launches the stopped current file again through the store's launch action, so loading, error
+   * and compatibility state behave as for any launch. It is the same file, so no history entry is
+   * recorded (it was recorded when it first launched) and the URL already points at it. A file its
+   * file context does not hold (a random launch whose directory never loaded) is relaunched as a
+   * one-file context in its parent directory.
+   */
+  private async relaunchCurrentFile(deviceId: string): Promise<void> {
+    if (this.store.getPlayerStatus(deviceId)() === PlayerStatus.Playing) {
+      logInfo(LogType.Info, `Relaunch skipped: current file is already playing on ${deviceId}`);
+      return;
+    }
+
+    if (!this.canLaunch(deviceId, 'relaunch')) {
+      return;
+    }
+
+    const currentFile = this.store.getCurrentFile(deviceId)();
+    if (!currentFile) {
+      return;
+    }
+
+    const fileContext = this.store.getPlayerFileContext(deviceId)();
+    const context = fileContext?.files.some((file) => file.path === currentFile.file.path)
+      ? fileContext
+      : null;
+
+    await this.store.launchFileWithContext({
+      deviceId,
+      file: currentFile.file,
+      directoryPath: context?.directoryPath ?? currentFile.parentPath,
+      files: context?.files ?? [currentFile.file],
+      launchMode: this.store.getLaunchMode(deviceId)(),
+    });
+
+    if (!this.hasErrorAndCleanup(deviceId)) {
+      this.setupTimerForFile(deviceId, currentFile.file);
+    }
+
+    this.handleIncompatibleFile(deviceId);
   }
 
   // Helper method to determine if current file is music type

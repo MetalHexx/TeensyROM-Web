@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import type { DebugElement } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
+import type { TooltipConfig } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../testing/render-player-component';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { LaunchMode, PlayerStatus, FileItemType, StorageType } from '@teensyrom-nx/domain';
@@ -33,6 +34,7 @@ function render(deviceId = 'test-device-id') {
   const playerStatus = signal<PlayerStatus>(PlayerStatus.Stopped);
   const fileContext = signal<PlayerFileContext | null>(null);
   const launchMode = signal<LaunchMode>(LaunchMode.Directory);
+  const stopping = signal(false);
   const audioStreamEnabled = signal(false);
 
   const context = {
@@ -40,6 +42,7 @@ function render(deviceId = 'test-device-id') {
     getPlayerStatus: vi.fn().mockReturnValue(playerStatus),
     getFileContext: vi.fn().mockReturnValue(fileContext),
     getLaunchMode: vi.fn().mockReturnValue(launchMode),
+    isStopping: vi.fn().mockReturnValue(stopping),
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
@@ -65,6 +68,7 @@ function render(deviceId = 'test-device-id') {
     playerStatus,
     fileContext,
     launchMode,
+    stopping,
     audioStreamEnabled,
   };
 }
@@ -214,6 +218,67 @@ describe('PlayerToolbarMiniComponent', () => {
     });
   });
 
+  describe('stop/play button', () => {
+    it('shows stop while a non-music file is playing', () => {
+      const { fixture, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      const [, stopButton] = playbackButtons(fixture);
+
+      expect(stopButton.nativeElement.getAttribute('icon')).toBe('stop');
+    });
+
+    it('turns stop into play once a non-music file has stopped, and play sends play', () => {
+      const { fixture, component, context, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+      const [, playButton] = playbackButtons(fixture);
+      playButton.nativeElement.dispatchEvent(new Event('buttonClick'));
+
+      expect(playButton.nativeElement.getAttribute('icon')).toBeNull();
+      expect(prop(playButton, 'icon')).toBe('play_arrow');
+      expect(component.playPauseTooltip().body).toBe('Launches the stopped file again.');
+      expect(context.play).toHaveBeenCalledWith('test-device-id');
+      expect(context.stop).not.toHaveBeenCalled();
+    });
+
+    it('keeps play/pause for a music file while it is playing', () => {
+      const { fixture, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      const [, playPause] = playbackButtons(fixture);
+
+      expect(prop(playPause, 'icon')).toBe('pause');
+    });
+
+    it('disables stop while a stop is in flight', () => {
+      const { fixture, currentFile, playerStatus, stopping } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      const stop = () => playbackButtons(fixture)[1];
+      expect(prop(stop(), 'disabled')).toBe(false);
+      expect(stop().nativeElement.classList.contains('stopping')).toBe(false);
+      expect((prop(stop(), 'tooltip') as TooltipConfig).title).toBe('Stop');
+
+      stopping.set(true);
+      fixture.detectChanges();
+
+      expect(prop(stop(), 'disabled')).toBe(true);
+      expect(stop().nativeElement.classList.contains('stopping')).toBe(true);
+      expect((prop(stop(), 'tooltip') as TooltipConfig).title).toBe('Stopping…');
+    });
+  });
+
   describe('canNavigateComputed()', () => {
     it('allows navigation with multiple files in context', () => {
       const { component, fileContext } = render();
@@ -288,10 +353,10 @@ describe('PlayerToolbarMiniComponent', () => {
       setInput('disabled', true);
       fixture.detectChanges();
 
-      const [previous, stopButton, next] = playbackButtons(fixture);
+      const [previous, playOrStop, next] = playbackButtons(fixture);
 
       expect(prop(previous, 'disabled')).toBe(true);
-      expect(prop(stopButton, 'disabled')).toBe(true);
+      expect(prop(playOrStop, 'disabled')).toBe(true);
       expect(prop(next, 'disabled')).toBe(true);
     });
 

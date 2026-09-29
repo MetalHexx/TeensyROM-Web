@@ -571,6 +571,252 @@ public class CommunicationPortBehaviorTests
         await recovery.Received(1).RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// Bench (UI Stop after a game launch): one reset command reset the C64 twice - the gate's reset of the
+    /// busy device, then the handler's own - 29.5 s for what one ~15 s reset already did. The gate's reset
+    /// brings the C64 back to the menu, which is all a reset command asks for.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FullBusyRecordResetCommand_GateResetIsTheReset_HandlerDoesNotRun_RecordEndsFullIdle()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = PortWithSuccessfulReset();
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var log = Substitute.For<ILoggingService>();
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            log, devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(0);
+        port.Written.Should().Equal(0x64, 0xEE, 0x64, 0x76); // one reset token, then the boot-complete version poll
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Connection.MenuBootPending.Should().BeFalse();
+        log.Received(1).Internal(Arg.Is<string>(m => m.Contains("not resetting again")), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task Handle_FullBusyRecordResetCommand_ResetMisses_FailsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. The menu did not come back up after the reset.");
+        invocations.Should().Be(0);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+    }
+
+    /// <summary>
+    /// The gate's reset took (the menu's SID token arrived) but the menu is still booting: the command fails
+    /// the way any command does there, rather than succeeding over a menu that has not finished booting or
+    /// resetting it again, and the next command checks the boot.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FullBusyRecordResetCommand_MenuBackButStillBooting_FailsWithoutRunningHandler_BootPending()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new ScriptedCommunicationPort();
+        port.EnqueueTokenAfterQuiet(650, TeensyToken.GoodSIDToken);
+        port.NewSegment(); // the gate's own buffer clear
+        port.NewSegment(); // the token wait's buffer clear
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText("Boot: in progress\n");
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions { MenuBootTimeoutMs = 1000 });
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. The C64 menu came back after the reset but has not finished booting within 1 s.");
+        invocations.Should().Be(0);
+        port.Written.Zip(port.Written.Skip(1)).Count(pair => pair is (0x64, 0xEE)).Should().Be(1); // one reset token
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Connection.MenuBootPending.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Leaving minimal brought the device back to full but the recovery's own boot wait ran out: the gate
+    /// fails the command on the pending boot before the reset exemption is reached.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MinimalRecordResetCommand_RecoveryLeavesBootPending_FailsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.FullIdle);
+                device.MarkMenuBootPending();
+                return new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.Zero, "the C64 menu did not report its boot complete after the reset");
+            });
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions { MenuBootTimeoutMs = 1000 });
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. The C64 menu came back after the reset but has not finished booting within 1 s.");
+        invocations.Should().Be(0);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Connection.MenuBootPending.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Leaving minimal reboots the Teensy into full, which resets the C64 into the menu: the reset a reset
+    /// command asks for is already done. The recovery substitute confirms the record the way
+    /// <see cref="DeviceRecovery"/> does on a full, not-busy reply.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MinimalRecordResetCommand_RecoveryAnswersFullIdle_SucceedsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.FullIdle);
+                return new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.Zero, null);
+            });
+        var log = Substitute.For<ILoggingService>();
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            log, devices, recovery, new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(0);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>());
+        log.Received(1).Internal(Arg.Is<string>(m => m.Contains("not resetting again")), Arg.Any<string?>());
+    }
+
+    /// <summary>
+    /// A recovery that comes back busy means the firmware answered Busy! to its storage probe after the
+    /// reset - something other than the menu is running - so the gate's reset does not count as the one
+    /// the command asks for: the handler still resets, and its success leaves the record idle.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MinimalRecordResetCommand_RecoveryAnswersFullBusy_HandlerStillResets_RecordEndsFullIdle()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.FullIdle);
+                device.MarkBusy();
+                return new RecoveryOutcome(DeviceMode.FullBusy, TimeSpan.Zero, TimeSpan.Zero, null);
+            });
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1); // the gate's; the handler here is a stub
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+    }
+
+    /// <summary>An idle device is not touched by the gate: the handler performs the one reset, as before.</summary>
+    [Fact]
+    public async Task Handle_FullIdleRecordResetCommand_GateSendsNoReset_HandlerRuns()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new ResetResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Handle_PortReportingClosedAndOpenPortThrows_RecoversWithDropAndPropagates()
     {

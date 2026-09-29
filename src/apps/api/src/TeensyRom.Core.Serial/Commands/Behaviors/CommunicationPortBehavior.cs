@@ -33,9 +33,13 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// the boot rather than resetting the C64 again. A <see cref="TeensyBusyException"/>
 	/// from the command's own reply earns one reset and one re-send, and a transport drop hands the device
 	/// to <see cref="IDeviceRecovery"/>. A
-	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
-	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
-	/// way; the simplicity is worth the redundant reset.
+	/// <see cref="ResetCommand"/> is exempt from a second reset: when the gate has just reset the device
+	/// itself - a busy device whose menu came back, or a minimal one brought back to full and idle - the
+	/// C64 is already sitting in the menu, which is all the command asks for, so it succeeds without the
+	/// handler rebooting the C64 into the same menu again (bench: one Stop cost two ~15 s resets). A device
+	/// the gate did not reset (idle, or with its boot pending) is reset by the handler as before, and one
+	/// that leaves minimal but answers busy still gets the handler's reset - the firmware is saying the
+	/// menu is not what is running.
 	/// </remarks>
 	/// </summary>
 	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log, IDeviceConnectionManager devices, IDeviceRecovery recovery, ConnectionOptions options) : IPipelineBehavior<TRequest, TResponse>
@@ -97,6 +101,12 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 						{
 							return MenuStillBooting();
 						}
+
+						if (request is ResetCommand && outcome.Mode == DeviceMode.FullIdle)
+						{
+							// Leaving minimal reset the C64 into the menu: the reset this command asks for is done.
+							return GateResetWasTheReset();
+						}
 					}
 					else if (device.Connection.MenuBootPending)
 					{
@@ -119,6 +129,12 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 						}
 
 						device.MarkIdle();
+
+						if (request is ResetCommand)
+						{
+							// The reset above is the one this command asks for.
+							return GateResetWasTheReset();
+						}
 					}
 				}
 
@@ -197,6 +213,16 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 						Error = "Command Failed. The menu did not come back up after the reset."
 					};
 			}
+		}
+
+		/// <summary>
+		/// Succeeds a <see cref="ResetCommand"/> without its handler: the gate's own reset has just put the C64
+		/// back in the menu. Logged, or the bench log shows one reset and then nothing for the command.
+		/// </summary>
+		private TResponse GateResetWasTheReset()
+		{
+			log.Internal("CommunicationPortBehavior: the gate's reset was the reset command's reset; not resetting again");
+			return new();
 		}
 
 		private TResponse MenuStillBooting() => new()
