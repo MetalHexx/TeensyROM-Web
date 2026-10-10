@@ -43,9 +43,7 @@ export class DjMixerViewComponent {
   private readonly storageStore = inject(StorageStore);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly enabledDevices = computed<Device[]>(() =>
-    this.deviceStore.devices().filter((d) => d.isEnabled)
-  );
+  readonly enabledDevices = computed<Device[]>(() => this.deviceStore.usableDevices());
 
   /** The two fixed deck columns the DJ view always renders — never derived from device count or
    *  order; only which device (if any) a deck is bound to changes. */

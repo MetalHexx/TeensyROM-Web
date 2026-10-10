@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { DevicesApiService } from '@teensyrom-nx/data-access/api-client';
+import { DevicesApiService, ResponseError } from '@teensyrom-nx/data-access/api-client';
 import { DeviceService } from './device.service';
 import { ALERT_SERVICE } from '@teensyrom-nx/domain';
 
@@ -18,6 +18,8 @@ describe('DeviceService - Alert Integration', () => {
     findDevices: ReturnType<typeof vi.fn>;
     resetDevice: ReturnType<typeof vi.fn>;
     pingDevice: ReturnType<typeof vi.fn>;
+    reconnectDevice: ReturnType<typeof vi.fn>;
+    forgetDevice: ReturnType<typeof vi.fn>;
   };
   let mockAlertService: {
     error: ReturnType<typeof vi.fn>;
@@ -29,6 +31,8 @@ describe('DeviceService - Alert Integration', () => {
       findDevices: vi.fn(),
       resetDevice: vi.fn(),
       pingDevice: vi.fn(),
+      reconnectDevice: vi.fn(),
+      forgetDevice: vi.fn(),
     };
 
     mockAlertService = {
@@ -182,6 +186,109 @@ describe('DeviceService - Alert Integration', () => {
       ).rejects.toThrow();
 
       expect(mockAlertService.error).toHaveBeenCalledWith('Failed to ping device');
+      logSpy.mockRestore();
+    });
+  });
+
+  describe('reconnectDevice', () => {
+    it('maps the response device through DomainMapper on success', async () => {
+      mockApiService.reconnectDevice.mockResolvedValue({
+        message: 'reconnected',
+        device: {
+          deviceId: 'device-1',
+          name: 'TeensyROM Device #1',
+          comPort: 'COM3',
+          fwVersion: '1.0.0',
+          isCompatible: true,
+          isConnected: true,
+          deviceState: 'Connected',
+          ipAddress: null,
+          tcpPort: null,
+          sdStorage: { deviceId: 'device-1', type: 'SD', available: true, indexExists: true },
+          usbStorage: unavailableStorage('device-1', 'USB'),
+        },
+      });
+
+      const result = await new Promise((resolve, reject) => {
+        service.reconnectDevice('device-1').subscribe({ next: resolve, error: reject });
+      });
+
+      expect(mockApiService.reconnectDevice).toHaveBeenCalledWith({ deviceId: 'device-1' });
+      expect(result).toMatchObject({ deviceId: 'device-1', name: 'TeensyROM Device #1' });
+    });
+
+    it('raises the not-found alert on a 502', async () => {
+      const error = new ResponseError(new Response(null, { status: 502 }), 'Bad Gateway');
+      mockApiService.reconnectDevice.mockRejectedValue(error);
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.reconnectDevice('device-1').subscribe({ next: resolve, error: reject });
+        })
+      ).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith(
+        'Device could not be found. Check it is powered on and connected.'
+      );
+      logSpy.mockRestore();
+    });
+
+    it('raises the generic reconnect alert on any other failure', async () => {
+      const error = new ResponseError(new Response(null, { status: 404 }), 'Not Found');
+      mockApiService.reconnectDevice.mockRejectedValue(error);
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.reconnectDevice('device-1').subscribe({ next: resolve, error: reject });
+        })
+      ).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to reconnect device');
+      logSpy.mockRestore();
+    });
+
+    it('raises the generic reconnect alert when the error carries no response', async () => {
+      mockApiService.reconnectDevice.mockRejectedValue(new Error('network down'));
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.reconnectDevice('device-1').subscribe({ next: resolve, error: reject });
+        })
+      ).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to reconnect device');
+      logSpy.mockRestore();
+    });
+  });
+
+  describe('forgetDevice', () => {
+    it('resolves without error on success', async () => {
+      mockApiService.forgetDevice.mockResolvedValue({ message: 'forgotten' });
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.forgetDevice('device-1').subscribe({ next: resolve, error: reject });
+        })
+      ).resolves.toBeUndefined();
+
+      expect(mockApiService.forgetDevice).toHaveBeenCalledWith({ deviceId: 'device-1' });
+    });
+
+    it('raises the forget alert on failure', async () => {
+      const error = new ResponseError(new Response(null, { status: 409 }), 'Conflict');
+      mockApiService.forgetDevice.mockRejectedValue(error);
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.forgetDevice('device-1').subscribe({ next: resolve, error: reject });
+        })
+      ).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to forget device');
       logSpy.mockRestore();
     });
   });

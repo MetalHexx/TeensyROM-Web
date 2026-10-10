@@ -31,6 +31,7 @@ describe('playerRouteResolver', () => {
   let mockDeviceStore: {
     hasInitialised: ReturnType<typeof vi.fn>;
     devices: ReturnType<typeof vi.fn>;
+    usableDevices: ReturnType<typeof vi.fn>;
   };
   let mockPlayerContextService: {
     startListeningToPopState: ReturnType<typeof vi.fn>;
@@ -159,6 +160,7 @@ describe('playerRouteResolver', () => {
     mockDeviceStore = {
       hasInitialised: vi.fn(() => true),
       devices: vi.fn(() => [createMockDevice()]),
+      usableDevices: vi.fn(() => [createMockDevice()]),
     };
 
     mockPlayerContextService = {
@@ -325,5 +327,43 @@ describe('playerRouteResolver', () => {
       path: '/music',
     });
     expect(mockPlayerContextService.launchFileWithContext).not.toHaveBeenCalled();
+  });
+
+  it('skips an offline device entirely - no storage init, no navigation, no launch', async () => {
+    const offlineDevice = createMockDevice({ deviceState: DeviceState.ConnectionLost });
+    const onlineDevice = createMockDevice({ deviceId: 'device-2' });
+
+    mockDeviceStore.devices = vi.fn(() => [offlineDevice, onlineDevice]);
+    mockDeviceStore.usableDevices = vi.fn(() => [onlineDevice]);
+
+    const settings = createMockSettings({
+      playerSettings: {
+        repeatModeOnStartup: false,
+        playTimerEnabled: false,
+        muteFastForward: false,
+        muteRandomSeek: false,
+        startupFilter: PlayerFilterType.All,
+        startupLaunchEnabled: false,
+        startupLaunchRandom: false,
+      },
+    });
+    mockSettingsStore.getSettings.mockReturnValue(signal<Settings | null>(settings));
+    mockStorageStore.getSelectedDirectoryForDevice.mockReturnValue(null);
+
+    await runResolver(createRoute());
+    await waitUntil(() => mockStorageStore.getSelectedDirectoryForDevice.mock.calls.length > 0);
+
+    expect(mockStorageStore.initializeStorage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId })
+    );
+    expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId })
+    );
+    expect(mockPlayerContextService.launchFileWithContext).not.toHaveBeenCalled();
+    expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+      deviceId: 'device-2',
+      storageType: StorageType.Sd,
+      path: '/',
+    });
   });
 });

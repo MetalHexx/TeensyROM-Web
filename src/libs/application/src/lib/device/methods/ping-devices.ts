@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { IDeviceService, DEVICE_SERVICE } from '@teensyrom-nx/domain';
+import { IDeviceService, DEVICE_SERVICE, DeviceState as DeviceConnectionState } from '@teensyrom-nx/domain';
 import { DeviceState } from '../device-store';
 import { firstValueFrom } from 'rxjs';
 
@@ -13,7 +13,9 @@ export function pingAllDevices(
 ) {
   return {
     pingAllDevices: async () => {
-      const devices = store.devices();
+      const devices = store
+        .devices()
+        .filter((device) => device.deviceState !== DeviceConnectionState.ConnectionLost);
       // allSettled: a failing ping (device service alerts and rethrows) must not leave the
       // other devices' pings unhandled or the call rejected.
       await Promise.allSettled(

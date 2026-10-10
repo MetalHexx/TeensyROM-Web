@@ -100,8 +100,10 @@ async function initializePlayer(
     `PlayerInit: DeviceStore initialized: ${deviceStore.devices().length} device(s) found`
   );
 
-  // Step 2: Initialize storage for all devices
-  const devices = deviceStore.devices();
+  // Step 2: Initialize storage for all usable devices (offline units skip storage init and,
+  // further below, startup navigation/launch - those calls would 404 against a device that
+  // isn't connected).
+  const devices = deviceStore.usableDevices();
   logInfo(LogType.Start, `PlayerInit: Initializing storage for ${devices.length} device(s)`);
 
   for (const currentDevice of devices) {

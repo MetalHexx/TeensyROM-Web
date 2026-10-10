@@ -1,4 +1,4 @@
-import { IDeviceService, DEVICE_SERVICE } from '@teensyrom-nx/domain';
+import { IDeviceService, DEVICE_SERVICE, DeviceState as DeviceConnectionState } from '@teensyrom-nx/domain';
 import { DeviceState } from '../device-store';
 import { firstValueFrom } from 'rxjs';
 import { inject } from '@angular/core';
@@ -15,7 +15,9 @@ export function resetAllDevices(
 ) {
   return {
     resetAllDevices: async () => {
-      const devices = store.devices();
+      const devices = store
+        .devices()
+        .filter((device) => device.deviceState !== DeviceConnectionState.ConnectionLost);
 
       const results = await Promise.allSettled(
         devices.map((device) => firstValueFrom(deviceService.resetDevice(device.deviceId)))

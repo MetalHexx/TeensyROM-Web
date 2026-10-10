@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { signal, computed } from '@angular/core';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 import {
@@ -58,6 +58,9 @@ describe('FileTransferViewComponent', () => {
 
   const setup = async (devices: Device[]) => {
     devicesSignal = signal(devices);
+    const usableDevicesSignal = computed(() =>
+      devicesSignal().filter((d) => d.isEnabled && d.deviceState !== DeviceState.ConnectionLost)
+    );
     getDirectoryMock = vi.fn().mockReturnValue(of(createMockDirectory()));
     searchMock = vi.fn().mockReturnValue(of([]));
 
@@ -95,7 +98,7 @@ describe('FileTransferViewComponent', () => {
       providers: [
         provideNoopAnimations(),
         TransferStore,
-        { provide: DeviceStore, useValue: { devices: devicesSignal } },
+        { provide: DeviceStore, useValue: { devices: devicesSignal, usableDevices: usableDevicesSignal } },
         { provide: STORAGE_SERVICE, useValue: mockStorageService },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: PlayerStore, useValue: mockPlayerStore },

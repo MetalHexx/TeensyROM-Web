@@ -1,4 +1,4 @@
-<mat-card [ngClass]="{ dimmed: !status() }">
+<mat-card [ngClass]="{ dimmed: isUnavailable() }">
   <mat-card-content>
     <div class="storage-container">
       <lib-icon-label
@@ -11,7 +11,7 @@
 
       <lib-icon-button
         (click)="onIndex()"
-        [disabled]="!status()"
+        [disabled]="isUnavailable()"
         [attr.data-testid]="'storage-index-button-' + (icon() === 'usb' ? 'usb' : 'sd')"
         [tooltip]="tooltipMessage()"
         size="large"

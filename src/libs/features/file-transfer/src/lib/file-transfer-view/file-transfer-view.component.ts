@@ -39,7 +39,7 @@ export class FileTransferViewComponent {
   private readonly transferStore = inject(TransferStore);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly enabledDevices = computed(() => this.deviceStore.devices().filter((d) => d.isEnabled));
+  readonly enabledDevices = computed(() => this.deviceStore.usableDevices());
 
   private readonly storedTargetDeviceId = this.transferStore.getTargetDeviceId();
 
