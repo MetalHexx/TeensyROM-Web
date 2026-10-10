@@ -302,7 +302,7 @@ trusting them — a coder or reviewer spot-checks by opening the file, not by tr
 | `…/DeviceConnectionManager.cs:152` | `ReconnectAsync` — every reconnect request's entry (expression body; the statement line, not the signature line above it) | `deviceId` |
 | `…/DeviceConnectionManager.cs:155` | `ForgetAsync` — every forget request's entry (same caveat) | `deviceId` |
 | `…/DeviceConnectionManager.cs:263` | `RunFullDiscovery` starts | `occasion` |
-| `…/DeviceConnectionManager.cs:286` | `RunFullDiscovery`'s save — only when the sweep found at least one device | `discovered.Count`, `occasion` |
+| `…/DeviceConnectionManager.cs:286` | `RunFullDiscovery`'s save — unconditional since P09, every known unit, found or not, is written every call | `discovered.Count`, `occasion` |
 | `…/DeviceConnectionManager.cs:298` | `RunConnectAtStart` — an empty/missing cache falls back to a full sweep | `cached?.Count` |
 | `…/DeviceConnectionManager.cs:327` | `RunConnectAtStart`'s confirm — every cached row tried in parallel | `cached.Count` |
 | `…/DeviceConnectionManager.cs:466` | the search-for-missing-units call (Start's online-last-time miss, or Reconnect's) | `skip.Count` |
