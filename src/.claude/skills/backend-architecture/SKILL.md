@@ -38,7 +38,7 @@ See [references/BACKEND_ARCHITECTURE.md](references/BACKEND_ARCHITECTURE.md) for
 
 - System architecture diagram and key components per layer (API, Device, Serial, Storage)
 - Endpoint organization, versioning/validation conventions, and a typical endpoint code example
-- The connectivity ring: the three discovery occasions, the gate (`CommunicationPortBehavior`), device recovery, and the serial locator
+- The connectivity ring: the five discovery occasions (start, Discover Devices, page load, reconnect, forget), the gate (`CommunicationPortBehavior`), device recovery, and the serial locator
 - Serial pipeline behaviors, command protocol (ACK/NAK), device modes
 - MediatR sequence diagrams for the launch flow and storage indexing
 - Storage/indexing deep dive: cache file structure, indexing strategies, read/write paths, metadata enrichment

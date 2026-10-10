@@ -180,7 +180,7 @@ Mock only at infrastructure boundaries — application and features tests should
 - Assets are automatically unpacked on startup.
 - The API requires TeensyROM firmware that reports its boot state (the version reply's `Boot:` line —
   fork branch `boot-complete-flag`, pending upstream).
-- `Connection:PreferredTransport` (default `Tcp`) picks the transport for a unit reachable on both.
+- `Connection:PreferredTransport` (default `Tcp`) orders the start and reconnect occasions' own cached-endpoint attempts, and picks the survivor when a scan finds a unit reachable on both.
 - After any reset the API stays silent until the C64 menu's SID token.
 
 ## UI & Styling Resources

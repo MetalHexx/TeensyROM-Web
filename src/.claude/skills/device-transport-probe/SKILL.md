@@ -77,9 +77,9 @@ node reset-launch.mjs --device 19277260 --rounds 10 --out reset-launch.txt
 ```
 
 `api-swap.mjs`'s first line says which transport the API chose (`device 19277260 on Tcp (...)`).
-**Check it**: `Connection:PreferredTransport` decides the transport when the device answers on both, but
-a cached connection row keeps whatever transport it cached regardless of the setting - see "Transport
-choice in the API" under Pitfalls before trusting a run's transport. `reset-launch.mjs` sends a zero-gap
+**Check it**: `Connection:PreferredTransport` orders the start/reconnect occasions' own cached-endpoint
+attempts and decides the survivor when a scan sees the device on both - see "Transport choice in the
+API" under Pitfalls before trusting a run's transport. `reset-launch.mjs` sends a zero-gap
 `PUT .../reset` immediately followed by a SID launch, no pause between them; a round passes only when
 both return `200`, and the launch only answers `200` once the firmware's `GoodSIDToken` has actually
 landed - so 10/10 here is direct proof the boot-complete wait holds at the tightest timing the API can
@@ -93,7 +93,8 @@ change touching reset, recovery, discovery, or launch:
 1. `node preflight.mjs --tcp <ip> --uid <chipId>` - fix the bench on any FAIL before continuing.
 2. Point the API at the transport under test: set `Connection__PreferredTransport` (`Tcp` or `Serial`),
    start the API, then force a full discovery (`GET /api/devices/?fullScan=true` - `api-swap.mjs` always
-   runs one itself). Confirm `api-swap.mjs`'s first line names the transport you meant to test.
+   runs one itself) to be certain regardless of what the cache already holds. Confirm `api-swap.mjs`'s
+   first line names the transport you meant to test.
 3. `node api-swap.mjs --device <chipId> --rounds 10 --out api-swap-<transport>.txt`
 4. `node reset-launch.mjs --device <chipId> --rounds 10 --out reset-launch-<transport>.txt`
 5. Stop the API - it holds every port during discovery/recovery, and the hardware suite opens its own.
@@ -158,6 +159,9 @@ the code; compare against "Expected results" below before concluding either way.
   answered in that window can make the Teensy miss a C64 bus cycle and corrupt the menu's copy of itself
   into C64 RAM (bench: every failed boot came from a round that polled then; none from 26 silent
   rounds). Wait for the token first, the same as the API's own reset/recovery does.
+- Playing a tune through the **ASID player** takes a unit off TCP entirely while it plays (bench-confirmed,
+  2026-10-10, expected) - a TCP probe that can't reach a unit may just mean ASID is active, not a
+  connectivity bug.
 
 **Firmware**
 - See "Firmware prerequisite" above for what the boot-complete flag is and how to build/flash it. Know
@@ -166,19 +170,22 @@ the code; compare against "Expected results" below before concluding either way.
   interleaved with replies. Parsers must tolerate it; the probes show it as text events.
 
 **Network**
-- Never unplug Ethernet to force serial: with a static IP the TR blocks at boot looking for the link
-  (a limitation of its Ethernet library).
+- Never reboot a **static-IP** unit with its cable out: it loops waiting for the network instead of ever
+  coming back (a limitation of its Ethernet library) - bench-confirmed, 2026-10-10. Unplug to force serial
+  only on a unit already up and running, never across a reset.
 - The bench PC must be on the TR's subnet (here 192.168.1.x, TR at 192.168.1.37:2112).
 
 **Transport choice in the API**
 - `Connection:PreferredTransport` (`appsettings.json`, default `Tcp`; env var
-  `Connection__PreferredTransport`) decides which transport wins when a chip answers on both
-  (`CartFinder.DeduplicateByDeviceId`).
-- **A cached connection row keeps the transport it cached.** Changing the setting and restarting the API
-  is not enough by itself: the cache-first start (`DeviceConnectionManager.RunConnectAtStart`) just
-  reconfirms whatever transport the last run wrote to `ConnectionRecords.json`. The change only takes
-  effect at the next full discovery - `GET /api/devices/?fullScan=true`, which `api-swap.mjs` always
-  triggers first. Always read `api-swap.mjs`'s first line rather than trusting the setting alone.
+  `Connection__PreferredTransport`) does three things, not one: it orders the start occasion's own
+  cached-row confirm (preferred endpoint first, then the row's other cached endpoint once,
+  `DeviceConnectionManager.TryConfirmCachedRow`), orders Reconnect's confirm the same way, and decides
+  which transport survives when a scan sees a chip on both (`CartFinder.DeduplicateByDeviceId`).
+- Changing the setting and restarting is enough on its own **when the cached row already holds an
+  endpoint for the new preferred transport** - the next start tries that endpoint first, no full scan
+  needed. A row missing that endpoint still needs a fresh discovery (Discover Devices, or the search a
+  Start/Reconnect miss triggers) before the setting can take effect for that unit. Always read
+  `api-swap.mjs`'s first line rather than assuming either way.
 - The hardware suite's `TEENSYROM_BENCH_TRANSPORT` sets `HardwareFixture`'s own `PreferredTransport`
   directly, not through `appsettings.json` - so `Serial` reliably drives Serial even with Ethernet up,
   no listener toggle needed for this suite.

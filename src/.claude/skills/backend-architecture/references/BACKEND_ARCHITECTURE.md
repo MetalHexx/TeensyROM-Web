@@ -117,10 +117,10 @@ graph TB
 
 | Component | Purpose | Key Files |
 |-----------|---------|-----------|
-| **DeviceConnectionManager** | Owns the three discovery occasions (start, Discover Devices, page load) and the confirmed device set, keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs |
+| **DeviceConnectionManager** | Owns the five discovery occasions (start, Discover Devices, page load, reconnect, forget) and the confirmed device set, keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs |
 | **CartFinder** | Turns one confirmed endpoint into a listed device: resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on both transports by `ConnectionOptions.PreferredTransport` | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
-| **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe every USB-descriptor-matched COM port / the local `/24` subnet with the version command; each yields one `DiscoveredEndpoint` per TeensyROM reply | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
-| **ConnectionRecordCache** | Whole-file JSON cache of confirmed connection records (`Config/ConnectionRecords.json`), read by the start occasion and rewritten after any occasion that contacts a device | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
+| **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe every USB-descriptor-matched COM port / the local `/24` subnet with the version command; each yields one `DiscoveredEndpoint` per TeensyROM reply. An optional skip set (a COM port name or bare IP) leaves a given candidate untouched, so the search a Start or Reconnect miss triggers never reopens a unit already available | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
+| **ConnectionRecordCache** | Whole-file JSON cache of confirmed connection records (`Config/ConnectionRecords.json`), read by the start occasion and rewritten after every occasion but a page load — Forget included, which rewrites without contacting any device. Each row carries an `Offline` flag and the unit's last-known facts (firmware, hardware variant, compatibility) so an unreachable unit stays listed instead of disappearing | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
 | **TeensyRomDevice** | Aggregate root representing a device: `Cart` metadata + `ICommunicationPort` + storage services | #file:apps/api/src/TeensyRom.Core/Entities/Device/TeensyRomDevice.cs |
 
 **Critical Pattern**: `TeensyRomDevice` encapsulates:
@@ -212,11 +212,23 @@ Endpoints/
 Γöé   ΓööΓöÇΓöÇ ...
 ΓööΓöÇΓöÇ Serial/          # Device management
     Γö£ΓöÇΓöÇ FindDevices/
-    Γö£ΓöÇΓöÇ ConnectDevice/
+    Γö£ΓöÇΓöÇ ReconnectDevice/
+    Γö£ΓöÇΓöÇ ForgetDevice/
     Γö£ΓöÇΓöÇ PingDevice/
-    Γö£ΓöÇΓöÇ Logs/
-    ΓööΓöÇΓöÇ DeviceEvents/
+    Γö£ΓöÇΓöÇ ResetDevice/
+    Γö£ΓöÇΓöÇ GetPorts/
+    ΓööΓöÇΓöÇ Logs/
 ```
+
+### Device Endpoints
+
+| Endpoint | Success | Failure |
+|----------|---------|---------|
+| `GET /api/devices/` | 200 — available units, then every known offline unit (`deviceState: ConnectionLost`) | 404 when neither an available nor an offline unit exists |
+| `POST /api/devices/{deviceId}/reconnect` | 200 — reconnected, or already available (no contact) | 404 unknown device; 502 the saved addresses and the search for missing units both missed |
+| `DELETE /api/devices/{deviceId}` | 200 — forgotten, from memory and the saved file | 404 unknown device; 409 still available (an available device is left untouched; only an offline unit can be forgotten) |
+
+Forgetting or reconnecting a unit never touches its entry in `settings.json` — only the connection record.
 
 ### Versioning & Validation
 
@@ -274,13 +286,15 @@ The connectivity ring is the set of collaborators that find a device, keep the g
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 graph TB
-    subgraph Occasions["Three Discovery Occasions"]
+    subgraph Occasions["Five Discovery Occasions"]
         START["ApplicationBootstrapService<br/>API start"]
         SCAN["FindDevicesEndpoint<br/>FullScan=true (Discover Devices)"]
         LOAD["FindDevicesEndpoint<br/>FullScan=false (page load)"]
+        RECONNECT["ReconnectDeviceEndpoint<br/>POST .../deviceId/reconnect"]
+        FORGET["ForgetDeviceEndpoint<br/>DELETE /api/devices/deviceId"]
     end
 
-    DCM["DeviceConnectionManager<br/>owns the three occasions"]
+    DCM["DeviceConnectionManager<br/>owns the five occasions"]
     CACHE["ConnectionRecordCache<br/>Config/ConnectionRecords.json"]
     FINDER["CartFinder<br/>endpoint to listed device"]
     STRAT["Discovery strategies<br/>Serial | Tcp"]
@@ -293,16 +307,20 @@ graph TB
     START --> DCM
     SCAN --> DCM
     LOAD --> DCM
+    RECONNECT --> DCM
+    FORGET --> DCM
 
-    DCM -->|"start: load cache,<br/>confirm by chip id"| CACHE
+    DCM -->|"start: load cache,<br/>preferred transport first"| CACHE
     CACHE -->|"cached row"| FINDER
-    DCM -->|"FullScan: full sweep"| FINDER
+    DCM -->|"FullScan: full sweep,<br/>with resets"| FINDER
     DCM -->|"page load: no contact"| RECORD
+    DCM -->|"reconnect: cached row,<br/>then search for missing"| FINDER
+    DCM -->|"forget: offline unit only"| RECORD
 
     FINDER --> STRAT
     STRAT --> LOCATOR
     FINDER -->|"builds/updates"| RECORD
-    DCM -->|"saves after start/FullScan"| CACHE
+    DCM -->|"saves after start/FullScan/<br/>reconnect/forget"| CACHE
 
     GATE -->|"reads mode"| RECORD
     GATE -->|"on drop or Minimal"| RECOVERY
@@ -324,10 +342,10 @@ graph TB
 | Component | Purpose | Key Files |
 |-----------|---------|-----------|
 | **DeviceConnectionRecord** | Per-device record: endpoints known per transport, transport in use, last-known `DeviceMode`, last-confirmed time. Survives across any single port. | #file:apps/api/src/TeensyRom.Core/Entities/Device/DeviceConnectionRecord.cs |
-| **DeviceConnectionManager** | Owns the three occasions and the confirmed device set (`_byChip`), keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs<br/>#file:apps/api/src/TeensyRom.Core/Abstractions/IDeviceConnnectionManager.cs |
-| **ConnectionRecordCache** | Whole-file JSON cache of confirmed rows (`Config/ConnectionRecords.json`), loaded by the start occasion, replaced whole after start/FullScan | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
+| **DeviceConnectionManager** | Owns the five occasions and the confirmed device set (`_byChip`), keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs<br/>#file:apps/api/src/TeensyRom.Core/Abstractions/IDeviceConnnectionManager.cs |
+| **ConnectionRecordCache** | Whole-file JSON cache of confirmed rows (`Config/ConnectionRecords.json`), loaded by the start occasion, replaced whole after every occasion but a page load (start, Discover Devices, reconnect, forget) | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
 | **CartFinder** | Turns one confirmed endpoint into a listed device (`BuildDevice`); resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on two transports by `ConnectionOptions.PreferredTransport` (default `Tcp`) | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
-| **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe USB-descriptor-matched COM ports / the local `/24` subnet with the version command | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
+| **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe USB-descriptor-matched COM ports / the local `/24` subnet with the version command; an optional skip set leaves a given candidate untouched | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
 | **CommunicationPortBehavior** | The gate: the MediatR pipeline behavior every command passes through | #file:apps/api/src/TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs |
 | **DeviceRecovery** | Reacquires a device on its own port instance after a drop, or when leaving minimal firmware | #file:apps/api/src/TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs<br/>#file:apps/api/src/TeensyRom.Core.Serial/Recovery/IDeviceRecovery.cs |
 | **ConnectionOptions** | Tunables bound from the `Connection` config section: poll interval, per-transport ceilings, launch-settle and connect-timeout windows | #file:apps/api/src/TeensyRom.Core.Serial/Recovery/ConnectionOptions.cs |
@@ -415,13 +433,30 @@ reply could matter.
   before either signal could arrive. `DeviceRecovery`'s `LeaveMinimal` path does the equivalent wait once
   the device is reacquired (below).
 
-### The Three Discovery Occasions
+### The Five Discovery Occasions
+
+All five run through one queue — only one is ever in flight at a time. Start and Discover Devices may
+join an already-running instance of either kind and share its result; Reconnect and Forget never join —
+each waits for whatever is running, then runs alone for its own caller only.
 
 | Occasion | Trigger | What it touches |
 |----------|---------|------------------|
-| **Start** | API boot — `ApplicationBootstrapService` calls `DeviceConnectionManager.ConnectAtStartAsync` | Loads `ConnectionRecords.json`; for each row, tries its cached transport first and, on a miss, the row's *other* cached endpoint once (`TryConfirmCachedRow`) before counting the row as a miss — each attempt bounded by `ConnectTimeoutMs`, confirmed by chip id (serial via `TeensyPortLocator`, TCP via a direct connect), and handed to `CartFinder.BuildDevice`. Any row miss, or an empty/missing cache, falls back to a full discovery sweep. |
-| **Discover Devices** | `GET /api/devices/?FullScan=true` (`FindDevicesEndpoint`) | Disposes every currently open port, runs `SerialDiscoveryStrategy` and `TcpDiscoveryStrategy` in parallel via `CartFinder.FindDevices`, marks any chip missing from the new sweep `Unreachable`. A device confirmed on one transport carries forward whatever endpoint it already held for the *other* transport (`CarryForwardEndpoint`) rather than losing it. **An empty sweep (0 devices found) leaves `ConnectionRecords.json` untouched** — the in-memory records already mark the absent chips `Unreachable`, and rewriting the file would drop a unit that is merely away right now, forcing a full scan on every later start; the file is only replaced whole when the sweep found at least one device. |
-| **Page load** | `GET /api/devices/` (`FullScan=false`, the default — this is also what the UI's own bootstrap call uses) | No device is contacted. Returns `GetAvailableDevices()` as already known; if a Start or Discover Devices occasion is in flight, it joins that occasion's result instead of returning an empty list, but starts nothing itself. |
+| **Start** | API boot — `ApplicationBootstrapService` calls `DeviceConnectionManager.ConnectAtStartAsync` | Loads `ConnectionRecords.json`. An empty or missing cache falls back to a full discovery sweep (the same as Discover Devices, with resets). Otherwise every row is confirmed in parallel: its `ConnectionOptions.PreferredTransport` endpoint first and, on a miss, the row's other cached endpoint once (`TryConfirmCachedRow`) — each attempt bounded by `ConnectTimeoutMs`, confirmed by chip id (serial via `TeensyPortLocator`, TCP via a direct connect), and handed to `CartFinder.BuildDevice`. A miss on any row that was online last time triggers exactly one search for missing units (below); a row that was already offline last time and misses again triggers nothing further. Every row still missing after this is saved offline with its last-known facts. |
+| **Discover Devices** | `GET /api/devices/?FullScan=true` (`FindDevicesEndpoint`) | Disposes every currently open port, runs `SerialDiscoveryStrategy` and `TcpDiscoveryStrategy` in parallel via `CartFinder.FindDevices`, marks any chip missing from the new sweep `Unreachable`. A device confirmed on one transport carries forward whatever endpoint it already held for the *other* transport (`CarryForwardEndpoint`) rather than losing it; a chip the sweep finds on both transports keeps whichever one `ConnectionOptions.PreferredTransport` names. This is the only occasion that always re-probes and resets every device, not just the ones that missed. **An empty sweep (0 devices found) leaves `ConnectionRecords.json` untouched** — the in-memory records already mark the absent chips `Unreachable`, and rewriting the file would drop a unit that is merely away right now, forcing a full scan on every later start; the file is only replaced whole when the sweep found at least one device. |
+| **Page load** | `GET /api/devices/` (`FullScan=false`, the default — this is also what the UI's own bootstrap call uses) | No device is contacted. Returns `GetAvailableDevices()` as already known; if a Start or Discover Devices occasion is in flight, it joins that occasion's result instead of returning an empty list, but starts nothing itself. A browser refresh alone never reaches a device. |
+| **Reconnect** | `POST /api/devices/{deviceId}/reconnect` (`ReconnectDeviceEndpoint`) | An already-available device returns immediately with no contact at all. Otherwise tries the unit's saved addresses the same preferred-transport-first way Start does, handed to `CartFinder.BuildDevice`; a miss runs the same one search for missing units Start's partial miss runs, which also merges in anything else it happens to find along the way. |
+| **Forget** | `DELETE /api/devices/{deviceId}` (`ForgetDeviceEndpoint`) | No device is contacted. Removes an offline unit only — in memory (`Unreachable`) or known only from the saved file — from both; an available unit is left untouched. Settings (`settings.json`) are kept either way. |
+
+**The one search for missing units** (`RunSearchForMissingUnits`, triggered by Start's online-last-time
+miss or by Reconnect) always skips every already-available unit's known COM port and IP
+(`BuildAvailableEndpointSkipSet`) — those ports are left open and undisturbed, never reset — and always
+saves afterward, even when it finds nothing.
+
+**Every discovery merges.** No known unit or address is dropped except by Forget: `RunSearchForMissingUnits`
+and `RunFullDiscovery` both merge found endpoints into the existing device/offline-row knowledge
+(`MergeDiscovered`) rather than replacing it, and `AdoptConfirmedDevice`/`ReleaseEndpointFromOtherChips`
+enforce one address, one chip, on every confirm path — a serial port or IP just confirmed for one chip is
+cleared from whatever other chip's record held it, in memory and among the file-only rows alike.
 
 ### Device Recovery
 
@@ -453,6 +488,13 @@ reply could matter.
 ```
 
 `Serial.ToMinimalMs` is 30 s, not 15 s: minimal only answers on serial after its own Ethernet setup, and with DHCP and no cable that setup waits out the whole DHCP timeout (15 s by default) first — the old 15 s ceiling turned a large launch into a 502 while the game had actually loaded. `MenuBootTimeoutMs` is not in the shipped file at all; it runs on `ConnectionOptions`'s compiled default (45 s) unless a deployment overrides `Connection:MenuBootTimeoutMs`.
+
+`PreferredTransport` is not only a scan-time tiebreaker: the start occasion tries this transport's cached
+endpoint first (falling back to the row's other cached endpoint on a miss, see *The Five Discovery
+Occasions* above), and Reconnect orders its own cached-row attempt the same way. Changing the setting and
+restarting is enough on its own when the row already holds both endpoints; only a row missing the
+preferred transport's endpoint needs a fresh discovery (Discover Devices, or the search a miss triggers)
+to pick it up.
 
 ### Launch's Drop-Expecting Flow
 
@@ -781,7 +823,7 @@ TeensyRom.Api
 - Recovery's own poll loop: `Connection.PollIntervalMs` (default 250ms) between version-command probes, bounded by a per-transport, per-reason ceiling — not a fixed retry count or delay (see *Connectivity Ring*)
 
 **Health Checks**:
-- No background polling task: a device's reachability is only re-checked when a command actually hits a transport drop, or when one of the three discovery occasions runs
+- No background polling task: a device's reachability is only re-checked when a command actually hits a transport drop, or when one of the five discovery occasions runs
 - The gate (`CommunicationPortBehavior`) catches the drop and hands the device to `DeviceRecovery`, which reacquires it and updates its `DeviceConnectionRecord`
 - A device that never answers within its recovery ceiling is marked `Unreachable` and drops out of `GetAvailableDevices()` until a discovery occasion finds it again
 

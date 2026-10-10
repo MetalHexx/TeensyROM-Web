@@ -147,6 +147,12 @@ connect attempt (a full discovery sweep, or a cached-row confirm against that un
 time how long the connect attempt takes to give up versus a plain refused/no-listener connect. This is the
 `ConnectTimeoutMs` / TCP sweep per-address timeout in practice, not a fast refusal.
 
+A **static-IP** unit is a different failure mode from the above, not a variant of it: rebooted with its
+cable out, it loops waiting for the network instead of ever reaching a connect-timeout-bounded state —
+**never reboot a static-IP unit unplugged.** Also bench-confirmed: playing a tune through the ASID player
+takes a unit off TCP entirely while it plays (expected) — a TCP probe that can't reach a unit may just
+mean ASID is active, not a connectivity bug.
+
 Read: `TCP sweep <start>–<end>: <n> addresses, <a> answered, <r> refused, <t> timed out, in <ms> ms` from
 `TcpDiscoveryStrategy`, or `DeviceConnectionManager: start confirm miss for <chipId>: open failed: ...` for
 the cached-row variant.
@@ -353,10 +359,14 @@ to avoid.
 
 Ran the `device-transport-probe` skill's "Prove a connection change" procedure end to end against device
 `19277260` (TR+, fork `boot-complete-flag` branch flashed) on both transports. Confirmed along the way:
-a cached connection row keeps the transport it cached — after setting `Connection__PreferredTransport`,
+~~a cached connection row keeps the transport it cached — after setting `Connection__PreferredTransport`,
 the cache-first start still opened the old transport until `GET /api/devices/?fullScan=true` forced a
-full discovery; and once the API held Serial as its live connection, `preflight.mjs --api-expected`
-correctly reported a FAIL on "COM4 open" (access denied) — expected, not a defect.
+full discovery~~ **(superseded by P09, 2026-10-10: the start occasion now tries `PreferredTransport`'s
+cached endpoint first, falling back to the row's other endpoint on a miss — a restart alone picks up the
+new setting when the row already holds both endpoints; `PreferredTransport` still also decides the
+survivor when a scan finds a chip on both transports)**; and once the API held Serial as its live
+connection, `preflight.mjs --api-expected` correctly reported a FAIL on "COM4 open" (access denied) —
+expected, not a defect.
 
 **`api-swap.mjs`, 10 rounds each** (`--out api-swap-tcp.txt` / `api-swap-serial.txt`):
 

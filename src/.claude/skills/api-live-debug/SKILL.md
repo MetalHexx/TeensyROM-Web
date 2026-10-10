@@ -152,7 +152,9 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 | `GET /api/devices/{deviceId}/storage/{SD\|USB}/directories?Path=` | |
 | `GET /api/devices/{deviceId}/ping` | user-triggered only — the API never sends this on its own |
 | `PUT /api/devices/{deviceId}/reset` | note the verb, `PUT` |
-| `GET /api/devices/?FullScan=` | rate-limited to one request per 5 s with a queue of one (`RateLimitHelper.FindDevicesRateLimiter`) |
+| `GET /api/devices/?FullScan=` | rate-limited to one request per 5 s with a queue of one (`RateLimitHelper.FindDevicesRateLimiter`); lists offline units (`deviceState: ConnectionLost`) after the available ones either way |
+| `POST /api/devices/{deviceId}/reconnect` | saved addresses, preferred transport first, then one search for missing units if that misses |
+| `DELETE /api/devices/{deviceId}` | offline units only - an available device answers 409 |
 | `POST /api/devices/{deviceId}/toggle-music` | |
 | `POST /api/logs` / `DELETE /api/logs` | starts/stops the log stream; the hub itself is `/api/logHub` |
 | `GET /api/devices/{deviceId}/storage/{SD\|USB}/files/content?Path=` | |
@@ -176,8 +178,13 @@ Endpoints a bench session actually drives, with their query-string parameters (e
   own reset (from its minimal→full or busy→idle branch) already put the C64 back in the menu
   (`GateResetWasTheReset`) — trace the gate, not just the handler, when a `Stop`/reset looks like it did
   nothing.
-- **Startup takes a different path.** It runs `ConnectAtStartAsync` → `RunConnectAtStart`, not
-  `FindDevices` — only a full discovery (`FullScan=true`) reaches `CartFinder.FindDevices`.
+- **Startup, Reconnect and Forget each take their own path, not `FindDevices`.** Start runs
+  `ConnectAtStartAsync` → `RunConnectAtStart`; Reconnect runs `ReconnectAsync` → `RunReconnect`; Forget
+  runs `ForgetAsync` → `RunForget` and never contacts a device at all. Start and Reconnect confirm a
+  cached row one at a time via `CartFinder.BuildDevice`, not `CartFinder.FindDevices` — a miss on either
+  falls through to `RunSearchForMissingUnits`, which *does* call `CartFinder.FindDevices` (the skip-set
+  overload), the same call Discover Devices (`FullScan=true`, `RunFullDiscovery`) makes with an empty
+  skip set.
 - **Never trace inside a read loop.** A tracepoint costs about 12 ms per hit, and TCP's `BytesToRead`
   reports 1 while only socket data is pending — so a byte-pump loop hits once per byte. A tracepoint
   inside `GetDirectoryRecursiveHandler.GetRawDirectoryData`'s read loop turned a 2.6 s directory read into
@@ -201,7 +208,10 @@ Endpoints a bench session actually drives, with their query-string parameters (e
   exception is reported to the debugger even with no exception breakpoints set.
   The TCP subnet sweep (254 refused connects, one `SocketException` each) went from
   ~2 s to 28 s. Port-open retries and port-closed handling on the launch path throw
-  too. Use tracepoints for *sequence and state*; take *timings* from a run with the
+  too. Measured 2026-10-10 with no breakpoints set: the same sweep took 0.14-0.29 s
+  detached against 27.2-28.2 s attached — about 100x, not a rounding difference — and a
+  reachable unit was still found either way, so the slowdown cost time, not correctness.
+  Use tracepoints for *sequence and state*; take *sweep timings* only from a run with the
   debugger detached (the log tap's ~100 ms batching still beats guessing, see "Log tap" above).
 - **Discovery bypasses the command pipeline.** `CartFinder` and the strategies talk
   to the port through `TRStreamExtensions` directly; tracepoints in
@@ -286,15 +296,18 @@ trusting them — a coder or reviewer spot-checks by opening the file, not by tr
 | `…/TRStreamExtensions.cs:212` | `WaitForBootComplete`'s poll, once per version request | `polls`, `stopwatch.ElapsedMilliseconds`, `reply.BootComplete` |
 | `…/TRStreamExtensions.cs:281` | `WaitForMenuBootToken`'s success exit — its read loop itself is off-limits, see the gotcha above | `timeoutMs`, `stopwatch.ElapsedMilliseconds` |
 | `TeensyRom.Core.Serial/Commands/Reset/ResetCommandHandler.cs:12` | explicit resets (when the gate doesn't shortcut them) | `request.DeviceId` |
-| `TeensyRom.Core.Device/CartFinder.cs:143` | `BuildDevice` — one confirmed endpoint becomes a listed device | `endpoint.Display`, `endpoint.ConnectionType`, `reply.IsMinimalFirmware` |
-| `…/CartFinder.cs:289` | `DeduplicateByDeviceId` — a chip found on two transports, the preferred one kept | `group.Key`, `group.Count()`, `match?.ConnectionType` |
-| `TeensyRom.Core.Device/DeviceConnectionManager.cs:64` | every `FindDevices` call (page load vs. full scan) | `fullScan`, `_byChip.Count` |
-| `…/DeviceConnectionManager.cs:114` | `RunFullDiscovery` starts | `occasion` |
-| `…/DeviceConnectionManager.cs:152` | `RunFullDiscovery`'s save — only when the sweep found at least one device | `discovered.Count`, `occasion` |
-| `…/DeviceConnectionManager.cs:165` | `RunConnectAtStart` — an empty/missing cache falls back to a full sweep | `cached?.Count` |
-| `…/DeviceConnectionManager.cs:171` | `RunConnectAtStart`'s confirm — every cached row tried in parallel | `cached.Count` |
-| `…/DeviceConnectionManager.cs:204` | `TryConfirmCachedRow` — one cached row's own confirm attempt | `row.ChipId`, `row.TransportInUse` |
-| `TeensyRom.Core.Device/TcpDiscoveryStrategy.cs:117` | `SweepRange`'s summary line — never the per-address lambda, see the gotcha above | `startIp`, `endIp`, `ipRange.Count`, `answered`, `refused`, `timedOut` |
+| `TeensyRom.Core.Device/CartFinder.cs:171` | `BuildDevice` — the minimal-firmware check right after one confirmed endpoint's version reply is mapped | `endpoint.Display`, `endpoint.ConnectionType`, `reply.IsMinimalFirmware` |
+| `…/CartFinder.cs:321` | `DeduplicateByDeviceId` — a chip found on two transports, the preferred one kept | `group.Key`, `group.Count()`, `match?.ConnectionType` |
+| `TeensyRom.Core.Device/DeviceConnectionManager.cs:122` | every `FindDevices` call (page load vs. full scan) | `fullScan`, `_byChip.Count` |
+| `…/DeviceConnectionManager.cs:152` | `ReconnectAsync` — every reconnect request's entry (expression body; the statement line, not the signature line above it) | `deviceId` |
+| `…/DeviceConnectionManager.cs:155` | `ForgetAsync` — every forget request's entry (same caveat) | `deviceId` |
+| `…/DeviceConnectionManager.cs:263` | `RunFullDiscovery` starts | `occasion` |
+| `…/DeviceConnectionManager.cs:286` | `RunFullDiscovery`'s save — only when the sweep found at least one device | `discovered.Count`, `occasion` |
+| `…/DeviceConnectionManager.cs:298` | `RunConnectAtStart` — an empty/missing cache falls back to a full sweep | `cached?.Count` |
+| `…/DeviceConnectionManager.cs:327` | `RunConnectAtStart`'s confirm — every cached row tried in parallel | `cached.Count` |
+| `…/DeviceConnectionManager.cs:466` | the search-for-missing-units call (Start's online-last-time miss, or Reconnect's) | `skip.Count` |
+| `…/DeviceConnectionManager.cs:599` | `TryConfirmCachedRow` — one cached row's own confirm attempt, preferred transport first | `row.ChipId`, `row.TransportInUse` |
+| `TeensyRom.Core.Device/TcpDiscoveryStrategy.cs:123` | `SweepRange`'s summary line — never the per-address lambda, see the gotcha above | `startIp`, `endIp`, `ipRange.Count`, `answered`, `refused`, `timedOut` |
 | `TeensyRom.Core.Serial/TcpCommunicationPort.cs:497` | the raw `TimeoutException` `WaitForSerialData` throws | `numBytes`, `timeoutMs`, `sw.ElapsedMilliseconds` |
 
 `request` evaluates to `{…CommandName}` — enough to name the command. Token values print as decimal
