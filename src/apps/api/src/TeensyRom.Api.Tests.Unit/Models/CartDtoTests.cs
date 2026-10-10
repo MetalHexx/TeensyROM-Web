@@ -44,4 +44,42 @@ public class CartDtoTests
 
         dto.IsConnected.Should().Be(expected);
     }
+
+    [Fact]
+    public void FromOffline_SetsDisconnectedStateAndUnavailableStorage()
+    {
+        var offline = new OfflineDevice("OFFLINE01", "COM7", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true);
+
+        var dto = CartDto.FromOffline(offline, _settingsProvider);
+
+        dto.DeviceId.Should().Be("OFFLINE01");
+        dto.IsConnected.Should().BeFalse();
+        dto.DeviceState.Should().Be(DeviceState.ConnectionLost);
+        dto.IsMinimalFirmware.Should().BeFalse();
+        dto.ComPort.Should().Be("COM7");
+        dto.SdStorage.Available.Should().BeFalse();
+        dto.UsbStorage.Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public void FromOffline_ParsesTcpEndpoint_WhenPresent()
+    {
+        var offline = new OfflineDevice("OFFLINE02", null, "192.168.1.50:80", ConnectionType.Tcp, "1.0.0", HardwareVariant.TeensyRom, true);
+
+        var dto = CartDto.FromOffline(offline, _settingsProvider);
+
+        dto.IpAddress.Should().Be("192.168.1.50");
+        dto.TcpPort.Should().Be(80);
+    }
+
+    [Fact]
+    public void FromOffline_NoTcpEndpoint_LeavesIpAddressEmptyAndPortAtDefault()
+    {
+        var offline = new OfflineDevice("OFFLINE03", "COM9", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true);
+
+        var dto = CartDto.FromOffline(offline, _settingsProvider);
+
+        dto.IpAddress.Should().BeEmpty();
+        dto.TcpPort.Should().Be(80);
+    }
 }

@@ -519,6 +519,68 @@
         }
       }
     },
+    "/api/devices/{deviceId}/reconnect": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Reconnect Device",
+        "description": "Reconnects a known but currently offline TeensyROM device.\n\n- Tries the unit's saved addresses, preferred transport first; a miss runs one search for missing units.\n- An already available device returns immediately with no device contact.\n- Not rate limited: the manager runs reconnects one at a time on its own.",
+        "operationId": "ReconnectDevice",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconnectDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{deviceId}/ping": {
       "get": {
         "tags": [
@@ -623,13 +685,75 @@
         }
       }
     },
+    "/api/devices/{deviceId}": {
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Forget Device",
+        "description": "Removes a known, offline TeensyROM device from memory and the saved connection file.\n\n- Only an offline device can be forgotten; an available device is left untouched.",
+        "operationId": "ForgetDevice",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgetDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices": {
       "get": {
         "tags": [
           "Devices"
         ],
         "summary": "Find Devices",
-        "description": "Returns all available and connected TeensyROM devices.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.",
+        "description": "Returns all available and connected TeensyROM devices, followed by every known offline unit.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.\n- Offline units are listed after the online ones, with deviceState ConnectionLost.",
         "operationId": "FindDevices",
         "parameters": [
           {
@@ -1950,6 +2074,17 @@
           }
         }
       },
+      "ForgetDeviceResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "GetActiveJobResponse": {
         "type": "object",
         "properties": {
@@ -2242,6 +2377,21 @@
           "instance": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "ReconnectDeviceResponse": {
+        "required": [
+          "device",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/CartDto"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },

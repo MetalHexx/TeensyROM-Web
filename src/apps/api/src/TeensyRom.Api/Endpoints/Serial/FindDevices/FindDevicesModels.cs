@@ -21,7 +21,8 @@ namespace TeensyRom.Api.Endpoints.FindCarts
     public class FindDevicesResponse
     {
         /// <summary>
-        /// The list of TeensyROM devices that are available to connect.
+        /// The list of known TeensyROM devices: available ones first, then offline units (listed with
+        /// deviceState ConnectionLost).
         /// </summary>
         [Required] public List<CartDto> Devices { get; set; } = [];
 

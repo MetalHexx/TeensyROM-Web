@@ -16,8 +16,10 @@
 import * as runtime from '../runtime';
 import type {
   FindDevicesResponse,
+  ForgetDeviceResponse,
   PingDeviceResponse,
   ProblemDetails,
+  ReconnectDeviceResponse,
   ResetDeviceResponse,
   StartLogsResponse,
   StopLogsResponse,
@@ -25,10 +27,14 @@ import type {
 import {
     FindDevicesResponseFromJSON,
     FindDevicesResponseToJSON,
+    ForgetDeviceResponseFromJSON,
+    ForgetDeviceResponseToJSON,
     PingDeviceResponseFromJSON,
     PingDeviceResponseToJSON,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
+    ReconnectDeviceResponseFromJSON,
+    ReconnectDeviceResponseToJSON,
     ResetDeviceResponseFromJSON,
     ResetDeviceResponseToJSON,
     StartLogsResponseFromJSON,
@@ -41,7 +47,15 @@ export interface FindDevicesRequest {
     fullScan: boolean;
 }
 
+export interface ForgetDeviceRequest {
+    deviceId: string;
+}
+
 export interface PingDeviceRequest {
+    deviceId: string;
+}
+
+export interface ReconnectDeviceRequest {
     deviceId: string;
 }
 
@@ -55,7 +69,7 @@ export interface ResetDeviceRequest {
 export class DevicesApiService extends runtime.BaseAPI {
 
     /**
-     * Returns all available and connected TeensyROM devices.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Offline units are listed after the online ones, with deviceState ConnectionLost.
      * Find Devices
      */
     async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
@@ -85,11 +99,46 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Offline units are listed after the online ones, with deviceState ConnectionLost.
      * Find Devices
      */
     async findDevices(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {
         const response = await this.findDevicesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Removes a known, offline TeensyROM device from memory and the saved connection file.  - Only an offline device can be forgotten; an available device is left untouched.
+     * Forget Device
+     */
+    async forgetDeviceRaw(requestParameters: ForgetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ForgetDeviceResponse>> {
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling forgetDevice().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/devices/{deviceId}`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ForgetDeviceResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Removes a known, offline TeensyROM device from memory and the saved connection file.  - Only an offline device can be forgotten; an available device is left untouched.
+     * Forget Device
+     */
+    async forgetDevice(requestParameters: ForgetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ForgetDeviceResponse> {
+        const response = await this.forgetDeviceRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -125,6 +174,41 @@ export class DevicesApiService extends runtime.BaseAPI {
      */
     async pingDevice(requestParameters: PingDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PingDeviceResponse> {
         const response = await this.pingDeviceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Reconnects a known but currently offline TeensyROM device.  - Tries the unit\'s saved addresses, preferred transport first; a miss runs one search for missing units. - An already available device returns immediately with no device contact. - Not rate limited: the manager runs reconnects one at a time on its own.
+     * Reconnect Device
+     */
+    async reconnectDeviceRaw(requestParameters: ReconnectDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ReconnectDeviceResponse>> {
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling reconnectDevice().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/reconnect`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ReconnectDeviceResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Reconnects a known but currently offline TeensyROM device.  - Tries the unit\'s saved addresses, preferred transport first; a miss runs one search for missing units. - An already available device returns immediately with no device contact. - Not rate limited: the manager runs reconnects one at a time on its own.
+     * Reconnect Device
+     */
+    async reconnectDevice(requestParameters: ReconnectDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ReconnectDeviceResponse> {
+        const response = await this.reconnectDeviceRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
