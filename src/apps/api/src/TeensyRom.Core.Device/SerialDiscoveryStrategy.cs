@@ -18,8 +18,13 @@ public class SerialDiscoveryStrategy(
     ITeensyPortLocator locator,
     IDeviceInterrogator interrogator) : IDiscoveryStrategy
 {
-    public Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct)
+    private static readonly IReadOnlySet<string> _noSkips = new HashSet<string>();
+
+    public Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct) => FindEndpoints(_noSkips, ct);
+
+    public Task<List<DiscoveredEndpoint>> FindEndpoints(IReadOnlySet<string> skipEndpoints, CancellationToken ct)
     {
+        var skip = new HashSet<string>(skipEndpoints, StringComparer.OrdinalIgnoreCase);
         var located = locator.ListPorts();
 
         List<string> candidates;
@@ -28,7 +33,7 @@ public class SerialDiscoveryStrategy(
 
         if (located.FilterAvailable)
         {
-            candidates = located.Ports.Select(p => p.PortName).ToList();
+            candidates = located.Ports.Select(p => p.PortName).Where(p => !skip.Contains(p)).ToList();
             descriptorChipIds = located.Ports.ToDictionary(p => p.PortName, p => p.ChipId);
             // DTR only for a row USB vendor/product already proved a TeensyROM; an Unknown row (macOS)
             // gets it off, same as any foreign device.
@@ -36,7 +41,7 @@ public class SerialDiscoveryStrategy(
         }
         else
         {
-            candidates = SerialHelper.GetComPorts();
+            candidates = SerialHelper.GetComPorts().Where(p => !skip.Contains(p)).ToList();
             descriptorChipIds = [];
             isTeensyRomPort = [];
             log.InternalWarning($"Serial discovery: descriptor filter unavailable ({located.UnavailableReason}); probing all {candidates.Count} port(s)");

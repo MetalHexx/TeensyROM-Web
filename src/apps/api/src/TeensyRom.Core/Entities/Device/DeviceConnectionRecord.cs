@@ -128,5 +128,21 @@ namespace TeensyRom.Core.Entities.Device
                 TcpEndpoint = endpoint;
             }
         }
+
+        /// <summary>
+        /// Drops only this transport's endpoint - used when another chip is confirmed at the address this
+        /// record was holding, so one address is never saved against two chips.
+        /// </summary>
+        public void ForgetEndpoint(ConnectionType transport)
+        {
+            if (transport == ConnectionType.Serial)
+            {
+                SerialPortName = null;
+            }
+            else
+            {
+                TcpEndpoint = null;
+            }
+        }
     }
 }

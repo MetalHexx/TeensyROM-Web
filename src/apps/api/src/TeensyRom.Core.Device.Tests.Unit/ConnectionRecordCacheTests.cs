@@ -1,4 +1,5 @@
 using TeensyRom.Core.Device;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
 
@@ -47,6 +48,38 @@ public class ConnectionRecordCacheTests : IDisposable
 
         result.Should().BeNull();
         _log.Received(1).InternalError(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// A file written before P09 only ever had the first four fields. Checked against a literal file
+    /// rather than trusting a default-parameter assumption about System.Text.Json's constructor binding.
+    /// </summary>
+    [Fact]
+    public void Load_WithPreP09FormatFile_LoadsRowsAsOnlineWithFactsUnknown()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var legacyJson = """
+            {
+              "LastUpdated": "2026-01-01T00:00:00Z",
+              "Records": [
+                { "ChipId": "chip-1", "SerialPortName": "COM12", "TcpEndpoint": null, "TransportInUse": 0 }
+              ]
+            }
+            """;
+        File.WriteAllText(_cacheFilePath, legacyJson);
+
+        var loaded = _sut.Load();
+
+        loaded.Should().NotBeNull();
+        var row = loaded!.Single();
+        row.ChipId.Should().Be("chip-1");
+        row.SerialPortName.Should().Be("COM12");
+        row.TcpEndpoint.Should().BeNull();
+        row.TransportInUse.Should().Be(ConnectionType.Serial);
+        row.Offline.Should().BeFalse();
+        row.FwVersion.Should().BeNull();
+        row.HardwareVariant.Should().Be(HardwareVariant.Unknown);
+        row.IsCompatible.Should().BeFalse();
     }
 
     [Fact]

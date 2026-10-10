@@ -50,11 +50,15 @@ public class TcpDiscoveryStrategy : IDiscoveryStrategy
         _probe = probe;
     }
 
+    private static readonly IReadOnlySet<string> _noSkips = new HashSet<string>();
+
+    public Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct) => FindEndpoints(_noSkips, ct);
+
     /// <summary>
     /// Sweeps the /24 subnet of every real local network adapter at the same time, probing only the
-    /// addresses that accept a TCP connection.
+    /// addresses that accept a TCP connection and are not in <paramref name="skipEndpoints"/>.
     /// </summary>
-    public async Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct)
+    public async Task<List<DiscoveredEndpoint>> FindEndpoints(IReadOnlySet<string> skipEndpoints, CancellationToken ct)
     {
         var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
@@ -64,17 +68,19 @@ public class TcpDiscoveryStrategy : IDiscoveryStrategy
             return [];
         }
 
-        var sweeps = await Task.WhenAll(subnetRanges.Select(range => SweepRange(range.Start, range.End, ct)));
+        var skip = new HashSet<string>(skipEndpoints, StringComparer.OrdinalIgnoreCase);
+        var sweeps = await Task.WhenAll(subnetRanges.Select(range => SweepRange(range.Start, range.End, skip, ct)));
 
         return sweeps.SelectMany(endpoints => endpoints).ToList();
     }
 
     /// <summary>
-    /// Sweeps one subnet range in parallel, probing only the addresses that accept a TCP connection.
+    /// Sweeps one subnet range in parallel, probing only the addresses that accept a TCP connection and
+    /// are not in <paramref name="skip"/>.
     /// </summary>
-    private async Task<List<DiscoveredEndpoint>> SweepRange(IPAddress startIp, IPAddress endIp, CancellationToken ct)
+    private async Task<List<DiscoveredEndpoint>> SweepRange(IPAddress startIp, IPAddress endIp, HashSet<string> skip, CancellationToken ct)
     {
-        var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp);
+        var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp).Where(ip => !skip.Contains(ip.ToString())).ToList();
 
         var discovered = new ConcurrentBag<DiscoveredEndpoint>();
         var answered = 0;

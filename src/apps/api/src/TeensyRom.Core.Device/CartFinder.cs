@@ -16,6 +16,12 @@ namespace TeensyRom.Core.Device
 		Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct);
 
 		/// <summary>
+		/// Same as <see cref="FindDevices(CancellationToken)"/>, except every strategy is handed
+		/// <paramref name="skipEndpoints"/> so a unit already reachable elsewhere is never opened again.
+		/// </summary>
+		Task<List<TeensyRomDevice>> FindDevices(IReadOnlySet<string> skipEndpoints, CancellationToken ct);
+
+		/// <summary>
 		/// Turns one confirmed endpoint (from a discovery strategy or a re-confirmed cache row) into a
 		/// listed device: minimal firmware rebooted through recovery, a busy storage probe reset once,
 		/// Ethernet vs Serial left to the caller. Null when the endpoint cannot be listed.
@@ -37,10 +43,15 @@ namespace TeensyRom.Core.Device
 		private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
 		private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
 
-		/// <summary>Reset at the top of every <see cref="FindDevices"/> run; a re-confirmed cache row never needs it since only a real chip id is ever cached.</summary>
+		/// <summary>Reset at the top of every <see cref="FindDevicesCore"/> run; a re-confirmed cache row never needs it since only a real chip id is ever cached.</summary>
 		private int _standInCount;
 
-		public async Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct)
+		public Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct) => FindDevicesCore(() => DiscoverAllEndpoints(ct), ct);
+
+		public Task<List<TeensyRomDevice>> FindDevices(IReadOnlySet<string> skipEndpoints, CancellationToken ct) =>
+			FindDevicesCore(() => DiscoverAllEndpoints(skipEndpoints, ct), ct);
+
+		private async Task<List<TeensyRomDevice>> FindDevicesCore(Func<Task<List<DiscoveredEndpoint>>> discover, CancellationToken ct)
 		{
 			string methodName = "CartFinder.FindDevices:";
 			List<TeensyRomDevice> foundDevices = [];
@@ -50,7 +61,7 @@ namespace TeensyRom.Core.Device
 			{
 				log.Internal($"{methodName} Starting device discovery using {_discoveryStrategies.Count()} {(_discoveryStrategies.Count() == 1 ? "strategy" : "strategies")}");
 
-				var endpoints = await DiscoverAllEndpoints(ct);
+				var endpoints = await discover();
 
 				if (endpoints.Count == 0)
 				{
@@ -103,6 +114,23 @@ namespace TeensyRom.Core.Device
 				return [];
 			}
 			var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(ct));
+			var results = await Task.WhenAll(tasks);
+			var allEndpoints = results.SelectMany(r => r).ToList();
+
+			log.Internal($"CartFinder.DiscoverAllEndpoints: Discovered {allEndpoints.Count} endpoint(s) across {_discoveryStrategies.Count()} strategy(ies)");
+
+			return allEndpoints;
+		}
+
+		/// <summary>Same as <see cref="DiscoverAllEndpoints(CancellationToken)"/>, passing the skip set to every strategy.</summary>
+		private async Task<List<DiscoveredEndpoint>> DiscoverAllEndpoints(IReadOnlySet<string> skipEndpoints, CancellationToken ct)
+		{
+			if (!_discoveryStrategies.Any())
+			{
+				log.Internal("CartFinder.DiscoverAllEndpoints: No discovery strategies registered");
+				return [];
+			}
+			var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(skipEndpoints, ct));
 			var results = await Task.WhenAll(tasks);
 			var allEndpoints = results.SelectMany(r => r).ToList();
 

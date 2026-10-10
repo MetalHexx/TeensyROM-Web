@@ -146,6 +146,25 @@ public class SerialDiscoveryStrategyTests
     }
 
     [Fact]
+    public async Task FindEndpoints_WithSkipSet_NeverOpensASkippedComName()
+    {
+        _locator.ListPorts().Returns(new PortLocatorResult(
+            [new TeensyRomPort("COM3", "chip-1", TeensyRomImage.Full), new TeensyRomPort("COM5", "chip-2", TeensyRomImage.Full)],
+            FilterAvailable: true,
+            UnavailableReason: null));
+
+        var port5 = CreatePort();
+        _transportFactory.CreateSerial("COM5", true).Returns(port5);
+        _interrogator.ReadVersion(port5).Returns(TeensyRomReply("chip-2"));
+
+        var result = await CreateSut().FindEndpoints(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "com3" }, CancellationToken.None);
+
+        result.Should().ContainSingle(e => e.Address == "COM5");
+        _transportFactory.DidNotReceive().CreateSerial("COM3", Arg.Any<bool>());
+        _transportFactory.Received(1).CreateSerial("COM5", true);
+    }
+
+    [Fact]
     public async Task FindEndpoints_WhenReplyChipIdDiffersFromDescriptor_LogsMismatchAndTrustsReply()
     {
         _locator.ListPorts().Returns(new PortLocatorResult(

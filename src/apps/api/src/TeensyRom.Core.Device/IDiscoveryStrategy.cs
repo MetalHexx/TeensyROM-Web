@@ -13,4 +13,11 @@ public interface IDiscoveryStrategy
     /// <param name="ct">Cancellation token to abort long-running scans.</param>
     /// <returns>A list of discovered TeensyROM endpoints.</returns>
     Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct);
+
+    /// <summary>
+    /// Same as <see cref="FindEndpoints(CancellationToken)"/>, except a candidate whose address is in
+    /// <paramref name="skipEndpoints"/> - a COM port name or a bare IP, compared case-insensitively - is
+    /// never opened or connected to, so a unit already reachable elsewhere is left undisturbed.
+    /// </summary>
+    Task<List<DiscoveredEndpoint>> FindEndpoints(IReadOnlySet<string> skipEndpoints, CancellationToken ct);
 }

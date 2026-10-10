@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
@@ -11,17 +12,26 @@ using TeensyRom.Core.Serial.Usb;
 namespace TeensyRom.Core.Device
 {
     /// <summary>
-    /// Owns the three discovery occasions - cache-first API start confirmed by chip id, full discovery
-    /// with resets on request, and records-only listing for a page load - and sequences them onto
-    /// <see cref="ICartFinder"/>, which alone knows how to turn an endpoint into a listed device.
-    /// <see cref="_byChip"/> keeps every device for the process lifetime, reachable or not: an
-    /// unreachable record's endpoints and last facts stay in place so the next discovery occasion can
-    /// find it again, but only <see cref="GetAvailableDevices"/> and <see cref="GetAvailableDevice"/>
-    /// ever surface it to a caller outside this class.
+    /// Owns the discovery occasions - cache-first API start confirmed by chip id, full discovery with
+    /// resets on request, records-only listing for a page load, and the explicit Reconnect/Forget pair -
+    /// and sequences them onto one queue. <see cref="ICartFinder"/> alone knows how to turn an endpoint
+    /// into a listed device.
+    /// <para>
+    /// Every unit the manager has ever known this session stays known, reachable or not: <see cref="_byChip"/>
+    /// holds every unit it has confirmed or discovered at least once (an unreachable one kept, Mode
+    /// <see cref="DeviceMode.Unreachable"/>, endpoints and facts intact), and <see cref="_offlineOnly"/>
+    /// holds units known only from the saved connection file, never yet confirmed this session. Only
+    /// <see cref="GetAvailableDevices"/>, <see cref="GetAvailableDevice"/> and <see cref="GetOfflineDevices"/>
+    /// ever surface this knowledge to a caller outside this class.
+    /// </para>
     /// </summary>
     public class DeviceConnectionManager : IDeviceConnectionManager
     {
-        private enum DiscoveryOccasion { Start, FullScan }
+        private enum DiscoveryOccasion { Start, FullScan, Reconnect, Forget }
+
+        private static readonly IReadOnlySet<string> _noSkips = new HashSet<string>();
+        private static readonly IReadOnlySet<DiscoveryOccasion> _startJoinableKinds = new HashSet<DiscoveryOccasion> { DiscoveryOccasion.Start };
+        private static readonly IReadOnlySet<DiscoveryOccasion> _fullScanJoinableKinds = new HashSet<DiscoveryOccasion> { DiscoveryOccasion.Start, DiscoveryOccasion.FullScan };
 
         private readonly ICartFinder _finder;
         private readonly IConnectionRecordCache _cache;
@@ -32,8 +42,15 @@ namespace TeensyRom.Core.Device
         private readonly ILoggingService _log;
 
         private readonly ConcurrentDictionary<string, TeensyRomDevice> _byChip = new();
+
+        /// <summary>Units known only from the saved connection file this session: never yet confirmed, so there is no <see cref="TeensyRomDevice"/> to hold them.</summary>
+        private readonly ConcurrentDictionary<string, CachedConnectionRecord> _offlineOnly = new();
+
         private readonly SemaphoreSlim _occasionGate = new(1, 1);
-        private Task<List<TeensyRomDevice>>? _inFlight;
+
+        /// <summary>Whatever occasion is currently running, of any kind - the one queue every occasion waits on or joins.</summary>
+        private Task? _running;
+        private DiscoveryOccasion? _runningKind;
 
         public DeviceConnectionManager(
             ICartFinder finder,
@@ -59,11 +76,52 @@ namespace TeensyRom.Core.Device
         public TeensyRomDevice? GetAvailableDevice(string deviceId) =>
             GetAvailableDevices().FirstOrDefault(d => d.DeviceId == deviceId);
 
+        public IReadOnlyList<OfflineDevice> GetOfflineDevices()
+        {
+            var result = new List<OfflineDevice>();
+
+            foreach (var device in _byChip.Values)
+            {
+                if (device.Connection.Mode != DeviceMode.Unreachable || IsStandInDeviceId(device.DeviceId))
+                {
+                    continue;
+                }
+
+                result.Add(new OfflineDevice(
+                    device.DeviceId,
+                    device.Connection.SerialPortName,
+                    device.Connection.TcpEndpoint,
+                    device.Connection.TransportInUse ?? device.ConnectionType,
+                    device.Cart.FwVersion,
+                    device.Cart.HardwareVariant,
+                    device.Cart.IsCompatible));
+            }
+
+            foreach (var row in _offlineOnly.Values)
+            {
+                if (IsStandInDeviceId(row.ChipId))
+                {
+                    continue;
+                }
+
+                result.Add(new OfflineDevice(
+                    row.ChipId,
+                    row.SerialPortName,
+                    row.TcpEndpoint,
+                    row.TransportInUse,
+                    row.FwVersion ?? string.Empty,
+                    row.HardwareVariant,
+                    row.IsCompatible));
+            }
+
+            return result;
+        }
+
         public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
         {
             if (!fullScan)
             {
-                var running = _inFlight;
+                var running = _running;
                 if (running is not null && !running.IsCompleted)
                 {
                     try
@@ -84,29 +142,120 @@ namespace TeensyRom.Core.Device
                 return available;
             }
 
-            return await RunOrJoin(token => RunFullDiscovery(DiscoveryOccasion.FullScan, token), ct);
+            return await RunJoinable(DiscoveryOccasion.FullScan, _fullScanJoinableKinds, token => RunFullDiscovery(DiscoveryOccasion.FullScan, token), ct);
         }
 
         public Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct) =>
-            RunOrJoin(RunConnectAtStart, ct);
+            RunJoinable(DiscoveryOccasion.Start, _startJoinableKinds, RunConnectAtStart, ct);
 
-        /// <summary>Joins the already-running occasion instead of queuing a second sweep; otherwise starts one under the gate.</summary>
-        private async Task<List<TeensyRomDevice>> RunOrJoin(Func<CancellationToken, Task<List<TeensyRomDevice>>> runOccasion, CancellationToken ct)
+        public Task<ReconnectOutcome> ReconnectAsync(string deviceId, CancellationToken ct) =>
+            RunExclusive(DiscoveryOccasion.Reconnect, token => RunReconnect(deviceId, token), ct);
+
+        public Task<ForgetResult> ForgetAsync(string deviceId, CancellationToken ct) =>
+            RunExclusive(DiscoveryOccasion.Forget, token => RunForget(deviceId), ct);
+
+        /// <summary>
+        /// Joins a running occasion whose kind is in <paramref name="joinableKinds"/>; otherwise waits
+        /// for whatever is running (of any kind), then runs its own and registers as <paramref name="kind"/>.
+        /// Used by the two occasions whose result can be safely shared across simultaneous callers: the
+        /// API start and Discover Devices (full discovery).
+        /// </summary>
+        private async Task<List<TeensyRomDevice>> RunJoinable(DiscoveryOccasion kind, IReadOnlySet<DiscoveryOccasion> joinableKinds, Func<CancellationToken, Task<List<TeensyRomDevice>>> run, CancellationToken ct)
         {
-            await _occasionGate.WaitAsync(ct);
-            Task<List<TeensyRomDevice>> task;
-            try
+            while (true)
             {
-                var running = _inFlight;
-                task = running is not null && !running.IsCompleted ? running : runOccasion(ct);
-                _inFlight = task;
-            }
-            finally
-            {
-                _occasionGate.Release();
-            }
+                Task<List<TeensyRomDevice>>? joinTask = null;
+                Task<List<TeensyRomDevice>>? ownTask = null;
+                Task? previous = null;
 
-            return await task;
+                await _occasionGate.WaitAsync(ct);
+                try
+                {
+                    if (_running is Task<List<TeensyRomDevice>> runningTask && !runningTask.IsCompleted &&
+                        _runningKind.HasValue && joinableKinds.Contains(_runningKind.Value))
+                    {
+                        joinTask = runningTask;
+                    }
+                    else if (_running is null || _running.IsCompleted)
+                    {
+                        ownTask = run(ct);
+                        _running = ownTask;
+                        _runningKind = kind;
+                    }
+                    else
+                    {
+                        previous = _running;
+                    }
+                }
+                finally
+                {
+                    _occasionGate.Release();
+                }
+
+                if (joinTask is not null)
+                {
+                    return await joinTask;
+                }
+
+                if (ownTask is not null)
+                {
+                    return await ownTask;
+                }
+
+                try
+                {
+                    await previous!;
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        /// <summary>
+        /// Never joins anything: waits for whatever is running (of any kind), then runs its own and
+        /// registers as <paramref name="kind"/>. Used by Reconnect and Forget, whose result belongs to
+        /// one caller alone.
+        /// </summary>
+        private async Task<T> RunExclusive<T>(DiscoveryOccasion kind, Func<CancellationToken, Task<T>> run, CancellationToken ct)
+        {
+            while (true)
+            {
+                Task<T>? ownTask = null;
+                Task? previous = null;
+
+                await _occasionGate.WaitAsync(ct);
+                try
+                {
+                    if (_running is null || _running.IsCompleted)
+                    {
+                        ownTask = run(ct);
+                        _running = ownTask;
+                        _runningKind = kind;
+                    }
+                    else
+                    {
+                        previous = _running;
+                    }
+                }
+                finally
+                {
+                    _occasionGate.Release();
+                }
+
+                if (ownTask is not null)
+                {
+                    return await ownTask;
+                }
+
+                try
+                {
+                    await previous!;
+                }
+                catch
+                {
+                }
+            }
         }
 
         private async Task<List<TeensyRomDevice>> RunFullDiscovery(DiscoveryOccasion occasion, CancellationToken ct)
@@ -118,19 +267,10 @@ namespace TeensyRom.Core.Device
                 device.CommunicationPort.Dispose();
             }
 
-            var discovered = await _finder.FindDevices(ct);
+            var discovered = await _finder.FindDevices(_noSkips, ct);
             var discoveredChips = new HashSet<string>(discovered.Select(d => d.DeviceId));
 
-            foreach (var device in discovered)
-            {
-                if (_byChip.TryGetValue(device.DeviceId, out var previous))
-                {
-                    CarryForwardEndpoint(device.Connection, ConnectionType.Serial, previous.Connection.SerialPortName);
-                    CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, previous.Connection.TcpEndpoint);
-                }
-
-                _byChip[device.DeviceId] = device;
-            }
+            MergeDiscovered(discovered);
 
             foreach (var (chipId, device) in _byChip)
             {
@@ -140,17 +280,10 @@ namespace TeensyRom.Core.Device
                 }
             }
 
-            if (discovered.Count == 0)
-            {
-                // The in-memory records already mark the absent chips unreachable; the saved file is left
-                // alone so a unit that's merely away right now doesn't get dropped and force a full scan
-                // on every later start.
-                _log.InternalSuccess("DeviceConnectionManager.FindDevices: Discovery found no devices; saved records kept.");
-            }
-            else
-            {
-                _cache.Save(BuildCacheRows());
-            }
+            // Every known unit is saved, online or offline, even when this sweep found nothing: a unit
+            // that's merely away right now must not be dropped from the file and force a full scan on
+            // every later start.
+            _cache.Save(BuildCacheRows());
 
             stopwatch.Stop();
             _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Discovery ({occasion}): {discovered.Count} device(s) ready in {stopwatch.ElapsedMilliseconds} ms");
@@ -164,51 +297,319 @@ namespace TeensyRom.Core.Device
 
             if (cached is null || cached.Count == 0)
             {
-                return await RunFullDiscovery(DiscoveryOccasion.Start, ct);
+                try
+                {
+                    return await RunFullDiscovery(DiscoveryOccasion.Start, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _log.InternalError($"DeviceConnectionManager.FindDevices: Discovery (start, full) failed: {ex.Message}");
+                    return GetAvailableDevices();
+                }
+            }
+
+            // Known before any port is opened: if anything below throws, a following Discover Devices
+            // still merges against these rows instead of a fresh sweep overwriting the file with only
+            // what it finds.
+            foreach (var row in cached)
+            {
+                _offlineOnly.TryAdd(row.ChipId, row);
             }
 
             var stopwatch = Stopwatch.StartNew();
-            var results = await Task.WhenAll(cached.Select(row => TryConfirmCachedRow(row, ct)));
 
-            if (results.Any(device => device is null))
+            try
             {
-                foreach (var device in results)
+                var results = await Task.WhenAll(cached.Select(row => TryConfirmCachedRowSafely(row, ct)));
+                var confirmedCount = 0;
+                var missedNonOfflineRow = false;
+
+                foreach (var (row, device) in cached.Zip(results))
                 {
-                    device?.CommunicationPort.Dispose();
+                    if (device is not null)
+                    {
+                        confirmedCount++;
+                        CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
+                        CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+                        AdoptConfirmedDevice(device);
+                    }
+                    else if (!row.Offline)
+                    {
+                        missedNonOfflineRow = true;
+                    }
                 }
-                return await RunFullDiscovery(DiscoveryOccasion.Start, ct);
-            }
 
-            foreach (var (row, device) in cached.Zip(results))
+                if (missedNonOfflineRow)
+                {
+                    // Exactly one search, skipping every unit just confirmed; everything still missing
+                    // afterwards (including an offline-last-time row this pass never touched) is kept,
+                    // flagged offline - the search itself saves.
+                    await RunSearchForMissingUnits(ct);
+                }
+                else
+                {
+                    // Nothing new to look for - either every row confirmed, or only already-offline rows
+                    // missed - but still saved whole so facts and flags stay current.
+                    _cache.Save(BuildCacheRows());
+                }
+
+                stopwatch.Stop();
+                _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Discovery (start, cached): {confirmedCount} device(s) confirmed in {stopwatch.ElapsedMilliseconds} ms");
+            }
+            catch (OperationCanceledException)
             {
-                CarryForwardEndpoint(device!.Connection, ConnectionType.Serial, row.SerialPortName);
-                CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
-                _byChip[device.DeviceId] = device;
+                throw;
             }
-
-            _cache.Save(BuildCacheRows());
-
-            stopwatch.Stop();
-            _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Discovery (start, cached): {results.Length} device(s) confirmed in {stopwatch.ElapsedMilliseconds} ms");
+            catch (Exception ex)
+            {
+                // Nothing but cancellation may escape the start: the rows are already known (above), so a
+                // following Discover Devices still has them even though this pass failed.
+                _log.InternalError($"DeviceConnectionManager.FindDevices: Discovery (start, cached) failed: {ex.Message}");
+            }
 
             return GetAvailableDevices();
         }
 
-        /// <summary>
-        /// Tries the row's <see cref="CachedConnectionRecord.TransportInUse"/> first. When that misses and
-        /// the row also holds an endpoint for the other transport, tries that once too before counting the
-        /// row as a miss. Every attempt is bounded by <see cref="ConnectionOptions.ConnectTimeoutMs"/>.
-        /// </summary>
-        private async Task<TeensyRomDevice?> TryConfirmCachedRow(CachedConnectionRecord row, CancellationToken ct)
+        private async Task<ReconnectOutcome> RunReconnect(string deviceId, CancellationToken ct)
         {
-            var device = await TryConfirmCachedRowOnTransport(row, ct);
+            var stopwatch = Stopwatch.StartNew();
+            CachedConnectionRecord row;
+
+            if (_byChip.TryGetValue(deviceId, out var existing))
+            {
+                if (existing.Connection.Mode != DeviceMode.Unreachable)
+                {
+                    _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Reconnect ({deviceId}): already available in {stopwatch.ElapsedMilliseconds} ms");
+                    return new ReconnectOutcome(ReconnectResult.AlreadyAvailable, existing);
+                }
+
+                row = new CachedConnectionRecord(
+                    existing.DeviceId,
+                    existing.Connection.SerialPortName,
+                    existing.Connection.TcpEndpoint,
+                    existing.Connection.TransportInUse ?? existing.ConnectionType,
+                    Offline: true,
+                    existing.Cart.FwVersion,
+                    existing.Cart.HardwareVariant,
+                    existing.Cart.IsCompatible);
+            }
+            else if (_offlineOnly.TryGetValue(deviceId, out var offlineRow))
+            {
+                row = offlineRow;
+            }
+            else
+            {
+                _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Reconnect ({deviceId}): unknown device in {stopwatch.ElapsedMilliseconds} ms");
+                return new ReconnectOutcome(ReconnectResult.UnknownDevice, null);
+            }
+
+            var device = await TryConfirmCachedRowSafely(row, ct);
 
             if (device is not null)
             {
-                return device;
+                CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
+                CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+                AdoptConfirmedDevice(device);
+                _cache.Save(BuildCacheRows());
+                _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Reconnect ({deviceId}): reconnected in {stopwatch.ElapsedMilliseconds} ms");
+                return new ReconnectOutcome(ReconnectResult.Reconnected, device);
             }
 
-            var other = row.TransportInUse == ConnectionType.Serial ? ConnectionType.Tcp : ConnectionType.Serial;
+            await RunSearchForMissingUnits(ct);
+
+            var found = GetAvailableDevice(deviceId);
+            var result = found is not null ? ReconnectResult.Reconnected : ReconnectResult.NotFound;
+            _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Reconnect ({deviceId}): {result} in {stopwatch.ElapsedMilliseconds} ms");
+            return new ReconnectOutcome(result, found);
+        }
+
+        private Task<ForgetResult> RunForget(string deviceId)
+        {
+            if (_byChip.TryGetValue(deviceId, out var device))
+            {
+                if (device.Connection.Mode != DeviceMode.Unreachable)
+                {
+                    _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): still available");
+                    return Task.FromResult(ForgetResult.StillAvailable);
+                }
+
+                _byChip.TryRemove(deviceId, out _);
+                _cache.Save(BuildCacheRows());
+                _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): forgotten");
+                return Task.FromResult(ForgetResult.Forgotten);
+            }
+
+            if (_offlineOnly.TryRemove(deviceId, out _))
+            {
+                _cache.Save(BuildCacheRows());
+                _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): forgotten");
+                return Task.FromResult(ForgetResult.Forgotten);
+            }
+
+            _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): unknown device");
+            return Task.FromResult(ForgetResult.UnknownDevice);
+        }
+
+        /// <summary>
+        /// Searches only for units not already available, skipping the endpoints of every available unit
+        /// so their ports are left open and undisturbed. Every found unit is merged in (step 7's rule);
+        /// nothing is marked unreachable, since this search never claimed to cover the whole address
+        /// space. Always saves, including when it finds nothing.
+        /// </summary>
+        private async Task RunSearchForMissingUnits(CancellationToken ct)
+        {
+            var skip = BuildAvailableEndpointSkipSet();
+            var discovered = await _finder.FindDevices(skip, ct);
+
+            MergeDiscovered(discovered);
+
+            _cache.Save(BuildCacheRows());
+        }
+
+        /// <summary>
+        /// Merges each found device into the known units: carries forward whatever endpoint it wasn't
+        /// found on, from a previous <see cref="_byChip"/> entry or an <see cref="_offlineOnly"/> row,
+        /// then adopts it (replacing any stale entry and applying the one-address-one-chip rule).
+        /// </summary>
+        private void MergeDiscovered(IEnumerable<TeensyRomDevice> discovered)
+        {
+            foreach (var device in discovered)
+            {
+                if (_byChip.TryGetValue(device.DeviceId, out var previous))
+                {
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Serial, previous.Connection.SerialPortName);
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, previous.Connection.TcpEndpoint);
+                }
+                else if (_offlineOnly.TryGetValue(device.DeviceId, out var row))
+                {
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
+                    CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+                }
+
+                AdoptConfirmedDevice(device);
+            }
+        }
+
+        /// <summary>Every available unit's COM port name and the IP part of its TCP endpoint - the addresses a search for missing units must leave alone.</summary>
+        private HashSet<string> BuildAvailableEndpointSkipSet()
+        {
+            var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var device in GetAvailableDevices())
+            {
+                if (!string.IsNullOrEmpty(device.Connection.SerialPortName))
+                {
+                    skip.Add(device.Connection.SerialPortName);
+                }
+
+                if (!string.IsNullOrEmpty(device.Connection.TcpEndpoint))
+                {
+                    skip.Add(device.Connection.TcpEndpoint.GetIpAddress());
+                }
+            }
+
+            return skip;
+        }
+
+        /// <summary>
+        /// Registers a freshly confirmed device as the known unit for its chip: the endpoint it was just
+        /// confirmed on is dropped from every other known chip first (one address, one chip, on every
+        /// confirm path), then it replaces any stale <see cref="_byChip"/> or <see cref="_offlineOnly"/>
+        /// entry.
+        /// </summary>
+        private void AdoptConfirmedDevice(TeensyRomDevice device)
+        {
+            var transport = device.ConnectionType;
+            var endpoint = device.Connection.EndpointFor(transport);
+
+            if (!string.IsNullOrEmpty(endpoint))
+            {
+                ReleaseEndpointFromOtherChips(device.DeviceId, transport, endpoint);
+            }
+
+            _offlineOnly.TryRemove(device.DeviceId, out _);
+            _byChip[device.DeviceId] = device;
+        }
+
+        /// <summary>Clears <paramref name="endpoint"/> from every other known chip's record on <paramref name="transport"/>, in memory and among the file-only rows.</summary>
+        private void ReleaseEndpointFromOtherChips(string chipId, ConnectionType transport, string endpoint)
+        {
+            foreach (var (otherId, other) in _byChip)
+            {
+                if (otherId == chipId)
+                {
+                    continue;
+                }
+
+                if (string.Equals(other.Connection.EndpointFor(transport), endpoint, StringComparison.OrdinalIgnoreCase))
+                {
+                    other.Connection.ForgetEndpoint(transport);
+                }
+            }
+
+            foreach (var otherId in _offlineOnly.Keys.ToList())
+            {
+                if (otherId == chipId || !_offlineOnly.TryGetValue(otherId, out var row))
+                {
+                    continue;
+                }
+
+                var rowEndpoint = transport == ConnectionType.Serial ? row.SerialPortName : row.TcpEndpoint;
+
+                if (string.Equals(rowEndpoint, endpoint, StringComparison.OrdinalIgnoreCase))
+                {
+                    _offlineOnly[otherId] = transport == ConnectionType.Serial
+                        ? row with { SerialPortName = null }
+                        : row with { TcpEndpoint = null };
+                }
+            }
+        }
+
+        /// <summary>As <see cref="TryConfirmCachedRow"/>, except nothing but cancellation escapes: any other exception counts as this row's miss.</summary>
+        private async Task<TeensyRomDevice?> TryConfirmCachedRowSafely(CachedConnectionRecord row, CancellationToken ct)
+        {
+            try
+            {
+                return await TryConfirmCachedRow(row, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Tries the row's transports in preferred-first order (<see cref="ConnectionOptions.PreferredTransport"/>
+        /// then the other), skipping a transport the row holds no endpoint for. <see cref="CachedConnectionRecord.TransportInUse"/>
+        /// no longer decides the order - it is only threaded through so the miss-handling below logs and
+        /// builds against the transport actually being tried. Every attempt is bounded by
+        /// <see cref="ConnectionOptions.ConnectTimeoutMs"/>.
+        /// </summary>
+        private async Task<TeensyRomDevice?> TryConfirmCachedRow(CachedConnectionRecord row, CancellationToken ct)
+        {
+            var preferred = _options.PreferredTransport;
+            var other = preferred == ConnectionType.Serial ? ConnectionType.Tcp : ConnectionType.Serial;
+
+            var preferredEndpoint = preferred == ConnectionType.Serial ? row.SerialPortName : row.TcpEndpoint;
+
+            if (!string.IsNullOrEmpty(preferredEndpoint))
+            {
+                var device = await TryConfirmCachedRowOnTransport(row with { TransportInUse = preferred }, ct);
+                if (device is not null)
+                {
+                    return device;
+                }
+            }
+
             var otherEndpoint = other == ConnectionType.Serial ? row.SerialPortName : row.TcpEndpoint;
 
             if (string.IsNullOrEmpty(otherEndpoint))
@@ -232,7 +633,7 @@ namespace TeensyRom.Core.Device
                 return null;
             }
 
-            return await TryOpenAndConfirm(_transports.CreateTcp(row.TcpEndpoint), row.ChipId, row.TransportInUse, host, parsedPort, ct);
+            return await TryOpenAndConfirm(() => _transports.CreateTcp(row.TcpEndpoint), row.ChipId, row.TransportInUse, host, parsedPort, ct);
         }
 
         /// <summary>
@@ -243,7 +644,9 @@ namespace TeensyRom.Core.Device
         /// switch swaps minimal COM7 for full COM4): every remaining candidate is opened and
         /// version-confirmed in order rather than paying for a full sweep, and the first that answers as
         /// this chip is adopted. Hands its confirmed endpoint to <see cref="ICartFinder.BuildDevice"/> -
-        /// the same builder full discovery uses. Returns null - every opened port disposed - on any miss.
+        /// the same builder full discovery uses. Returns null - every opened port disposed - on any miss,
+        /// including when the cached port name no longer exists at all (<see cref="TryOpenAndConfirm"/>
+        /// builds the port inside its own miss handling, so that never throws here).
         /// </summary>
         private async Task<TeensyRomDevice?> TryConfirmCachedSerialRow(CachedConnectionRecord row, CancellationToken ct)
         {
@@ -260,7 +663,7 @@ namespace TeensyRom.Core.Device
                 // "Cannot tell" must not become "reject" - the one case that survives Windows holding a
                 // stale port entry for an image that just detached. But since the filter cannot vouch for
                 // this port, it may just as well be some other device now: DTR never asserts here.
-                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName, isTeensyRomPort: false), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
+                return await TryOpenAndConfirm(() => _transports.CreateSerial(row.SerialPortName, isTeensyRomPort: false), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
             }
 
             var cachedCandidate = lookup.Candidates.FirstOrDefault(c => string.Equals(c.PortName, row.SerialPortName, StringComparison.OrdinalIgnoreCase));
@@ -268,7 +671,7 @@ namespace TeensyRom.Core.Device
             if (cachedCandidate is not null)
             {
                 var isTeensyRomPort = cachedCandidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal;
-                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName, isTeensyRomPort), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
+                return await TryOpenAndConfirm(() => _transports.CreateSerial(row.SerialPortName, isTeensyRomPort), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
             }
 
             // The cached name is no longer among the candidates - a genuine move (e.g. a mode switch
@@ -277,27 +680,34 @@ namespace TeensyRom.Core.Device
             foreach (var candidate in lookup.Candidates)
             {
                 var isTeensyRomPort = candidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal;
-                var device = await TryOpenAndConfirm(_transports.CreateSerial(candidate.PortName, isTeensyRomPort), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
+                var device = await TryOpenAndConfirm(() => _transports.CreateSerial(candidate.PortName, isTeensyRomPort), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
                 if (device is not null)
                 {
                     return device;
                 }
             }
 
-            // No candidate answered as this chip: the cache said otherwise, so full discovery decides.
+            // No candidate answered as this chip: the cache said otherwise, so the search decides.
             _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: descriptor no longer names this chip");
             return null;
         }
 
-        /// <summary>Opens <paramref name="port"/> bounded by the connect timeout, confirms the version reply is <paramref name="chipId"/>, and builds the device - disposing the port on any miss.</summary>
-        private async Task<TeensyRomDevice?> TryOpenAndConfirm(ICommunicationPort port, string chipId, ConnectionType transport, string address, int? tcpPort, CancellationToken ct)
+        /// <summary>
+        /// Builds the port from <paramref name="createPort"/> and opens it, both inside the same miss
+        /// handling, bounded by the connect timeout - so a cached COM name that no longer exists on the
+        /// machine (<see cref="IDeviceTransportFactory.CreateSerial"/> throws) is a miss here, never a
+        /// throw out of the manager. Confirms the version reply is <paramref name="chipId"/> and builds
+        /// the device, disposing the port on any miss.
+        /// </summary>
+        private async Task<TeensyRomDevice?> TryOpenAndConfirm(Func<ICommunicationPort> createPort, string chipId, ConnectionType transport, string address, int? tcpPort, CancellationToken ct)
         {
-            ICommunicationPort? owned = port;
+            ICommunicationPort? owned = null;
 
             try
             {
                 try
                 {
+                    owned = createPort();
                     owned.OpenPort(_options.ConnectTimeoutMs);
                 }
                 catch (Exception ex)
@@ -339,18 +749,35 @@ namespace TeensyRom.Core.Device
         }
 
         /// <summary>
-        /// Writes each available device's record as a cache row, both endpoints included when the record
-        /// holds them - a rediscovered or start-confirmed device carries forward whatever endpoint it held
-        /// for the transport it wasn't just confirmed on.
+        /// Writes every known unit as a cache row: an available unit online from its record and
+        /// <see cref="TeensyRomDevice.Cart"/> (<c>FwVersion</c>, <c>HardwareVariant</c>, <c>IsCompatible</c>),
+        /// an unreachable or file-only unit offline with its last-known facts. Stand-in ids are still
+        /// skipped (the cache writer already drops them).
         /// </summary>
-        private List<CachedConnectionRecord> BuildCacheRows() =>
-            GetAvailableDevices()
-                .Select(d => new CachedConnectionRecord(
-                    d.DeviceId,
-                    d.Connection.SerialPortName,
-                    d.Connection.TcpEndpoint,
-                    d.Connection.TransportInUse ?? d.ConnectionType))
-                .ToList();
+        private List<CachedConnectionRecord> BuildCacheRows()
+        {
+            var rows = new List<CachedConnectionRecord>();
+
+            foreach (var device in _byChip.Values)
+            {
+                rows.Add(new CachedConnectionRecord(
+                    device.DeviceId,
+                    device.Connection.SerialPortName,
+                    device.Connection.TcpEndpoint,
+                    device.Connection.TransportInUse ?? device.ConnectionType,
+                    Offline: device.Connection.Mode == DeviceMode.Unreachable,
+                    device.Cart.FwVersion,
+                    device.Cart.HardwareVariant,
+                    device.Cart.IsCompatible));
+            }
+
+            foreach (var row in _offlineOnly.Values)
+            {
+                rows.Add(row with { Offline = true });
+            }
+
+            return rows;
+        }
 
         /// <summary>Fills <paramref name="transport"/>'s endpoint on <paramref name="target"/> from <paramref name="candidateEndpoint"/>, but only when the target doesn't already have one.</summary>
         private static void CarryForwardEndpoint(DeviceConnectionRecord target, ConnectionType transport, string? candidateEndpoint)
@@ -360,5 +787,9 @@ namespace TeensyRom.Core.Device
                 target.RememberEndpoint(transport, candidateEndpoint);
             }
         }
+
+        /// <summary>True when the id is a per-run stand-in (<see cref="CartFinder"/> assigns these) rather than a chip id read from a device.</summary>
+        private static bool IsStandInDeviceId(string? deviceId) =>
+            deviceId == "Unknown" || (deviceId?.StartsWith("Unknown-") ?? false);
     }
 }

@@ -64,6 +64,36 @@ public class TcpDiscoveryStrategyTests
             s.Contains(Address.ToString()) && s.Contains("connected but no version reply") && s.Contains("empty")));
     }
 
+    /// <summary>
+    /// <see cref="NetworkHelper.GetLocalSubnetRanges"/> reflects whatever adapters this test runs on, so
+    /// the only environment-agnostic way to prove a skipped address is never connected to is to skip
+    /// every address the sweep would otherwise visit and assert the probe never ran at all.
+    /// </summary>
+    [Fact]
+    public async Task FindEndpoints_WithEveryLocalAddressSkipped_NeverConnectsToAnyAddress()
+    {
+        var ranges = NetworkHelper.GetLocalSubnetRanges();
+
+        if (ranges.Count == 0)
+        {
+            return;
+        }
+
+        var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var range in ranges)
+        {
+            foreach (var ip in NetworkHelper.GenerateIpRange(range.Start, range.End))
+            {
+                skip.Add(ip.ToString());
+            }
+        }
+
+        var result = await CreateSut().FindEndpoints(skip, CancellationToken.None);
+
+        result.Should().BeEmpty();
+        await _probe.DidNotReceive().Connect(Arg.Any<IPAddress>(), Arg.Any<int>());
+    }
+
     [Fact]
     public async Task ProbeAddress_WhenConnectRefused_PropagatesSocketExceptionForSweepToClassify()
     {

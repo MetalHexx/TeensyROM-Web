@@ -154,4 +154,19 @@ public class DeviceConnectionRecordTests
 
         sut.TcpEndpoint.Should().BeNull();
     }
+
+    [Fact]
+    public void ForgetEndpoint_ClearsOnlyThatTransportsEndpoint()
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+        sut.RememberEndpoint(ConnectionType.Tcp, "192.168.1.37:2112");
+
+        sut.ForgetEndpoint(ConnectionType.Tcp);
+
+        sut.TcpEndpoint.Should().BeNull();
+        sut.SerialPortName.Should().Be("COM12");
+        sut.TransportInUse.Should().Be(ConnectionType.Serial);
+        sut.Mode.Should().Be(DeviceMode.FullIdle);
+    }
 }
