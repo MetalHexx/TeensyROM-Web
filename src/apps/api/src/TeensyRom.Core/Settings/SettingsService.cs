@@ -153,6 +153,30 @@ namespace TeensyRom.Core.Settings
             }
         }
 
+        /// <summary>
+        /// Removes and persists a device's settings entry.
+        /// </summary>
+        /// <param name="deviceId">The unique device identifier.</param>
+        /// <returns>False when there was no entry for the device.</returns>
+        public bool RemoveDeviceSettings(string deviceId)
+        {
+            lock (_lock)
+            {
+                if (_currentSettings is null)
+                {
+                    _currentSettings = InitDefaultSettings();
+                }
+
+                var updatedDevices = new List<DeviceSettings>(_currentSettings.KnownDevices);
+                if (updatedDevices.RemoveAll(d => d.DeviceId == deviceId) == 0) return false;
+
+                var updatedSettings = _currentSettings with { KnownDevices = updatedDevices };
+                SaveSettings(updatedSettings);
+                _log.Internal($"Removed device settings for device: {deviceId}");
+                return true;
+            }
+        }
+
         private TeensySettings InitDefaultSettings()
         {
             return new TeensySettings();

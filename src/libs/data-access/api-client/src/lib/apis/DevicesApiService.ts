@@ -119,7 +119,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Removes a known, offline TeensyROM device from memory and the saved connection file.  - Only an offline device can be forgotten; an available device is left untouched.
+     * Removes a known, offline TeensyROM device from memory, the saved connection file and its saved settings.  - Only an offline device can be forgotten; an available device is left untouched.
      * Forget Device
      */
     async forgetDeviceRaw(requestParameters: ForgetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ForgetDeviceResponse>> {
@@ -145,7 +145,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Removes a known, offline TeensyROM device from memory and the saved connection file.  - Only an offline device can be forgotten; an available device is left untouched.
+     * Removes a known, offline TeensyROM device from memory, the saved connection file and its saved settings.  - Only an offline device can be forgotten; an available device is left untouched.
      * Forget Device
      */
     async forgetDevice(requestParameters: ForgetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ForgetDeviceResponse> {

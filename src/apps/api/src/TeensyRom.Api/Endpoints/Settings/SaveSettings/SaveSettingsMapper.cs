@@ -17,16 +17,26 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 
         /// <summary>
         /// Maps request to entity while preserving backend-managed fields from existing settings.
-        /// Retrieves current settings to preserve IndexingStatus and other backend-managed data.
+        /// Device entries are applied by ID onto the existing list: a request never adds or removes an entry,
+        /// an entry the request omits is kept as-is, and an ID repeated in the request uses its first occurrence.
         /// </summary>
         public TeensySettings ToEntity(SaveSettingsRequest request)
         {
             var existingSettings = settingsService.GetSettings();
-            
+
+            var requestedById = new Dictionary<string, DeviceSettingsDto>();
+            foreach (var dto in request.KnownDevices)
+            {
+                requestedById.TryAdd(dto.DeviceId, dto);
+            }
+
             return new TeensySettings
             {
-                KnownDevices = request.KnownDevices.Select(dto => 
-                    MapDeviceSettings(dto, existingSettings.KnownDevices)).ToList(),
+                KnownDevices = existingSettings.KnownDevices
+                    .Select(existing => requestedById.TryGetValue(existing.DeviceId, out var dto)
+                        ? MapDeviceSettings(dto, existing)
+                        : existing)
+                    .ToList(),
                 PlayerSettings = MapPlayerSettings(request.PlayerSettings),
                 FileTransferSettings = MapFileTransferSettings(request.FileTransferSettings),
                 SearchSettings = MapSearchSettings(request.SearchSettings),
@@ -35,19 +45,17 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         }
 
         /// <summary>
-        /// Maps device settings DTO to entity while preserving IndexingStatus from existing settings.
+        /// Maps device settings DTO to entity while preserving IndexingStatus from the existing entry.
         /// IndexingStatus is backend-managed and should not be overwritten by frontend requests.
         /// </summary>
-        private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto, List<DeviceSettings> existingDevices)
+        private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto, DeviceSettings existing)
         {
-            var existingDevice = existingDevices.FirstOrDefault(d => d.DeviceId == dto.DeviceId);
-
             return new DeviceSettings
             {
-                DeviceId = dto.DeviceId,
+                DeviceId = existing.DeviceId,
                 VideoSettings = MapVideoSettings(dto.VideoSettings),
                 AudioSettings = MapAudioSettings(dto.AudioSettings),
-                IndexingStatus = existingDevice?.IndexingStatus ?? new IndexingStatus()
+                IndexingStatus = existing.IndexingStatus
             };
         }
 

@@ -753,7 +753,7 @@
           "Devices"
         ],
         "summary": "Forget Device",
-        "description": "Removes a known, offline TeensyROM device from memory and the saved connection file.\n\n- Only an offline device can be forgotten; an available device is left untouched.",
+        "description": "Removes a known, offline TeensyROM device from memory, the saved connection file and its saved settings.\n\n- Only an offline device can be forgotten; an available device is left untouched.",
         "operationId": "ForgetDevice",
         "parameters": [
           {
