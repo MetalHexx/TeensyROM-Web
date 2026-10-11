@@ -17,7 +17,8 @@ const meta: Meta<RotaryKnobComponent> = {
           "for any bounded numeric parameter that benefits from a compact rotary affordance rather " +
           "than a linear fader like `ChannelFaderComponent`. `size` steps the dial and its own " +
           "label/readout font across the shared `ControlSize` scale; `'large'` is the default and " +
-          "renders pixel-identical to every use that predates this input.",
+          "renders pixel-identical to every use that predates this input. " +
+          "`disabled` dims the dial and makes it inert to keyboard, drag and double-click.",
       },
     },
   },
@@ -46,5 +47,12 @@ export const Sizes: Story = {
         <lib-rotary-knob label="Extra Large" accessibleName="Extra Large demo" [value]="0" size="extra-large" />
       </div>
     `,
+  }),
+};
+
+/** `disabled` dims the dial and makes it inert to keyboard, drag and double-click. */
+export const Disabled: Story = {
+  render: () => ({
+    template: `<lib-rotary-knob label="Cutoff" accessibleName="Cutoff demo" [value]="0.4" [disabled]="true" />`,
   }),
 };

@@ -262,4 +262,72 @@ describe('RotaryKnobComponent', () => {
       expect(emitted).toEqual([]);
     });
   });
+
+  describe('disabled', () => {
+    function pointerEvent(type: string, clientY: number): PointerEvent {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      return event as unknown as PointerEvent;
+    }
+
+    function disable(): void {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+    }
+
+    it('is enabled by default', () => {
+      expect(rangeInput().disabled).toBe(false);
+      expect((fixture.nativeElement as HTMLElement).hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('disables the native range input and flags the host', () => {
+      disable();
+
+      expect(rangeInput().disabled).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).hasAttribute('data-disabled')).toBe(true);
+    });
+
+    it('emits nothing on input, double-click or vertical drag', () => {
+      disable();
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.value = '0.5';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      input.dispatchEvent(pointerEvent('pointerdown', 100));
+      input.dispatchEvent(pointerEvent('pointermove', 50));
+      input.dispatchEvent(pointerEvent('pointerup', 50));
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('leaves pointerdown to the browser rather than preventing its default', () => {
+      disable();
+
+      const down = pointerEvent('pointerdown', 100);
+      rangeInput().dispatchEvent(down);
+
+      expect(down.defaultPrevented).toBe(false);
+    });
+
+    it('abandons a drag disabled mid-way, so re-enabling does not resume it', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', 100));
+      input.dispatchEvent(pointerEvent('pointermove', 90));
+      expect(emitted).toHaveLength(1);
+
+      disable();
+      input.dispatchEvent(pointerEvent('pointermove', 60));
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      input.dispatchEvent(pointerEvent('pointermove', 20));
+
+      expect(emitted).toHaveLength(1);
+    });
+  });
 });

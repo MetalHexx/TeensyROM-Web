@@ -13,7 +13,8 @@ const meta: Meta<SpeedPanelComponent> = {
           'presentational — it holds no state of its own; the caller has already pinned ' +
           '`faderValue` into `[min, max]` and formatted `valueText`. The host is itself a flex ' +
           "column, so the fader's own `flex: 1 1 0` fills whatever height a bounded ancestor gives " +
-          "this component — see the `BoundedColumn` story.",
+          "this component — see the `BoundedColumn` story. `model.disabled` dims the fader and every " +
+          'jump button and makes them inert.',
       },
     },
   },
@@ -53,4 +54,9 @@ export const BoundedColumn: Story = {
       </div>
     `,
   }),
+};
+
+/** `model.disabled` dims the fader and every jump button and makes them inert. */
+export const Disabled: Story = {
+  args: { model: { ...model, disabled: true } },
 };

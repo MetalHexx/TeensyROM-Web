@@ -169,4 +169,70 @@ describe('DeckStripComponent', () => {
     expect(wrapper().classList.contains('deck-strip-fader--fixed')).toBe(true);
     expect(fader().hasAttribute('data-fixed-length')).toBe(true);
   });
+
+  describe('disabled', () => {
+    function channelFader(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[aria-label="Channel fader deck A"]');
+    }
+
+    function filterButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('lib-filter-mode-selector button'));
+    }
+
+    it('leaves every control enabled by default', () => {
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(filterButtons().every((button) => !button.disabled)).toBe(true);
+      expect(channelFader().disabled).toBe(false);
+    });
+
+    it('disables only the knobs whose own model says so', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        ...model,
+        knobs: model.knobs.map((knob) => ({ ...knob, disabled: knob.id === 'resonance' })),
+      });
+      fixture.detectChanges();
+
+      expect(knobInput('Resonance').disabled).toBe(true);
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(knobInput('Key').disabled).toBe(false);
+    });
+
+    it('disables the filter selector through the filter model, and no knob or fader with it', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        ...model,
+        filter: { ...model.filter, disabled: true },
+      });
+      fixture.detectChanges();
+
+      expect(filterButtons()).toHaveLength(4);
+      expect(filterButtons().every((button) => button.disabled)).toBe(true);
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(channelFader().disabled).toBe(false);
+    });
+
+    it('keeps the channel fader enabled and emitting while every knob and the filter are disabled', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        filter: { ...model.filter, disabled: true },
+        knobs: model.knobs.map((knob) => ({ ...knob, disabled: true })),
+        fader: model.fader,
+      });
+      fixture.detectChanges();
+      const faderEmitted: number[] = [];
+      const knobEmitted: unknown[] = [];
+      component.faderChange.subscribe((v) => faderEmitted.push(v));
+      component.knobChange.subscribe((e) => knobEmitted.push(e));
+
+      expect(channelFader().disabled).toBe(false);
+      channelFader().value = '0.4';
+      channelFader().dispatchEvent(new Event('input'));
+      knobInput('Cutoff').value = '0.4';
+      knobInput('Cutoff').dispatchEvent(new Event('input'));
+
+      expect(faderEmitted).toEqual([0.4]);
+      expect(knobEmitted).toEqual([]);
+    });
+  });
 });

@@ -10,6 +10,10 @@
   font-size: var(--font-size-sm);
 }
 
+:host([data-disabled]) {
+  opacity: 0.5;
+}
+
 .voice-row-line {
   display: flex;
   align-items: center;
@@ -18,6 +22,10 @@
 
   input[type='checkbox'] {
     margin: 0;
+
+    &:disabled {
+      cursor: not-allowed;
+    }
   }
 }
 
@@ -26,4 +34,8 @@
 .voice-hold {
   width: 100%;
   height: var(--perf-control-height, 2rem);
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }

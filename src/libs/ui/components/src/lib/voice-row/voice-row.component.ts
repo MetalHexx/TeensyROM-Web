@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, input, output } from '@angular/core';
 
 /** One voice's caller-composed state within a voice panel. */
 export interface VoiceRowModel {
@@ -23,7 +23,8 @@ export interface VoiceRowModel {
  * only way a keyboard user can express "while held".
  *
  * Purely presentational: it holds no state of its own and never resolves latched-XOR-held itself —
- * `model().holdLabel` already carries whatever the caller decided that means.
+ * `model().holdLabel` already carries whatever the caller decided that means. While `disabled()`,
+ * both controls are inert and dimmed; a row disabled mid-hold releases it so no voice is left held.
  *
  * @example
  * ```html
@@ -39,18 +40,40 @@ export interface VoiceRowModel {
   templateUrl: './voice-row.component.html',
   styleUrl: './voice-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-disabled]': "disabled() ? '' : null",
+  },
 })
 export class VoiceRowComponent {
   /** The voice row's display model and state. */
   readonly model = input.required<VoiceRowModel>();
+  /** Disables the mute checkbox and the hold button and dims the row. Defaults to `false`, so every
+   *  existing use is unchanged. Becoming disabled while a hold is in progress emits
+   *  `heldChange(false)` once. */
+  readonly disabled = input<boolean>(false);
   /** Emits when the mute checkbox is toggled. */
   readonly mutedChange = output<boolean>();
   /** Emits on hold button press (`true`) and release/cancel (`false`). Momentary; both press and release are meaningful. */
   readonly heldChange = output<boolean>();
 
+  /** Whether a hold (pointer or keyboard) is in progress, so a row disabled mid-hold knows to
+   *  release it. */
+  private held = false;
+
   /** Tracks a keyboard-initiated hold so `onHoldBlur` knows whether to end one — a pointer hold
    *  ends through `onHoldEnd` regardless of focus, via pointer capture. */
   private keyHeld = false;
+
+  /** Releases a hold in progress when the row becomes disabled: a disabled button never delivers its
+   *  own release, so without this the voice would stay inverted. */
+  constructor() {
+    effect(() => {
+      if (this.disabled() && this.held) {
+        this.keyHeld = false;
+        this.endHold();
+      }
+    });
+  }
 
   /** Forwards the mute checkbox's toggled state. */
   protected onMutedChange(event: Event): void {
@@ -61,13 +84,20 @@ export class VoiceRowComponent {
    *  the browser fires no `pointerup` here and the row stays inverted. Guarded with `?.` because
    *  this API isn't implemented in the jsdom test environment. */
   protected onHoldStart(event: PointerEvent): void {
+    if (this.disabled()) {
+      return;
+    }
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+    this.held = true;
     this.heldChange.emit(true);
   }
 
   /** Handles both `pointerup` and `pointercancel` — either way the hold ends. */
   protected onHoldEnd(): void {
-    this.heldChange.emit(false);
+    if (this.disabled()) {
+      return;
+    }
+    this.endHold();
   }
 
   /** Keyboard equivalent of `onHoldStart` for Enter/Space; `event.repeat` guards against the
@@ -75,7 +105,7 @@ export class VoiceRowComponent {
    *  `keydown` event (rather than Angular's `keydown.enter`/`keydown.space` filter syntax) because
    *  strict template type checking can't resolve those filtered event names to `KeyboardEvent`. */
   protected onHoldKeyDown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' && event.key !== ' ') {
+    if (this.disabled() || (event.key !== 'Enter' && event.key !== ' ')) {
       return;
     }
     event.preventDefault();
@@ -83,17 +113,18 @@ export class VoiceRowComponent {
       return;
     }
     this.keyHeld = true;
+    this.held = true;
     this.heldChange.emit(true);
   }
 
   /** Keyboard equivalent of `onHoldEnd` for Enter/Space. */
   protected onHoldKeyUp(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' && event.key !== ' ') {
+    if (this.disabled() || (event.key !== 'Enter' && event.key !== ' ')) {
       return;
     }
     event.preventDefault();
     this.keyHeld = false;
-    this.heldChange.emit(false);
+    this.endHold();
   }
 
   /** Ends a keyboard hold the browser will never deliver a matching `keyup` for — focus left this
@@ -104,6 +135,12 @@ export class VoiceRowComponent {
       return;
     }
     this.keyHeld = false;
+    this.endHold();
+  }
+
+  /** Clears the hold state and emits the release. */
+  private endHold(): void {
+    this.held = false;
     this.heldChange.emit(false);
   }
 }

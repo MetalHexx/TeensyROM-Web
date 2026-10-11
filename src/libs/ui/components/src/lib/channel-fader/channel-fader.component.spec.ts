@@ -107,4 +107,32 @@ describe('ChannelFaderComponent', () => {
       expect(host.hasAttribute('data-fixed-length')).toBe(true);
     });
   });
+
+  describe('disabled', () => {
+    it('is enabled by default', () => {
+      expect(rangeInput().disabled).toBe(false);
+      expect((fixture.nativeElement as HTMLElement).hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('disables the native range input and flags the host', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      expect(rangeInput().disabled).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).hasAttribute('data-disabled')).toBe(true);
+    });
+
+    it('emits nothing on input while disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.value = '0.5';
+      input.dispatchEvent(new Event('input'));
+
+      expect(emitted).toEqual([]);
+    });
+  });
 });

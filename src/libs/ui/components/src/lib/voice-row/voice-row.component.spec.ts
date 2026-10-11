@@ -164,4 +164,72 @@ describe('VoiceRowComponent', () => {
   it('renders no state caption', () => {
     expect(fixture.nativeElement.querySelector('.voice-state')).toBeNull();
   });
+
+  describe('disabled', () => {
+    function disable(): void {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+    }
+
+    it('is enabled by default', () => {
+      expect(checkbox().disabled).toBe(false);
+      expect(holdButton().disabled).toBe(false);
+    });
+
+    it('disables the checkbox and the hold button', () => {
+      disable();
+
+      expect(checkbox().disabled).toBe(true);
+      expect(holdButton().disabled).toBe(true);
+    });
+
+    it('emits nothing on a mute toggle, pointer hold or keyboard hold', () => {
+      disable();
+      const held: boolean[] = [];
+      const muted: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+      component.mutedChange.subscribe((v) => muted.push(v));
+
+      checkbox().click();
+      holdButton().dispatchEvent(pointerEvent('pointerdown'));
+      holdButton().dispatchEvent(pointerEvent('pointerup'));
+      holdButton().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      holdButton().dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+
+      expect(held).toEqual([]);
+      expect(muted).toEqual([]);
+    });
+
+    it('releases a pointer hold in progress exactly once when it becomes disabled', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(pointerEvent('pointerdown'));
+      disable();
+      holdButton().dispatchEvent(pointerEvent('pointerup'));
+      fixture.detectChanges();
+
+      expect(held).toEqual([true, false]);
+    });
+
+    it('releases a keyboard hold in progress exactly once, without a second release on blur', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      disable();
+      holdButton().dispatchEvent(new Event('blur'));
+
+      expect(held).toEqual([true, false]);
+    });
+
+    it('emits no release when it becomes disabled with nothing held', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      disable();
+
+      expect(held).toEqual([]);
+    });
+  });
 });

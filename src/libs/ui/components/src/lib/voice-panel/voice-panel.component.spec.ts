@@ -75,4 +75,43 @@ describe('VoicePanelComponent', () => {
 
     expect(fired).toBe(true);
   });
+
+  describe('disabled', () => {
+    function controls(): (HTMLInputElement | HTMLButtonElement)[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('input, button'));
+    }
+
+    function disable(): void {
+      fixture.componentRef.setInput('model', { ...testModel(), disabled: true });
+      fixture.detectChanges();
+    }
+
+    it('leaves every row and the Clear button enabled by default', () => {
+      expect(controls()).toHaveLength(7);
+      expect(controls().every((control) => !control.disabled)).toBe(true);
+    });
+
+    it('disables every row control and the Clear button', () => {
+      disable();
+
+      expect(controls()).toHaveLength(7);
+      expect(controls().every((control) => control.disabled)).toBe(true);
+    });
+
+    it('emits nothing from a row or Clear while disabled', () => {
+      disable();
+      const emitted: unknown[] = [];
+      component.mutedChange.subscribe((e) => emitted.push(e));
+      component.heldChange.subscribe((e) => emitted.push(e));
+      component.clearMutes.subscribe(() => emitted.push('clear'));
+
+      fixture.nativeElement.querySelector('input[type="checkbox"]').click();
+      fixture.nativeElement
+        .querySelector('.voice-hold')
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      fixture.nativeElement.querySelector('.voice-clear button').click();
+
+      expect(emitted).toEqual([]);
+    });
+  });
 });

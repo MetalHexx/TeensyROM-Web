@@ -51,5 +51,10 @@
   button {
     width: 100%;
     height: var(--perf-control-height, 2rem);
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 }

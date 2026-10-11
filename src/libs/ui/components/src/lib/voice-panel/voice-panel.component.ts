@@ -11,13 +11,15 @@ export interface VoicePanelModel {
   readonly rows: readonly VoiceRowModel[];
   /** e.g. 'Clear all voice mutes deck A' — the Clear button's own accessible name. */
   readonly clearAccessibleName: string;
+  /** Disables every row and the Clear button. Absent means enabled. */
+  readonly disabled?: boolean;
 }
 
 /**
  * One deck's per-voice mute/kill list: a heading, one `VoiceRowComponent` per `model().rows` entry,
  * and a Clear button that resets every latched mute at once. Purely presentational — it composes
  * `VoiceRowComponent` and holds no state of its own; the caller owns every row's mute/held state
- * and every write.
+ * and every write. `model().disabled` disables every row and the Clear button.
  *
  * @example
  * ```html

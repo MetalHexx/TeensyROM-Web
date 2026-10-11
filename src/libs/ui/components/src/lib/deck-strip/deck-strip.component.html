@@ -13,6 +13,7 @@
     [max]="knob.max ?? 1"
     [step]="knob.step ?? 0.01"
     [readout]="knob.readout ?? null"
+    [disabled]="knob.disabled ?? false"
     [size]="size()"
     (valueChange)="onKnobChange(knob.id, $event)"
   />
