@@ -24,13 +24,14 @@ export interface RenameDeviceBody {
      * @type {string}
      * @memberof RenameDeviceBody
      */
-    name?: string;
+    name: string;
 }
 
 /**
  * Check if a given object implements the RenameDeviceBody interface.
  */
 export function instanceOfRenameDeviceBody(value: object): value is RenameDeviceBody {
+    if (!('name' in value) || value['name'] === undefined) return false;
     return true;
 }
 
@@ -44,7 +45,7 @@ export function RenameDeviceBodyFromJSONTyped(json: any, ignoreDiscriminator: bo
     }
     return {
         
-        'name': json['name'] == null ? undefined : json['name'],
+        'name': json['name'],
     };
 }
 

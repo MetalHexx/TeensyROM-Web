@@ -68,6 +68,8 @@ namespace TeensyRom.Core.Device
         private Task? _running;
         private DiscoveryOccasion? _runningKind;
 
+        private volatile bool _startedFromSavedRecords;
+
         public DeviceConnectionManager(
             ICartFinder finder,
             IConnectionRecordCache cache,
@@ -85,6 +87,8 @@ namespace TeensyRom.Core.Device
             _options = options;
             _log = log;
         }
+
+        public bool StartedFromSavedRecords => _startedFromSavedRecords;
 
         public List<TeensyRomDevice> GetAvailableDevices() =>
             _byChip.Values.Where(d => d.Connection.Mode != DeviceMode.Unreachable).ToList();
@@ -364,6 +368,8 @@ namespace TeensyRom.Core.Device
         private async Task<List<TeensyRomDevice>> RunConnectAtStart(CancellationToken ct)
         {
             var cached = _cache.Load();
+
+            _startedFromSavedRecords = cached is { Count: > 0 };
 
             if (cached is null || cached.Count == 0)
             {

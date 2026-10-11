@@ -55,7 +55,8 @@ const meta: Meta<InlineEditTitleComponent> = {
       control: 'boolean',
     },
     editLabel: {
-      description: 'Accessible name for the title button and the text field, e.g. "Rename TR-1".',
+      description:
+        'Accessible name for the title button and the text field, e.g. "Rename TR-1". Left empty, the field falls back to "Edit <value>".',
       control: 'text',
     },
     invalidDescription: {

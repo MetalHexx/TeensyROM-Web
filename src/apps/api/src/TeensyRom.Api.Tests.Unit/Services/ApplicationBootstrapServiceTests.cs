@@ -39,9 +39,10 @@ public class ApplicationBootstrapServiceTests
     private static OfflineDevice OfflineUnit(string chipId) =>
         new(chipId, "COM3", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true, chipId);
 
-    private void GivenStartKnows(string[] availableIds, string[] offlineIds)
+    private void GivenStartKnows(string[] availableIds, string[] offlineIds, bool startedFromSavedRecords = true)
     {
         var available = availableIds.Select(AvailableDevice).ToList();
+        _deviceManager.StartedFromSavedRecords.Returns(startedFromSavedRecords);
         _deviceManager.ConnectAtStartAsync(Arg.Any<CancellationToken>()).Returns(available);
         _deviceManager.GetAvailableDevices().Returns(available);
         _deviceManager.GetOfflineDevices().Returns(offlineIds.Select(OfflineUnit).ToList());
@@ -81,6 +82,20 @@ public class ApplicationBootstrapServiceTests
 
         _settingsService.DidNotReceive().RemoveDeviceSettings(Arg.Any<string>());
         _log.Received(1).Internal("ApplicationBootstrap: Orphan cleanup skipped - no connection records", Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task StartAsync_StartBeganWithNoSavedRecordsButDiscoveryFoundUnits_LeavesSettingsUntouched()
+    {
+        // A deleted ConnectionRecords.json: the start fell back to a full discovery that found only AAAA,
+        // so the records now held are the discovery's own - BBBB and OLDHASH are not orphans, just unseen.
+        GivenSettingsFor("AAAA", "BBBB", "OLDHASH");
+        GivenStartKnows(availableIds: ["AAAA"], offlineIds: [], startedFromSavedRecords: false);
+
+        await CreateService().StartAsync(CancellationToken.None);
+
+        _settingsService.DidNotReceive().RemoveDeviceSettings(Arg.Any<string>());
+        _log.Received(1).Internal("ApplicationBootstrap: Orphan cleanup skipped - start began with no saved connection records", Arg.Any<string?>());
     }
 
     [Fact]

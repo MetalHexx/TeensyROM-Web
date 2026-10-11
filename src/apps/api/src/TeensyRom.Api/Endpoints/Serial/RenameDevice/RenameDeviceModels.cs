@@ -30,7 +30,7 @@ namespace TeensyRom.Api.Endpoints.RenameDevice
         /// <summary>
         /// The new device name: 1 to 24 characters after trimming, with no control characters.
         /// </summary>
-        public string Name { get; set; } = string.Empty;
+        [Required] public string Name { get; set; } = string.Empty;
     }
 
     public class RenameDeviceRequestValidator : AbstractValidator<RenameDeviceRequest>

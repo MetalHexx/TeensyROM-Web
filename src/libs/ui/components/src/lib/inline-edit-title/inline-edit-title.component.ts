@@ -75,7 +75,11 @@ export class InlineEditTitleComponent {
    */
   readonly saving = input<boolean>(false);
 
-  /** Accessible name for the title button and the text field, e.g. `Rename TR-1` — defaults to `''`. */
+  /**
+   * Accessible name for the title button and the text field, e.g. `Rename TR-1` — defaults to `''`.
+   * Left empty, the button names itself from its text and the field falls back to `Edit <value>`,
+   * so the field is never unlabelled.
+   */
   readonly editLabel = input<string>('');
 
   /** Visually hidden explanation announced and linked via `aria-describedby` while the draft is flagged invalid — defaults to `''`. */
@@ -98,6 +102,9 @@ export class InlineEditTitleComponent {
 
   /** Unique id linking the field to its hidden invalid description. */
   protected readonly descriptionId = `lib-inline-edit-title-description-${nextInstanceId++}`;
+
+  /** The field's accessible name: the consumer's `editLabel`, else one built from `value` — an input's own text never names it. */
+  protected readonly fieldLabel = computed(() => this.editLabel() || `Edit ${this.value()}`.trim());
 
   /** The `n/max` counter text. */
   protected readonly counter = computed(() => `${this.draft().length}/${this.maxLength()}`);

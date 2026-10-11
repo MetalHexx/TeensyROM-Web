@@ -20,7 +20,7 @@
       [value]="draft()"
       [disabled]="pending() || saving()"
       [attr.maxlength]="maxLength()"
-      [attr.aria-label]="editLabel() || null"
+      [attr.aria-label]="fieldLabel()"
       [attr.aria-invalid]="showInvalid() ? 'true' : null"
       [attr.aria-describedby]="showInvalid() ? descriptionId : null"
       (input)="onInput($event)"

@@ -165,6 +165,38 @@ public class DeviceConnectionManagerTests
     }
 
     [Fact]
+    public async Task StartedFromSavedRecords_WithNoCache_StaysFalseEvenWhenFullDiscoveryFindsUnits()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("44444444", ConnectionType.Serial, "COM9", port);
+
+        _cache.Load().Returns((IReadOnlyList<CachedConnectionRecord>?)null);
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+
+        var manager = CreateManager();
+        manager.StartedFromSavedRecords.Should().BeFalse("no start has run yet");
+
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle();
+        manager.StartedFromSavedRecords.Should().BeFalse("the record the discovery just created is not a saved record");
+    }
+
+    [Fact]
+    public async Task StartedFromSavedRecords_WithSavedRows_IsTrueAfterStart()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord>
+        {
+            new("aaaa1111", null, null, ConnectionType.Serial, Offline: true)
+        });
+
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        manager.StartedFromSavedRecords.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ConnectAtStartAsync_WithRowAnsweringWrongChip_RunsOneSearchAndCacheHoldsTheMissedRowFlaggedOffline()
     {
         var cachedPort = CreatePort(ConnectionType.Serial);

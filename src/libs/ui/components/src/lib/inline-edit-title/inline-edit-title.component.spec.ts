@@ -100,6 +100,14 @@ describe('InlineEditTitleComponent', () => {
       expect(input.getAttribute('aria-label')).toBe('Rename TR-1');
     });
 
+    it('names the field from the value when no edit label is supplied, leaving the button to its own text', () => {
+      fixture.componentRef.setInput('editLabel', '');
+      fixture.detectChanges();
+
+      expect(titleButton().getAttribute('aria-label')).toBeNull();
+      expect(startEditing().getAttribute('aria-label')).toBe('Edit TR-1');
+    });
+
     it('applies maxlength and shows the counter', () => {
       fixture.componentRef.setInput('maxLength', 12);
       const input = startEditing();

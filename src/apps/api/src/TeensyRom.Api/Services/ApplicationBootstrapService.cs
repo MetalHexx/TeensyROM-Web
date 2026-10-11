@@ -100,10 +100,17 @@ namespace TeensyRom.Api.Services
 
         /// <summary>
         /// Removes Settings.json device entries that no connection record backs. Offline units still count as known.
-        /// With no records at all (fresh install, deleted record file) nothing is removed.
+        /// A start that began with no saved records (fresh install, deleted record file) removes nothing, even when
+        /// its discovery then found units: the records it ends with are its own, not the record of what was known before.
         /// </summary>
         private void RemoveOrphanedSettings()
         {
+            if (!_deviceManager.StartedFromSavedRecords)
+            {
+                _log.Internal("ApplicationBootstrap: Orphan cleanup skipped - start began with no saved connection records");
+                return;
+            }
+
             var knownIds = SettingsOrphans.KnownIds(
                 _deviceManager.GetAvailableDevices().Select(d => d.DeviceId)
                     .Concat(_deviceManager.GetOfflineDevices().Select(d => d.ChipId)));

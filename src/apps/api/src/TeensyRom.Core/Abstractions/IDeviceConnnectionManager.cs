@@ -23,6 +23,14 @@ namespace TeensyRom.Core.Abstractions
         Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct);
 
         /// <summary>
+        /// Whether the last <see cref="ConnectAtStartAsync"/> began from saved connection records. False
+        /// before any start, and after a start that found no usable file (fresh install, or a deleted,
+        /// empty or unreadable cache) - even if its full discovery then went on to find units, which
+        /// makes the records a start ends with its own and not evidence of what was known before.
+        /// </summary>
+        bool StartedFromSavedRecords { get; }
+
+        /// <summary>
         /// fullScan = true -&gt; full discovery with resets (Discover Devices): merges against every known
         /// unit and saves even when it finds nothing. fullScan = false -&gt; the listed records, no device
         /// contact (page load / refresh).

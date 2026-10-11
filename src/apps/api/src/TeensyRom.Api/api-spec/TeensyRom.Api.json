@@ -2469,6 +2469,9 @@
         }
       },
       "RenameDeviceBody": {
+        "required": [
+          "name"
+        ],
         "type": "object",
         "properties": {
           "name": {

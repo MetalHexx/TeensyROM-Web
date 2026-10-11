@@ -59,6 +59,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct)
             => Task.FromResult(_devices);
 
+        /// <summary>The fake reads no record cache, so a start never begins from saved records and the startup orphan cleanup stays off.</summary>
+        public bool StartedFromSavedRecords => false;
+
         public Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
             => Task.FromResult(_devices);
 

@@ -28,6 +28,16 @@ public class StandInDeviceIdTests
     [InlineData("ABC123")]
     [InlineData("UnknownChip")]
     [InlineData("unknown")]
+    [InlineData("Unknown-")]
+    [InlineData("Unknown-Lab")]
+    [InlineData("Unknown-2x")]
+    [InlineData("Unknown-02")]
+    [InlineData("Unknown-1")]
+    [InlineData("Unknown-0")]
+    [InlineData("Unknown-+2")]
+    [InlineData("Unknown--2")]
+    [InlineData("Unknown-2-3")]
+    [InlineData("Unknown-99999999999")]
     public void IsStandIn_WithARealChipIdOrNothing_IsFalse(string? deviceId)
     {
         StandInDeviceId.IsStandIn(deviceId).Should().BeFalse();
