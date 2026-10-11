@@ -1,3 +1,5 @@
+using TeensyRom.Core.Common;
+
 namespace TeensyRom.Api.Services
 {
     /// <summary>
@@ -10,7 +12,7 @@ namespace TeensyRom.Api.Services
         /// which never identify a real unit.
         /// </summary>
         public static IReadOnlySet<string> KnownIds(IEnumerable<string> connectionIds) =>
-            connectionIds.Where(id => !IsStandIn(id)).ToHashSet();
+            connectionIds.Where(id => !StandInDeviceId.IsStandIn(id)).ToHashSet();
 
         /// <summary>
         /// The settings IDs missing from <paramref name="knownIds"/>. An empty known set yields none:
@@ -20,8 +22,5 @@ namespace TeensyRom.Api.Services
             knownIds.Count == 0
                 ? []
                 : settingsIds.Where(id => !knownIds.Contains(id)).ToList();
-
-        private static bool IsStandIn(string id) =>
-            id == "Unknown" || id.StartsWith("Unknown-");
     }
 }

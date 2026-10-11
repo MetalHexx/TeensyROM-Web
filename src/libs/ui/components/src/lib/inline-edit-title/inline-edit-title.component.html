@@ -19,7 +19,7 @@
       autocomplete="off"
       spellcheck="false"
       [value]="draft()"
-      [disabled]="saving()"
+      [disabled]="pending() || saving()"
       [attr.maxlength]="maxLength()"
       [attr.aria-label]="editLabel() || null"
       [attr.aria-invalid]="showInvalid() ? 'true' : null"

@@ -120,7 +120,7 @@ graph TB
 | **DeviceConnectionManager** | Owns the five discovery occasions (start, Discover Devices, page load, reconnect, forget) and the confirmed device set, keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs |
 | **CartFinder** | Turns one confirmed endpoint into a listed device: resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on both transports by `ConnectionOptions.PreferredTransport` | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
 | **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe every USB-descriptor-matched COM port / the local `/24` subnet with the version command; each yields one `DiscoveredEndpoint` per TeensyROM reply. An optional skip set (a COM port name or bare IP) leaves a given candidate untouched, so the search a Start or Reconnect miss triggers never reopens a unit already available | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
-| **ConnectionRecordCache** | Whole-file JSON cache of confirmed connection records (`Config/ConnectionRecords.json`), read by the start occasion and rewritten after every occasion but a page load — Forget included, which rewrites without contacting any device. Each row carries an `Offline` flag and the unit's last-known facts (firmware, hardware variant, compatibility) so an unreachable unit stays listed instead of disappearing | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
+| **ConnectionRecordCache** | Whole-file JSON cache of confirmed connection records (`Config/ConnectionRecords.json`), read by the start occasion and rewritten after every occasion but a page load — Forget included, which rewrites without contacting any device. Each row carries an `Offline` flag, the unit's last-known facts (firmware, hardware variant, compatibility) so an unreachable unit stays listed instead of disappearing, and its device `Name` (see *Device Endpoints*) | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
 | **TeensyRomDevice** | Aggregate root representing a device: `Cart` metadata + `ICommunicationPort` + storage services | #file:apps/api/src/TeensyRom.Core/Entities/Device/TeensyRomDevice.cs |
 
 **Critical Pattern**: `TeensyRomDevice` encapsulates:
@@ -226,7 +226,10 @@ Endpoints/
 |----------|---------|---------|
 | `GET /api/devices/` | 200 — available units, then every known offline unit (`deviceState: ConnectionLost`) | 404 when neither an available nor an offline unit exists |
 | `POST /api/devices/{deviceId}/reconnect` | 200 — reconnected, or already available (no contact) | 404 unknown device; 502 the saved addresses and the search for missing units both missed |
+| `PUT /api/devices/{deviceId}/name` | 200 — the renamed unit's updated `CartDto`; works offline, no device contact | 400 invalid name (trimmed, 1–24 chars, no control characters); 404 unknown device or a per-run `Unknown` stand-in |
 | `DELETE /api/devices/{deviceId}` | 200 — forgotten, from memory, the saved file and `settings.json` | 404 unknown device; 409 still available (an available device is left untouched; only an offline unit can be forgotten) |
+
+The API owns device names. `DeviceConnectionManager` keeps each name on the unit's connection record (`ConnectionRecords.json`, never `settings.json`) and stamps it onto `Cart.Name` whenever a device is rebuilt. A unit with no name gets the lowest free `TR-n`; this is backfilled in chip-id order at start and assigned on first sight, and Forget drops the name. Rename is the one device operation outside the occasion queue (see *The Five Discovery Occasions*): it contacts no device and serialises on the manager's names lock and its single whole-file save lock.
 
 Reconnecting a unit never touches its entry in `settings.json`. Forgetting a unit removes its `settings.json` entry along with its connection record, and each API start removes any `settings.json` entry that no connection record (available or offline) backs. The start cleanup is skipped when there are no connection records, so a fresh install or a deleted `ConnectionRecords.json` never wipes settings.
 
@@ -437,7 +440,9 @@ reply could matter.
 
 All five run through one queue — only one is ever in flight at a time. Start and Discover Devices may
 join an already-running instance of either kind and share its result; Reconnect and Forget never join —
-each waits for whatever is running, then runs alone for its own caller only.
+each waits for whatever is running, then runs alone for its own caller only. Renaming a device
+(`PUT /api/devices/{deviceId}/name`) is not an occasion: it never enters the queue, contacts no device,
+and runs under the manager's names lock plus the one whole-file save lock.
 
 | Occasion | Trigger | What it touches |
 |----------|---------|------------------|

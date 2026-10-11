@@ -21,11 +21,12 @@ export class CrtStorageService implements ICrtStorage {
   private readonly STORAGE_KEY_PREFIX = 'teensyrom_crt_';
   private readonly CUSTOM_PRESETS_KEY = 'teensyrom_crt_custom_presets';
   private readonly MAX_CUSTOM_PRESETS = 50;
-  private readonly CONTEXTS: readonly CrtStorageContext[] = [
-    'file-image',
-    'video-compact',
-    'video-dialog',
-  ];
+  /** Every context; the `Record` makes adding a `CrtStorageContext` without listing it here a compile error. */
+  private readonly CONTEXTS = Object.keys({
+    'file-image': true,
+    'video-compact': true,
+    'video-dialog': true,
+  } satisfies Record<CrtStorageContext, true>) as CrtStorageContext[];
 
   constructor(@Inject(ALERT_SERVICE) private readonly alertService: IAlertService) {}
 

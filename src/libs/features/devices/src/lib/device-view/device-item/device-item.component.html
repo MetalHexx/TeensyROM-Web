@@ -64,24 +64,28 @@
         <lib-icon-label
           icon="keyboard"
           data-testid="device-machine-label"
-          [label]="machine"
+          [label]="'Machine: ' + machine"
         ></lib-icon-label>
       }
       @if (videoLabel(); as video) {
-        <lib-icon-label icon="tv" data-testid="device-video-label" [label]="video"></lib-icon-label>
+        <lib-icon-label
+          icon="tv"
+          data-testid="device-video-label"
+          [label]="'Video: ' + video"
+        ></lib-icon-label>
       }
       @if (clockLabel(); as clock) {
         <lib-icon-label
           icon="av_timer"
           data-testid="device-clock-label"
-          [label]="clock"
+          [label]="'Clock: ' + clock"
         ></lib-icon-label>
       }
       @if (hardwareLabel(); as hardware) {
         <lib-icon-label
           icon="memory"
           data-testid="device-hardware-label"
-          [label]="hardware"
+          [label]="'Hardware: ' + hardware"
         ></lib-icon-label>
       }
 

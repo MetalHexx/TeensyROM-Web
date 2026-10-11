@@ -44,8 +44,6 @@ public interface IConnectionRecordCache
 /// <inheritdoc cref="IConnectionRecordCache"/>
 public sealed class ConnectionRecordCache : IConnectionRecordCache
 {
-    private const string _unknownDeviceIdBase = "Unknown";
-
     private readonly ILoggingService _log;
     private readonly string _cacheFilePath;
     private readonly object _lock = new();
@@ -133,7 +131,7 @@ public sealed class ConnectionRecordCache : IConnectionRecordCache
 
     /// <summary>False for the display-only "Unknown"/"Unknown-2" stand-ins CartFinder assigns per run.</summary>
     private static bool IsRealChipId(string chipId) =>
-        !string.IsNullOrWhiteSpace(chipId) && chipId != _unknownDeviceIdBase && !chipId.StartsWith($"{_unknownDeviceIdBase}-");
+        !string.IsNullOrWhiteSpace(chipId) && !StandInDeviceId.IsStandIn(chipId);
 
     private sealed record ConnectionRecordFile
     {

@@ -403,12 +403,20 @@ describe('DeviceItemComponent', () => {
       expect(input.getAttribute('maxlength')).toBe('24');
     });
 
-    it('locks the editor while the rename is saving', () => {
+    it('keeps the editor open and locked from the commit until the rename is saved', () => {
+      component.rename.subscribe(() => fixture.componentRef.setInput('saving', true));
+
       const input = openEditor();
-      fixture.componentRef.setInput('saving', true);
+      typeAndPress(input, 'Studio TR', 'Enter');
+
+      expect(input.isConnected).toBe(true);
+      expect(input.disabled).toBe(true);
+      expect(input.value).toBe('Studio TR');
+
+      fixture.componentRef.setInput('saving', false);
       fixture.detectChanges();
 
-      expect(input.disabled).toBe(true);
+      expect(input.isConnected).toBe(false);
     });
 
     it('still allows renaming an offline device', () => {
@@ -437,17 +445,17 @@ describe('DeviceItemComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(fact('device-machine-label')?.textContent).toContain('C128');
-      expect(fact('device-video-label')?.textContent).toContain('PAL');
-      expect(fact('device-clock-label')?.textContent).toContain('50 Hz');
-      expect(fact('device-hardware-label')?.textContent).toContain('TeensyROM+');
+      expect(fact('device-machine-label')?.textContent).toContain('Machine: C128');
+      expect(fact('device-video-label')?.textContent).toContain('Video: PAL');
+      expect(fact('device-clock-label')?.textContent).toContain('Clock: 50 Hz');
+      expect(fact('device-hardware-label')?.textContent).toContain('Hardware: TeensyROM+');
     });
 
     it('names the original hardware without a plus', () => {
       fixture.componentRef.setInput('device', mockDevice);
       fixture.detectChanges();
 
-      expect(fact('device-hardware-label')?.textContent?.trim()).toContain('TeensyROM');
+      expect(fact('device-hardware-label')?.textContent).toContain('Hardware: TeensyROM');
       expect(fact('device-hardware-label')?.textContent).not.toContain('+');
     });
 

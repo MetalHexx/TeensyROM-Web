@@ -1,5 +1,8 @@
 export const DEVICE_NAME_MAX_LENGTH = 24;
 
+/** The device-name rule in words, for hints and assistive descriptions. Mirrors the API's validation message. */
+export const DEVICE_NAME_RULE_DESCRIPTION = `Name must be 1–${DEVICE_NAME_MAX_LENGTH} characters with no control characters.`;
+
 export interface DeviceNameValidation {
   valid: boolean;
   /** The trimmed name, returned whether or not it is valid. */

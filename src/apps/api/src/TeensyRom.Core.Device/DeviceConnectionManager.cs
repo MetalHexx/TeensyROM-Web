@@ -98,7 +98,7 @@ namespace TeensyRom.Core.Device
 
             foreach (var device in _byChip.Values)
             {
-                if (device.Connection.Mode != DeviceMode.Unreachable || IsStandInDeviceId(device.DeviceId))
+                if (device.Connection.Mode != DeviceMode.Unreachable || StandInDeviceId.IsStandIn(device.DeviceId))
                 {
                     continue;
                 }
@@ -108,7 +108,7 @@ namespace TeensyRom.Core.Device
 
             foreach (var row in _offlineOnly.Values)
             {
-                if (IsStandInDeviceId(row.ChipId))
+                if (StandInDeviceId.IsStandIn(row.ChipId))
                 {
                     continue;
                 }
@@ -194,7 +194,7 @@ namespace TeensyRom.Core.Device
 
             lock (_namesLock)
             {
-                var known = !IsStandInDeviceId(deviceId) &&
+                var known = !StandInDeviceId.IsStandIn(deviceId) &&
                     (_byChip.TryGetValue(deviceId, out device) || _offlineOnly.TryGetValue(deviceId, out offlineRow));
 
                 if (!known)
@@ -389,7 +389,7 @@ namespace TeensyRom.Core.Device
             {
                 _offlineOnly.TryAdd(row.ChipId, row);
 
-                if (!IsStandInDeviceId(row.ChipId) && !string.IsNullOrWhiteSpace(row.Name))
+                if (!StandInDeviceId.IsStandIn(row.ChipId) && !string.IsNullOrWhiteSpace(row.Name))
                 {
                     _names.TryAdd(row.ChipId, row.Name);
                 }
@@ -397,7 +397,7 @@ namespace TeensyRom.Core.Device
 
             // Rows from a file written before names existed get their TR-N now, in chip-id order, so
             // the backfill is saved by this same occasion.
-            foreach (var row in cached.Where(r => !IsStandInDeviceId(r.ChipId)).OrderBy(r => r.ChipId, StringComparer.Ordinal))
+            foreach (var row in cached.Where(r => !StandInDeviceId.IsStandIn(r.ChipId)).OrderBy(r => r.ChipId, StringComparer.Ordinal))
             {
                 EnsureName(row.ChipId);
             }
@@ -633,13 +633,14 @@ namespace TeensyRom.Core.Device
                 ReleaseEndpointFromOtherChips(device.DeviceId, transport, endpoint);
             }
 
-            _offlineOnly.TryRemove(device.DeviceId, out _);
-
             // The device object (and its cart) is rebuilt on every confirm, so the saved name is stamped
             // back on here. Stand-ins are display-only: they show their own id and never take a TR-N.
+            // The offline row leaves in the same critical section the live row arrives in, so a rename
+            // never finds the chip in neither map.
             lock (_namesLock)
             {
-                device.Cart.Name = IsStandInDeviceId(device.DeviceId) ? device.DeviceId : EnsureName(device.DeviceId);
+                _offlineOnly.TryRemove(device.DeviceId, out _);
+                device.Cart.Name = StandInDeviceId.IsStandIn(device.DeviceId) ? device.DeviceId : EnsureName(device.DeviceId);
                 _byChip[device.DeviceId] = device;
             }
         }
@@ -934,9 +935,5 @@ namespace TeensyRom.Core.Device
                 target.RememberEndpoint(transport, candidateEndpoint);
             }
         }
-
-        /// <summary>True when the id is a per-run stand-in (<see cref="CartFinder"/> assigns these) rather than a chip id read from a device.</summary>
-        private static bool IsStandInDeviceId(string? deviceId) =>
-            deviceId == "Unknown" || (deviceId?.StartsWith("Unknown-") ?? false);
     }
 }

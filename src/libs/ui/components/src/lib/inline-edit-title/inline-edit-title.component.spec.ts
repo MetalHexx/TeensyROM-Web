@@ -81,13 +81,76 @@ describe('InlineEditTitleComponent', () => {
       type(input, 'Studio');
       expect(fixture.nativeElement.querySelector('.counter').textContent.trim()).toBe('6/12');
     });
+  });
 
-    it('disables the field while saving', () => {
+  describe('saving', () => {
+    beforeEach(() => {
+      fixture.componentInstance.commit.subscribe(() =>
+        fixture.componentRef.setInput('saving', true)
+      );
+    });
+
+    const commitStudio = (key = 'Enter'): HTMLInputElement => {
       const input = startEditing();
-      fixture.componentRef.setInput('saving', true);
+      type(input, 'Studio');
+      if (key === 'blur') {
+        input.dispatchEvent(new Event('blur'));
+        fixture.detectChanges();
+      } else {
+        press(input, key);
+      }
+      return input;
+    };
+
+    const settle = (value: string): void => {
+      fixture.componentRef.setInput('value', value);
+      fixture.componentRef.setInput('saving', false);
+      fixture.detectChanges();
+    };
+
+    it('keeps the field open, disabled and showing the typed name while the commit is saving', () => {
+      const input = commitStudio();
+
+      expect(field()).toBe(input);
+      expect(input.disabled).toBe(true);
+      expect(input.value).toBe('Studio');
+      expect(fixture.nativeElement.querySelector('.counter').textContent.trim()).toBe('6/24');
+      expect(commitSpy).toHaveBeenCalledExactlyOnceWith('Studio');
+    });
+
+    it('closes onto the saved name and returns focus to the button when the save lands', () => {
+      commitStudio();
+      settle('Studio');
+
+      expect(field()).toBeNull();
+      expect(titleButton().textContent).toContain('Studio');
+      expect(document.activeElement).toBe(titleButton());
+    });
+
+    it('closes back onto the old name when the save fails', () => {
+      commitStudio();
+      fixture.componentRef.setInput('saving', false);
       fixture.detectChanges();
 
-      expect(input.disabled).toBe(true);
+      expect(field()).toBeNull();
+      expect(titleButton().textContent).toContain('TR-1');
+    });
+
+    it('does not offer a second edit or a second commit while saving', () => {
+      const input = commitStudio();
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(commitSpy).toHaveBeenCalledTimes(1);
+      expect(titleButton().classList).toContain('is-editing');
+    });
+
+    it('does not take focus back after a commit made by leaving the field', () => {
+      commitStudio('blur');
+      settle('Studio');
+
+      expect(field()).toBeNull();
+      expect(document.activeElement).not.toBe(titleButton());
     });
   });
 
@@ -200,7 +263,7 @@ describe('InlineEditTitleComponent', () => {
       expect(field()).toBeNull();
     });
 
-    it('does not commit a second time when the field is removed after Enter', () => {
+    it('does not commit a second time when the field blurs after Enter', () => {
       const input = startEditing();
       type(input, 'Studio');
       press(input, 'Enter');

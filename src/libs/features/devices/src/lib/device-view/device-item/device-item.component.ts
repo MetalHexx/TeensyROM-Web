@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { NgClass } from '@angular/common';
 import {
   DEVICE_NAME_MAX_LENGTH,
+  DEVICE_NAME_RULE_DESCRIPTION,
   Device,
   DeviceHardwareVariant,
   DeviceMachine,
@@ -67,7 +68,7 @@ export class DeviceItemComponent {
   private readonly deviceStore = inject(DeviceStore);
 
   readonly DEVICE_NAME_MAX_LENGTH = DEVICE_NAME_MAX_LENGTH;
-  readonly nameInvalidDescription = `Name must be 1–${DEVICE_NAME_MAX_LENGTH} characters.`;
+  readonly nameInvalidDescription = DEVICE_NAME_RULE_DESCRIPTION;
   readonly isValidName = (draft: string): boolean => validateDeviceName(draft).valid;
 
   readonly isEnabled = computed(() => this.device()?.isEnabled ?? true);
