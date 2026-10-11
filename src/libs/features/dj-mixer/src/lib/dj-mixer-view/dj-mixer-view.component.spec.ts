@@ -101,6 +101,15 @@ function createDjStoreStub() {
   return {
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
+    deck: () =>
+      signal({
+        speed: 1,
+        voices: [
+          { muted: false, held: false },
+          { muted: false, held: false },
+          { muted: false, held: false },
+        ],
+      }),
     deckMix: () =>
       signal({
         level: 1,
