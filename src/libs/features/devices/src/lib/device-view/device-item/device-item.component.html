@@ -1,5 +1,4 @@
 <lib-scaling-card
-  [title]="device()?.name"
   [enableOverflow]="false"
   data-testid="device-card"
   [ngClass]="{ dimmed: !isEnabled() && !isOffline() }"
@@ -34,6 +33,20 @@
   >
   </lib-icon-button>
 
+  <!-- Editable name: projected as the card title so Material keeps owning the title typography and spacing -->
+  <mat-card-title slot="header">
+    <lib-inline-edit-title
+      data-testid="device-name"
+      [value]="device()?.name ?? ''"
+      [maxLength]="DEVICE_NAME_MAX_LENGTH"
+      [isValid]="isValidName"
+      [saving]="saving()"
+      [editLabel]="'Rename ' + (device()?.name ?? '')"
+      [invalidDescription]="nameInvalidDescription"
+      (commit)="onRename($event)"
+    ></lib-inline-edit-title>
+  </mat-card-title>
+
   <!-- Main content -->
   <div class="device-content">
     <div class="device-info" data-testid="device-info">
@@ -47,6 +60,30 @@
         data-testid="device-firmware-label"
         [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
       ></lib-icon-label>
+      @if (machineLabel(); as machine) {
+        <lib-icon-label
+          icon="keyboard"
+          data-testid="device-machine-label"
+          [label]="machine"
+        ></lib-icon-label>
+      }
+      @if (videoLabel(); as video) {
+        <lib-icon-label icon="tv" data-testid="device-video-label" [label]="video"></lib-icon-label>
+      }
+      @if (clockLabel(); as clock) {
+        <lib-icon-label
+          icon="av_timer"
+          data-testid="device-clock-label"
+          [label]="clock"
+        ></lib-icon-label>
+      }
+      @if (hardwareLabel(); as hardware) {
+        <lib-icon-label
+          icon="memory"
+          data-testid="device-hardware-label"
+          [label]="hardware"
+        ></lib-icon-label>
+      }
 
       <!-- Show connection info: offline takes priority, then prefer TCP details when available -->
       @if (isOffline()) {

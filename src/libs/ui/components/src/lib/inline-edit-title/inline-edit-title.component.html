@@ -1,0 +1,37 @@
+<button
+  #titleButton
+  type="button"
+  class="title"
+  [class.is-editing]="editing()"
+  [attr.aria-label]="editLabel() || null"
+  (click)="startEdit()"
+>
+  <span class="text">{{ value() }}</span>
+  <mat-icon class="edit-icon" aria-hidden="true">edit</mat-icon>
+</button>
+
+@if (editing()) {
+  <span class="field" [class.invalid]="showInvalid()">
+    <input
+      #field
+      class="input"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      [value]="draft()"
+      [disabled]="saving()"
+      [attr.maxlength]="maxLength()"
+      [attr.aria-label]="editLabel() || null"
+      [attr.aria-invalid]="showInvalid() ? 'true' : null"
+      [attr.aria-describedby]="showInvalid() ? descriptionId : null"
+      (input)="onInput($event)"
+      (keydown.enter)="onEnter($event)"
+      (keydown.escape)="onEscape()"
+      (blur)="onBlur()"
+    />
+    <span class="counter">{{ counter() }}</span>
+    <span class="visually-hidden" aria-live="polite" [id]="descriptionId">{{
+      showInvalid() ? invalidDescription() : ''
+    }}</span>
+  </span>
+}

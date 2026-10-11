@@ -347,6 +347,142 @@ describe('DeviceItemComponent', () => {
     });
   });
 
+  describe('Rename', () => {
+    const openEditor = (): HTMLInputElement => {
+      fixture.nativeElement.querySelector('[data-testid="device-name"] button').click();
+      fixture.detectChanges();
+      return fixture.nativeElement.querySelector('[data-testid="device-name"] input');
+    };
+
+    const typeAndPress = (input: HTMLInputElement, text: string, key: string): void => {
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+    });
+
+    it('shows the device name on an edit button', () => {
+      const button = fixture.nativeElement.querySelector('[data-testid="device-name"] button');
+
+      expect(button.textContent).toContain('Test Device');
+      expect(button.getAttribute('aria-label')).toBe('Rename Test Device');
+    });
+
+    it('emits rename with the device id and the trimmed name', () => {
+      let renamed: { deviceId: string; name: string } | undefined;
+      component.rename.subscribe((request) => (renamed = request));
+
+      typeAndPress(openEditor(), '  Studio TR  ', 'Enter');
+
+      expect(renamed).toEqual({ deviceId: 'test-device-1', name: 'Studio TR' });
+    });
+
+    it('emits nothing when the name is unchanged', () => {
+      const renameSpy = vi.fn();
+      component.rename.subscribe(renameSpy);
+
+      typeAndPress(openEditor(), 'Test Device', 'Enter');
+
+      expect(renameSpy).not.toHaveBeenCalled();
+    });
+
+    it('keeps the editor open and emits nothing for an invalid name', () => {
+      const renameSpy = vi.fn();
+      component.rename.subscribe(renameSpy);
+
+      const input = openEditor();
+      typeAndPress(input, '   ', 'Enter');
+
+      expect(renameSpy).not.toHaveBeenCalled();
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('maxlength')).toBe('24');
+    });
+
+    it('locks the editor while the rename is saving', () => {
+      const input = openEditor();
+      fixture.componentRef.setInput('saving', true);
+      fixture.detectChanges();
+
+      expect(input.disabled).toBe(true);
+    });
+
+    it('still allows renaming an offline device', () => {
+      fixture.componentRef.setInput('device', { ...mockDevice, deviceState: DeviceState.ConnectionLost });
+      fixture.detectChanges();
+      let renamed: { deviceId: string; name: string } | undefined;
+      component.rename.subscribe((request) => (renamed = request));
+
+      typeAndPress(openEditor(), 'Offline Rename', 'Enter');
+
+      expect(renamed?.name).toBe('Offline Rename');
+    });
+  });
+
+  describe('Device facts', () => {
+    const fact = (testId: string): HTMLElement | null =>
+      fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+    it('shows machine, video, clock and hardware once known', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        machine: DeviceMachine.C128,
+        videoStandard: DeviceVideoStandard.Pal,
+        todClockHz: 50,
+        hardwareVariant: DeviceHardwareVariant.TeensyRomPlus,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-machine-label')?.textContent).toContain('C128');
+      expect(fact('device-video-label')?.textContent).toContain('PAL');
+      expect(fact('device-clock-label')?.textContent).toContain('50 Hz');
+      expect(fact('device-hardware-label')?.textContent).toContain('TeensyROM+');
+    });
+
+    it('names the original hardware without a plus', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      expect(fact('device-hardware-label')?.textContent?.trim()).toContain('TeensyROM');
+      expect(fact('device-hardware-label')?.textContent).not.toContain('+');
+    });
+
+    it('hides a fact whose value is unknown', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        machine: DeviceMachine.Unknown,
+        videoStandard: DeviceVideoStandard.Unknown,
+        todClockHz: null,
+        hardwareVariant: DeviceHardwareVariant.Unknown,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-machine-label')).toBeNull();
+      expect(fact('device-video-label')).toBeNull();
+      expect(fact('device-clock-label')).toBeNull();
+      expect(fact('device-hardware-label')).toBeNull();
+    });
+
+    it('shows only firmware and hardware among the facts while offline', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        deviceState: DeviceState.ConnectionLost,
+        todClockHz: 60,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-firmware-label')).toBeTruthy();
+      expect(fact('device-hardware-label')).toBeTruthy();
+      expect(fact('device-machine-label')).toBeNull();
+      expect(fact('device-video-label')).toBeNull();
+      expect(fact('device-clock-label')).toBeNull();
+    });
+  });
+
   describe('Offline Functionality', () => {
     const offlineDevice: Device = {
       ...mockDevice,

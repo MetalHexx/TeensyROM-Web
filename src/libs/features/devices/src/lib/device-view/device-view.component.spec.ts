@@ -29,6 +29,7 @@ describe('DevicesComponent', () => {
     disableDevice: ReturnType<typeof vi.fn>;
     reconnectDevice: ReturnType<typeof vi.fn>;
     forgetDevice: ReturnType<typeof vi.fn>;
+    renameDevice: ReturnType<typeof vi.fn>;
   };
   let mockDialog: { open: ReturnType<typeof vi.fn> };
 
@@ -70,6 +71,7 @@ describe('DevicesComponent', () => {
       disableDevice: vi.fn(),
       reconnectDevice: vi.fn(),
       forgetDevice: vi.fn(),
+      renameDevice: vi.fn().mockResolvedValue(true),
     };
 
     mockDialog = { open: vi.fn() };
@@ -111,6 +113,39 @@ describe('DevicesComponent', () => {
 
       expect(component.isReconnecting('device-1')).toBe(true);
       expect(component.isReconnecting('device-2')).toBe(false);
+    });
+  });
+
+  describe('rename', () => {
+    it('calls deviceStore.renameDevice with the device id and the new name', async () => {
+      await component.onRename({ deviceId: 'device-1', name: 'Studio TR' });
+
+      expect(mockDeviceStore.renameDevice).toHaveBeenCalledWith('device-1', 'Studio TR');
+    });
+
+    it('marks the device as renaming until the store call settles', async () => {
+      let finish: (renamed: boolean) => void = () => undefined;
+      mockDeviceStore.renameDevice.mockReturnValueOnce(
+        new Promise<boolean>((resolve) => (finish = resolve))
+      );
+
+      const pending = component.onRename({ deviceId: 'device-1', name: 'Studio TR' });
+
+      expect(component.isRenaming('device-1')).toBe(true);
+      expect(component.isRenaming('device-2')).toBe(false);
+
+      finish(true);
+      await pending;
+
+      expect(component.isRenaming('device-1')).toBe(false);
+    });
+
+    it('clears the renaming mark when the store reports the rename failed', async () => {
+      mockDeviceStore.renameDevice.mockResolvedValueOnce(false);
+
+      await component.onRename({ deviceId: 'device-1', name: 'Studio TR' });
+
+      expect(component.isRenaming('device-1')).toBe(false);
     });
   });
 
