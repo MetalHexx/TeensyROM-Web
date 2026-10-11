@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import type { TuneReference } from '@sidablist/tunes';
 import { StorageType } from '@teensyrom-nx/domain';
-import { DjStore, DeckBindingState, DeckStatus, MidiState } from './dj-store';
+import {
+  DjStore,
+  DeckBindingState,
+  DeckDetectedKey,
+  DeckMixState,
+  DeckStatus,
+  MidiState,
+} from './dj-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
 
 function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
@@ -46,6 +53,36 @@ describe('DjStore', () => {
 
       expect(store.midi()).toEqual({ accessState: 'idle', ports: [], lastError: null });
       expect(store.seen()).toEqual({});
+    });
+
+    it('starts both decks with home speed, three unmuted unheld voices, no key and not switching', () => {
+      for (const slot of ['A', 'B'] as const) {
+        const deck = store.decks()[slot];
+        expect(deck.speed).toBe(1);
+        expect(deck.voices).toEqual([
+          { muted: false, held: false },
+          { muted: false, held: false },
+          { muted: false, held: false },
+        ]);
+        expect(deck.detectedKey).toBeNull();
+        expect(deck.switching).toBe(false);
+      }
+    });
+
+    it('starts both mix slots at home, the crossfader centred and the key format Camelot', () => {
+      const home: DeckMixState = {
+        level: 1,
+        cutoff: 0,
+        resonance: 0,
+        pulseWidth: 0,
+        keySemitones: 0,
+        filterMode: null,
+      };
+
+      expect(store.mix().A).toEqual(home);
+      expect(store.mix().B).toEqual(home);
+      expect(store.crossfader()).toBe(0);
+      expect(store.keyDisplayFormat()).toBe('camelot');
     });
   });
 
@@ -158,6 +195,231 @@ describe('DjStore', () => {
       store.markSeen({ key: keyB, reference: refB });
 
       expect(store.seen()).toEqual({ [keyA]: refA, [keyB]: refB });
+    });
+
+    it('setDeckMix merges the patch into one slot and leaves the other fields and slot alone', () => {
+      store.setDeckMix({ slot: 'A', patch: { level: 0.4, filterMode: 'bandPass' } });
+
+      expect(store.mix().A).toEqual({
+        level: 0.4,
+        cutoff: 0,
+        resonance: 0,
+        pulseWidth: 0,
+        keySemitones: 0,
+        filterMode: 'bandPass',
+      });
+      expect(store.mix().B.level).toBe(1);
+      expect(store.mix().B.filterMode).toBeNull();
+    });
+
+    it('setDeckMix stores positions at full resolution, without rounding', () => {
+      store.setDeckMix({ slot: 'A', patch: { cutoff: 0.123456789, level: 0.987654321 } });
+
+      expect(store.mix().A.cutoff).toBe(0.123456789);
+      expect(store.mix().A.level).toBe(0.987654321);
+    });
+
+    it('setDeckMix rounds keySemitones to a whole semitone and bounds it to ±12', () => {
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3.6 } });
+      expect(store.mix().A.keySemitones).toBe(4);
+
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: 40 } });
+      expect(store.mix().A.keySemitones).toBe(12);
+
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: -40 } });
+      expect(store.mix().A.keySemitones).toBe(-12);
+    });
+
+    it('setCrossfader sets the position at full resolution', () => {
+      store.setCrossfader({ position: -0.3141592 });
+      expect(store.crossfader()).toBe(-0.3141592);
+    });
+
+    it('setKeyDisplayFormat sets the format', () => {
+      store.setKeyDisplayFormat({ format: 'note' });
+      expect(store.keyDisplayFormat()).toBe('note');
+    });
+
+    it('resetDeckTuneShaping homes shaping and the detected key, keeping level, crossfader and key format', () => {
+      store.setDeckMix({
+        slot: 'A',
+        patch: {
+          level: 0.5,
+          cutoff: 0.6,
+          resonance: -0.2,
+          pulseWidth: 0.9,
+          keySemitones: 5,
+          filterMode: 'highPass',
+        },
+      });
+      store.setDeckMix({ slot: 'B', patch: { cutoff: 0.3 } });
+      store.setDeckDetectedKey({
+        slot: 'A',
+        detectedKey: { tonic: 1, mode: 'minor', camelot: '8A' },
+      });
+      store.setCrossfader({ position: 0.7 });
+      store.setKeyDisplayFormat({ format: 'note' });
+
+      store.resetDeckTuneShaping({ slot: 'A' });
+
+      expect(store.mix().A).toEqual({
+        level: 0.5,
+        cutoff: 0,
+        resonance: 0,
+        pulseWidth: 0,
+        keySemitones: 0,
+        filterMode: null,
+      });
+      expect(store.decks().A.detectedKey).toBeNull();
+      expect(store.crossfader()).toBe(0.7);
+      expect(store.keyDisplayFormat()).toBe('note');
+      expect(store.mix().B.cutoff).toBe(0.3);
+    });
+
+    it('setDeckEngineControls sets speed and voices only, leaving the other slot untouched', () => {
+      const voices = [
+        { muted: true, held: false },
+        { muted: false, held: true },
+        { muted: false, held: false },
+      ];
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+
+      store.setDeckEngineControls({ slot: 'A', speed: 1.37, voices });
+
+      expect(store.decks().A.speed).toBe(1.37);
+      expect(store.decks().A.voices).toEqual(voices);
+      expect(store.decks().A.status).toBe('playing');
+      expect(store.decks().B.speed).toBe(1);
+    });
+
+    it('setDeckSwitching sets switching, leaving busy and the other slot untouched', () => {
+      store.setDeckSwitching({ slot: 'A', switching: true });
+      expect(store.decks().A.switching).toBe(true);
+      expect(store.decks().A.busy).toBe(false);
+      expect(store.decks().B.switching).toBe(false);
+
+      store.setDeckSwitching({ slot: 'A', switching: false });
+      expect(store.decks().A.switching).toBe(false);
+    });
+
+    it('setDeckDetectedKey sets and clears the detected key', () => {
+      const detectedKey: DeckDetectedKey = { tonic: 9, mode: 'minor', camelot: '8A' };
+
+      store.setDeckDetectedKey({ slot: 'B', detectedKey });
+      expect(store.decks().B.detectedKey).toEqual(detectedKey);
+      expect(store.decks().A.detectedKey).toBeNull();
+
+      store.setDeckDetectedKey({ slot: 'B', detectedKey: null });
+      expect(store.decks().B.detectedKey).toBeNull();
+    });
+  });
+
+  describe('deckMix', () => {
+    beforeEach(() => setup());
+
+    it('reads the slot mix state', () => {
+      const mix = store.deckMix('B');
+      expect(mix().cutoff).toBe(0);
+
+      store.setDeckMix({ slot: 'B', patch: { cutoff: -0.5 } });
+      expect(mix().cutoff).toBe(-0.5);
+    });
+  });
+
+  describe('canShape', () => {
+    beforeEach(() => setup());
+
+    function load(): void {
+      store.setDeckLoaded({ slot: 'A', reference: tuneReference() });
+    }
+
+    it('is false for an empty deck, even at a settled status', () => {
+      store.setDeckStatus({ slot: 'A', status: 'stopped' });
+      expect(store.canShape('A')()).toBe(false);
+    });
+
+    it.each(['empty', 'loading', 'indexing', 'failed'] as const)(
+      'is false for a loaded deck that is %s',
+      (status) => {
+        load();
+        store.setDeckStatus({ slot: 'A', status });
+        expect(store.canShape('A')()).toBe(false);
+      }
+    );
+
+    it.each(['playing', 'paused', 'stopped'] as const)(
+      'is true for a loaded deck that is %s',
+      (status) => {
+        load();
+        store.setDeckStatus({ slot: 'A', status });
+        expect(store.canShape('A')()).toBe(true);
+      }
+    );
+
+    it('is false while switching, and true again once it clears', () => {
+      load();
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+
+      store.setDeckSwitching({ slot: 'A', switching: true });
+      expect(store.canShape('A')()).toBe(false);
+
+      store.setDeckSwitching({ slot: 'A', switching: false });
+      expect(store.canShape('A')()).toBe(true);
+    });
+
+    it('stays true while busy is set by a Play press', () => {
+      load();
+      store.setDeckStatus({ slot: 'A', status: 'paused' });
+      store.setDeckBusy({ slot: 'A', busy: true });
+
+      expect(store.canShape('A')()).toBe(true);
+    });
+  });
+
+  describe('keyReadout', () => {
+    beforeEach(() => setup());
+
+    const cSharpMinor: DeckDetectedKey = { tonic: 1, mode: 'minor', camelot: '8B' };
+
+    it('shows the detected key in Camelot by default', () => {
+      store.setDeckDetectedKey({ slot: 'A', detectedKey: cSharpMinor });
+      expect(store.keyReadout('A')()).toBe('8B');
+    });
+
+    it('shows the detected key as a note name once the format is note', () => {
+      store.setDeckDetectedKey({ slot: 'A', detectedKey: cSharpMinor });
+      store.setKeyDisplayFormat({ format: 'note' });
+      expect(store.keyReadout('A')()).toBe('C#m');
+    });
+
+    it('shifts the detected key by keySemitones in both formats', () => {
+      store.setDeckDetectedKey({ slot: 'A', detectedKey: cSharpMinor });
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3 } });
+
+      expect(store.keyReadout('A')()).toBe('9A');
+      store.setKeyDisplayFormat({ format: 'note' });
+      expect(store.keyReadout('A')()).toBe('Em');
+    });
+
+    it('wraps a shifted note past B back to C', () => {
+      store.setDeckDetectedKey({
+        slot: 'A',
+        detectedKey: { tonic: 11, mode: 'major', camelot: '1B' },
+      });
+      store.setKeyDisplayFormat({ format: 'note' });
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: 1 } });
+
+      expect(store.keyReadout('A')()).toBe('C');
+    });
+
+    it('falls back to the signed offset with no detected key, using U+2212 for negatives', () => {
+      expect(store.keyReadout('A')()).toBe('0');
+
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3 } });
+      expect(store.keyReadout('A')()).toBe('+3');
+
+      store.setDeckMix({ slot: 'A', patch: { keySemitones: -5 } });
+      expect(store.keyReadout('A')()).toBe('−5');
     });
   });
 
