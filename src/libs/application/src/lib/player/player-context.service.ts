@@ -7,6 +7,7 @@ import {
   PlayerScope,
   FileItemType,
   FileItem,
+  PlayerStatus,
   StorageType,
   StorageTypeUtil,
   ALERT_SERVICE,
@@ -175,6 +176,10 @@ export class PlayerContextService implements IPlayerContext {
 
   isLoading(deviceId: string) {
     return this.store.isPlayerLoading(deviceId);
+  }
+
+  isStopping(deviceId: string) {
+    return this.store.isPlayerStopping(deviceId);
   }
 
   /**
@@ -361,12 +366,23 @@ export class PlayerContextService implements IPlayerContext {
       return;
     }
 
+    // A non-song always relaunches. A Stopped song relaunches too: resumeTimer has no timer
+    // left to resume, and the device (cleared by a reset or transfer) needs the file started
+    // again rather than a toggle that would unpause a menu tune that isn't this file. Only a
+    // Paused song resumes in place.
+    const isStoppedSong =
+      this.isCurrentFileMusicType(deviceId) &&
+      this.store.getPlayerStatus(deviceId)() === PlayerStatus.Stopped;
+
+    if (!this.isCurrentFileMusicType(deviceId) || isStoppedSong) {
+      await this.relaunchCurrentFile(deviceId);
+      return;
+    }
+
     await this.store.play({ deviceId });
 
     // Phase 5: Resume timer for music files
-    if (this.isCurrentFileMusicType(deviceId)) {
-      this.timerManager.resumeTimer(deviceId);
-    }
+    this.timerManager.resumeTimer(deviceId);
   }
 
   async pause(deviceId: string): Promise<void> {
@@ -385,10 +401,35 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async stop(deviceId: string): Promise<void> {
+    // A second stop while the reset is still running would only queue another full reset.
+    if (this.store.isPlayerStopping(deviceId)()) {
+      logWarn(`Stop ignored: device ${deviceId} is already stopping`);
+      return;
+    }
+
     await this.store.stopPlayback({ deviceId });
 
-    // Phase 5: Stop timer
-    this.timerManager.stopTimer(deviceId);
+    // Phase 5: Stop the timer only when the reset actually succeeded. A failed reset leaves the
+    // file running on the device, so the timer must keep counting toward auto-advance and Stop
+    // stays available to retry.
+    if (this.store.getPlayerError(deviceId)() === null) {
+      this.timerManager.stopTimer(deviceId);
+    }
+  }
+
+  /**
+   * Reflects a device-view reset into that device's player. Local only - sends nothing to the
+   * device, since the reset itself already happened there. When a player entry exists for the
+   * device, its timer is torn down and its status set to Stopped with no error; a device with
+   * no player entry is left untouched.
+   */
+  reflectDeviceReset(deviceId: string): void {
+    if (!this.store.getDevicePlayer(deviceId)()) {
+      return;
+    }
+
+    this.cleanupTimer(deviceId);
+    this.store.reflectTransferStopped({ deviceId });
   }
 
   async next(deviceId: string): Promise<void> {
@@ -519,6 +560,48 @@ export class PlayerContextService implements IPlayerContext {
 
   isCurrentFileCompatible(deviceId: string) {
     return this.store.isCurrentFileCompatible(deviceId);
+  }
+
+  /**
+   * Launches the stopped current file again through the store's launch action, so loading, error
+   * and compatibility state behave as for any launch. It is the same file, so no history entry is
+   * recorded (it was recorded when it first launched) and the URL already points at it. A file its
+   * file context does not hold (a random launch whose directory never loaded) is relaunched as a
+   * one-file context in its parent directory.
+   */
+  private async relaunchCurrentFile(deviceId: string): Promise<void> {
+    if (this.store.getPlayerStatus(deviceId)() === PlayerStatus.Playing) {
+      logInfo(LogType.Info, `Relaunch skipped: current file is already playing on ${deviceId}`);
+      return;
+    }
+
+    if (!this.canLaunch(deviceId, 'relaunch')) {
+      return;
+    }
+
+    const currentFile = this.store.getCurrentFile(deviceId)();
+    if (!currentFile) {
+      return;
+    }
+
+    const fileContext = this.store.getPlayerFileContext(deviceId)();
+    const context = fileContext?.files.some((file) => file.path === currentFile.file.path)
+      ? fileContext
+      : null;
+
+    await this.store.launchFileWithContext({
+      deviceId,
+      file: currentFile.file,
+      directoryPath: context?.directoryPath ?? currentFile.parentPath,
+      files: context?.files ?? [currentFile.file],
+      launchMode: this.store.getLaunchMode(deviceId)(),
+    });
+
+    if (!this.hasErrorAndCleanup(deviceId)) {
+      this.setupTimerForFile(deviceId, currentFile.file);
+    }
+
+    this.handleIncompatibleFile(deviceId);
   }
 
   // Helper method to determine if current file is music type

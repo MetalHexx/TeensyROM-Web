@@ -2,16 +2,22 @@ namespace TeensyRom.Core.Device;
 
 /// <summary>
 /// Defines a strategy for discovering device endpoints (Serial COM ports or TCP IP addresses).
-/// Implementations return lightweight endpoint information without performing device validation.
+/// A strategy always performs its full scan; when and how often to call it is the caller's decision.
 /// </summary>
 public interface IDiscoveryStrategy
 {
     /// <summary>
-    /// Finds all available endpoints for the transport type (Serial or TCP).
-    /// This method only performs discovery - no validation, version checking, or device creation.
+    /// Probes every candidate endpoint for this transport type with the version command and returns
+    /// one <see cref="DiscoveredEndpoint"/> per TeensyROM reply, each with an open, positioned port.
     /// </summary>
     /// <param name="ct">Cancellation token to abort long-running scans.</param>
-    /// <param name="fullScan">If true, performs full subnet/port scan. If false, uses cached endpoints when available. Defaults to false.</param>
-    /// <returns>A list of discovered endpoints that can be validated and connected to.</returns>
-    Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct, bool fullScan = false);
+    /// <returns>A list of discovered TeensyROM endpoints.</returns>
+    Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct);
+
+    /// <summary>
+    /// Same as <see cref="FindEndpoints(CancellationToken)"/>, except a candidate whose address is in
+    /// <paramref name="skipEndpoints"/> - a COM port name or a bare IP, compared case-insensitively - is
+    /// never opened or connected to, so a unit already reachable elsewhere is left undisturbed.
+    /// </summary>
+    Task<List<DiscoveredEndpoint>> FindEndpoints(IReadOnlySet<string> skipEndpoints, CancellationToken ct);
 }

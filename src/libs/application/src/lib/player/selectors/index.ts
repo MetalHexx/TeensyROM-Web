@@ -5,6 +5,7 @@ import { getDevicePlayer } from './get-device-player';
 import { getCurrentFile } from './get-current-file';
 import { getPlayerFileContext } from './get-player-file-context';
 import { isPlayerLoading } from './is-player-loading';
+import { isPlayerStopping } from './is-player-stopping';
 import { getPlayerError } from './get-player-error';
 import { getPlayerStatus } from './get-player-status';
 import { getShuffleSettings } from './get-shuffle-settings';
@@ -25,6 +26,7 @@ export function withPlayerSelectors() {
       ...getCurrentFile(writableStore),
       ...getPlayerFileContext(writableStore),
       ...isPlayerLoading(writableStore),
+      ...isPlayerStopping(writableStore),
       ...getPlayerError(writableStore),
       ...getPlayerStatus(writableStore),
       ...getShuffleSettings(writableStore),

@@ -19,7 +19,7 @@ describe('TransferToolbarComponent', () => {
       providers: [
         provideNoopAnimations(),
         TransferStore,
-        { provide: DeviceStore, useValue: { devices: devicesSignal } },
+        { provide: DeviceStore, useValue: { devices: devicesSignal, usableDevices: devicesSignal } },
       ],
     }).compileComponents();
 

@@ -1,0 +1,86 @@
+{
+  "keys": {
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489": {
+      "subKeys": [
+        "TEENSYROM-SERIAL-14470230",
+        "TEENSYROM-SERIAL-19277260",
+        "TEENSYROM-SERIAL-00000000",
+        "TR-LEFT-01",
+        "TR-RIGHT-01",
+        "14470230",
+        "19277260"
+      ]
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\TEENSYROM-SERIAL-14470230": {
+      "values": { "ParentIdPrefix": "b&296959f3&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&296959f3&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM12" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\TEENSYROM-SERIAL-19277260": {
+      "values": { "ParentIdPrefix": "b&29629d22&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&29629d22&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM4" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\TEENSYROM-SERIAL-00000000": {
+      "values": { "ParentIdPrefix": "b&10000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&10000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM11" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\TR-LEFT-01": {
+      "values": { "ParentIdPrefix": "b&20000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&20000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM9" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\TR-RIGHT-01": {
+      "values": { "ParentIdPrefix": "b&30000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&30000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM10" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\14470230": {
+      "values": { "ParentIdPrefix": "b&40000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&40000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM6" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489\\19277260": {
+      "values": { "ParentIdPrefix": "b&50000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0489&MI_00\\b&50000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM8" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0483": {
+      "subKeys": [
+        "14470230",
+        "19277260"
+      ]
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0483\\14470230": {
+      "values": { "ParentIdPrefix": "b&83df5a4&1" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0483&MI_00\\b&83df5a4&1&0000\\Device Parameters": {
+      "values": { "PortName": "COM5" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0483\\19277260": {
+      "values": { "ParentIdPrefix": "b&83738d3&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_16C0&PID_0483&MI_00\\b&83738d3&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM7" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_0403&PID_6001": {
+      "subKeys": [
+        "A12345"
+      ]
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_0403&PID_6001\\A12345": {
+      "values": { "ParentIdPrefix": "b&60000000&0" }
+    },
+    "SYSTEM\\CurrentControlSet\\Enum\\USB\\VID_0403&PID_6001&MI_00\\b&60000000&0&0000\\Device Parameters": {
+      "values": { "PortName": "COM3" }
+    }
+  }
+}

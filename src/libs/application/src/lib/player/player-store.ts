@@ -62,6 +62,8 @@ export interface DevicePlayerState {
   historyViewVisible: boolean;
   playTimerConfig: PlayTimerConfig;
   isLoading: boolean;
+  /** A stop (device reset, ~15 s) is in flight; another would only queue a second full reset. */
+  isStopping: boolean;
   error: string | null;
   lastUpdated: number | null;
 }

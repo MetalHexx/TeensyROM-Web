@@ -1,7 +1,7 @@
 // Tap the API's SignalR log hub and append every line to a file, timestamped.
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-const require = createRequire('C:/dev/src/TeensyROM-Web/src/package.json');
+const require = createRequire(import.meta.url);
 const signalR = require('@microsoft/signalr');
 
 const out = process.argv[2];

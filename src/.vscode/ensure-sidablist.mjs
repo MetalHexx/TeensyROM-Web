@@ -11,7 +11,7 @@ if (!existsSync(sidablist)) {
   process.exit(0);
 }
 
-const libs = ['analysis', 'tunes'];
+const libs = ['core', 'analysis', 'tunes', 'asid'];
 
 function run(command, cwd) {
   console.log(`> ${command}`);
@@ -22,11 +22,17 @@ const distMissing = libs.filter((lib) => !existsSync(join(sidablist, 'libs', lib
 if (distMissing.length > 0) {
   console.log(`SIDablist libs missing a build: ${distMissing.join(', ')}. Installing and building...`);
   run('pnpm install', sidablist);
-  run('pnpm --filter @sidablist/analysis --filter @sidablist/tunes run build', sidablist);
+  run('pnpm -r run build', sidablist);
 }
 
-const linksMissing = libs.filter((lib) => !existsSync(join(root, 'node_modules', '@sidablist', lib)));
-if (linksMissing.length > 0) {
-  console.log(`Frontend node_modules missing links: ${linksMissing.join(', ')}. Running pnpm install...`);
+// Check the resolved dist, not just the node_modules path: @sidablist/core is a `file:`
+// dependency, which pnpm snapshots at install time rather than symlinking live. If that
+// snapshot was taken before core had a dist build, the symlink exists but stays stale
+// until pnpm install runs again - so an existence check on the path alone would miss it.
+const resolvedDistMissing = libs.filter(
+  (lib) => !existsSync(join(root, 'node_modules', '@sidablist', lib, 'dist'))
+);
+if (resolvedDistMissing.length > 0) {
+  console.log(`Frontend node_modules missing built output for: ${resolvedDistMissing.join(', ')}. Running pnpm install...`);
   run('pnpm install', root);
 }

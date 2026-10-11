@@ -6,10 +6,20 @@ import {
   IStorageService,
   IDeviceService,
 } from '@teensyrom-nx/domain';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { StorageType, Device, DeviceState } from '@teensyrom-nx/domain';
+import { PLAYER_CONTEXT, type IPlayerContext } from '../player/player-context.interface';
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+/**
+ * A small stub rather than the full `createMockPlayerContext` - `application` may not depend
+ * on `testing-app-mocks`, and `resetAllDevices` only ever calls `reflectDeviceReset`.
+ */
+const createMockPlayerContext = (): IPlayerContext =>
+  ({
+    reflectDeviceReset: vi.fn(),
+  }) as unknown as IPlayerContext;
 
 describe('DeviceStore - indexStorage state updates', () => {
   let store: InstanceType<typeof DeviceStore>;
@@ -57,6 +67,8 @@ describe('DeviceStore - indexStorage state updates', () => {
       findDevices: vi.fn().mockReturnValue(of([])),
       resetDevice: vi.fn().mockReturnValue(of(void 0)),
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
     };
 
     TestBed.configureTestingModule({
@@ -64,6 +76,7 @@ describe('DeviceStore - indexStorage state updates', () => {
         DeviceStore,
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
       ],
     });
 
@@ -382,6 +395,8 @@ describe('DeviceStore - indexStorageAllStorage', () => {
       findDevices: vi.fn().mockReturnValue(of([])),
       resetDevice: vi.fn().mockReturnValue(of(void 0)),
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
     };
 
     TestBed.configureTestingModule({
@@ -389,6 +404,7 @@ describe('DeviceStore - indexStorageAllStorage', () => {
         DeviceStore,
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
       ],
     });
 
@@ -538,5 +554,420 @@ describe('DeviceStore - indexStorageAllStorage', () => {
 
       expect(store.isIndexing()).toBe(false);
     });
+  });
+});
+
+describe('DeviceStore - resetAllDevices and pingAllDevices', () => {
+  let store: InstanceType<typeof DeviceStore>;
+  let mockDeviceService: IDeviceService;
+  let mockPlayerContext: IPlayerContext;
+
+  const createMockDevice = (deviceId: string): Device => ({
+    deviceId,
+    comPort: 'COM3',
+    name: `Test Device ${deviceId}`,
+    fwVersion: '1.0.0',
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.Connected,
+    isEnabled: true,
+    ipAddress: undefined,
+    tcpPort: undefined,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+  });
+
+  beforeEach(() => {
+    mockDeviceService = {
+      findDevices: vi.fn().mockReturnValue(of([])),
+      resetDevice: vi.fn().mockReturnValue(of(void 0)),
+      pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+    };
+    mockPlayerContext = createMockPlayerContext();
+
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceStore,
+        { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        {
+          provide: DEVICE_STORAGE_SERVICE,
+          useValue: {
+            index: vi.fn(),
+            getDirectory: vi.fn(),
+            indexAll: vi.fn(),
+            search: vi.fn(),
+            saveFavorite: vi.fn(),
+            removeFavorite: vi.fn(),
+            getFavorites: vi.fn(),
+          } as unknown as IStorageService,
+        },
+        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+      ],
+    });
+
+    store = TestBed.inject(DeviceStore);
+  });
+
+  describe('resetAllDevices', () => {
+    it('reflects every device into the player when all resets succeed', async () => {
+      const device1 = createMockDevice('device-1');
+      const device2 = createMockDevice('device-2');
+      mockDeviceService.findDevices = vi.fn().mockReturnValue(of([device1, device2]));
+      await store.findDevices();
+
+      await store.resetAllDevices();
+
+      expect(mockDeviceService.resetDevice).toHaveBeenCalledWith('device-1');
+      expect(mockDeviceService.resetDevice).toHaveBeenCalledWith('device-2');
+      expect(mockPlayerContext.reflectDeviceReset).toHaveBeenCalledWith('device-1');
+      expect(mockPlayerContext.reflectDeviceReset).toHaveBeenCalledWith('device-2');
+    });
+
+    it('reflects only the device whose reset succeeded, and still resolves, when the other fails', async () => {
+      const device1 = createMockDevice('device-1');
+      const device2 = createMockDevice('device-2');
+      mockDeviceService.findDevices = vi.fn().mockReturnValue(of([device1, device2]));
+      await store.findDevices();
+
+      mockDeviceService.resetDevice = vi.fn((deviceId: string) =>
+        deviceId === 'device-1'
+          ? throwError(() => new Error('Failed to reset device'))
+          : of(void 0)
+      );
+
+      await expect(store.resetAllDevices()).resolves.toBeUndefined();
+
+      expect(mockPlayerContext.reflectDeviceReset).not.toHaveBeenCalledWith('device-1');
+      expect(mockPlayerContext.reflectDeviceReset).toHaveBeenCalledWith('device-2');
+    });
+
+    it('skips offline devices', async () => {
+      const online = createMockDevice('device-1');
+      const offline = { ...createMockDevice('device-2'), deviceState: DeviceState.ConnectionLost };
+      mockDeviceService.findDevices = vi.fn().mockReturnValue(of([online, offline]));
+      await store.findDevices();
+
+      await store.resetAllDevices();
+
+      expect(mockDeviceService.resetDevice).toHaveBeenCalledWith('device-1');
+      expect(mockDeviceService.resetDevice).not.toHaveBeenCalledWith('device-2');
+    });
+  });
+
+  describe('pingAllDevices', () => {
+    it('resolves even when one device fails to ping', async () => {
+      const device1 = createMockDevice('device-1');
+      const device2 = createMockDevice('device-2');
+      mockDeviceService.findDevices = vi.fn().mockReturnValue(of([device1, device2]));
+      await store.findDevices();
+
+      mockDeviceService.pingDevice = vi.fn((deviceId: string) =>
+        deviceId === 'device-1' ? throwError(() => new Error('Failed to ping device')) : of(void 0)
+      );
+
+      await expect(store.pingAllDevices()).resolves.toBeUndefined();
+
+      expect(mockDeviceService.pingDevice).toHaveBeenCalledWith('device-1');
+      expect(mockDeviceService.pingDevice).toHaveBeenCalledWith('device-2');
+    });
+
+    it('skips offline devices', async () => {
+      const online = createMockDevice('device-1');
+      const offline = { ...createMockDevice('device-2'), deviceState: DeviceState.ConnectionLost };
+      mockDeviceService.findDevices = vi.fn().mockReturnValue(of([online, offline]));
+      await store.findDevices();
+
+      await store.pingAllDevices();
+
+      expect(mockDeviceService.pingDevice).toHaveBeenCalledWith('device-1');
+      expect(mockDeviceService.pingDevice).not.toHaveBeenCalledWith('device-2');
+    });
+  });
+});
+
+describe('DeviceStore - usableDevices and hasEnabledDevices', () => {
+  let store: InstanceType<typeof DeviceStore>;
+  let mockDeviceService: IDeviceService;
+
+  const createMockDevice = (deviceId: string, overrides: Partial<Device> = {}): Device => ({
+    deviceId,
+    comPort: 'COM3',
+    name: `Test Device ${deviceId}`,
+    fwVersion: '1.0.0',
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.Connected,
+    isEnabled: true,
+    ipAddress: undefined,
+    tcpPort: undefined,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    mockDeviceService = {
+      findDevices: vi.fn().mockReturnValue(of([])),
+      resetDevice: vi.fn().mockReturnValue(of(void 0)),
+      pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceStore,
+        { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        {
+          provide: DEVICE_STORAGE_SERVICE,
+          useValue: {
+            index: vi.fn(),
+            getDirectory: vi.fn(),
+            indexAll: vi.fn(),
+            search: vi.fn(),
+            saveFavorite: vi.fn(),
+            removeFavorite: vi.fn(),
+            getFavorites: vi.fn(),
+          } as unknown as IStorageService,
+        },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+      ],
+    });
+
+    store = TestBed.inject(DeviceStore);
+  });
+
+  it('excludes offline devices from usableDevices', async () => {
+    const online = createMockDevice('device-1');
+    const offline = createMockDevice('device-2', { deviceState: DeviceState.ConnectionLost });
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([online, offline]));
+    await store.findDevices();
+
+    expect(store.usableDevices().map((d) => d.deviceId)).toEqual(['device-1']);
+  });
+
+  it('excludes disabled devices from usableDevices', async () => {
+    const enabled = createMockDevice('device-1');
+    const disabled = createMockDevice('device-2', { isEnabled: false });
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([enabled, disabled]));
+    await store.findDevices();
+
+    expect(store.usableDevices().map((d) => d.deviceId)).toEqual(['device-1']);
+  });
+
+  it('reflects usableDevices in hasEnabledDevices', async () => {
+    const offline = createMockDevice('device-1', { deviceState: DeviceState.ConnectionLost });
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    expect(store.hasEnabledDevices()).toBe(false);
+  });
+});
+
+describe('DeviceStore - reconnectDevice', () => {
+  let store: InstanceType<typeof DeviceStore>;
+  let mockDeviceService: IDeviceService;
+
+  const createMockDevice = (deviceId: string, overrides: Partial<Device> = {}): Device => ({
+    deviceId,
+    comPort: 'COM3',
+    name: `Test Device ${deviceId}`,
+    fwVersion: '1.0.0',
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.ConnectionLost,
+    isEnabled: true,
+    ipAddress: undefined,
+    tcpPort: undefined,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    mockDeviceService = {
+      findDevices: vi.fn().mockReturnValue(of([])),
+      resetDevice: vi.fn().mockReturnValue(of(void 0)),
+      pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceStore,
+        { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        {
+          provide: DEVICE_STORAGE_SERVICE,
+          useValue: {
+            index: vi.fn(),
+            getDirectory: vi.fn(),
+            indexAll: vi.fn(),
+            search: vi.fn(),
+            saveFavorite: vi.fn(),
+            removeFavorite: vi.fn(),
+            getFavorites: vi.fn(),
+          } as unknown as IStorageService,
+        },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+      ],
+    });
+
+    store = TestBed.inject(DeviceStore);
+  });
+
+  it('tracks the id as reconnecting while in flight, and clears it once done', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    const reconnectSubject = new Subject<Device>();
+    mockDeviceService.reconnectDevice = vi.fn().mockReturnValue(reconnectSubject.asObservable());
+
+    const reconnectPromise = store.reconnectDevice('device-1');
+    expect(store.reconnectingDeviceIds()).toEqual(['device-1']);
+
+    reconnectSubject.next(createMockDevice('device-1', { deviceState: DeviceState.Connected }));
+    reconnectSubject.complete();
+    await reconnectPromise;
+
+    expect(store.reconnectingDeviceIds()).toEqual([]);
+  });
+
+  it('replaces the device with the reconnected one, keeping its current isEnabled, and merges the refreshed list', async () => {
+    const offline = createMockDevice('device-1', { isEnabled: false });
+    const other = createMockDevice('device-2', { deviceState: DeviceState.Connected });
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline, other]));
+    await store.findDevices();
+
+    const reconnected = createMockDevice('device-1', {
+      deviceState: DeviceState.Connected,
+      comPort: 'COM9',
+    });
+    mockDeviceService.reconnectDevice = vi.fn().mockReturnValue(of(reconnected));
+
+    const updatedOther = createMockDevice('device-2', {
+      deviceState: DeviceState.Connected,
+      fwVersion: '2.0.0',
+    });
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([reconnected, updatedOther]));
+
+    await store.reconnectDevice('device-1');
+
+    const devices = store.devices();
+    const reconnectedDevice = devices.find((d) => d.deviceId === 'device-1');
+    const otherDevice = devices.find((d) => d.deviceId === 'device-2');
+
+    expect(reconnectedDevice?.comPort).toBe('COM9');
+    expect(reconnectedDevice?.deviceState).toBe(DeviceState.Connected);
+    expect(reconnectedDevice?.isEnabled).toBe(false);
+    expect(otherDevice?.fwVersion).toBe('2.0.0');
+    expect(otherDevice?.isEnabled).toBe(true);
+  });
+
+  it('leaves the device as it was, and still clears the reconnecting id, when the reconnect call fails', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    mockDeviceService.reconnectDevice = vi.fn().mockReturnValue(throwError(() => new Error('Failed to reconnect device')));
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+
+    await store.reconnectDevice('device-1');
+
+    const device = store.devices().find((d) => d.deviceId === 'device-1');
+    expect(device?.deviceState).toBe(DeviceState.ConnectionLost);
+    expect(store.reconnectingDeviceIds()).toEqual([]);
+  });
+
+  it('clears the reconnecting id even when the refresh read fails', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    const reconnected = createMockDevice('device-1', { deviceState: DeviceState.Connected });
+    mockDeviceService.reconnectDevice = vi.fn().mockReturnValue(of(reconnected));
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(throwError(() => new Error('refresh failed')));
+
+    await store.reconnectDevice('device-1');
+
+    expect(store.reconnectingDeviceIds()).toEqual([]);
+  });
+});
+
+describe('DeviceStore - forgetDevice', () => {
+  let store: InstanceType<typeof DeviceStore>;
+  let mockDeviceService: IDeviceService;
+
+  const createMockDevice = (deviceId: string, overrides: Partial<Device> = {}): Device => ({
+    deviceId,
+    comPort: 'COM3',
+    name: `Test Device ${deviceId}`,
+    fwVersion: '1.0.0',
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.ConnectionLost,
+    isEnabled: true,
+    ipAddress: undefined,
+    tcpPort: undefined,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    mockDeviceService = {
+      findDevices: vi.fn().mockReturnValue(of([])),
+      resetDevice: vi.fn().mockReturnValue(of(void 0)),
+      pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceStore,
+        { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        {
+          provide: DEVICE_STORAGE_SERVICE,
+          useValue: {
+            index: vi.fn(),
+            getDirectory: vi.fn(),
+            indexAll: vi.fn(),
+            search: vi.fn(),
+            saveFavorite: vi.fn(),
+            removeFavorite: vi.fn(),
+            getFavorites: vi.fn(),
+          } as unknown as IStorageService,
+        },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+      ],
+    });
+
+    store = TestBed.inject(DeviceStore);
+  });
+
+  it('removes the device from devices on success', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    await store.forgetDevice('device-1');
+
+    expect(store.devices()).toEqual([]);
+  });
+
+  it('leaves the device in place on failure', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    mockDeviceService.forgetDevice = vi.fn().mockReturnValue(throwError(() => new Error('Failed to forget device')));
+
+    await store.forgetDevice('device-1');
+
+    expect(store.devices().map((d) => d.deviceId)).toEqual(['device-1']);
   });
 });

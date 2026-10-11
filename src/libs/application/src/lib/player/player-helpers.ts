@@ -38,6 +38,7 @@ export function createDefaultDeviceState(
       durationMs: DEFAULT_TIMER_MS,
     },
     isLoading: false,
+    isStopping: false,
     error: null,
     lastUpdated: null,
   };

@@ -77,3 +77,13 @@
     padding: 0 !important;
   }
 }
+
+// An offline card dims only its title and content, leaving the corner buttons (reconnect/forget)
+// at full brightness. The global `.dimmed` utility can't do this - opacity cascades to every
+// descendant, including the corner slot - so this targets the title/content elements directly.
+:host ::ng-deep mat-card.offline {
+  mat-card-title,
+  mat-card-content {
+    opacity: 0.5;
+  }
+}

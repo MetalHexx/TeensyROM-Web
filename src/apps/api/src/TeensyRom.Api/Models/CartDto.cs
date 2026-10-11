@@ -3,6 +3,7 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial;
 
 namespace TeensyRom.Api.Models
 {
@@ -120,6 +121,10 @@ namespace TeensyRom.Api.Models
             return new CartDto
             {
                 DeviceId = device.DeviceId ?? string.Empty,
+                // FromDevice only ever maps an available device (GetAvailableDevices filters out
+                // Unreachable), so this is true for every row it builds; an offline unit is still listed,
+                // but through FromOffline below instead of here.
+                IsConnected = device.Connection.Mode != DeviceMode.Unreachable,
                 ComPort = device.ComPort,
                 ConnectionType = device.ConnectionType,
                 IpAddress = device.IpAddress,
@@ -128,7 +133,8 @@ namespace TeensyRom.Api.Models
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,
                 HardwareVariant = device.Cart.HardwareVariant,
-                IsMinimalFirmware = device.Cart.IsMinimalFirmware,
+                IsMinimalFirmware = device.Connection.Mode == DeviceMode.Minimal,
+                DeviceState = device.Connection.Mode == DeviceMode.FullBusy ? DeviceState.Busy : DeviceState.Connected,
                 BuildTimestamp = device.Cart.BuildTimestamp,
                 CpuMhz = device.Cart.CpuMhz,
                 TemperatureC = device.Cart.TemperatureC,
@@ -137,6 +143,33 @@ namespace TeensyRom.Api.Models
                 TodClockHz = device.Cart.TodClockHz,
                 SdStorage = CartStorageDto.FromStorage(device.Cart.SdStorage, indexingStatus?.SdLastIndexed),
                 UsbStorage = CartStorageDto.FromStorage(device.Cart.UsbStorage, indexingStatus?.UsbLastIndexed)
+            };
+        }
+
+        /// <summary>
+        /// Creates a <see cref="CartDto"/> for a known unit that is not currently available.
+        /// </summary>
+        public static CartDto FromOffline(OfflineDevice device, IDeviceSettingsProvider settingsProvider)
+        {
+            var deviceSettings = settingsProvider.GetDeviceSettings(device.ChipId);
+            var indexingStatus = deviceSettings?.IndexingStatus;
+            var hasEndpoint = NetworkHelper.TryParseEndpoint(device.TcpEndpoint, out var host, out var port);
+
+            return new CartDto
+            {
+                DeviceId = device.ChipId,
+                IsConnected = false,
+                DeviceState = DeviceState.ConnectionLost,
+                ComPort = device.SerialPortName ?? string.Empty,
+                ConnectionType = device.LastTransport,
+                IpAddress = hasEndpoint ? host : string.Empty,
+                TcpPort = hasEndpoint ? port : 80,
+                FwVersion = device.FwVersion,
+                IsCompatible = device.IsCompatible,
+                HardwareVariant = device.HardwareVariant,
+                IsMinimalFirmware = false,
+                SdStorage = CartStorageDto.FromStorage(new CartStorage(TeensyStorageType.SD, false) { DeviceId = device.ChipId }, indexingStatus?.SdLastIndexed),
+                UsbStorage = CartStorageDto.FromStorage(new CartStorage(TeensyStorageType.USB, false) { DeviceId = device.ChipId }, indexingStatus?.UsbLastIndexed)
             };
         }
     }

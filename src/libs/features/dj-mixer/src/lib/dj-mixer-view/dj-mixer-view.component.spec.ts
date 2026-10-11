@@ -120,12 +120,14 @@ function createDeckServiceStub() {
 
 function render(devices: unknown[], storageStoreOverrides: Record<string, unknown> = {}) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const usableDevices = signal(devices.filter((d: any) => d.isEnabled));
 
   TestBed.configureTestingModule({
     imports: [DjMixerViewComponent],
     providers: [
       provideNoopAnimations(),
-      { provide: DeviceStore, useValue: { devices: signal(devices) } },
+      { provide: DeviceStore, useValue: { devices: signal(devices), usableDevices } },
       { provide: StorageStore, useValue: storageStore },
       { provide: DjStore, useValue: createDjStoreStub() },
       { provide: DeckService, useValue: createDeckServiceStub() },

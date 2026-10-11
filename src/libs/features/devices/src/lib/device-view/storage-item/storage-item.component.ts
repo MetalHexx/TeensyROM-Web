@@ -26,11 +26,20 @@ export class StorageStatusComponent {
   status = input<boolean | undefined>(undefined);
   /** Whether storage has been indexed */
   indexExists = input<boolean>(true);
-  
+  /** True when the device is offline and its storage state can't be known - defaults to false. */
+  unknown = input<boolean>(false);
+
   index = output<void>();
+
+  /** True when the tile should render as unavailable - no storage present, or (while offline)
+   *  its state can't be known. Drives both the dimmed tile styling and the disabled index action. */
+  readonly isUnavailable = computed(() => this.unknown() || !this.status());
 
   /** Subtitle text based on storage state */
   readonly subtitle = computed(() => {
+    if (this.unknown()) {
+      return 'Unknown';
+    }
     if (!this.status()) {
       return 'Unavailable';
     }
@@ -39,7 +48,7 @@ export class StorageStatusComponent {
 
   /** CSS class for subtitle color */
   readonly subtitleClass = computed(() => {
-    if (!this.status()) {
+    if (this.isUnavailable()) {
       return 'dimmed';
     }
     return this.indexExists() ? 'highlight' : 'error';

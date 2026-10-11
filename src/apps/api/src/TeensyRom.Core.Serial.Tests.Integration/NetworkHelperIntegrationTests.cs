@@ -10,16 +10,21 @@ namespace TeensyRom.Core.Serial.Tests.Integration;
 public class NetworkHelperIntegrationTests
 {
     [Fact]
-    public void GetLocalSubnetRange_ReturnsValidRange_WhenActiveNetworkExists()
+    public void GetLocalSubnetRanges_ReturnsValidRanges_WhenActiveNetworkExists()
     {
         // Act
-        var subnetRange = NetworkHelper.GetLocalSubnetRange();
+        var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
         // Assert
-        if (subnetRange.HasValue)
+        if (subnetRanges.Count == 0)
         {
-            var (start, end) = subnetRange.Value;
+            // If no network interface, that's also valid for test environments
+            // This can happen in CI/CD environments without network access
+            Assert.True(true, "No active network interface found - test environment may be isolated");
+        }
 
+        foreach (var (start, end) in subnetRanges)
+        {
             start.Should().NotBeNull("start IP should not be null");
             end.Should().NotBeNull("end IP should not be null");
             start.AddressFamily.Should().Be(AddressFamily.InterNetwork, "should be IPv4");
@@ -38,30 +43,22 @@ public class NetworkHelperIntegrationTests
                 startBytes[i].Should().Be(endBytes[i], $"octet {i} should match for /24 subnet");
             }
         }
-        else
-        {
-            // If no network interface, that's also valid for test environments
-            // This can happen in CI/CD environments without network access
-            Assert.True(true, "No active network interface found - test environment may be isolated");
-        }
     }
 
     [Fact]
-    public void GetLocalSubnetRange_ReturnsNull_WhenNoActiveInterface()
+    public void GetLocalSubnetRanges_ReturnsEmptyOrDistinctRanges()
     {
         // This test documents expected behavior
         // In most environments, there will be at least one active interface
-        // However, in isolated test environments, null is acceptable
+        // However, in isolated test environments, an empty list is acceptable
 
         // Act
-        var subnetRange = NetworkHelper.GetLocalSubnetRange();
+        var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
         // Assert
         // We can't force this condition without disrupting network interfaces
-        // So we just verify it doesn't throw and returns either valid range or null
-        subnetRange.Should().Match<(IPAddress Start, IPAddress End)?>(r =>
-            r == null || (r.Value.Start != null && r.Value.End != null)
-        );
+        // So we just verify it doesn't throw and never repeats a subnet
+        subnetRanges.Select(r => r.Start).Should().OnlyHaveUniqueItems();
     }
 
     [Fact]
@@ -244,25 +241,19 @@ public class NetworkHelperIntegrationTests
     }
 
     [Fact]
-    public void GetLocalSubnetRange_GenerateIpRange_WorkTogether()
+    public void GetLocalSubnetRanges_GenerateIpRange_WorkTogether()
     {
         // Arrange & Act
-        var subnetRange = NetworkHelper.GetLocalSubnetRange();
+        var subnetRanges = NetworkHelper.GetLocalSubnetRanges();
 
-        if (subnetRange.HasValue)
+        foreach (var (start, end) in subnetRanges)
         {
-            var (start, end) = subnetRange.Value;
             var ipRange = NetworkHelper.GenerateIpRange(start, end);
 
             // Assert
             ipRange.Should().NotBeEmpty("should generate IP range from subnet");
             ipRange[0].Should().Be(start, "first IP should be start of range");
             ipRange[^1].Should().Be(end, "last IP should be end of range");
-        }
-        else
-        {
-            // No active network interface
-            Assert.True(true, "No active network interface - integration test isolated");
         }
     }
 

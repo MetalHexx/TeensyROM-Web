@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Tests.Unit;
 
@@ -432,6 +435,95 @@ public class TcpCommunicationPortTests : IDisposable
         buffer.Should().Equal(sent);
     }
 
+    [Fact]
+    public async Task Read_ShouldReturnBufferedBytes_WithoutWaitingOnTheSocketForTheRest()
+    {
+        // Arrange
+        using var listener = new TcpListenerScope();
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+        using var accepted = await listener.Accepted;
+        using var port = new TcpCommunicationPort(_mockLogger, client);
+
+        var sent = Encoding.ASCII.GetBytes("Busy!\n");
+        await accepted.GetStream().WriteAsync(sent);
+        await accepted.GetStream().FlushAsync();
+        port.WaitForSerialData(sent.Length, 5000);
+
+        // Act - everything sent is already buffered and nothing more is coming. Waiting on the socket
+        // for the rest of the 4096 would run into the read timeout and throw the buffered bytes away.
+        var buffer = new byte[4096];
+        var bytesRead = port.Read(buffer, 0, buffer.Length);
+
+        // Assert
+        bytesRead.Should().Be(sent.Length);
+        buffer.Take(bytesRead).Should().Equal(sent);
+    }
+
+    [Fact]
+    public async Task ProbeStorageRoot_ShouldReportBusy_WhenFailTokenAndBusyTextArriveTogether()
+    {
+        // Arrange - a device running a program answers the list command with the Fail token and
+        // "Busy!\n" in one write, so both land in the receive buffer during the ack wait.
+        using var listener = new TcpListenerScope();
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+        using var accepted = await listener.Accepted;
+        using var port = new TcpCommunicationPort(_mockLogger, client);
+
+        var device = Task.Run(async () =>
+        {
+            var stream = accepted.GetStream();
+            await stream.ReadExactlyAsync(new byte[2]);
+            var reply = BitConverter.GetBytes(TeensyToken.Fail.Value).Concat(Encoding.ASCII.GetBytes("Busy!\n")).ToArray();
+            await stream.WriteAsync(reply);
+            await stream.FlushAsync();
+        });
+
+        // Act
+        var result = port.ProbeStorageRoot(TeensyStorageType.SD, _mockLogger);
+        await device;
+
+        // Assert
+        result.Should().Be(StoragePresence.Busy);
+    }
+
+    [Fact]
+    public async Task ClearBuffers_ShouldDiscardStaleBytes_WithoutWaitingForAFullBuffer()
+    {
+        // Arrange - a launch that returns at the firmware's ack leaves late text on the socket, such as
+        // "Resetting C64" when the launch interrupted a running program.
+        using var listener = new TcpListenerScope();
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+        using var accepted = await listener.Accepted;
+        using var port = new TcpCommunicationPort(_mockLogger, client);
+
+        var stale = Encoding.ASCII.GetBytes("Resetting C64\r\n");
+        await accepted.GetStream().WriteAsync(stale);
+        await accepted.GetStream().FlushAsync();
+        var arrival = Stopwatch.StartNew();
+        while (client.Available < stale.Length && arrival.ElapsedMilliseconds < 5000) await Task.Delay(5);
+
+        // Act
+        var clearing = Stopwatch.StartNew();
+        var clear = Task.Run(port.ClearBuffers);
+        var finished = await Task.WhenAny(clear, Task.Delay(2000)) == clear;
+        clearing.Stop();
+
+        var fresh = Encoding.ASCII.GetBytes("ok");
+        await accepted.GetStream().WriteAsync(fresh);
+        await accepted.GetStream().FlushAsync();
+        port.WaitForSerialData(fresh.Length, 5000);
+        var buffer = new byte[16];
+        var bytesRead = port.Read(buffer, 0, buffer.Length);
+
+        // Assert - the old ReadExactly(4096) waited out the read timeout for bytes that never came.
+        finished.Should().BeTrue();
+        clearing.ElapsedMilliseconds.Should().BeLessThan(250);
+        buffer.Take(bytesRead).Should().Equal(fresh, "the stale text was discarded, the next reply is intact");
+    }
+
     /// <summary>
     /// A loopback listener on an OS-assigned port, exposing the connection it accepts.
     /// </summary>
@@ -554,6 +646,22 @@ public class TcpCommunicationPortTests : IDisposable
 
         // Assert
         act.Should().Throw<SocketException>();
+    }
+
+    [Fact]
+    public void OpenPort_BoundedAgainstNonRoutableAddress_ThrowsWithinTheBoundInsteadOfTheOsSynRetry()
+    {
+        // Arrange - a non-routable address with no listener, so the OS would otherwise hold the
+        // connect attempt open for its own multi-second SYN retry.
+        _port.SetPort("10.255.255.1:2112");
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act
+        var act = () => _port.OpenPort(connectTimeoutMs: 200);
+
+        // Assert
+        act.Should().Throw<TimeoutException>();
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
     }
 
     #endregion

@@ -2,6 +2,8 @@ import { Injectable, Inject } from '@angular/core';
 import {
   DevicesApiService,
   FindDevicesResponse,
+  ReconnectDeviceResponse,
+  ResponseError,
 } from '@teensyrom-nx/data-access/api-client';
 import { Device, IDeviceService, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
@@ -41,6 +43,29 @@ export class DeviceService implements IDeviceService {
       map(() => void 0),
       catchError((error) => this.handleError(error, 'pingDevice', 'Failed to ping device'))
     );
+  }
+
+  reconnectDevice(deviceId: string): Observable<Device> {
+    return from(this.apiService.reconnectDevice({ deviceId })).pipe(
+      map((response: ReconnectDeviceResponse) => DomainMapper.toDevice(response.device)),
+      catchError((error) =>
+        this.handleError(error, 'reconnectDevice', this.reconnectErrorMessage(error))
+      )
+    );
+  }
+
+  forgetDevice(deviceId: string): Observable<void> {
+    return from(this.apiService.forgetDevice({ deviceId })).pipe(
+      map(() => void 0),
+      catchError((error) => this.handleError(error, 'forgetDevice', 'Failed to forget device'))
+    );
+  }
+
+  private reconnectErrorMessage(error: unknown): string {
+    if (error instanceof ResponseError && error.response.status === 502) {
+      return 'Device could not be found. Check it is powered on and connected.';
+    }
+    return 'Failed to reconnect device';
   }
 
   private handleError(

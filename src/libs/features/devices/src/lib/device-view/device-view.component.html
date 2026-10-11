@@ -9,9 +9,12 @@
 
       <lib-device-item
         [device]="device"
+        [reconnecting]="isReconnecting(device.deviceId)"
         [attr.data-testid]="'device-item-' + device.deviceId"
         (enable)="onEnable($event)"
         (disable)="onDisable($event)"
+        (reconnect)="onReconnect($event)"
+        (forget)="onForget($event)"
       >
       </lib-device-item>
 

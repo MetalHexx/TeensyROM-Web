@@ -313,14 +313,14 @@ describe('DeviceItemComponent', () => {
     it('should render device name', () => {
       fixture.componentRef.setInput('device', mockDevice);
       fixture.detectChanges();
-      
+
       expect(fixture.nativeElement.textContent).toContain('Test Device');
     });
 
     it('should render both storage status components', () => {
       fixture.componentRef.setInput('device', mockDevice);
       fixture.detectChanges();
-      
+
       const storages = fixture.debugElement.queryAll(By.directive(StorageStatusComponent));
       expect(storages.length).toBe(2);
     });
@@ -328,10 +328,112 @@ describe('DeviceItemComponent', () => {
     it('should render USB storage first, SD storage second', () => {
       fixture.componentRef.setInput('device', mockDevice);
       fixture.detectChanges();
-      
+
       const storages = fixture.debugElement.queryAll(By.directive(StorageStatusComponent));
       expect(storages[0].componentInstance.icon()).toBe('usb');
       expect(storages[1].componentInstance.icon()).toBe('sd_card');
+    });
+  });
+
+  describe('Offline Functionality', () => {
+    const offlineDevice: Device = {
+      ...mockDevice,
+      deviceState: DeviceState.ConnectionLost,
+    };
+
+    it('renders the offline label and forget button when offline', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="device-offline-label"]')
+      ).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="device-forget-button"]')
+      ).toBeTruthy();
+    });
+
+    it('renders neither the offline label nor the forget button when online', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="device-offline-label"]')
+      ).toBeFalsy();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="device-forget-button"]')
+      ).toBeFalsy();
+    });
+
+    it('passes unknown to both storage tiles when offline', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.detectChanges();
+
+      const storages = fixture.debugElement.queryAll(By.directive(StorageStatusComponent));
+      expect(storages[0].componentInstance.unknown()).toBe(true);
+      expect(storages[1].componentInstance.unknown()).toBe(true);
+    });
+
+    it('shows "Reconnecting…" instead of "Offline" while reconnecting', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.componentRef.setInput('reconnecting', true);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Reconnecting…');
+      expect(fixture.nativeElement.textContent).not.toContain('Offline');
+    });
+
+    it('emits reconnect with the device id when the power button is clicked while offline', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.detectChanges();
+
+      let reconnectedId = '';
+      component.reconnect.subscribe((deviceId) => {
+        reconnectedId = deviceId;
+      });
+
+      component.onPowerClick();
+
+      expect(reconnectedId).toBe('test-device-1');
+    });
+
+    it('toggles enable/disable instead of reconnecting when the power button is clicked online', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      let disabledId = '';
+      component.disable.subscribe((deviceId) => {
+        disabledId = deviceId;
+      });
+
+      component.onPowerClick();
+
+      expect(disabledId).toBe('test-device-1');
+    });
+
+    it('emits forget with the device id when the forget button is clicked', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.detectChanges();
+
+      let forgottenId = '';
+      component.forget.subscribe((deviceId) => {
+        forgottenId = deviceId;
+      });
+
+      component.onForget();
+
+      expect(forgottenId).toBe('test-device-1');
+    });
+
+    it('disables the power button while reconnecting', () => {
+      fixture.componentRef.setInput('device', offlineDevice);
+      fixture.componentRef.setInput('reconnecting', true);
+      fixture.detectChanges();
+
+      const powerButton = fixture.nativeElement.querySelector(
+        '[data-testid="device-power-button"] button'
+      );
+      expect(powerButton.disabled).toBe(true);
     });
   });
 });

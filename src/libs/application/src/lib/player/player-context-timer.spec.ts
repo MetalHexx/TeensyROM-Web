@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { FileItemType, LaunchMode } from '@teensyrom-nx/domain';
+import { FileItemType, LaunchMode, PlayerStatus } from '@teensyrom-nx/domain';
 import { createPlayerHarness, type PlayerHarness } from './testing/player-context-harness';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import type { WritableStore } from './player-helpers';
@@ -607,6 +607,46 @@ describe('PlayerContextService - play timer', () => {
       });
       expect(harness.service.getTimerState(deviceId)()?.totalTime).toBe(5000);
     });
+
+    it('keeps advancing on completion when Stop fails, for a custom-timer game', async () => {
+      const fastCompletionHarness = createPlayerHarness({ timerTickMs: 1100 });
+      fastCompletionHarness.service.initializePlayer(deviceId);
+      fastCompletionHarness.service.setCustomTimer(deviceId, true, 1000);
+
+      const game1 = createTestFileItem({
+        type: FileItemType.Game,
+        path: '/games/game1.prg',
+        name: 'game1.prg',
+      });
+      const game2 = createTestFileItem({
+        type: FileItemType.Game,
+        path: '/games/game2.prg',
+        name: 'game2.prg',
+      });
+
+      await fastCompletionHarness.service.launchFileWithContext({
+        deviceId,
+        file: game1,
+        directoryPath: '/games',
+        files: [game1, game2],
+      });
+
+      fastCompletionHarness.deviceService.resetDevice = vi.fn(() =>
+        throwError(() => new Error('Device reset failed'))
+      );
+
+      await fastCompletionHarness.service.stop(deviceId);
+      expect(fastCompletionHarness.service.getPlayerStatus(deviceId)()).toBe(PlayerStatus.Playing);
+
+      await waitUntil(
+        () => fastCompletionHarness.service.getCurrentFile(deviceId)()?.file.name === 'game2.prg'
+      );
+
+      expect(fastCompletionHarness.playerService.launchFile).toHaveBeenCalledTimes(2);
+      // The new file's own timer is still running on this same fast tick; tear it down so it
+      // doesn't complete again later and reach into this test's already-destroyed injector.
+      fastCompletionHarness.service.removePlayer(deviceId);
+    }, 10000);
   });
 
   describe('isSlowLoading', () => {

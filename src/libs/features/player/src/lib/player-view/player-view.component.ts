@@ -13,7 +13,5 @@ import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 export class PlayerViewComponent {
   readonly deviceStore = inject(DeviceStore);
 
-  readonly enabledDevices = computed(() =>
-    this.deviceStore.devices().filter((device) => device.isEnabled)
-  );
+  readonly enabledDevices = computed(() => this.deviceStore.usableDevices());
 }

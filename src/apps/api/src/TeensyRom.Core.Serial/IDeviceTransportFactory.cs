@@ -17,8 +17,13 @@ namespace TeensyRom.Core.Serial
         /// Creates a serial transport state context for the specified COM port.
         /// </summary>
         /// <param name="portName">The COM port name (e.g., "COM3").</param>
+        /// <param name="isTeensyRomPort">
+        /// True only when USB vendor/product already proved this port a TeensyROM - asserts DTR eagerly
+        /// for the firmware's boot-time <c>Serial.begin()</c> wait. False (default) for any port that
+        /// might belong to a foreign device, so DTR is never asserted against it.
+        /// </param>
         /// <returns>A configured ISerialStateContext for serial communication.</returns>
-        ICommunicationPort CreateSerial(string portName);
+        ICommunicationPort CreateSerial(string portName, bool isTeensyRomPort = false);
 
         /// <summary>
         /// Creates a TCP transport state context for the specified endpoint.
