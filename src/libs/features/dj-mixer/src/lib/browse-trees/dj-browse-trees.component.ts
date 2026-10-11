@@ -60,7 +60,7 @@ function toBrowseTreeModel(device: Device): BrowseTreeModel {
       storageType: StorageType.Sd,
       label: 'SD Storage',
       icon: 'sd_storage',
-      accessibleName: `SD Storage, Device ${device.deviceId}`,
+      accessibleName: `SD Storage, ${device.name}`,
     });
   }
   if (device.usbStorage?.available) {
@@ -68,17 +68,15 @@ function toBrowseTreeModel(device: Device): BrowseTreeModel {
       storageType: StorageType.Usb,
       label: 'USB Storage',
       icon: 'usb',
-      accessibleName: `USB Storage, Device ${device.deviceId}`,
+      accessibleName: `USB Storage, ${device.name}`,
     });
   }
 
   return {
     deviceId: device.deviceId,
-    // The real devices' reported `name` is currently always "Unnamed" — `deviceId` (e.g.
-    // `YRTCPIRY`) is the only value that actually distinguishes them in the tree.
-    label: device.deviceId,
+    label: device.name,
     icon: 'desktop_windows',
-    accessibleName: `Device ${device.deviceId}`,
+    accessibleName: `Device ${device.name}`,
     storages,
   };
 }

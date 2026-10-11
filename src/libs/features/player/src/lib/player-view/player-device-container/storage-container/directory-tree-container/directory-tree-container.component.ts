@@ -8,7 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { StorageStore } from '@teensyrom-nx/application';
+import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import {
   DirectoryListing,
   DirectoryTreeNode,
@@ -37,8 +37,15 @@ export class DirectoryTreeContainerComponent {
   directoryNavigated = output<void>();
 
   private readonly storageStore = inject(StorageStore);
+  private readonly deviceStore = inject(DeviceStore);
 
   private readonly cache = signal<DirectoryListingCache>(new Map());
+
+  private readonly deviceName = computed(
+    () =>
+      this.deviceStore.devices().find((d) => d.deviceId === this.deviceId())?.name ??
+      this.deviceId()
+  );
 
   // Use effect to sync store data to cache (cannot write to signals in computed)
   private readonly cacheSync = effect(() => {
@@ -66,6 +73,7 @@ export class DirectoryTreeContainerComponent {
 
     return buildDirectoryTree({
       deviceId: this.deviceId(),
+      deviceName: this.deviceName(),
       storageTypes,
       cache: this.cache(),
     });

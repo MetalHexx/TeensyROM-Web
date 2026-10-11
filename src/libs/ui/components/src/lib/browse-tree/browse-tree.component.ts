@@ -92,7 +92,7 @@ export interface BrowseTreeStorageModel {
  */
 export interface BrowseTreeModel {
   readonly deviceId: string;
-  readonly label: string; // the text rendered on the device row, e.g. the device id
+  readonly label: string; // the text rendered on the device row, e.g. the device name
   readonly icon: string; // 'desktop_windows'
   readonly accessibleName: string; // 'Device SGVISJTN'
   readonly storages: readonly BrowseTreeStorageModel[];
