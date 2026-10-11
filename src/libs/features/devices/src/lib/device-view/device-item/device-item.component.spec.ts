@@ -475,7 +475,7 @@ describe('DeviceItemComponent', () => {
       expect(fact('device-hardware-label')).toBeNull();
     });
 
-    it('shows only firmware and hardware among the facts while offline', () => {
+    it('shows only the cartridge facts among the facts while offline', () => {
       fixture.componentRef.setInput('device', {
         ...mockDevice,
         deviceState: DeviceState.ConnectionLost,
@@ -485,9 +485,85 @@ describe('DeviceItemComponent', () => {
 
       expect(fact('device-firmware-label')).toBeTruthy();
       expect(fact('device-hardware-label')).toBeTruthy();
+      expect(fact('device-compatible-label')).toBeTruthy();
       expect(fact('device-machine-label')).toBeNull();
       expect(fact('device-video-label')).toBeNull();
       expect(fact('device-clock-label')).toBeNull();
+    });
+  });
+
+  describe('Card layout', () => {
+    const fact = (testId: string): HTMLElement =>
+      fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+    const column = (testId: string): HTMLElement => fact(testId).parentElement as HTMLElement;
+    const testIds = (container: HTMLElement): (string | null)[] =>
+      Array.from(container.children).map((child) => child.getAttribute('data-testid'));
+
+    it('lists the cartridge facts in the left column, with FW Compatible directly under Firmware', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      expect(testIds(column('device-id-label'))).toEqual([
+        'device-id-label',
+        'device-hardware-label',
+        'device-firmware-label',
+        'device-compatible-label',
+      ]);
+      expect(fact('device-compatible-label').textContent).toContain('FW Compatible: Yes');
+    });
+
+    it('lists the host and link in the right column', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        todClockHz: 60,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-machine-label'))).toEqual([
+        'device-machine-label',
+        'device-video-label',
+        'device-clock-label',
+        'device-address-label',
+      ]);
+    });
+
+    it('shows a USB-connected device by its port at the end of the right column', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        todClockHz: 60,
+        ipAddress: undefined,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-port-label'))).toEqual([
+        'device-machine-label',
+        'device-video-label',
+        'device-clock-label',
+        'device-port-label',
+      ]);
+      expect(fact('device-port-label').textContent).toContain('Port: COM3');
+    });
+
+    it('leaves only the Offline row in the right column while offline', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        deviceState: DeviceState.ConnectionLost,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-offline-label'))).toEqual(['device-offline-label']);
+      expect(column('device-offline-label')).not.toBe(column('device-id-label'));
+    });
+
+    it('keeps the storage tiles in their own container outside the facts', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      const storage = fixture.nativeElement.querySelector('[data-testid="device-storage"]');
+      const info = fixture.nativeElement.querySelector('[data-testid="device-info"]');
+
+      expect(testIds(storage)).toEqual(['usb-storage-status', 'sd-storage-status']);
+      expect(info.contains(storage)).toBe(false);
     });
   });
 

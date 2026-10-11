@@ -1,7 +1,36 @@
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 import { InlineEditTitleComponent } from './inline-edit-title.component';
+
+/** A parent that wires `saving` and `value` the way a real consumer does, from its `commit` handler. */
+@Component({
+  imports: [InlineEditTitleComponent],
+  template: `<lib-inline-edit-title
+    [value]="name()"
+    [saving]="saving()"
+    (commit)="onCommit($event)"
+  />`,
+})
+class SavingHostComponent {
+  readonly name = signal('TR-1');
+  readonly saving = signal(false);
+  committed: string | null = null;
+
+  onCommit(next: string): void {
+    this.committed = next;
+    this.saving.set(true);
+  }
+
+  /** Ends the save: the new name lands when it succeeded, the old one stays when it failed. */
+  settle(succeeded: boolean): void {
+    if (succeeded && this.committed !== null) {
+      this.name.set(this.committed);
+    }
+    this.saving.set(false);
+  }
+}
 
 describe('InlineEditTitleComponent', () => {
   let fixture: ComponentFixture<InlineEditTitleComponent>;
@@ -118,13 +147,14 @@ describe('InlineEditTitleComponent', () => {
       expect(commitSpy).toHaveBeenCalledExactlyOnceWith('Studio');
     });
 
-    it('closes onto the saved name and returns focus to the button when the save lands', () => {
+    it('closes onto the saved name as the plain title when the save lands', () => {
       commitStudio();
       settle('Studio');
 
       expect(field()).toBeNull();
       expect(titleButton().textContent).toContain('Studio');
-      expect(document.activeElement).toBe(titleButton());
+      expect(titleButton().classList).not.toContain('is-editing');
+      expect(document.activeElement).not.toBe(titleButton());
     });
 
     it('closes back onto the old name when the save fails', () => {
@@ -154,24 +184,82 @@ describe('InlineEditTitleComponent', () => {
     });
   });
 
+  describe('saving handed off by a real parent', () => {
+    let hostFixture: ComponentFixture<SavingHostComponent>;
+    let host: SavingHostComponent;
+
+    const hostField = (): HTMLInputElement | null =>
+      hostFixture.nativeElement.querySelector('input');
+    const hostButton = (): HTMLButtonElement =>
+      hostFixture.nativeElement.querySelector('button.title');
+
+    const commitStudio = (): HTMLInputElement => {
+      hostButton().click();
+      hostFixture.detectChanges();
+      const input = hostField() as HTMLInputElement;
+      input.value = 'Studio';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      hostFixture.detectChanges();
+      return input;
+    };
+
+    beforeEach(() => {
+      hostFixture = TestBed.createComponent(SavingHostComponent);
+      host = hostFixture.componentInstance;
+      hostFixture.detectChanges();
+    });
+
+    it('holds the field open and disabled on the typed name while the parent is saving', () => {
+      const input = commitStudio();
+
+      expect(host.committed).toBe('Studio');
+      expect(hostField()).toBe(input);
+      expect(input.disabled).toBe(true);
+      expect(input.value).toBe('Studio');
+    });
+
+    it('returns to the plain title showing the new name when the parent finishes saving', () => {
+      commitStudio();
+      host.settle(true);
+      hostFixture.detectChanges();
+
+      expect(hostField()).toBeNull();
+      expect(hostButton().textContent).toContain('Studio');
+      expect(document.activeElement).not.toBe(hostButton());
+    });
+
+    it('returns to the plain title showing the old name when the parent save fails', () => {
+      commitStudio();
+      host.settle(false);
+      hostFixture.detectChanges();
+
+      expect(hostField()).toBeNull();
+      expect(hostButton().textContent).toContain('TR-1');
+      expect(document.activeElement).not.toBe(hostButton());
+    });
+  });
+
   describe('Enter', () => {
-    it('commits the trimmed draft when it is valid and changed, then returns to the button', () => {
+    it('commits the trimmed draft when it is valid and changed, then returns to the plain title', () => {
       const input = startEditing();
       type(input, '  Studio  ');
       press(input, 'Enter');
 
       expect(commitSpy).toHaveBeenCalledExactlyOnceWith('Studio');
       expect(field()).toBeNull();
-      expect(document.activeElement).toBe(titleButton());
+      expect(titleButton().classList).not.toContain('is-editing');
+      expect(document.activeElement).not.toBe(titleButton());
     });
 
-    it('exits without committing when the trimmed draft equals the value', () => {
+    it('exits to the plain title without committing when the trimmed draft equals the value', () => {
       const input = startEditing();
       type(input, ' TR-1 ');
       press(input, 'Enter');
 
       expect(commitSpy).not.toHaveBeenCalled();
       expect(field()).toBeNull();
+      expect(document.activeElement).not.toBe(titleButton());
     });
 
     it('keeps the field open and flags it when the draft is invalid', () => {
@@ -212,7 +300,7 @@ describe('InlineEditTitleComponent', () => {
   });
 
   describe('Escape', () => {
-    it('reverts, emits nothing and returns focus to the button', () => {
+    it('reverts to the plain title and emits nothing', () => {
       const input = startEditing();
       type(input, 'Studio');
       press(input, 'Escape');
@@ -220,7 +308,7 @@ describe('InlineEditTitleComponent', () => {
       expect(commitSpy).not.toHaveBeenCalled();
       expect(field()).toBeNull();
       expect(titleButton().textContent).toContain('TR-1');
-      expect(document.activeElement).toBe(titleButton());
+      expect(document.activeElement).not.toBe(titleButton());
     });
 
     it('starts the next edit from the committed value, not the abandoned draft', () => {

@@ -170,6 +170,9 @@ describe('DevicesComponent', () => {
       fixture.detectChanges();
 
       expect(input.isConnected).toBe(false);
+      const title = root.querySelector<HTMLButtonElement>('[data-testid="device-name"] button');
+      expect(title?.classList).not.toContain('is-editing');
+      expect(document.activeElement).not.toBe(title);
     });
 
     it('clears the renaming mark when the store reports the rename failed', async () => {

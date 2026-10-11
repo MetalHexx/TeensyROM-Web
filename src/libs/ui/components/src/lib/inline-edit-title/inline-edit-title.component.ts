@@ -18,9 +18,9 @@ let nextInstanceId = 0;
 
 /**
  * A title that renames itself in place. In its resting state it is a button showing `value`, with a
- * pencil icon revealed on hover and keyboard focus. Clicking it (or pressing Enter) swaps in a text
- * field over the same line box, so surrounding content never moves between the resting, editing,
- * invalid and saving states.
+ * pencil icon revealed only while the pointer hovers it. Clicking it (or pressing Enter) swaps in a
+ * text field over the same line box, so surrounding content never moves between the resting,
+ * editing, invalid and saving states.
  *
  * It inherits font, line height, letter spacing and colour from its container, so drop it inside
  * whatever already styles the title (for example a `mat-card-title`). The component is
@@ -33,8 +33,10 @@ let nextInstanceId = 0;
  * open, disabled and showing the typed text for as long as the consumer holds `saving` true; once
  * `saving` is false again the title button returns, showing `value` — the new name when the save
  * landed, the old one when it failed. A consumer that never raises `saving` in response to
- * `commit` gets the button back on the next change detection. Reach for this over
- * `InputFieldComponent` when the text being edited is a heading rather than a form field.
+ * `commit` gets the button back on the next change detection. However the edit ends, the plain
+ * title comes back without keyboard focus: nothing is left ringed or revealed, so it reads as at
+ * rest. Reach for this over `InputFieldComponent` when the text being edited is a heading rather
+ * than a form field.
  *
  * @example
  * ```html
@@ -101,9 +103,7 @@ export class InlineEditTitleComponent {
   protected readonly counter = computed(() => `${this.draft().length}/${this.maxLength()}`);
 
   private readonly injector = inject(Injector);
-  private readonly titleButton = viewChild<ElementRef<HTMLButtonElement>>('titleButton');
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
-  private restoreFocusOnClose = false;
 
   constructor() {
     // Runs after the consumer's bindings for the current change detection pass are applied, so
@@ -148,26 +148,25 @@ export class InlineEditTitleComponent {
       this.showInvalid.set(true);
       return;
     }
-    this.finish(true, true);
+    this.finish(true);
   }
 
-  /** Abandons the draft and returns focus to the title button. */
+  /** Abandons the draft and returns to the resting title. */
   protected onEscape(): void {
-    this.finish(false, true);
+    this.finish(false);
   }
 
-  /** Leaving the field commits a valid changed draft and otherwise reverts, without taking focus back. */
+  /** Leaving the field commits a valid changed draft and otherwise reverts. */
   protected onBlur(): void {
     if (!this.editing() || this.pending()) {
       return;
     }
-    this.finish(this.isValid()(this.draft()), false);
+    this.finish(this.isValid()(this.draft()));
   }
 
   /** Ends the edit — or, for a changed draft, hands it to the consumer and holds the field open until it is saved. */
-  private finish(commit: boolean, restoreFocus: boolean): void {
+  private finish(commit: boolean): void {
     const trimmed = this.draft().trim();
-    this.restoreFocusOnClose = restoreFocus;
     if (commit && trimmed !== this.value()) {
       this.draft.set(trimmed);
       this.showInvalid.set(false);
@@ -182,12 +181,5 @@ export class InlineEditTitleComponent {
     this.pending.set(false);
     this.editing.set(false);
     this.showInvalid.set(false);
-    if (this.restoreFocusOnClose) {
-      this.focusTitleButton();
-    }
-  }
-
-  private focusTitleButton(): void {
-    afterNextRender(() => this.titleButton()?.nativeElement.focus(), { injector: this.injector });
   }
 }

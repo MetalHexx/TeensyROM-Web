@@ -50,72 +50,78 @@
   <!-- Main content -->
   <div class="device-content">
     <div class="device-info" data-testid="device-info">
-      <lib-icon-label
-        icon="tag"
-        data-testid="device-id-label"
-        [label]="'Device ID: ' + (device()?.deviceId ?? '')"
-      ></lib-icon-label>
-      <lib-icon-label
-        icon="developer_board"
-        data-testid="device-firmware-label"
-        [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
-      ></lib-icon-label>
-      @if (machineLabel(); as machine) {
+      <!-- The cartridge: each unit's own identity and firmware -->
+      <div class="device-facts">
         <lib-icon-label
-          icon="keyboard"
-          data-testid="device-machine-label"
-          [label]="'Machine: ' + machine"
+          icon="tag"
+          data-testid="device-id-label"
+          [label]="'Device ID: ' + (device()?.deviceId ?? '')"
         ></lib-icon-label>
-      }
-      @if (videoLabel(); as video) {
+        @if (hardwareLabel(); as hardware) {
+          <lib-icon-label
+            icon="memory"
+            data-testid="device-hardware-label"
+            [label]="'Hardware: ' + hardware"
+          ></lib-icon-label>
+        }
         <lib-icon-label
-          icon="tv"
-          data-testid="device-video-label"
-          [label]="'Video: ' + video"
+          icon="developer_board"
+          data-testid="device-firmware-label"
+          [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
         ></lib-icon-label>
-      }
-      @if (clockLabel(); as clock) {
         <lib-icon-label
-          icon="av_timer"
-          data-testid="device-clock-label"
-          [label]="'Clock: ' + clock"
+          icon="verified_user"
+          data-testid="device-compatible-label"
+          [label]="'FW Compatible: ' + (device()?.isCompatible ? 'Yes' : 'No')"
         ></lib-icon-label>
-      }
-      @if (hardwareLabel(); as hardware) {
-        <lib-icon-label
-          icon="memory"
-          data-testid="device-hardware-label"
-          [label]="'Hardware: ' + hardware"
-        ></lib-icon-label>
-      }
+      </div>
 
-      <!-- Show connection info: offline takes priority, then prefer TCP details when available -->
-      @if (isOffline()) {
-        <lib-icon-label
-          icon="cloud_off"
-          data-testid="device-offline-label"
-          [label]="offlineLabel()"
-          color="error"
-        ></lib-icon-label>
-      } @else if (device()?.ipAddress) {
-        <lib-icon-label
-          icon="wifi"
-          data-testid="device-address-label"
-          [label]="(device()?.ipAddress ?? '') + (device()?.tcpPort ? ':' + device()?.tcpPort : '')"
-        ></lib-icon-label>
-      } @else {
-        <lib-icon-label
-          icon="usb"
-          data-testid="device-port-label"
-          [label]="'Port: ' + (device()?.comPort ?? '')"
-        ></lib-icon-label>
-      }
+      <!-- The host and the link to it -->
+      <div class="device-facts">
+        @if (machineLabel(); as machine) {
+          <lib-icon-label
+            icon="keyboard"
+            data-testid="device-machine-label"
+            [label]="'Machine: ' + machine"
+          ></lib-icon-label>
+        }
+        @if (videoLabel(); as video) {
+          <lib-icon-label
+            icon="tv"
+            data-testid="device-video-label"
+            [label]="'Video: ' + video"
+          ></lib-icon-label>
+        }
+        @if (clockLabel(); as clock) {
+          <lib-icon-label
+            icon="av_timer"
+            data-testid="device-clock-label"
+            [label]="'Clock: ' + clock"
+          ></lib-icon-label>
+        }
 
-      <lib-icon-label
-        icon="verified_user"
-        data-testid="device-compatible-label"
-        [label]="'Compatible: ' + (device()?.isCompatible ? 'Yes' : 'No')"
-      ></lib-icon-label>
+        <!-- Show connection info: offline takes priority, then prefer TCP details when available -->
+        @if (isOffline()) {
+          <lib-icon-label
+            icon="cloud_off"
+            data-testid="device-offline-label"
+            [label]="offlineLabel()"
+            color="error"
+          ></lib-icon-label>
+        } @else if (device()?.ipAddress) {
+          <lib-icon-label
+            icon="wifi"
+            data-testid="device-address-label"
+            [label]="(device()?.ipAddress ?? '') + (device()?.tcpPort ? ':' + device()?.tcpPort : '')"
+          ></lib-icon-label>
+        } @else {
+          <lib-icon-label
+            icon="usb"
+            data-testid="device-port-label"
+            [label]="'Port: ' + (device()?.comPort ?? '')"
+          ></lib-icon-label>
+        }
+      </div>
     </div>
     <div class="device-storage" data-testid="device-storage">
       <lib-storage-status

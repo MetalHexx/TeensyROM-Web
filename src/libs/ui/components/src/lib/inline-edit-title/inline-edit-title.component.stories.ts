@@ -30,7 +30,7 @@ const meta: Meta<InlineEditTitleComponent> = {
     docs: {
       description: {
         component:
-          "A title that renames itself in place. At rest it is a button showing `value` with a pencil revealed on hover and keyboard focus; clicking it or pressing Enter swaps in a text field laid over the same line box, so nothing around it moves between the resting, editing, invalid and saving states. It inherits font, line height, letter spacing and colour from its container — place it inside whatever already styles the title, such as a `mat-card-title` projected into a card's `header` slot. The component knows nothing about the rules behind the name: the consumer passes `isValid` and `maxLength`, listens for `commit`, persists the new text, and feeds it back through `value`. Enter commits (an invalid draft keeps the field open and turns the outline and counter red), Escape cancels, and leaving the field commits a valid changed draft and otherwise reverts. After a commit the field stays open, disabled and showing the typed text until `saving` returns to false; the button then shows `value` — the new name on success, the old one on failure. Reach for `InputFieldComponent` instead when the text is a form field rather than a heading.",
+          "A title that renames itself in place. At rest it is a button showing `value` with a pencil revealed only while the pointer hovers it; clicking it or pressing Enter swaps in a text field laid over the same line box, so nothing around it moves between the resting, editing, invalid and saving states. It inherits font, line height, letter spacing and colour from its container — place it inside whatever already styles the title, such as a `mat-card-title` projected into a card's `header` slot. The component knows nothing about the rules behind the name: the consumer passes `isValid` and `maxLength`, listens for `commit`, persists the new text, and feeds it back through `value`. Enter commits (an invalid draft keeps the field open and turns the outline and counter red), Escape cancels, and leaving the field commits a valid changed draft and otherwise reverts. After a commit the field stays open, disabled and showing the typed text until `saving` returns to false; the button then shows `value` — the new name on success, the old one on failure. Reach for `InputFieldComponent` instead when the text is a form field rather than a heading.",
       },
     },
   },
@@ -82,7 +82,7 @@ const meta: Meta<InlineEditTitleComponent> = {
 export default meta;
 type Story = StoryObj<InlineEditTitleComponent>;
 
-/** Resting state: the value as a button; hover or focus it to reveal the pencil. */
+/** Resting state: the value as a button; hover it to reveal the pencil. */
 export const View: Story = {};
 
 /** Edit mode with the current text selected and the `n/max` counter at the field's right end. */
