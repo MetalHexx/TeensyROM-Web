@@ -447,7 +447,7 @@ describe('DeviceItemComponent', () => {
 
       expect(fact('device-machine-label')?.textContent).toContain('Machine: C128');
       expect(fact('device-video-label')?.textContent).toContain('Video: PAL');
-      expect(fact('device-clock-label')?.textContent).toContain('Clock: 50 Hz');
+      expect(fact('device-clock-label')?.textContent).toContain('TOD Clock: 50 Hz');
       expect(fact('device-hardware-label')?.textContent).toContain('Hardware: TeensyROM+');
     });
 
