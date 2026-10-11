@@ -1,9 +1,11 @@
 import { Injectable, effect, inject } from '@angular/core';
-import { logError } from '@teensyrom-nx/utils';
+import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { DeckSpeed } from './deck-speed';
+import { MixerApplier } from './mixer-applier';
 import { TuneLoader } from './tune-loader';
-import { DjStore, type DeckStatus } from './dj-store';
+import { DjStore, type DeckDetectedKey, type DeckStatus, type DeckVoiceState } from './dj-store';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
 
@@ -14,7 +16,27 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+type Transport = ReturnType<DeckRuntime['snapshot']>['transport'];
+
 const RESUMABLE_STATUSES: readonly DeckStatus[] = ['playing', 'paused', 'stopped'];
+
+/** The SID's three voices, in engine order. */
+const VOICES: readonly number[] = [0, 1, 2];
+
+/** The detected key an index record carries, or `null` unless tonic, mode and camelot are all
+ *  known. */
+function detectedKeyOf(index: {
+  readonly tonic: number | null;
+  readonly mode: 'major' | 'minor' | null;
+  readonly camelot: string | null;
+}): DeckDetectedKey | null {
+  const { tonic, mode, camelot } = index;
+  return tonic !== null && mode !== null && camelot !== null ? { tonic, mode, camelot } : null;
+}
+
+function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]): boolean {
+  return a.length === b.length && a.every((voice, i) => voice.muted === b[i].muted && voice.held === b[i].held);
+}
 
 /**
  * The root of the DJ transport: two decks, each a `DeckRuntime` slot fronted by a `TuneLoader`
@@ -23,6 +45,10 @@ const RESUMABLE_STATUSES: readonly DeckStatus[] = ['playing', 'paused', 'stopped
  * newer one: the loader's own generation guard covers its awaits, and this service's own
  * `sequence` counter extends that protection through `runtime.play` itself, a span the loader's
  * guard cannot see because it has already returned by then.
+ *
+ * It also fronts the speed and voice commands and reflects the engine's tempo and voice state into
+ * the store. Every load and subtune switch returns the deck's tune-shaping controls to home before
+ * anything else, so a new tune never inherits the last one's settings.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -33,6 +59,8 @@ export class DeckService {
   private readonly loader = inject(TuneLoader);
   private readonly store = inject(DjStore);
   private readonly bindings = inject(DeckBindings);
+  private readonly deckSpeed = inject(DeckSpeed);
+  private readonly mixerApplier = inject(MixerApplier);
 
   /** This service's own per-slot command counter — distinct from the loader's generation, which
    *  guards only the loader's own awaits. Bumped by `load` and `selectSubtune` on entry; every
@@ -46,11 +74,20 @@ export class DeckService {
    *  and applied once, deliberately, when the owning call clears it. */
   private readonly suspended: Record<Slot, boolean> = { A: false, B: false };
 
+  /** The transport and subtune of the snapshot `applySnapshot` last landed per slot, so the
+   *  subscription re-applies only on a real transition — a speed-fader tick or a hold press
+   *  notifies too, and must not re-run the status, subtune and structure writes. */
+  private readonly applied: Record<Slot, { transport: Transport; subtune: number | null } | null> = {
+    A: null,
+    B: null,
+  };
+
   constructor() {
     for (const slot of DECK_SLOTS) {
       this.runtime.build(slot);
       this.runtime.subscribe(slot, () => {
-        if (!this.suspended[slot]) {
+        this.reflectEngineControls(slot);
+        if (!this.suspended[slot] && this.transitioned(slot)) {
           this.applySnapshot(slot);
         }
       });
@@ -62,11 +99,15 @@ export class DeckService {
   async load(slot: Slot, source: LoadSource): Promise<void> {
     const mySeq = ++this.sequence[slot];
     this.store.setDeckBusy({ slot, busy: true });
+    this.store.setDeckSwitching({ slot, switching: true });
     this.suspended[slot] = true;
 
     // Always, idempotent on an already-stopped player: a drop during an older load's `play` must
     // silence that tune, and the status alone cannot say whether one is currently sounding.
     this.runtime.stop(slot);
+    // Synchronous, before the first await: it always lands ahead of the new tune's `play`, a failed
+    // load still ends at home, and a superseded load can never reset after a newer one has started.
+    this.resetTuneShaping(slot);
     this.sample(slot);
 
     let failure: string | null = null;
@@ -88,6 +129,7 @@ export class DeckService {
       }
 
       this.runtime.load(slot, playable);
+      this.store.setDeckDetectedKey({ slot, detectedKey: detectedKeyOf(playable.index) });
       // Lands the reference even on a cache hit, when the loader's own callback above never fired
       // for either phase — the subtune path below always did this at its own equivalent line.
       this.store.setDeckLoaded({ slot, reference: playable.reference });
@@ -113,6 +155,7 @@ export class DeckService {
       if (this.sequence[slot] === mySeq) {
         this.suspended[slot] = false;
         this.store.setDeckBusy({ slot, busy: false });
+        this.store.setDeckSwitching({ slot, switching: false });
         // The notification that matters — `play()` announcing `playing` — arrives inside the
         // suspended window above and is dropped there; this is what lands it, once, on the way out.
         this.applySnapshot(slot);
@@ -181,8 +224,10 @@ export class DeckService {
 
     const mySeq = ++this.sequence[slot];
     this.store.setDeckBusy({ slot, busy: true });
+    this.store.setDeckSwitching({ slot, switching: true });
     this.suspended[slot] = true;
     this.runtime.stop(slot);
+    this.resetTuneShaping(slot);
     this.sample(slot);
 
     let failure: string | null = null;
@@ -206,6 +251,7 @@ export class DeckService {
       }
 
       this.runtime.load(slot, playable);
+      this.store.setDeckDetectedKey({ slot, detectedKey: detectedKeyOf(playable.index) });
       this.store.setDeckLoaded({ slot, reference: playable.reference });
       this.store.setDeckStructure({
         slot,
@@ -237,6 +283,7 @@ export class DeckService {
       if (this.sequence[slot] === mySeq) {
         this.suspended[slot] = false;
         this.store.setDeckBusy({ slot, busy: false });
+        this.store.setDeckSwitching({ slot, switching: false });
         this.applySnapshot(slot);
         if (failure !== null) {
           this.store.setDeckStatus({ slot, status: 'failed', error: failure });
@@ -249,6 +296,54 @@ export class DeckService {
   setRepeat(slot: Slot, on: boolean): void {
     this.runtime.setRepeat(slot, on);
     this.store.setDeckRepeat({ slot, repeat: on });
+  }
+
+  /** The speed fader: sets the tempo multiplier within 0.5x–1.5x. Refused while the deck has
+   *  nothing shapeable loaded. */
+  setSpeed(slot: Slot, multiplier: number): void {
+    if (!this.canShape(slot, 'setSpeed')) {
+      return;
+    }
+    this.deckSpeed.setFader(slot, multiplier);
+    this.reflectEngineControls(slot);
+  }
+
+  /** A speed jump button press, following the remembered-speed excursion rules within
+   *  0.3x–1.7x. Refused while the deck has nothing shapeable loaded. */
+  jumpSpeed(slot: Slot, id: 'up' | 'home' | 'down'): void {
+    if (!this.canShape(slot, 'jumpSpeed')) {
+      return;
+    }
+    this.deckSpeed.jump(slot, id);
+    this.reflectEngineControls(slot);
+  }
+
+  /** Latches or unlatches a voice's mute. Refused while the deck has nothing shapeable loaded. */
+  setVoiceMuted(slot: Slot, voice: number, muted: boolean): void {
+    if (!this.canShape(slot, 'setVoiceMuted')) {
+      return;
+    }
+    this.runtime.setVoiceMuted(slot, voice, muted);
+    this.reflectEngineControls(slot);
+  }
+
+  /** Holds or releases a voice. A release is always honoured — a hold must never be left stuck
+   *  because the deck stopped being shapeable while the button was down. */
+  setVoiceHeld(slot: Slot, voice: number, held: boolean): void {
+    if (held && !this.canShape(slot, 'setVoiceHeld')) {
+      return;
+    }
+    this.runtime.setVoiceHeld(slot, voice, held);
+    this.reflectEngineControls(slot);
+  }
+
+  /** Clears every latched voice mute. Refused while the deck has nothing shapeable loaded. */
+  clearVoiceMutes(slot: Slot): void {
+    if (!this.canShape(slot, 'clearVoiceMutes')) {
+      return;
+    }
+    this.runtime.clearVoiceMutes(slot);
+    this.reflectEngineControls(slot);
   }
 
   /** Loads both slots' bindings from the repository, reconciles them against what is currently
@@ -294,6 +389,8 @@ export class DeckService {
       return;
     }
 
+    this.applied[slot] = { transport: snapshot.transport, subtune: snapshot.tune.subtune };
+
     const status: DeckStatus =
       snapshot.transport === 'ended' ? 'stopped' : snapshot.transport === 'error' ? 'failed' : snapshot.transport;
 
@@ -312,6 +409,51 @@ export class DeckService {
     if (structure !== null) {
       this.store.setDeckStructure({ slot, structure, lengthFrames: snapshot.basis.positionBasisFrames });
     }
+  }
+
+  /** Whether the engine's transport or current subtune differs from what `applySnapshot` last
+   *  landed for this slot — the only notifications worth re-running its writes and logs for. */
+  private transitioned(slot: Slot): boolean {
+    const snapshot = this.runtime.snapshot(slot);
+    const applied = this.applied[slot];
+    return (
+      applied === null ||
+      applied.transport !== snapshot.transport ||
+      applied.subtune !== (snapshot.tune?.subtune ?? null)
+    );
+  }
+
+  /** Mirrors the engine's tempo and voice state onto the store, writing only on a difference —
+   *  every notification calls this, including those during a load's suspended window. */
+  private reflectEngineControls(slot: Slot): void {
+    const { tempo, voices } = this.runtime.snapshot(slot);
+    const deck = this.store.deck(slot)();
+    if (deck.speed !== tempo.multiplier || !sameVoices(deck.voices, voices)) {
+      this.store.setDeckEngineControls({ slot, speed: tempo.multiplier, voices });
+    }
+  }
+
+  /** Returns the deck's tune-shaping controls to home on both the store and the engine: the
+   *  mixer knobs, key and filter (via the applier), tempo and any open speed excursion, latched
+   *  mutes and holds. Level and the crossfader are re-applied by the applier, not reset. */
+  private resetTuneShaping(slot: Slot): void {
+    this.mixerApplier.resetTuneShaping(slot);
+    this.deckSpeed.reset(slot);
+    this.runtime.clearVoiceMutes(slot);
+    for (const voice of VOICES) {
+      this.runtime.setVoiceHeld(slot, voice, false);
+    }
+    this.reflectEngineControls(slot);
+  }
+
+  /** The gate for the speed and voice commands: true when the deck's controls are live, otherwise
+   *  warns once naming the slot and command, and returns false. */
+  private canShape(slot: Slot, command: string): boolean {
+    if (this.store.canShape(slot)()) {
+      return true;
+    }
+    logWarn(`DeckService: deck ${slot} has nothing shapeable loaded — ${command} refused.`);
+    return false;
   }
 
   /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` and paused

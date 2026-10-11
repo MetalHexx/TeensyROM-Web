@@ -69,6 +69,59 @@
   flex: 1 1 auto;
   justify-content: center;
   // Two medium strips plus this gap have to fit the card's own content width — the same 148px the
-  // crossfader's track is cut to at desktop.
-  gap: var(--spacing-md);
+  // crossfader's track is cut to at desktop. Shared with the key switch's span below.
+  --strips-gap: var(--spacing-md);
+  gap: var(--strips-gap);
+}
+
+// Every strip reserves this row between its Key knob and its fader, so the two strips' controls
+// stay level; only the first strip's row holds the switch.
+.key-notation-slot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 24px;
+  margin-top: auto;
+}
+
+// The one Camelot / Note switch, styled like `lib-filter-mode-selector`'s medium option cells. It
+// lives in the first strip's row but is drawn across every strip: as wide as `--strip-count` strips
+// and their gaps (the strips share the width equally), centred on that span, never narrower than
+// its own labels. Out of flow, so it adds nothing to the strips' width. The z-index keeps the
+// later strips' own slots, which it overlaps, from covering the half drawn over them.
+.key-notation {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: calc(var(--strip-count) * 50% + (var(--strip-count) - 1) * var(--strips-gap) / 2);
+  display: flex;
+  box-sizing: border-box;
+  width: calc(var(--strip-count) * 100% + (var(--strip-count) - 1) * var(--strips-gap));
+  min-width: max-content;
+  height: 100%;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.key-notation-option {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  border-right: 1px solid var(--color-dimmed);
+  background: transparent;
+  color: var(--color-dimmed);
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.key-notation-option--engaged {
+  background: var(--color-primary);
+  color: var(--color-dimmed-light);
 }

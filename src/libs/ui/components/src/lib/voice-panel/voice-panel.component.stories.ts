@@ -11,7 +11,8 @@ const meta: Meta<VoicePanelComponent> = {
         component:
           "One deck's per-voice mute/kill list: a heading, one `VoiceRowComponent` per row, and a " +
           'Clear button that resets every latched mute at once. Purely presentational — it holds no ' +
-          "state of its own; the caller owns every row's mute/held state and every write.",
+          "state of its own; the caller owns every row's mute/held state and every write. " +
+          '`model.disabled` dims every row and the Clear button and makes them inert.',
       },
     },
   },
@@ -53,4 +54,9 @@ const model: VoicePanelModel = {
 
 export const Default: Story = {
   args: { model },
+};
+
+/** `model.disabled` dims every row and the Clear button and makes them inert. */
+export const Disabled: Story = {
+  args: { model: { ...model, disabled: true } },
 };

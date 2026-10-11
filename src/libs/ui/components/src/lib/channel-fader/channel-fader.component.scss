@@ -29,6 +29,16 @@
   --channel-fader-font: var(--font-size-md);
 }
 
+// Dims the whole control, label included; the input carries the not-allowed cursor since it is the
+// element the pointer is actually over.
+:host([data-disabled]) {
+  opacity: 0.5;
+
+  input[type='range'] {
+    cursor: not-allowed;
+  }
+}
+
 // `length` pins the range input's own travel instead of letting it grow with the host — the host
 // itself stops growing too, so a fixed length isn't re-inflated by the flex-grow it otherwise shares
 // with everything else in its column.

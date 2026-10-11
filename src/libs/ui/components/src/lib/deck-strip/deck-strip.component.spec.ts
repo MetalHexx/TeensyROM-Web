@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DeckStripComponent, DeckStripModel } from './deck-strip.component';
@@ -168,5 +169,109 @@ describe('DeckStripComponent', () => {
 
     expect(wrapper().classList.contains('deck-strip-fader--fixed')).toBe(true);
     expect(fader().hasAttribute('data-fixed-length')).toBe(true);
+  });
+
+  describe('the deckStripAfterKnobs hook', () => {
+    @Component({
+      imports: [DeckStripComponent],
+      template: `<lib-deck-strip [model]="model"
+        ><div deckStripAfterKnobs class="hooked"></div
+      ></lib-deck-strip>`,
+    })
+    class HostComponent {
+      readonly model = testModel();
+    }
+
+    function between(first: Element, middle: Element, last: Element): boolean {
+      const follows = (a: Element, b: Element) =>
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return follows(first, middle) && follows(middle, last);
+    }
+
+    it('renders nothing between the last knob and the fader when nothing is projected', () => {
+      const lastKnob = Array.from(
+        fixture.nativeElement.querySelectorAll('lib-rotary-knob')
+      ).pop() as HTMLElement;
+
+      expect(lastKnob.nextElementSibling?.classList.contains('deck-strip-fader')).toBe(true);
+    });
+
+    it('projects marked content between the last knob and the fader', () => {
+      const host = TestBed.createComponent(HostComponent);
+      host.detectChanges();
+      const root: HTMLElement = host.nativeElement;
+
+      const lastKnob = Array.from(root.querySelectorAll('lib-rotary-knob')).pop() as HTMLElement;
+      const hooked = root.querySelector('.hooked') as HTMLElement;
+      const fader = root.querySelector('.deck-strip-fader') as HTMLElement;
+
+      expect(between(lastKnob, hooked, fader)).toBe(true);
+    });
+  });
+
+  describe('disabled', () => {
+    function channelFader(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[aria-label="Channel fader deck A"]');
+    }
+
+    function filterButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('lib-filter-mode-selector button'));
+    }
+
+    it('leaves every control enabled by default', () => {
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(filterButtons().every((button) => !button.disabled)).toBe(true);
+      expect(channelFader().disabled).toBe(false);
+    });
+
+    it('disables only the knobs whose own model says so', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        ...model,
+        knobs: model.knobs.map((knob) => ({ ...knob, disabled: knob.id === 'resonance' })),
+      });
+      fixture.detectChanges();
+
+      expect(knobInput('Resonance').disabled).toBe(true);
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(knobInput('Key').disabled).toBe(false);
+    });
+
+    it('disables the filter selector through the filter model, and no knob or fader with it', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        ...model,
+        filter: { ...model.filter, disabled: true },
+      });
+      fixture.detectChanges();
+
+      expect(filterButtons()).toHaveLength(4);
+      expect(filterButtons().every((button) => button.disabled)).toBe(true);
+      expect(knobInput('Cutoff').disabled).toBe(false);
+      expect(channelFader().disabled).toBe(false);
+    });
+
+    it('keeps the channel fader enabled and emitting while every knob and the filter are disabled', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        filter: { ...model.filter, disabled: true },
+        knobs: model.knobs.map((knob) => ({ ...knob, disabled: true })),
+        fader: model.fader,
+      });
+      fixture.detectChanges();
+      const faderEmitted: number[] = [];
+      const knobEmitted: unknown[] = [];
+      component.faderChange.subscribe((v) => faderEmitted.push(v));
+      component.knobChange.subscribe((e) => knobEmitted.push(e));
+
+      expect(channelFader().disabled).toBe(false);
+      channelFader().value = '0.4';
+      channelFader().dispatchEvent(new Event('input'));
+      knobInput('Cutoff').value = '0.4';
+      knobInput('Cutoff').dispatchEvent(new Event('input'));
+
+      expect(faderEmitted).toEqual([0.4]);
+      expect(knobEmitted).toEqual([]);
+    });
   });
 });

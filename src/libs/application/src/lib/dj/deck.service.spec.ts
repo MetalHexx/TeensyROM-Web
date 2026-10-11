@@ -16,8 +16,12 @@ import {
 import { DeckService } from './deck.service';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { MixerApplier } from './mixer-applier';
+import { MixerService } from './mixer.service';
 import { TuneLoader } from './tune-loader';
 import { DjStore } from './dj-store';
+import { linearCrossfaderGain } from './mixer/crossfader-curve';
+import { keyCoefficientFor, scaleCoefficientFor } from './mixer/scale-taper';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
@@ -744,6 +748,486 @@ describe('DeckService', () => {
 
     expect(outputPortForMock).not.toHaveBeenCalled();
     expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+  });
+
+  describe('speed, voices and the new-tune reset', () => {
+    let mixer: MixerService;
+
+    const HOME_VOICES = [
+      { muted: false, held: false },
+      { muted: false, held: false },
+      { muted: false, held: false },
+    ];
+
+    function withKey(playable: Playable): Playable {
+      return { ...playable, index: { ...playable.index, tonic: 9, mode: 'minor', camelot: '8A' } };
+    }
+
+    /** Every resolve answers with a keyed playable, so a loaded tune has a detected key to reset. */
+    function resolveKeyed(): void {
+      resolveMock.mockImplementation(async (identity: TuneIdentity) => {
+        const fixture = bySidHash.get(identity.sidHash);
+        return fixture === undefined ? null : withKey(playableOf(fixture, identity.subtune));
+      });
+    }
+
+    function resolveUnkeyed(): void {
+      resolveMock.mockImplementation(async (identity: TuneIdentity) => {
+        const fixture = bySidHash.get(identity.sidHash);
+        return fixture === undefined ? null : playableOf(fixture, identity.subtune);
+      });
+    }
+
+    /** Pushes every tune-shaping control, speed and voice state of `slot` off home. */
+    function shapeAway(slot: 'A' | 'B'): void {
+      mixer.setKnob(slot, 'cutoff', 0.6);
+      mixer.setKnob(slot, 'resonance', -0.4);
+      mixer.setKnob(slot, 'pulseWidth', 0.8);
+      mixer.setKeySemitones(slot, 3);
+      mixer.setFilterMode(slot, 'lowPass');
+      service.setSpeed(slot, 1.3);
+      service.setVoiceMuted(slot, 1, true);
+      service.setVoiceHeld(slot, 2, true);
+    }
+
+    function expectHome(slot: 'A' | 'B'): void {
+      const deck = store.deck(slot)();
+      expect(deck.speed).toBe(1);
+      expect(deck.voices).toEqual(HOME_VOICES);
+      expect(runtime.snapshot(slot).tempo.multiplier).toBe(1);
+      expect(runtime.snapshot(slot).voices).toEqual(HOME_VOICES);
+      expect(store.deckMix(slot)()).toEqual(
+        expect.objectContaining({ cutoff: 0, resonance: 0, pulseWidth: 0, keySemitones: 0, filterMode: null })
+      );
+    }
+
+    beforeEach(() => {
+      mixer = TestBed.inject(MixerService);
+    });
+
+    describe('speed and voice commands', () => {
+      it('the speed fader sets the tempo within 0.5x-1.5x and the store follows', async () => {
+        await loadAndWait('A', register(makeFixture()));
+
+        service.setSpeed('A', 1.25);
+        expect(runtime.snapshot('A').tempo.multiplier).toBe(1.25);
+        expect(store.deck('A')().speed).toBe(1.25);
+
+        service.setSpeed('A', 9);
+        expect(store.deck('A')().speed).toBe(1.5);
+        service.setSpeed('A', -3);
+        expect(store.deck('A')().speed).toBe(0.5);
+      });
+
+      it('jumps follow the excursion rules out to 0.3x-1.7x, and Home with none open returns to 1.0x', async () => {
+        await loadAndWait('A', register(makeFixture()));
+
+        service.setSpeed('A', 1.5);
+        service.jumpSpeed('A', 'up');
+        expect(store.deck('A')().speed).toBeCloseTo(1.7);
+
+        service.jumpSpeed('A', 'home');
+        expect(store.deck('A')().speed).toBe(1.5);
+
+        service.setSpeed('A', 1.4);
+        service.jumpSpeed('A', 'home');
+        expect(store.deck('A')().speed).toBe(1);
+      });
+
+      it('mute, hold and clear-all reach the engine and are reflected in the store; clear-all leaves holds', async () => {
+        await loadAndWait('A', register(makeFixture()));
+
+        service.setVoiceMuted('A', 0, true);
+        service.setVoiceMuted('A', 1, true);
+        service.setVoiceHeld('A', 2, true);
+        expect(runtime.snapshot('A').voices).toEqual([
+          { muted: true, held: false },
+          { muted: true, held: false },
+          { muted: false, held: true },
+        ]);
+        expect(store.deck('A')().voices).toEqual(runtime.snapshot('A').voices);
+
+        service.clearVoiceMutes('A');
+        expect(store.deck('A')().voices).toEqual([
+          { muted: false, held: false },
+          { muted: false, held: false },
+          { muted: false, held: true },
+        ]);
+
+        service.setVoiceHeld('A', 2, false);
+        expect(store.deck('A')().voices).toEqual(HOME_VOICES);
+      });
+
+      it('never touches the other deck', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        await loadAndWait('B', register(makeFixture()));
+        service.setSpeed('B', 1.2);
+        service.setVoiceMuted('B', 0, true);
+        const bBefore = store.deck('B')();
+
+        service.setSpeed('A', 0.7);
+        service.jumpSpeed('A', 'down');
+        service.setVoiceMuted('A', 2, true);
+        service.setVoiceHeld('A', 1, true);
+        service.clearVoiceMutes('A');
+
+        expect(store.deck('B')().speed).toBe(bBefore.speed);
+        expect(store.deck('B')().voices).toEqual(bBefore.voices);
+        expect(runtime.snapshot('B').tempo.multiplier).toBe(1.2);
+      });
+
+      it('a speed or hold change does not re-run the status, subtune or structure writes, but a transport change still does', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        const statusSpy = vi.spyOn(store, 'setDeckStatus');
+        const subtuneSpy = vi.spyOn(store, 'setDeckSubtune');
+        const structureSpy = vi.spyOn(store, 'setDeckStructure');
+        const controlsSpy = vi.spyOn(store, 'setDeckEngineControls');
+
+        service.setSpeed('A', 1.1);
+        service.setSpeed('A', 1.2);
+        service.jumpSpeed('A', 'up');
+        service.setVoiceHeld('A', 0, true);
+        service.setVoiceHeld('A', 0, false);
+
+        expect(statusSpy).not.toHaveBeenCalled();
+        expect(subtuneSpy).not.toHaveBeenCalled();
+        expect(structureSpy).not.toHaveBeenCalled();
+        expect(controlsSpy).toHaveBeenCalledTimes(5);
+
+        controlsSpy.mockClear();
+        service.setSpeed('A', 1.2);
+        service.setSpeed('A', 1.2);
+        expect(controlsSpy).toHaveBeenCalledTimes(1);
+
+        await service.togglePlayPause('A');
+        expect(statusSpy).toHaveBeenCalledWith(expect.objectContaining({ slot: 'A', status: 'paused' }));
+      });
+
+      it('logs nothing on an accepted command', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        vi.mocked(logWarn).mockClear();
+
+        service.setSpeed('A', 1.2);
+        service.jumpSpeed('A', 'up');
+        service.setVoiceMuted('A', 0, true);
+        service.setVoiceHeld('A', 1, true);
+        service.setVoiceHeld('A', 1, false);
+        service.clearVoiceMutes('A');
+
+        expect(vi.mocked(logWarn)).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('command gating', () => {
+      const commands: readonly [string, (target: DeckService) => void][] = [
+        ['setSpeed', (target) => target.setSpeed('A', 1.3)],
+        ['jumpSpeed', (target) => target.jumpSpeed('A', 'up')],
+        ['setVoiceMuted', (target) => target.setVoiceMuted('A', 0, true)],
+        ['setVoiceHeld', (target) => target.setVoiceHeld('A', 0, true)],
+        ['clearVoiceMutes', (target) => target.clearVoiceMutes('A')],
+      ];
+
+      it.each(commands)('%s is refused on an empty deck with one warning naming the slot and command', (name, run) => {
+        const tempoSpy = vi.spyOn(runtime, 'setTempo');
+        const mutedSpy = vi.spyOn(runtime, 'setVoiceMuted');
+        const heldSpy = vi.spyOn(runtime, 'setVoiceHeld');
+        const clearSpy = vi.spyOn(runtime, 'clearVoiceMutes');
+        vi.mocked(logWarn).mockClear();
+
+        run(service);
+
+        expect(tempoSpy).not.toHaveBeenCalled();
+        expect(mutedSpy).not.toHaveBeenCalled();
+        expect(heldSpy).not.toHaveBeenCalled();
+        expect(clearSpy).not.toHaveBeenCalled();
+        expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logWarn).mock.calls[0][0]).toMatch(new RegExp(`deck A.*${name}`));
+      });
+
+      it('every command is refused while a load is switching, and a hold release still passes', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        service.setVoiceHeld('A', 0, true);
+
+        let releaseResolve!: (playable: Playable | null) => void;
+        resolveMock.mockImplementationOnce(
+          () =>
+            new Promise<Playable | null>((resolve) => {
+              releaseResolve = resolve;
+            })
+        );
+        const load = service.load('A', fixture.source);
+        await vi.waitFor(() => expect(resolveMock).toHaveBeenCalledTimes(2));
+        expect(store.deck('A')().switching).toBe(true);
+        expect(store.canShape('A')()).toBe(false);
+
+        const tempoSpy = vi.spyOn(runtime, 'setTempo');
+        const mutedSpy = vi.spyOn(runtime, 'setVoiceMuted');
+        const heldSpy = vi.spyOn(runtime, 'setVoiceHeld');
+        const clearSpy = vi.spyOn(runtime, 'clearVoiceMutes');
+        vi.mocked(logWarn).mockClear();
+
+        for (const [, run] of commands) {
+          run(service);
+        }
+        expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(commands.length);
+        expect(tempoSpy).not.toHaveBeenCalled();
+        expect(mutedSpy).not.toHaveBeenCalled();
+        expect(clearSpy).not.toHaveBeenCalled();
+        expect(heldSpy).not.toHaveBeenCalled();
+
+        vi.mocked(logWarn).mockClear();
+        service.setVoiceHeld('A', 0, false);
+        expect(heldSpy).toHaveBeenCalledWith('A', 0, false);
+        expect(vi.mocked(logWarn)).not.toHaveBeenCalled();
+
+        releaseResolve(playableOf(fixture));
+        await load;
+        expect(store.deck('A')().switching).toBe(false);
+        service.setSpeed('A', 1.2);
+        expect(store.deck('A')().speed).toBe(1.2);
+      });
+
+      it('commands are accepted while a Play press holds the deck busy', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        await service.togglePlayPause('A'); // pause
+        expect(store.deck('A')().status).toBe('paused');
+
+        let releasePlay!: () => void;
+        const playSpy = vi.spyOn(runtime, 'play').mockImplementation(
+          () =>
+            new Promise<void>((resolve) => {
+              releasePlay = resolve;
+            })
+        );
+        const toggle = service.togglePlayPause('A');
+        await vi.waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
+        expect(store.deck('A')().busy).toBe(true);
+        expect(store.deck('A')().switching).toBe(false);
+        vi.mocked(logWarn).mockClear();
+
+        service.setSpeed('A', 1.25);
+        service.setVoiceMuted('A', 1, true);
+
+        expect(store.deck('A')().speed).toBe(1.25);
+        expect(store.deck('A')().voices[1].muted).toBe(true);
+        expect(vi.mocked(logWarn)).not.toHaveBeenCalled();
+
+        releasePlay();
+        await toggle;
+      });
+    });
+
+    describe('switching flag', () => {
+      it('is set for the whole of a load and a subtune switch, and cleared when each settles', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 2 }));
+        const switchingSpy = vi.spyOn(store, 'setDeckSwitching');
+
+        const load = service.load('A', fixture.source);
+        expect(store.deck('A')().switching).toBe(true);
+        await load;
+        expect(store.deck('A')().switching).toBe(false);
+
+        const select = service.selectSubtune('A', 2);
+        expect(store.deck('A')().switching).toBe(true);
+        await select;
+        expect(store.deck('A')().switching).toBe(false);
+
+        expect(switchingSpy.mock.calls.map(([arg]) => arg.switching)).toEqual([true, false, true, false]);
+      });
+
+      it('is cleared when a load fails', async () => {
+        await service.load('A', register(makeFixture({ invalidBytes: true })).source);
+
+        expect(store.deck('A')().status).toBe('failed');
+        expect(store.deck('A')().switching).toBe(false);
+      });
+
+      it('is left alone by a Play press', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        const switchingSpy = vi.spyOn(store, 'setDeckSwitching');
+
+        await service.togglePlayPause('A');
+        await service.togglePlayPause('A');
+
+        expect(switchingSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('detected key', () => {
+      it('lands the new tune key on a load, and clears when the index has none', async () => {
+        resolveKeyed();
+        await loadAndWait('A', register(makeFixture()));
+        expect(store.deck('A')().detectedKey).toEqual({ tonic: 9, mode: 'minor', camelot: '8A' });
+
+        resolveUnkeyed();
+        await loadAndWait('A', register(makeFixture()));
+        expect(store.deck('A')().detectedKey).toBeNull();
+      });
+
+      it('lands the new subtune key on a subtune switch', async () => {
+        await loadAndWait('A', register(makeFixture({ subtuneCount: 2 })));
+        expect(store.deck('A')().detectedKey).toBeNull();
+        resolveKeyed();
+
+        await service.selectSubtune('A', 2);
+
+        expect(store.deck('A')().detectedKey).toEqual({ tonic: 9, mode: 'minor', camelot: '8A' });
+      });
+
+      it('is null when the index knows only part of the key', async () => {
+        const fixture = register(makeFixture());
+        resolveMock.mockImplementation(async (identity: TuneIdentity) => {
+          const playable = playableOf(fixture, identity.subtune);
+          return { ...playable, index: { ...playable.index, tonic: 9, mode: 'minor' as const, camelot: null } };
+        });
+
+        await loadAndWait('A', fixture);
+
+        expect(store.deck('A')().detectedKey).toBeNull();
+      });
+    });
+
+    describe('new-tune reset', () => {
+      it('a drop returns speed, voices, knobs, key and filter to home on store and engine, keeping level and crossfader', async () => {
+        resolveKeyed();
+        await loadAndWait('A', register(makeFixture()));
+        mixer.setLevel('A', 0.6);
+        mixer.setCrossfader(0.3);
+        shapeAway('A');
+        expect(store.deck('A')().speed).toBe(1.3);
+        expect(store.deck('A')().voices[1].muted).toBe(true);
+        expect(store.deck('A')().detectedKey).not.toBeNull();
+
+        const scaleSpy = vi.spyOn(runtime, 'setRegisterScale');
+        const keySpy = vi.spyOn(runtime, 'setKeyCoefficient');
+        const filterSpy = vi.spyOn(runtime, 'setFilterMode');
+        const gainSpy = vi.spyOn(runtime, 'setOutputGain');
+        resolveUnkeyed();
+
+        await loadAndWait('A', register(makeFixture()));
+
+        expectHome('A');
+        expect(store.deck('A')().detectedKey).toBeNull();
+        expect(scaleSpy).toHaveBeenCalledWith('A', 'cutoff', scaleCoefficientFor(0));
+        expect(scaleSpy).toHaveBeenCalledWith('A', 'resonance', scaleCoefficientFor(0));
+        expect(scaleSpy).toHaveBeenCalledWith('A', 'pulseWidth', scaleCoefficientFor(0));
+        expect(keySpy).toHaveBeenCalledWith('A', keyCoefficientFor(0));
+        expect(filterSpy).toHaveBeenCalledWith('A', null);
+        expect(store.deckMix('A')().level).toBe(0.6);
+        expect(store.crossfader()).toBe(0.3);
+        expect(gainSpy).toHaveBeenLastCalledWith('A', 0.6 * linearCrossfaderGain(0.3, 'a'));
+      });
+
+      it('a subtune switch returns the same controls to home', async () => {
+        resolveKeyed();
+        await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+        mixer.setLevel('A', 0.6);
+        shapeAway('A');
+        service.jumpSpeed('A', 'up');
+
+        await service.selectSubtune('A', 2);
+
+        expectHome('A');
+        expect(store.deck('A')().subtune).toBe(2);
+        expect(store.deckMix('A')().level).toBe(0.6);
+
+        // The excursion the jump opened is gone with the reset: a fresh Home press is a plain 1.0x.
+        service.setSpeed('A', 1.2);
+        service.jumpSpeed('A', 'home');
+        expect(store.deck('A')().speed).toBe(1);
+      });
+
+      it('applies the reset before the loader awaits anything and before the tune is loaded or played', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        shapeAway('A');
+
+        const stopSpy = vi.spyOn(runtime, 'stop');
+        const tempoSpy = vi.spyOn(runtime, 'setTempo');
+        const clearSpy = vi.spyOn(runtime, 'clearVoiceMutes');
+        const heldSpy = vi.spyOn(runtime, 'setVoiceHeld');
+        const scaleSpy = vi.spyOn(runtime, 'setRegisterScale');
+        const loadSpy = vi.spyOn(runtime, 'load');
+        const playSpy = vi.spyOn(runtime, 'play');
+        resolveMock.mockClear();
+
+        await loadAndWait('A', fixture);
+
+        const first = (spy: { mock: { invocationCallOrder: number[] } }): number => spy.mock.invocationCallOrder[0];
+        const resolveOrder = resolveMock.mock.invocationCallOrder[0];
+        expect(first(stopSpy)).toBeLessThan(first(tempoSpy));
+        for (const reset of [tempoSpy, clearSpy, heldSpy, scaleSpy]) {
+          expect(first(reset)).toBeLessThan(resolveOrder);
+        }
+        expect(resolveOrder).toBeLessThan(first(loadSpy));
+        expect(first(loadSpy)).toBeLessThan(first(playSpy));
+      });
+
+      it('a failed load still ends at home, with level kept', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        mixer.setLevel('A', 0.6);
+        shapeAway('A');
+
+        await service.load('A', register(makeFixture({ invalidBytes: true })).source);
+
+        expect(store.deck('A')().status).toBe('failed');
+        expectHome('A');
+        expect(store.deckMix('A')().level).toBe(0.6);
+      });
+
+      it('a superseded load never resets the newer one once it has started', async () => {
+        const fixtureA = register(makeFixture());
+        const fixtureB = register(makeFixture());
+        const realPlay = DeckRuntime.prototype.play.bind(runtime);
+        let releaseFirstPlay!: () => void;
+        const firstPlayGate = new Promise<void>((resolve) => {
+          releaseFirstPlay = resolve;
+        });
+        const playSpy = vi.spyOn(runtime, 'play').mockImplementation((slot) => {
+          if (playSpy.mock.calls.length === 1) {
+            return firstPlayGate;
+          }
+          return realPlay(slot);
+        });
+        const resetSpy = vi.spyOn(TestBed.inject(MixerApplier), 'resetTuneShaping');
+
+        const first = service.load('A', fixtureA.source);
+        await vi.waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
+        await service.load('A', fixtureB.source);
+        expect(resetSpy).toHaveBeenCalledTimes(2);
+
+        service.setSpeed('A', 1.3);
+        service.setVoiceMuted('A', 1, true);
+
+        releaseFirstPlay();
+        await first;
+
+        expect(resetSpy).toHaveBeenCalledTimes(2);
+        expect(store.deck('A')().speed).toBe(1.3);
+        expect(store.deck('A')().voices[1].muted).toBe(true);
+        expect(store.deck('A')().loaded?.identity.sidHash).toBe(fixtureB.reference.identity.sidHash);
+      });
+
+      it('leaves the other deck untouched', async () => {
+        await loadAndWait('A', register(makeFixture()));
+        await loadAndWait('B', register(makeFixture()));
+        mixer.setLevel('B', 0.4);
+        shapeAway('B');
+        const bDeck = store.deck('B')();
+        const bMix = store.deckMix('B')();
+        const tempoSpy = vi.spyOn(runtime, 'setTempo');
+
+        await loadAndWait('A', register(makeFixture()));
+        await service.selectSubtune('A', 1);
+
+        expect(store.deck('B')().speed).toBe(bDeck.speed);
+        expect(store.deck('B')().voices).toEqual(bDeck.voices);
+        expect(store.deckMix('B')()).toEqual(bMix);
+        expect(runtime.snapshot('B').tempo.multiplier).toBe(1.3);
+        expect(tempoSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      });
+    });
   });
 
   describe('binding delegation', () => {

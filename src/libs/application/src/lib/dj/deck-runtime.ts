@@ -1,7 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { createSidPlayer, parseSidFile, frames, clamp } from '@sidablist/core';
-import type { SidPlayer, PlayerSnapshot, Frames, FrameClock, ReplayRunner } from '@sidablist/core';
+import type {
+  SidPlayer,
+  PlayerSnapshot,
+  Frames,
+  FrameClock,
+  ReplayRunner,
+  SidFilterMode,
+} from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
@@ -99,6 +106,53 @@ export class DeckRuntime {
 
   setRepeat(slot: Slot, on: boolean): void {
     this.requireSlot(slot).player.setRepeatTrack(on);
+  }
+
+  /** Sets this slot's output gain, 0…1. */
+  setOutputGain(slot: Slot, gain: number): void {
+    this.requireSlot(slot).player.setOutputGain(gain);
+  }
+
+  /** Scales one register group's value by `coefficient` (1 = untouched). */
+  setRegisterScale(
+    slot: Slot,
+    group: 'cutoff' | 'resonance' | 'pulseWidth',
+    coefficient: number
+  ): void {
+    this.requireSlot(slot).player.setRegisterScale(group, coefficient);
+  }
+
+  /** Transposes all three voices by the same pitch `coefficient` (1 = untouched). */
+  setKeyCoefficient(slot: Slot, coefficient: number): void {
+    const { player } = this.requireSlot(slot);
+    for (const voice of [0, 1, 2]) {
+      player.setVoicePitch(voice, coefficient);
+    }
+  }
+
+  /** Overrides the SID filter mode; `null` plays the tune's own filter-mode bits. */
+  setFilterMode(slot: Slot, mode: SidFilterMode | null): void {
+    this.requireSlot(slot).player.setFilterMode(mode);
+  }
+
+  /** Sets this slot's tempo multiplier (1 = the tune's own speed). */
+  setTempo(slot: Slot, multiplier: number): void {
+    this.requireSlot(slot).player.setTempo(multiplier);
+  }
+
+  /** Latches a voice's mute (voice 0…2). */
+  setVoiceMuted(slot: Slot, voice: number, muted: boolean): void {
+    this.requireSlot(slot).player.setVoiceMuted(voice, muted);
+  }
+
+  /** Momentarily holds a voice (voice 0…2). */
+  setVoiceHeld(slot: Slot, voice: number, held: boolean): void {
+    this.requireSlot(slot).player.setVoiceHeld(voice, held);
+  }
+
+  /** Clears every latched voice mute; holds are untouched. */
+  clearVoiceMutes(slot: Slot): void {
+    this.requireSlot(slot).player.clearVoiceMutes();
   }
 
   /** `scrubToPercent`'s basis rule, moved here: the percentage is measured against the snapshot's

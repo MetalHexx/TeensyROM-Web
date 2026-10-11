@@ -10,6 +10,13 @@ import { setDeckRepeat } from './set-deck-repeat';
 import { setBinding } from './set-binding';
 import { setMidi } from './set-midi';
 import { markSeen } from './mark-seen';
+import { setDeckMix } from './set-deck-mix';
+import { setCrossfader } from './set-crossfader';
+import { setKeyDisplayFormat } from './set-key-display-format';
+import { resetDeckTuneShaping } from './reset-deck-tune-shaping';
+import { setDeckEngineControls } from './set-deck-engine-controls';
+import { setDeckDetectedKey } from './set-deck-detected-key';
+import { setDeckSwitching } from './set-deck-switching';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -25,6 +32,13 @@ export function withDjActions() {
       ...setBinding(writableStore),
       ...setMidi(writableStore),
       ...markSeen(writableStore),
+      ...setDeckMix(writableStore),
+      ...setCrossfader(writableStore),
+      ...setKeyDisplayFormat(writableStore),
+      ...resetDeckTuneShaping(writableStore),
+      ...setDeckEngineControls(writableStore),
+      ...setDeckDetectedKey(writableStore),
+      ...setDeckSwitching(writableStore),
     };
   });
 }

@@ -10,9 +10,14 @@
       [min]="model().min"
       [max]="model().max"
       [step]="model().step"
+      [disabled]="model().disabled ?? false"
       (valueChange)="faderChange.emit($event)"
     />
 
-    <lib-jump-button-group [buttons]="model().jumpButtons" (jump)="jump.emit($event)" />
+    <lib-jump-button-group
+      [class.speed-jump-buttons--disabled]="model().disabled"
+      [buttons]="jumpButtons()"
+      (jump)="jump.emit($event)"
+    />
   </div>
 </section>

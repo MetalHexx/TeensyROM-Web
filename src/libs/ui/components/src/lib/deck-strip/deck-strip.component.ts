@@ -31,10 +31,13 @@ export interface DeckStripKnobModel {
   /** Rendered under the dial when present — Key's transposed-key or semitone readout, and nothing
    *  else among today's four knobs. `null`/absent hides it entirely. */
   readonly readout?: string | null;
+  /** Disables this knob and dims it. Absent means enabled. */
+  readonly disabled?: boolean;
 }
 
 /** The caller-composed state one whole deck strip renders: filter mode, its knobs in render
- *  order, and the channel fader beneath them. */
+ *  order, and the channel fader beneath them. Each tune-shaping control carries its own
+ *  `disabled` (`filter.disabled`, each knob's `disabled`); the channel fader has none. */
 export interface DeckStripModel {
   /** The filter mode selector's own model, passed straight through. */
   readonly filter: FilterModeSelectorModel;
@@ -53,7 +56,12 @@ export interface DeckStripModel {
  * One deck's whole control strip, top to bottom: filter mode, then every knob in `model().knobs`
  * order, then the channel fader. Purely presentational — composes `FilterModeSelectorComponent`,
  * one `RotaryKnobComponent` per knob and `ChannelFaderComponent`, and holds no state of its own;
- * the caller owns every value and every write.
+ * the caller owns every value and every write. The filter selector and each knob can be disabled
+ * through their own model entries; the channel fader, being the deck's level, is never disabled.
+ *
+ * Content carrying the `deckStripAfterKnobs` attribute is projected between the last knob and the
+ * fader — a caller's way to put one control in that row, such as a switch shared across strips.
+ * Nothing is rendered there by default.
  *
  * @example
  * ```html

@@ -14,6 +14,8 @@ export interface FilterModeSelectorModel {
   readonly groupAccessibleName: string;
   /** Per-button aria-labels, caller-composed, e.g. { lowPass: 'Filter mode low-pass deck A', … } */
   readonly optionAccessibleNames: Readonly<Record<FilterModeValue, string>>;
+  /** Disables every option and dims the group. Absent means enabled. */
+  readonly disabled?: boolean;
 }
 
 /** One selectable filter-mode button: its engine-facing value and its on-screen label. */

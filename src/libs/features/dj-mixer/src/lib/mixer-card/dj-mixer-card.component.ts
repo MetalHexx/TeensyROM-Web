@@ -3,13 +3,19 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import {
+  DjStore,
+  MixerService,
+  type KeyDisplayFormat,
+  type Slot,
+} from '@teensyrom-nx/application';
+import {
   CrossfaderComponent,
   DeckStripComponent,
   ScalingCompactCardComponent,
   type DeckStripModel,
+  type FilterModeValue,
 } from '@teensyrom-nx/ui/components';
 import type { DeckRef } from '../deck-ref';
-import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
 
 /**
  * The travel shared by every channel fader and by the crossfader: the card's own content width,
@@ -28,6 +34,19 @@ const FADER_LENGTH =
  */
 const BELOW_TABLET = '(max-width: 1279px)';
 
+type MixerKnob = 'cutoff' | 'resonance' | 'pulseWidth';
+
+/** The strip's `knobChange` id is an opaque string; this is the one place it is narrowed. */
+function isMixerKnob(id: string): id is MixerKnob {
+  return id === 'cutoff' || id === 'resonance' || id === 'pulseWidth';
+}
+
+/** The key-notation switch's two buttons, in render order. */
+const KEY_FORMAT_OPTIONS: readonly { readonly format: KeyDisplayFormat; readonly label: string }[] = [
+  { format: 'camelot', label: 'Camelot' },
+  { format: 'note', label: 'Note' },
+];
+
 @Component({
   selector: 'lib-dj-mixer-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,12 +56,20 @@ const BELOW_TABLET = '(max-width: 1279px)';
   styleUrl: './dj-mixer-card.component.scss',
 })
 export class DjMixerCardComponent {
+  private readonly djStore = inject(DjStore);
+  private readonly mixerService = inject(MixerService);
+
   readonly decks = input.required<readonly DeckRef[]>();
   readonly showCrossfader = input.required<boolean>();
 
-  private readonly stripsByIndex = computed<ReadonlyMap<number, DeckStripModel>>(
-    () => new Map(this.decks().map((deck) => [deck.index, createDeckPlaceholders(deck).strip]))
+  /** Each deck paired with the strip model built from its store values. */
+  readonly strips = computed(() =>
+    this.decks().map((deck) => ({ deck, model: this.stripModel(deck) }))
   );
+
+  readonly crossfader = this.djStore.crossfader;
+  readonly keyDisplayFormat = this.djStore.keyDisplayFormat;
+  readonly keyFormatOptions = KEY_FORMAT_OPTIONS;
 
   readonly firstLetter = computed(() => this.decks()[0]?.letter ?? '');
   readonly lastLetter = computed(() => this.decks()[this.decks().length - 1]?.letter ?? '');
@@ -66,8 +93,84 @@ export class DjMixerCardComponent {
    */
   readonly faderLength = computed<string | null>(() => (this.columnForm() ? FADER_LENGTH : null));
 
-  stripFor(deck: DeckRef): DeckStripModel {
-    const strip = this.stripsByIndex().get(deck.index);
-    return strip ?? createDeckPlaceholders(deck).strip;
+  onKnobChange(slot: Slot, change: { id: string; value: number }): void {
+    if (change.id === 'key') {
+      this.mixerService.setKeySemitones(slot, change.value);
+    } else if (isMixerKnob(change.id)) {
+      this.mixerService.setKnob(slot, change.id, change.value);
+    }
+  }
+
+  onFaderChange(slot: Slot, level: number): void {
+    this.mixerService.setLevel(slot, level);
+  }
+
+  /** `FilterModeValue` and the service's `SidFilterMode` are the same union, so the mode passes
+   *  through unmapped; `null` plays the tune's own filter mode. */
+  onFilterModeSelect(slot: Slot, mode: FilterModeValue | null): void {
+    this.mixerService.setFilterMode(slot, mode);
+  }
+
+  onCrossfaderChange(position: number): void {
+    this.mixerService.setCrossfader(position);
+  }
+
+  onKeyFormatSelect(format: KeyDisplayFormat): void {
+    this.mixerService.setKeyDisplayFormat(format);
+  }
+
+  private stripModel({ slot, letter }: DeckRef): DeckStripModel {
+    const mix = this.djStore.deckMix(slot)();
+    const disabled = !this.djStore.canShape(slot)();
+    const keyReadout = this.djStore.keyReadout(slot)();
+
+    return {
+      filter: {
+        engaged: mix.filterMode,
+        disabled,
+        groupAccessibleName: `Filter mode deck ${letter}`,
+        optionAccessibleNames: {
+          lowPass: `Filter mode low-pass deck ${letter}`,
+          bandPass: `Filter mode band-pass deck ${letter}`,
+          highPass: `Filter mode high-pass deck ${letter}`,
+          off: `Filter mode off deck ${letter}`,
+        },
+      },
+      knobs: [
+        {
+          id: 'cutoff',
+          label: 'Cutoff',
+          accessibleName: `Cutoff deck ${letter}`,
+          value: mix.cutoff,
+          disabled,
+        },
+        {
+          id: 'resonance',
+          label: 'Resonance',
+          accessibleName: `Resonance deck ${letter}`,
+          value: mix.resonance,
+          disabled,
+        },
+        {
+          id: 'pulseWidth',
+          label: 'Pulse width',
+          accessibleName: `Pulse width deck ${letter}`,
+          value: mix.pulseWidth,
+          disabled,
+        },
+        {
+          id: 'key',
+          label: 'Key',
+          accessibleName: `Key deck ${letter}`,
+          value: mix.keySemitones,
+          min: -12,
+          max: 12,
+          step: 1,
+          readout: keyReadout,
+          disabled,
+        },
+      ],
+      fader: { value: mix.level, label: letter, accessibleName: `Gain deck ${letter}` },
+    };
   }
 }

@@ -51,13 +51,22 @@
 
 <div class="voice-speed-column" [style.gridArea]="'vs' + deck().index">
   <lib-scaling-compact-card class="voice-card" animationEntry="from-bottom">
-    <lib-voice-panel [model]="models().voice"></lib-voice-panel>
+    <lib-voice-panel
+      [model]="voiceModel()"
+      (mutedChange)="onVoiceMutedChange($event)"
+      (heldChange)="onVoiceHeldChange($event)"
+      (clearMutes)="onClearVoiceMutes()"
+    ></lib-voice-panel>
   </lib-scaling-compact-card>
   <lib-scaling-compact-card
     class="speed-card"
     cardClass="compact-card--fill"
     animationEntry="from-bottom"
   >
-    <lib-speed-panel [model]="models().speed"></lib-speed-panel>
+    <lib-speed-panel
+      [model]="speedModel()"
+      (faderChange)="onSpeedChange($event)"
+      (jump)="onSpeedJump($event)"
+    ></lib-speed-panel>
   </lib-scaling-compact-card>
 </div>

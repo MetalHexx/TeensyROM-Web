@@ -12,7 +12,9 @@ const meta: Meta<VoiceRowComponent> = {
           "One voice's mute/kill controls: a checkbox for the latched mute, checkbox and label on " +
           'one line, and a momentary hold button beneath them that inverts the latched mute for as ' +
           "long as it's held — by pointer or by Enter/Space. Purely presentational: `holdLabel` is " +
-          "the caller's own resolved verb, unaffected by whether the button is currently held.",
+          "the caller's own resolved verb, unaffected by whether the button is currently held. " +
+          '`disabled` dims the row and makes both controls inert; a row disabled mid-hold releases ' +
+          'it so no voice is left held.',
       },
     },
   },
@@ -38,4 +40,9 @@ export const Audible: Story = {
 
 export const Muted: Story = {
   args: { model: rowModel(true) },
+};
+
+/** `disabled` dims the row and makes the checkbox and the hold button inert. */
+export const Disabled: Story = {
+  args: { model: rowModel(false), disabled: true },
 };

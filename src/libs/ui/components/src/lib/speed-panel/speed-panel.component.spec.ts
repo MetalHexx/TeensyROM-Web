@@ -61,4 +61,60 @@ describe('SpeedPanelComponent', () => {
 
     expect(emitted).toEqual(['home']);
   });
+
+  describe('disabled', () => {
+    function jumpButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('button'));
+    }
+
+    function fader(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[type="range"]');
+    }
+
+    function disable(): void {
+      fixture.componentRef.setInput('model', testModel({ disabled: true }));
+      fixture.detectChanges();
+    }
+
+    it('leaves the fader and every jump button enabled by default', () => {
+      expect(fader().disabled).toBe(false);
+      expect(jumpButtons().every((button) => !button.disabled)).toBe(true);
+    });
+
+    it('disables the fader and every jump button', () => {
+      disable();
+
+      expect(fader().disabled).toBe(true);
+      expect(jumpButtons()).toHaveLength(3);
+      expect(jumpButtons().every((button) => button.disabled)).toBe(true);
+    });
+
+    it("keeps a jump button's own disabled while the panel is enabled", () => {
+      fixture.componentRef.setInput(
+        'model',
+        testModel({
+          jumpButtons: [
+            { id: 'up', label: '+50%', accessibleName: 'Speed up 50% deck A', disabled: true },
+            { id: 'home', label: 'Home', accessibleName: 'Speed home deck A' },
+          ],
+        })
+      );
+      fixture.detectChanges();
+
+      expect(jumpButtons().map((button) => button.disabled)).toEqual([true, false]);
+    });
+
+    it('emits nothing from the fader or a jump button while disabled', () => {
+      disable();
+      const emitted: unknown[] = [];
+      component.faderChange.subscribe((v) => emitted.push(v));
+      component.jump.subscribe((id) => emitted.push(id));
+
+      fader().value = '1.25';
+      fader().dispatchEvent(new Event('input'));
+      jumpButtons().forEach((button) => button.click());
+
+      expect(emitted).toEqual([]);
+    });
+  });
 });
