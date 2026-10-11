@@ -22,7 +22,7 @@ public class FindDevicesEndpointTests
             Substitute.For<IStorageService>());
 
     private static OfflineDevice OfflineDevice() =>
-        new(OfflineDeviceId, "COM3", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true);
+        new(OfflineDeviceId, "COM3", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true, "TR-1");
 
     [Fact]
     public async Task Handle_OnlineAndOffline_ListsOnlineFirstThenOffline()

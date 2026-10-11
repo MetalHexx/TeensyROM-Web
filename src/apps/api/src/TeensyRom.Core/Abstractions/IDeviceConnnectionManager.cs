@@ -6,7 +6,7 @@ namespace TeensyRom.Core.Abstractions
 
     /// <summary>
     /// Owns the discovery occasions - API start, full discovery, records-only listing, and the explicit
-    /// Reconnect/Forget pair - and the devices they confirm. A unit the manager has ever known this
+    /// Reconnect/Forget pair - the devices they confirm, and each known unit's saved name. A unit the manager has ever known this
     /// session, reachable or not, stays in its knowledge: an unreachable or file-only unit's record is
     /// the manager's private state, kept internally so a later occasion can find or restore it, and is
     /// never surfaced through <see cref="GetAvailableDevices"/> or <see cref="GetAvailableDevice"/> -
@@ -21,6 +21,14 @@ namespace TeensyRom.Core.Abstractions
         /// Every row still missing afterwards is kept, flagged offline; the cache is saved whole either way.
         /// </summary>
         Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct);
+
+        /// <summary>
+        /// Whether the last <see cref="ConnectAtStartAsync"/> began from saved connection records. False
+        /// before any start, and after a start that found no usable file (fresh install, or a deleted,
+        /// empty or unreadable cache) - even if its full discovery then went on to find units, which
+        /// makes the records a start ends with its own and not evidence of what was known before.
+        /// </summary>
+        bool StartedFromSavedRecords { get; }
 
         /// <summary>
         /// fullScan = true -&gt; full discovery with resets (Discover Devices): merges against every known
@@ -59,5 +67,13 @@ namespace TeensyRom.Core.Abstractions
         /// nothing can save between the availability check and the removal.
         /// </summary>
         Task<ForgetResult> ForgetAsync(string deviceId, CancellationToken ct);
+
+        /// <summary>
+        /// Sets a known unit's name, reachable or not; no device contact. A name failing
+        /// <see cref="TeensyRom.Core.Common.DeviceNameRules"/> is <see cref="RenameResult.InvalidName"/>;
+        /// an unknown chip or a stand-in is <see cref="RenameResult.UnknownDevice"/>. Does not wait behind
+        /// a running discovery occasion.
+        /// </summary>
+        Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct);
     }
 }

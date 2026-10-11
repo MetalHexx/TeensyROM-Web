@@ -164,6 +164,7 @@ namespace TeensyRom.Api.Models
                 ConnectionType = device.LastTransport,
                 IpAddress = hasEndpoint ? host : string.Empty,
                 TcpPort = hasEndpoint ? port : 80,
+                Name = device.Name,
                 FwVersion = device.FwVersion,
                 IsCompatible = device.IsCompatible,
                 HardwareVariant = device.HardwareVariant,

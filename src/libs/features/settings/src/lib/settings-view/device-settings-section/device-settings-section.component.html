@@ -1,36 +1,37 @@
 <lib-scaling-card 
   title="Device Settings"
   [animationTrigger]="animationTrigger()">
-  @if (knownDevicesArray().length === 0) {
+  @if (devices().length === 0) {
     <div class="empty-state">
       <mat-icon>devices</mat-icon>
       <p>No devices have been connected yet.</p>
       <p class="hint">Connect a TeensyROM device to configure its settings.</p>
     </div>
   } @else {
-    @for (deviceGroup of sortedDeviceControls(); track deviceGroup.get('deviceId')?.value; let i = $index) {
-      <div class="device-section" [class.disabled]="isDeviceDisabled(deviceGroup)">
+    @for (card of cards(); track card.device.deviceId; let i = $index) {
+      <div class="device-section" [class.disabled]="isDeviceDisabled(card)">
         <div class="device-header">
           <lib-icon-label
             icon="desktop_windows"
-            [label]="getDeviceTitle(deviceGroup)"
+            [label]="card.device.name"
             size="extra-large"
             color="primary"
             [truncate]="true"
           ></lib-icon-label>
-          @if (!isDeviceOnline(deviceGroup)) {
+          <span class="device-chip-id">{{ card.device.deviceId }}</span>
+          @if (!card.isOnline) {
             <span class="offline-indicator">(Offline)</span>
           }
         </div>
 
-        <form [formGroup]="asFormGroup(deviceGroup)" [class.disabled]="isDeviceDisabled(deviceGroup)">
+        <form [formGroup]="card.group" [class.disabled]="isDeviceDisabled(card)">
           <div class="device-settings-grid">
             <div class="device-settings-column">
               <!-- Video Settings Group -->
               <div class="settings-group">
                 <h4 class="group-title">Video Settings</h4>
 
-                @if (getEnableVideoControl(deviceGroup); as enableVideoCtrl) {
+                @if (getEnableVideoControl(card.group); as enableVideoCtrl) {
                   <lib-settings-toggle-item
                     label="Enable Video Overlay"
                     description="Show video capture overlay for this device. Requires a video capture device connected to your C64 video output."
@@ -44,10 +45,10 @@
 
                 <lib-audio-settings-section
                   #audioSection
-                  [audioFormGroup]="getAudioSettings(deviceGroup)"
-                  [savedDeviceIndex]="getAudioDeviceIndex(deviceGroup)"
-                  [deviceId]="getDeviceId(deviceGroup)"
-                  [deviceIndex]="getDeviceIndex(deviceGroup)"
+                  [audioFormGroup]="getAudioSettings(card.group)"
+                  [savedDeviceIndex]="getAudioDeviceIndex(card.group)"
+                  [deviceId]="getDeviceId(card.group)"
+                  [deviceIndex]="card.hasEntry ? getDeviceIndex(card.group) : -1"
                   [loadOnInit]="i === 0" />
               </div>
             </div>
@@ -61,7 +62,7 @@
         </form>
       </div>
 
-      @if (i < sortedDeviceControls().length - 1) {
+      @if (i < cards().length - 1) {
         <hr class="device-divider" />
       }
     }

@@ -24,21 +24,21 @@ type Story = StoryObj<BrowseTreeComponent>;
 
 const defaultModel: BrowseTreeModel = {
   deviceId: 'SGVISJTN',
-  label: 'Teensy ROM Device',
+  label: 'Studio Rack',
   icon: 'desktop_windows',
-  accessibleName: 'Device SGVISJTN',
+  accessibleName: 'Device Studio Rack',
   storages: [
     {
       storageType: StorageType.Sd,
       label: 'SD Storage',
       icon: 'sd_storage',
-      accessibleName: 'SD Storage, Device SGVISJTN',
+      accessibleName: 'SD Storage, Studio Rack',
     },
     {
       storageType: StorageType.Usb,
       label: 'USB Storage',
       icon: 'usb',
-      accessibleName: 'USB Storage, Device SGVISJTN',
+      accessibleName: 'USB Storage, Studio Rack',
     },
   ],
 };
@@ -68,7 +68,7 @@ export const SingleStorage: Story = {
           storageType: StorageType.Sd,
           label: 'SD Storage',
           icon: 'sd_storage',
-          accessibleName: 'SD Storage, Device SGVISJTN',
+          accessibleName: 'SD Storage, Studio Rack',
         },
       ],
     },

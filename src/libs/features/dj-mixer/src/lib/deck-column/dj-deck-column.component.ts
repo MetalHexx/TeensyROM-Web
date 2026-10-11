@@ -8,7 +8,8 @@ import {
   VoicePanelComponent,
 } from '@teensyrom-nx/ui/components';
 import type { BindingCardModel, TransportPanelModel } from '@teensyrom-nx/ui/components';
-import { DeckService, DjStore } from '@teensyrom-nx/application';
+import { DeckService, DeviceStore, DjStore } from '@teensyrom-nx/application';
+import { findDeviceForMidiPort } from '@teensyrom-nx/domain';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
 import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
@@ -30,6 +31,7 @@ import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
 })
 export class DjDeckColumnComponent {
   private readonly djStore = inject(DjStore);
+  private readonly deviceStore = inject(DeviceStore);
   private readonly deckService = inject(DeckService);
 
   readonly deck = input.required<DeckRef>();
@@ -82,14 +84,18 @@ export class DjDeckColumnComponent {
   readonly bindingModel = computed<BindingCardModel>(() => {
     const { letter } = this.deck();
     const binding = this.binding();
+    const devices = this.deviceStore.devices();
     return {
       accessibleName: `MIDI binding deck ${letter}`,
       heading: `Deck ${letter}`,
-      ports: binding.portOptions.map((option) => ({
-        id: option.id,
-        label: option.label,
-        takenBy: option.takenBy ?? undefined,
-      })),
+      ports: binding.portOptions.map((option) => {
+        const device = findDeviceForMidiPort(option.portName, devices);
+        return {
+          id: option.id,
+          label: device ? `${device.name}: ${option.label}` : option.label,
+          takenBy: option.takenBy ?? undefined,
+        };
+      }),
       selectedPortId: binding.selectedPortId,
       portsEnabled: binding.portsEnabled,
       portPlaceholder: binding.portPlaceholder,

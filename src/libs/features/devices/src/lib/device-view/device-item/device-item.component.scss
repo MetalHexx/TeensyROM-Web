@@ -10,42 +10,43 @@
   box-sizing: border-box;
 }
 
+// Facts on top in two columns, storage tiles in their own full-width row beneath.
 .device-content {
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--spacing-lg);
   margin-top: var(--spacing-lg);
   padding: 0;
 }
 
-.device-storage {
+// Left column is the cartridge, right column is the host and link. A fact that is not shown leaves
+// a gap only in its own column.
+.device-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: var(--spacing-md) var(--spacing-lg);
+}
+
+.device-facts {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: var(--spacing-md);
+  min-width: 0;
+}
+
+.device-storage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--spacing-lg);
-  margin-top: var(--spacing-xs);
-  flex: 1;
   width: 100%;
 }
 
-.device-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-// At tablet and below, stack device-content vertically for better readability
+// At tablet and below, the facts become one list in the same order and the tiles stack
 @include breakpoints.below-tablet {
-  .device-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: var(--spacing-lg);
-    padding: 0;
+  .device-info,
+  .device-storage {
+    grid-template-columns: 1fr;
   }
 }
 

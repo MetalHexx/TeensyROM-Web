@@ -1,6 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { DeviceState, StorageType, type Device } from '@teensyrom-nx/domain';
+import {
+  DeviceState,
+  StorageType,
+  type Device,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { BrowseTreeComponent } from '@teensyrom-nx/ui/components';
 import { DjBrowseTreesComponent } from './dj-browse-trees.component';
 
@@ -10,6 +17,10 @@ function device(deviceId: string, overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: `TeensyROM ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -40,7 +51,7 @@ describe('DjBrowseTreesComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.device-row').length).toBe(3);
   });
 
-  it('builds each tree model from the device and its available storages, labelling it by device id', () => {
+  it('builds each tree model from the device and its available storages, labelling it by device name', () => {
     const { fixture } = render([device('SGVISJTN', { name: 'Workbench' })]);
 
     const tree = fixture.debugElement.query(By.directive(BrowseTreeComponent))
@@ -48,24 +59,41 @@ describe('DjBrowseTreesComponent', () => {
 
     expect(tree.model()).toEqual({
       deviceId: 'SGVISJTN',
-      label: 'SGVISJTN',
+      label: 'Workbench',
       icon: 'desktop_windows',
-      accessibleName: 'Device SGVISJTN',
+      accessibleName: 'Device Workbench',
       storages: [
         {
           storageType: StorageType.Sd,
           label: 'SD Storage',
           icon: 'sd_storage',
-          accessibleName: 'SD Storage, Device SGVISJTN',
+          accessibleName: 'SD Storage, Workbench',
         },
         {
           storageType: StorageType.Usb,
           label: 'USB Storage',
           icon: 'usb',
-          accessibleName: 'USB Storage, Device SGVISJTN',
+          accessibleName: 'USB Storage, Workbench',
         },
       ],
     });
+  });
+
+  it('relabels the tree and its storages when the device input carries a new name, keeping the device id key', () => {
+    const { fixture } = render([device('SGVISJTN', { name: 'TR-1' })]);
+    fixture.componentRef.setInput('devices', [device('SGVISJTN', { name: 'Living Room' })]);
+    fixture.detectChanges();
+
+    const tree = fixture.debugElement.query(By.directive(BrowseTreeComponent))
+      .componentInstance as BrowseTreeComponent;
+
+    expect(tree.model().deviceId).toBe('SGVISJTN');
+    expect(tree.model().label).toBe('Living Room');
+    expect(tree.model().accessibleName).toBe('Device Living Room');
+    expect(tree.model().storages.map((s) => s.accessibleName)).toEqual([
+      'SD Storage, Living Room',
+      'USB Storage, Living Room',
+    ]);
   });
 
   it('omits an unavailable storage from the tree model', () => {

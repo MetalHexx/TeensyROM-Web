@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
 import { DeviceStore, StorageStore, TransferStore, TRANSFER_CONTEXT, ITransferContext } from '@teensyrom-nx/application';
-import { Device, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { DropzoneCardComponent } from '../file-transfer-view/dropzone-card/dropzone-card.component';
 
 const FIXTURE_DEVICE_ID = 'dev-fixture-device';
@@ -10,6 +17,10 @@ const FIXTURE_DEVICE: Device = {
   comPort: 'COM3',
   name: 'Workbench TR',
   fwVersion: '1.0.0',
+  machine: DeviceMachine.C64,
+  videoStandard: DeviceVideoStandard.Ntsc,
+  todClockHz: null,
+  hardwareVariant: DeviceHardwareVariant.TeensyRom,
   isCompatible: true,
   isConnected: true,
   deviceState: DeviceState.Connected,

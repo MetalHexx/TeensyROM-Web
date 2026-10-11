@@ -226,7 +226,7 @@ Tests use `data-testid` attributes for reliable element selection. This approach
 | `device-firmware-label`   | Firmware icon-label   | Firmware version               |
 | `device-port-label`       | Port icon-label       | COM port/USB path              |
 | `device-state-label`      | State icon-label      | Device state (Connected, etc.) |
-| `device-compatible-label` | Compatible icon-label | Compatibility status           |
+| `device-compatible-label` | FW Compatible label   | Firmware compatibility status  |
 | `device-storage`          | `.device-storage`     | Storage status section         |
 | `usb-storage-status`      | USB storage component | USB storage status             |
 | `sd-storage-status`       | SD storage component  | SD card storage status         |

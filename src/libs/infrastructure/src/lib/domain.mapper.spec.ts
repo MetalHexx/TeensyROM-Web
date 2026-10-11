@@ -29,6 +29,9 @@ import {
   FileItemType,
   StorageType,
   DeviceState,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
   PlayerFilterType,
   PlayerScope,
   Settings,
@@ -589,6 +592,44 @@ describe('DomainMapper (Device)', () => {
       expect(result.usbStorage).toBeDefined();
       expect(result.usbStorage.type).toBe(StorageType.Usb);
       expect(result.usbStorage.available).toBe(false);
+    });
+
+    describe('device facts', () => {
+      const buildCartDto = (overrides: Partial<CartDto> = {}): CartDto => ({
+        deviceId: 'device-123',
+        comPort: 'COM3',
+        name: 'TeensyROM Cart',
+        fwVersion: '1.0.0',
+        isCompatible: true,
+        isConnected: true,
+        deviceState: ApiDeviceState.Connected,
+        hardwareVariant: HardwareVariant.TeensyRomPlus,
+        isMinimalFirmware: false,
+        buildTimestamp: 'Sep 18 2026, 09:41:32',
+        machine: MachineType.C128,
+        videoStandard: VideoStandard.Pal,
+        todClockHz: 50,
+        sdStorage: { deviceId: 'device-123', type: ApiStorageType.Sd, available: true, indexExists: false },
+        usbStorage: { deviceId: 'device-123', type: ApiStorageType.Usb, available: false, indexExists: false },
+        connectionType: ConnectionType.Serial,
+        ipAddress: '',
+        tcpPort: 0,
+        ...overrides,
+      });
+
+      it('should map machine, video standard, TOD clock and hardware variant', () => {
+        const result = DomainMapper.toDevice(buildCartDto());
+
+        expect(result.machine).toBe(DeviceMachine.C128);
+        expect(result.videoStandard).toBe(DeviceVideoStandard.Pal);
+        expect(result.todClockHz).toBe(50);
+        expect(result.hardwareVariant).toBe(DeviceHardwareVariant.TeensyRomPlus);
+      });
+
+      it('should map a missing TOD clock to null', () => {
+        expect(DomainMapper.toDevice(buildCartDto({ todClockHz: undefined })).todClockHz).toBeNull();
+        expect(DomainMapper.toDevice(buildCartDto({ todClockHz: null })).todClockHz).toBeNull();
+      });
     });
 
     it('should handle null CartDto', () => {

@@ -165,6 +165,38 @@ public class DeviceConnectionManagerTests
     }
 
     [Fact]
+    public async Task StartedFromSavedRecords_WithNoCache_StaysFalseEvenWhenFullDiscoveryFindsUnits()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("44444444", ConnectionType.Serial, "COM9", port);
+
+        _cache.Load().Returns((IReadOnlyList<CachedConnectionRecord>?)null);
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+
+        var manager = CreateManager();
+        manager.StartedFromSavedRecords.Should().BeFalse("no start has run yet");
+
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle();
+        manager.StartedFromSavedRecords.Should().BeFalse("the record the discovery just created is not a saved record");
+    }
+
+    [Fact]
+    public async Task StartedFromSavedRecords_WithSavedRows_IsTrueAfterStart()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord>
+        {
+            new("aaaa1111", null, null, ConnectionType.Serial, Offline: true)
+        });
+
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        manager.StartedFromSavedRecords.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ConnectAtStartAsync_WithRowAnsweringWrongChip_RunsOneSearchAndCacheHoldsTheMissedRowFlaggedOffline()
     {
         var cachedPort = CreatePort(ConnectionType.Serial);
@@ -958,5 +990,326 @@ public class DeviceConnectionManagerTests
         offline.HardwareVariant.Should().Be(HardwareVariant.TeensyRomPlus);
         offline.IsCompatible.Should().BeTrue();
         offline.SerialPortName.Should().Be("COM3");
+    }
+
+    // --- Device names ---
+
+    /// <summary>Returns the rows passed to the most recent <see cref="IConnectionRecordCache.Save"/>.</summary>
+    private Func<List<CachedConnectionRecord>> CaptureLastSave()
+    {
+        List<CachedConnectionRecord> saved = [];
+        _cache.When(c => c.Save(Arg.Any<IEnumerable<CachedConnectionRecord>>()))
+            .Do(ci => saved = ci.Arg<IEnumerable<CachedConnectionRecord>>().ToList());
+        return () => saved;
+    }
+
+    private static string? NameOf(IEnumerable<CachedConnectionRecord> rows, string chipId) =>
+        rows.Single(r => r.ChipId == chipId).Name;
+
+    [Fact]
+    public async Task FindDevices_FullScan_NamesFreshChipsInChipIdOrder()
+    {
+        var deviceB = CreateDevice("bbbb2222", ConnectionType.Serial, "COM4", CreatePort(ConnectionType.Serial));
+        var deviceA = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var lastSave = CaptureLastSave();
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { deviceB, deviceA });
+
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        deviceA.Cart.Name.Should().Be("TR-1");
+        deviceB.Cart.Name.Should().Be("TR-2");
+        NameOf(lastSave(), "aaaa1111").Should().Be("TR-1");
+        NameOf(lastSave(), "bbbb2222").Should().Be("TR-2");
+    }
+
+    [Fact]
+    public async Task FindDevices_FullScan_AfterRenamingTr1_TheNextNewChipTakesTheFreedNumber()
+    {
+        var deviceA = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var deviceB = CreateDevice("bbbb2222", ConnectionType.Serial, "COM4", CreatePort(ConnectionType.Serial));
+        var deviceC = CreateDevice("cccc3333", ConnectionType.Serial, "COM5", CreatePort(ConnectionType.Serial));
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { deviceA, deviceB },
+            new List<TeensyRomDevice> { deviceA, deviceB, deviceC });
+
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        await manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        deviceC.Cart.Name.Should().Be("TR-1");
+        deviceA.Cart.Name.Should().Be("Kitchen");
+        deviceB.Cart.Name.Should().Be("TR-2");
+    }
+
+    [Fact]
+    public async Task FindDevices_FullScan_StandInChipsShowTheirOwnIdAndNeverConsumeATrNumber()
+    {
+        var standIn = CreateDevice("Unknown", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var real = CreateDevice("aaaa1111", ConnectionType.Serial, "COM4", CreatePort(ConnectionType.Serial));
+        var lastSave = CaptureLastSave();
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { standIn, real });
+
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        standIn.Cart.Name.Should().Be("Unknown");
+        real.Cart.Name.Should().Be("TR-1");
+        lastSave().Single(r => r.ChipId == "Unknown").Name.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithRowsThatHaveNoName_AssignsTrNumbersInChipIdOrderAndSavesThem()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord>
+        {
+            new("bbbb2222", null, null, ConnectionType.Serial, Offline: true),
+            new("aaaa1111", null, null, ConnectionType.Serial, Offline: true)
+        });
+        var lastSave = CaptureLastSave();
+
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        NameOf(lastSave(), "aaaa1111").Should().Be("TR-1");
+        NameOf(lastSave(), "bbbb2222").Should().Be("TR-2");
+        manager.GetOfflineDevices().Select(d => (d.ChipId, d.Name)).Should().BeEquivalentTo(
+            new[] { ("aaaa1111", "TR-1"), ("bbbb2222", "TR-2") });
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithSomeSavedNames_KeepsThemAndGivesTheRestTheLowestFreeNumbers()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord>
+        {
+            new("zzzz9999", null, null, ConnectionType.Serial, Offline: true, Name: "TR-1"),
+            new("aaaa1111", null, null, ConnectionType.Serial, Offline: true),
+            new("bbbb2222", null, null, ConnectionType.Serial, Offline: true, Name: "  "),
+            new("cccc3333", null, null, ConnectionType.Serial, Offline: true, Name: "Kitchen")
+        });
+        var lastSave = CaptureLastSave();
+
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        NameOf(lastSave(), "zzzz9999").Should().Be("TR-1");
+        NameOf(lastSave(), "cccc3333").Should().Be("Kitchen");
+        NameOf(lastSave(), "aaaa1111").Should().Be("TR-2");
+        NameOf(lastSave(), "bbbb2222").Should().Be("TR-3");
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WhenAConfirmedRowHadASavedName_TheRebuiltDeviceCarriesIt()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("11112222", ConnectionType.Serial, "COM5", port);
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial, Name: "Kitchen") });
+        AllowSerialLookup("11112222", "COM5");
+        _transports.CreateSerial("COM5", true).Returns(port);
+        _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+
+        var manager = CreateManager();
+        var started = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        started.Should().ContainSingle().Which.Cart.Name.Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task RenameAsync_WhenAvailable_StampsTheDeviceReturnsItAndSavesTheName()
+    {
+        var device = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var lastSave = CaptureLastSave();
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        var outcome = await manager.RenameAsync("aaaa1111", "  Kitchen ", CancellationToken.None);
+
+        outcome.Result.Should().Be(RenameResult.Renamed);
+        outcome.Device.Should().BeSameAs(device);
+        outcome.OfflineDevice.Should().BeNull();
+        device.Cart.Name.Should().Be("Kitchen");
+        NameOf(lastSave(), "aaaa1111").Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task RenameAsync_WhenOnlyKnownFromTheSavedFile_ReturnsTheOfflineDeviceAndSavesTheName()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("aaaa1111", null, null, ConnectionType.Serial, Offline: true) });
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+        var lastSave = CaptureLastSave();
+
+        var outcome = await manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+
+        outcome.Result.Should().Be(RenameResult.Renamed);
+        outcome.Device.Should().BeNull();
+        outcome.OfflineDevice!.Name.Should().Be("Kitchen");
+        manager.GetOfflineDevices().Should().ContainSingle().Which.Name.Should().Be("Kitchen");
+        NameOf(lastSave(), "aaaa1111").Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task RenameAsync_WhenTheUnitIsUnreachable_ReturnsTheOfflineDevice()
+    {
+        var device = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { device },
+            new List<TeensyRomDevice>());
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        var outcome = await manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+
+        outcome.Result.Should().Be(RenameResult.Renamed);
+        outcome.Device.Should().BeNull();
+        outcome.OfflineDevice!.ChipId.Should().Be("aaaa1111");
+        outcome.OfflineDevice.Name.Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task RenameAsync_ForAStandInOrUnknownChip_IsUnknownDeviceAndSavesNothing()
+    {
+        var standIn = CreateDevice("Unknown", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { standIn });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        _cache.ClearReceivedCalls();
+
+        var standInOutcome = await manager.RenameAsync("Unknown", "Kitchen", CancellationToken.None);
+        var unknownOutcome = await manager.RenameAsync("nosuchchip", "Kitchen", CancellationToken.None);
+
+        standInOutcome.Result.Should().Be(RenameResult.UnknownDevice);
+        unknownOutcome.Result.Should().Be(RenameResult.UnknownDevice);
+        standIn.Cart.Name.Should().Be("Unknown");
+        _cache.DidNotReceive().Save(Arg.Any<IEnumerable<CachedConnectionRecord>>());
+    }
+
+    [Theory]
+    [InlineData("  ")]
+    [InlineData("")]
+    [InlineData("1234567890123456789012345")]
+    [InlineData("bad\tname")]
+    public async Task RenameAsync_WithAnInvalidName_IsInvalidNameAndChangesNothing(string name)
+    {
+        var device = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        _cache.ClearReceivedCalls();
+
+        var outcome = await manager.RenameAsync("aaaa1111", name, CancellationToken.None);
+
+        outcome.Result.Should().Be(RenameResult.InvalidName);
+        device.Cart.Name.Should().Be("TR-1");
+        _cache.DidNotReceive().Save(Arg.Any<IEnumerable<CachedConnectionRecord>>());
+    }
+
+    [Fact]
+    public async Task RenameAsync_WhileADiscoveryIsRunning_CompletesWithoutWaitingForIt()
+    {
+        var device = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var sweepGate = new TaskCompletionSource<List<TeensyRomDevice>>();
+        var lastSave = CaptureLastSave();
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            Task.FromResult(new List<TeensyRomDevice> { device }),
+            sweepGate.Task);
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        var sweep = manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        var rename = manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+
+        rename.IsCompleted.Should().BeTrue();
+        (await rename).Result.Should().Be(RenameResult.Renamed);
+
+        var rebuilt = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        sweepGate.SetResult([rebuilt]);
+        await sweep;
+
+        rebuilt.Cart.Name.Should().Be("Kitchen");
+        NameOf(lastSave(), "aaaa1111").Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task FindDevices_FullScan_RebuiltDeviceKeepsItsRenamedName()
+    {
+        var original = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        var rebuilt = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        rebuilt.Cart.Name.Should().Be("Unnamed");
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { original },
+            new List<TeensyRomDevice> { rebuilt });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        await manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        manager.GetAvailableDevice("aaaa1111").Should().BeSameAs(rebuilt);
+        rebuilt.Cart.Name.Should().Be("Kitchen");
+    }
+
+    [Fact]
+    public async Task ReconnectAsync_RebuiltDeviceKeepsItsRenamedNameAndTheSavedRowCarriesIt()
+    {
+        var staleDevice = CreateDevice("reconnct", ConnectionType.Tcp, "10.0.0.9:80", CreatePort(ConnectionType.Tcp));
+        var finderStub = Substitute.For<ICartFinder>();
+        var manager = new DeviceConnectionManager(finderStub, _cache, _transports, _interrogator, _locator, _options, _log);
+        finderStub.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { staleDevice },
+            new List<TeensyRomDevice>());
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        await manager.RenameAsync("reconnct", "Kitchen", CancellationToken.None);
+
+        var freshPort = CreatePort(ConnectionType.Tcp);
+        var freshDevice = CreateDevice("reconnct", ConnectionType.Tcp, "10.0.0.9:80", freshPort);
+        _transports.CreateTcp("10.0.0.9:80").Returns(freshPort);
+        _interrogator.ReadVersion(freshPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "reconnct" });
+        finderStub.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(freshDevice);
+        _cache.ClearReceivedCalls();
+
+        var outcome = await manager.ReconnectAsync("reconnct", CancellationToken.None);
+
+        outcome.Result.Should().Be(ReconnectResult.Reconnected);
+        freshDevice.Cart.Name.Should().Be("Kitchen");
+        _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows => rows.Single().Name == "Kitchen"));
+    }
+
+    [Fact]
+    public async Task ForgetAsync_ThenTheUnitReturns_GetsAFreshTrNumber()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord>
+        {
+            new("aaaa1111", null, null, ConnectionType.Serial, Offline: true, Name: "Kitchen"),
+            new("bbbb2222", null, null, ConnectionType.Serial, Offline: true)
+        });
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+        manager.GetOfflineDevices().Single(d => d.ChipId == "bbbb2222").Name.Should().Be("TR-1");
+
+        (await manager.ForgetAsync("aaaa1111", CancellationToken.None)).Should().Be(ForgetResult.Forgotten);
+        var returning = CreateDevice("aaaa1111", ConnectionType.Serial, "COM3", CreatePort(ConnectionType.Serial));
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { returning });
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        returning.Cart.Name.Should().Be("TR-2");
+    }
+
+    [Fact]
+    public async Task ForgetAsync_ThenRenameOfTheForgottenUnit_IsUnknownDevice()
+    {
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("aaaa1111", null, null, ConnectionType.Serial, Offline: true) });
+        var manager = CreateManager();
+        await manager.ConnectAtStartAsync(CancellationToken.None);
+        await manager.ForgetAsync("aaaa1111", CancellationToken.None);
+
+        var outcome = await manager.RenameAsync("aaaa1111", "Kitchen", CancellationToken.None);
+
+        outcome.Result.Should().Be(RenameResult.UnknownDevice);
     }
 }

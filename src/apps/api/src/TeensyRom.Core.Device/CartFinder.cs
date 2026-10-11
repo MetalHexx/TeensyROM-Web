@@ -1,4 +1,5 @@
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
@@ -39,7 +40,6 @@ namespace TeensyRom.Core.Device
 		IDeviceSettingsProvider settingsProvider,
 		ConnectionOptions options) : ICartFinder
 	{
-		private const string _unknownDeviceIdBase = "Unknown";
 		private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
 		private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
 
@@ -236,7 +236,7 @@ namespace TeensyRom.Core.Device
 		private string NextStandInDeviceId()
 		{
 			_standInCount++;
-			return _standInCount == 1 ? _unknownDeviceIdBase : $"{_unknownDeviceIdBase}-{_standInCount}";
+			return StandInDeviceId.ForOrdinal(_standInCount);
 		}
 
 		/// <summary>
@@ -262,18 +262,12 @@ namespace TeensyRom.Core.Device
 		}
 
 		/// <summary>
-		/// True when the id is a per-run stand-in rather than a chip id read from the device.
-		/// </summary>
-		private static bool IsStandInDeviceId(string? deviceId) =>
-			deviceId == _unknownDeviceIdBase || (deviceId?.StartsWith($"{_unknownDeviceIdBase}-") ?? false);
-
-		/// <summary>
 		/// Ensures a discovered device is saved to settings.
 		/// Skips devices without a chip id (no stable DeviceId to key on).
 		/// </summary>
 		private void EnsureDeviceInSettings(string deviceId)
 		{
-			if (string.IsNullOrWhiteSpace(deviceId) || IsStandInDeviceId(deviceId))
+			if (string.IsNullOrWhiteSpace(deviceId) || StandInDeviceId.IsStandIn(deviceId))
 			{
 				log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
 				return;

@@ -45,11 +45,12 @@ export class SettingsViewComponent {
   // Active section state
   readonly activeSection = signal<'player' | 'devices' | 'fileTransfer' | 'search'>('player');
 
-  // Device map for child components
-  readonly deviceMap = computed(() => {
-    const devices = this.deviceStore.devices();
-    return new Map(devices.map(d => [d.deviceId, d]));
-  });
+  // Device list for the device settings cards
+  readonly devices = this.deviceStore.devices;
+
+  /** Builds the detached default settings group for a device with no saved entry */
+  readonly createDefaultDeviceGroup = (deviceId: string): FormGroup =>
+    this.formService.createDefaultDeviceFormGroup(deviceId);
 
   // Expose service state to template
   readonly settings = this.formService.settings;

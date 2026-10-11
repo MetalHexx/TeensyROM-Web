@@ -41,6 +41,12 @@
       flex: 0 1 auto;
     }
 
+    .device-chip-id {
+      color: var(--color-dimmed);
+      font-size: 0.875rem;
+      flex-shrink: 0;
+    }
+
     .offline-indicator {
       color: var(--color-error);
       font-size: 1rem;

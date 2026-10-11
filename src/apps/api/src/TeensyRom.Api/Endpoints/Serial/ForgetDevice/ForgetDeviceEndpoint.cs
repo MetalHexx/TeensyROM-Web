@@ -4,7 +4,7 @@ using TeensyRom.Core.Entities.Device;
 
 namespace TeensyRom.Api.Endpoints.ForgetDevice
 {
-    public class ForgetDeviceEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<ForgetDeviceRequest, ForgetDeviceResponse>
+    public class ForgetDeviceEndpoint(IDeviceConnectionManager deviceManager, IDeviceSettingsProvider settingsProvider) : RadEndpoint<ForgetDeviceRequest, ForgetDeviceResponse>
     {
         public override void Configure()
         {
@@ -17,7 +17,7 @@ namespace TeensyRom.Api.Endpoints.ForgetDevice
                 .WithSummary("Forget Device")
                 .WithTags("Devices")
                 .WithDescription(
-                    "Removes a known, offline TeensyROM device from memory and the saved connection file.\n\n" +
+                    "Removes a known, offline TeensyROM device from memory, the saved connection file and its saved settings.\n\n" +
                     "- Only an offline device can be forgotten; an available device is left untouched."
                 );
         }
@@ -29,6 +29,7 @@ namespace TeensyRom.Api.Endpoints.ForgetDevice
             switch (result)
             {
                 case ForgetResult.Forgotten:
+                    settingsProvider.RemoveDeviceSettings(r.DeviceId);
                     Response = new();
                     Send();
                     return;

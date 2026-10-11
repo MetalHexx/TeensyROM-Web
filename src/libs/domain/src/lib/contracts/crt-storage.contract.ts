@@ -62,6 +62,14 @@ export interface ICrtStorage {
   clear(deviceId: string, context: CrtStorageContext): void;
 
   /**
+   * Remove persisted settings for a device across every context.
+   * Custom presets are not device-scoped and are left alone.
+   *
+   * @param deviceId - TeensyROM device identifier
+   */
+  clearDevice(deviceId: string): void;
+
+  /**
    * Save a custom preset with the given name and settings.
    * Name should include 'custom-' prefix.
    * 

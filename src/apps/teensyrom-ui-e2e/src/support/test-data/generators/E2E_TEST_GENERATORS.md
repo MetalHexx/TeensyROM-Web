@@ -106,7 +106,8 @@ function generateDevice(overrides?: Partial<CartDto>): CartDto;
 - `isConnected`: `true`
 - `deviceState`: `DeviceState.Connected`
 - `comPort`: Random selection from `['COM3', 'COM4', 'COM5', 'COM6']`
-- `name`: `"TeensyROM {CompanyName}"` (e.g., "TeensyROM Acme Corp")
+- `name`: `"TR-{N}"` (e.g., "TR-42"), the same shape the API assigns
+- `machine` / `videoStandard` / `todClockHz`: `C64` / `NTSC` / `60`
 - `fwVersion`: Semantic version (e.g., "1.5.3")
 - `isCompatible`: `true`
 - `sdStorage`: Generated via `generateCartStorage` with type SD

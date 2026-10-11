@@ -1,6 +1,10 @@
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
+import { DeviceStore } from '@teensyrom-nx/application';
 import {
   CRT_STORAGE,
+  Device,
+  DeviceVideoStandard,
   ICrtStorage,
   CrtSettings,
   CustomCrtPreset,
@@ -44,6 +48,7 @@ function createMockCrtStorage(overrides: Partial<ICrtStorage> = {}): ICrtStorage
     load: vi.fn(() => null),
     hasSavedSettings: vi.fn(() => false),
     clear: vi.fn(),
+    clearDevice: vi.fn(),
     loadCustomPresets: vi.fn().mockReturnValue([]),
     saveCustomPreset: vi.fn(),
     updateCustomPreset: vi.fn(),
@@ -54,11 +59,20 @@ function createMockCrtStorage(overrides: Partial<ICrtStorage> = {}): ICrtStorage
   };
 }
 
-function render(crtStorage: ICrtStorage, deviceId = 'test-device') {
-  return renderPlayerComponent(FileImageComponent, {
+function device(deviceId: string, videoStandard: DeviceVideoStandard): Device {
+  return { deviceId, videoStandard } as Device;
+}
+
+function render(crtStorage: ICrtStorage, deviceId = 'test-device', devices: Device[] = []) {
+  const devicesSignal = signal<Device[]>(devices);
+  const result = renderPlayerComponent(FileImageComponent, {
     inputs: { deviceId },
-    providers: [{ provide: CRT_STORAGE, useValue: crtStorage }],
+    providers: [
+      { provide: CRT_STORAGE, useValue: crtStorage },
+      { provide: DeviceStore, useValue: { devices: devicesSignal } },
+    ],
   });
+  return { ...result, devicesSignal };
 }
 
 describe('FileImageComponent', () => {
@@ -140,5 +154,65 @@ describe('FileImageComponent', () => {
     expect(() => component.onCrtPresetSelected('custom-missing' as CustomPresetName)).not.toThrow();
 
     expect(component['crtSettings']()).toEqual(originalSettings);
+  });
+});
+
+describe('FileImageComponent video standard', () => {
+  it('starts a device with no saved settings in its NTSC standard', () => {
+    const { component } = render(
+      createMockCrtStorage(),
+      'test-device',
+      [device('test-device', DeviceVideoStandard.Ntsc)]
+    );
+
+    expect(component['crtSettings']().videoStandard).toBe('NTSC');
+  });
+
+  it('starts an unknown device in PAL', () => {
+    const { component } = render(createMockCrtStorage());
+
+    expect(component['crtSettings']().videoStandard).toBe('PAL');
+  });
+
+  it('keeps a saved PAL choice on an NTSC device', () => {
+    const crtStorage = createMockCrtStorage({
+      load: vi.fn(() => ({ ...customPresetSettings, videoStandard: 'PAL' as const })),
+    });
+    const { component } = render(crtStorage, 'test-device', [device('test-device', DeviceVideoStandard.Ntsc)]);
+
+    expect(component['crtSettings']().videoStandard).toBe('PAL');
+  });
+
+  it('applies the device standard to a built-in preset', () => {
+    const { component } = render(createMockCrtStorage(), 'test-device', [
+      device('test-device', DeviceVideoStandard.Ntsc),
+    ]);
+
+    component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL);
+
+    expect(component['crtSettings']().videoStandard).toBe('NTSC');
+  });
+
+  it('keeps the stored standard of a custom preset', () => {
+    const crtStorage = createMockCrtStorage({
+      loadCustomPresets: vi.fn().mockReturnValue([
+        { ...mockCustomPresets[0], settings: { ...customPresetSettings, videoStandard: 'NTSC' as const } },
+      ]),
+    });
+    const { component } = render(crtStorage, 'test-device', [device('test-device', DeviceVideoStandard.Pal)]);
+
+    component.onCrtPresetSelected('custom-image-preset' as CustomPresetName);
+
+    expect(component['crtSettings']().videoStandard).toBe('NTSC');
+  });
+
+  it('adopts the device standard when the device list arrives after the view', () => {
+    const { component, devicesSignal, fixture } = render(createMockCrtStorage(), 'test-device');
+    expect(component['crtSettings']().videoStandard).toBe('PAL');
+
+    devicesSignal.set([device('test-device', DeviceVideoStandard.Ntsc)]);
+    fixture.detectChanges();
+
+    expect(component['crtSettings']().videoStandard).toBe('NTSC');
   });
 });

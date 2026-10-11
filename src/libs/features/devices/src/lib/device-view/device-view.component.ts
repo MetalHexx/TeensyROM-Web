@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmationDialogComponent } from '@teensyrom-nx/ui/components';
 import { DeviceStore } from '@teensyrom-nx/application';
-import { DeviceItemComponent } from './device-item/device-item.component';
+import { DeviceItemComponent, DeviceRenameRequest } from './device-item/device-item.component';
 import { DeviceLogsComponent } from './device-logs/device-logs.component';
 import { DeviceToolbarComponent } from './device-toolbar/device-toolbar.component';
 
@@ -22,6 +22,9 @@ export class DeviceViewComponent {
   isLoading = this.deviceStore.isLoading;
   reconnectingDeviceIds = this.deviceStore.reconnectingDeviceIds;
 
+  /** Ids of devices whose rename is being saved. */
+  readonly renamingDeviceIds = signal<string[]>([]);
+
   onEnable(deviceId: string) {
     this.deviceStore.enableDevice(deviceId);
   }
@@ -32,6 +35,19 @@ export class DeviceViewComponent {
 
   isReconnecting(deviceId: string): boolean {
     return this.reconnectingDeviceIds().includes(deviceId);
+  }
+
+  isRenaming(deviceId: string): boolean {
+    return this.renamingDeviceIds().includes(deviceId);
+  }
+
+  async onRename({ deviceId, name }: DeviceRenameRequest): Promise<void> {
+    this.renamingDeviceIds.update((ids) => [...ids, deviceId]);
+    try {
+      await this.deviceStore.renameDevice(deviceId, name);
+    } finally {
+      this.renamingDeviceIds.update((ids) => ids.filter((id) => id !== deviceId));
+    }
   }
 
   onReconnect(deviceId: string): void {

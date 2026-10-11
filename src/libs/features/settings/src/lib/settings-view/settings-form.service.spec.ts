@@ -874,4 +874,34 @@ describe('SettingsFormService', () => {
       expect(service.getDeviceIndexById('device-gamma')).toBe(2);
     });
   });
+
+  describe('Default Device Form Group', () => {
+    it('should build a disabled group with video off and default audio for the device', () => {
+      const group = service.createDefaultDeviceFormGroup('new-device');
+
+      expect(group.disabled).toBe(true);
+      const value = group.getRawValue();
+      expect(value.deviceId).toBe('new-device');
+      expect(value.videoSettings.enableVideo).toBe(false);
+      expect(value.audioSettings).toEqual({
+        enableAudioStream: false,
+        audioDeviceIndex: -1,
+        audioDeviceName: '',
+        captureChannelCount: 1,
+        sampleRate: 48000,
+        channels: [],
+        useOpusEncoding: true,
+      });
+    });
+
+    it('should not add the default group to the known devices form array', () => {
+      const before = service.getKnownDevices().length;
+
+      const group = service.createDefaultDeviceFormGroup('new-device');
+
+      expect(service.getKnownDevices().length).toBe(before);
+      expect(service.getDeviceIndexById('new-device')).toBe(-1);
+      expect(service.getKnownDevices().controls).not.toContain(group);
+    });
+  });
 });

@@ -5,6 +5,8 @@ import type { MidiAccessState } from '../ports/midi-access';
 
 export interface BindingOption {
   id: string;
+  /** The raw port name, kept apart from `label` so a consumer can match it to a device. */
+  portName: string;
   label: string;
   takenBy: Slot | null;
 }
@@ -51,6 +53,7 @@ export function bindingSummary(store: WritableStore<DjState>) {
 
         const portOptions: BindingOption[] = midi.ports.map((port) => ({
           id: port.id,
+          portName: port.name,
           label: `${port.name} (${port.manufacturer})`,
           takenBy: otherBinding.port?.id === port.id ? other : null,
         }));

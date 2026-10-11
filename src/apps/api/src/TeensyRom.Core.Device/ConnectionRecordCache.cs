@@ -11,7 +11,8 @@ namespace TeensyRom.Core.Device;
 /// A connection record as persisted to the whole-file cache: an online row (<see cref="Offline"/> false)
 /// confirmed this session, or an offline row kept so the unit can be found or reconnected later. The
 /// trailing members are optional so a file written before P09 - only the first four - still loads, read
-/// as online with its facts unknown.
+/// as online with its facts unknown. <see cref="Name"/> is the unit's saved device name; a file written
+/// before names existed loads it as null and the manager assigns one at start.
 /// </summary>
 public sealed record CachedConnectionRecord(
     string ChipId,
@@ -21,7 +22,8 @@ public sealed record CachedConnectionRecord(
     bool Offline = false,
     string? FwVersion = null,
     HardwareVariant HardwareVariant = HardwareVariant.Unknown,
-    bool IsCompatible = false);
+    bool IsCompatible = false,
+    string? Name = null);
 
 /// <summary>
 /// Whole-file cache of confirmed device connection records, read by the API start occasion to
@@ -42,8 +44,6 @@ public interface IConnectionRecordCache
 /// <inheritdoc cref="IConnectionRecordCache"/>
 public sealed class ConnectionRecordCache : IConnectionRecordCache
 {
-    private const string _unknownDeviceIdBase = "Unknown";
-
     private readonly ILoggingService _log;
     private readonly string _cacheFilePath;
     private readonly object _lock = new();
@@ -131,7 +131,7 @@ public sealed class ConnectionRecordCache : IConnectionRecordCache
 
     /// <summary>False for the display-only "Unknown"/"Unknown-2" stand-ins CartFinder assigns per run.</summary>
     private static bool IsRealChipId(string chipId) =>
-        !string.IsNullOrWhiteSpace(chipId) && chipId != _unknownDeviceIdBase && !chipId.StartsWith($"{_unknownDeviceIdBase}-");
+        !string.IsNullOrWhiteSpace(chipId) && !StandInDeviceId.IsStandIn(chipId);
 
     private sealed record ConnectionRecordFile
     {

@@ -13,6 +13,7 @@ import {
 } from './directory-tree.model';
 
 const DEVICE_ID = 'device-1';
+const DEVICE_NAME = 'TR-1';
 
 function cacheFrom(listings: DirectoryListing[]): DirectoryListingCache {
   return mergeDirectoryListings(new Map(), listings);
@@ -36,6 +37,7 @@ describe('directory-tree.model', () => {
     it('always returns exactly one root device node with the expected shape', () => {
       const nodes = buildDirectoryTree({
         deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
         storageTypes: [StorageType.Sd],
         cache: cacheFrom([]),
       });
@@ -43,15 +45,44 @@ describe('directory-tree.model', () => {
       expect(nodes).toHaveLength(1);
       const deviceNode = nodes[0];
       expect(deviceNode.id).toBe(`device-${DEVICE_ID}`);
-      expect(deviceNode.name).toBe(`Device ${DEVICE_ID}`);
+      expect(deviceNode.name).toBe(DEVICE_NAME);
       expect(deviceNode.type).toBe(DirectoryTreeNodeType.Device);
       expect(deviceNode.icon).toBe('desktop_windows');
       expect(deviceNode.deviceId).toBe(DEVICE_ID);
     });
 
+    it('relabels the device node from deviceName without changing any node id', () => {
+      const cache = cacheFrom([
+        {
+          deviceId: DEVICE_ID,
+          storageType: StorageType.Sd,
+          path: '/',
+          directories: [{ name: 'games', path: '/games' }],
+        },
+      ]);
+      const build = (deviceName: string) =>
+        buildDirectoryTree({
+          deviceId: DEVICE_ID,
+          deviceName,
+          storageTypes: [StorageType.Sd],
+          cache,
+        });
+      const collectIds = (nodes: DirectoryTreeNode[]): string[] =>
+        nodes.flatMap((node) => [node.id, ...collectIds(node.children ?? [])]);
+
+      const before = build('TR-1');
+      const after = build('Living Room');
+
+      expect(before[0].name).toBe('TR-1');
+      expect(after[0].name).toBe('Living Room');
+      expect(collectIds(after)).toEqual(collectIds(before));
+      expect(after[0].id).toBe(`device-${DEVICE_ID}`);
+    });
+
     it('gives the device node a placeholder child when storageTypes is empty', () => {
       const nodes = buildDirectoryTree({
         deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
         storageTypes: [],
         cache: cacheFrom([]),
       });
@@ -68,6 +99,7 @@ describe('directory-tree.model', () => {
     it('builds one storage node per storage type, ordered and named as given', () => {
       const nodes = buildDirectoryTree({
         deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
         storageTypes: [StorageType.Usb, StorageType.Sd],
         cache: cacheFrom([]),
       });
@@ -93,6 +125,7 @@ describe('directory-tree.model', () => {
     it('maps storage type to icon: sd_storage, usb, and storage for anything else', () => {
       const nodes = buildDirectoryTree({
         deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
         storageTypes: [StorageType.Sd, StorageType.Usb, 'OTHER' as StorageType],
         cache: cacheFrom([]),
       });
@@ -121,6 +154,7 @@ describe('directory-tree.model', () => {
 
       const nodes = buildDirectoryTree({
         deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
         storageTypes: [StorageType.Sd],
         cache,
       });
@@ -158,7 +192,17 @@ describe('directory-tree.model', () => {
         },
       ]);
 
-      const nodes = buildDirectoryTree({ deviceId: DEVICE_ID, storageTypes: [StorageType.Sd], cache });
+      const nodes = buildDirectoryTree({
+
+        deviceId: DEVICE_ID,
+
+        deviceName: DEVICE_NAME,
+
+        storageTypes: [StorageType.Sd],
+
+        cache,
+
+      });
       const gamesNode = findNode(nodes, `${DEVICE_ID}-${StorageType.Sd}-/games`);
 
       expect(gamesNode?.children).toHaveLength(1);
@@ -181,7 +225,17 @@ describe('directory-tree.model', () => {
         },
       ]);
 
-      const nodes = buildDirectoryTree({ deviceId: DEVICE_ID, storageTypes: [StorageType.Sd], cache });
+      const nodes = buildDirectoryTree({
+
+        deviceId: DEVICE_ID,
+
+        deviceName: DEVICE_NAME,
+
+        storageTypes: [StorageType.Sd],
+
+        cache,
+
+      });
       const gamesNode = findNode(nodes, `${DEVICE_ID}-${StorageType.Sd}-/games`);
 
       expect(gamesNode?.children).toEqual([]);
@@ -197,7 +251,17 @@ describe('directory-tree.model', () => {
         },
       ]);
 
-      const nodes = buildDirectoryTree({ deviceId: DEVICE_ID, storageTypes: [StorageType.Sd], cache });
+      const nodes = buildDirectoryTree({
+
+        deviceId: DEVICE_ID,
+
+        deviceName: DEVICE_NAME,
+
+        storageTypes: [StorageType.Sd],
+
+        cache,
+
+      });
       const gamesNode = findNode(nodes, `${DEVICE_ID}-${StorageType.Sd}-/games`);
 
       expect(gamesNode?.children).toHaveLength(1);
@@ -218,7 +282,17 @@ describe('directory-tree.model', () => {
         },
       ]);
 
-      const nodes = buildDirectoryTree({ deviceId: DEVICE_ID, storageTypes: [StorageType.Sd], cache });
+      const nodes = buildDirectoryTree({
+
+        deviceId: DEVICE_ID,
+
+        deviceName: DEVICE_NAME,
+
+        storageTypes: [StorageType.Sd],
+
+        cache,
+
+      });
       const storageNode = nodes[0].children?.[0];
 
       expect(storageNode?.children).toHaveLength(1);

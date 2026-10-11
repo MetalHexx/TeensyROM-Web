@@ -1,7 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { DeviceItemComponent } from './device-item.component';
-import { Device, DeviceStorage, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceStorage,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { DeviceStore } from '@teensyrom-nx/application';
 import { By } from '@angular/platform-browser';
 import { StorageStatusComponent } from '../storage-item/storage-item.component';
@@ -17,6 +25,10 @@ describe('DeviceItemComponent', () => {
     comPort: 'COM3',
     name: 'Test Device',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -332,6 +344,226 @@ describe('DeviceItemComponent', () => {
       const storages = fixture.debugElement.queryAll(By.directive(StorageStatusComponent));
       expect(storages[0].componentInstance.icon()).toBe('usb');
       expect(storages[1].componentInstance.icon()).toBe('sd_card');
+    });
+  });
+
+  describe('Rename', () => {
+    const openEditor = (): HTMLInputElement => {
+      fixture.nativeElement.querySelector('[data-testid="device-name"] button').click();
+      fixture.detectChanges();
+      return fixture.nativeElement.querySelector('[data-testid="device-name"] input');
+    };
+
+    const typeAndPress = (input: HTMLInputElement, text: string, key: string): void => {
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+    });
+
+    it('shows the device name on an edit button', () => {
+      const button = fixture.nativeElement.querySelector('[data-testid="device-name"] button');
+
+      expect(button.textContent).toContain('Test Device');
+      expect(button.getAttribute('aria-label')).toBe('Rename Test Device');
+    });
+
+    it('emits rename with the device id and the trimmed name', () => {
+      let renamed: { deviceId: string; name: string } | undefined;
+      component.rename.subscribe((request) => (renamed = request));
+
+      typeAndPress(openEditor(), '  Studio TR  ', 'Enter');
+
+      expect(renamed).toEqual({ deviceId: 'test-device-1', name: 'Studio TR' });
+    });
+
+    it('emits nothing when the name is unchanged', () => {
+      const renameSpy = vi.fn();
+      component.rename.subscribe(renameSpy);
+
+      typeAndPress(openEditor(), 'Test Device', 'Enter');
+
+      expect(renameSpy).not.toHaveBeenCalled();
+    });
+
+    it('keeps the editor open and emits nothing for an invalid name', () => {
+      const renameSpy = vi.fn();
+      component.rename.subscribe(renameSpy);
+
+      const input = openEditor();
+      typeAndPress(input, '   ', 'Enter');
+
+      expect(renameSpy).not.toHaveBeenCalled();
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('maxlength')).toBe('24');
+    });
+
+    it('keeps the editor open and locked from the commit until the rename is saved', () => {
+      component.rename.subscribe(() => fixture.componentRef.setInput('saving', true));
+
+      const input = openEditor();
+      typeAndPress(input, 'Studio TR', 'Enter');
+
+      expect(input.isConnected).toBe(true);
+      expect(input.disabled).toBe(true);
+      expect(input.value).toBe('Studio TR');
+
+      fixture.componentRef.setInput('saving', false);
+      fixture.detectChanges();
+
+      expect(input.isConnected).toBe(false);
+    });
+
+    it('still allows renaming an offline device', () => {
+      fixture.componentRef.setInput('device', { ...mockDevice, deviceState: DeviceState.ConnectionLost });
+      fixture.detectChanges();
+      let renamed: { deviceId: string; name: string } | undefined;
+      component.rename.subscribe((request) => (renamed = request));
+
+      typeAndPress(openEditor(), 'Offline Rename', 'Enter');
+
+      expect(renamed?.name).toBe('Offline Rename');
+    });
+  });
+
+  describe('Device facts', () => {
+    const fact = (testId: string): HTMLElement | null =>
+      fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+    it('shows machine, video, clock and hardware once known', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        machine: DeviceMachine.C128,
+        videoStandard: DeviceVideoStandard.Pal,
+        todClockHz: 50,
+        hardwareVariant: DeviceHardwareVariant.TeensyRomPlus,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-machine-label')?.textContent).toContain('Machine: C128');
+      expect(fact('device-video-label')?.textContent).toContain('Video: PAL');
+      expect(fact('device-clock-label')?.textContent).toContain('TOD Clock: 50 Hz');
+      expect(fact('device-hardware-label')?.textContent).toContain('Hardware: TeensyROM+');
+    });
+
+    it('names the original hardware without a plus', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      expect(fact('device-hardware-label')?.textContent).toContain('Hardware: TeensyROM');
+      expect(fact('device-hardware-label')?.textContent).not.toContain('+');
+    });
+
+    it('hides a fact whose value is unknown', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        machine: DeviceMachine.Unknown,
+        videoStandard: DeviceVideoStandard.Unknown,
+        todClockHz: null,
+        hardwareVariant: DeviceHardwareVariant.Unknown,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-machine-label')).toBeNull();
+      expect(fact('device-video-label')).toBeNull();
+      expect(fact('device-clock-label')).toBeNull();
+      expect(fact('device-hardware-label')).toBeNull();
+    });
+
+    it('shows only the cartridge facts among the facts while offline', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        deviceState: DeviceState.ConnectionLost,
+        todClockHz: 60,
+      });
+      fixture.detectChanges();
+
+      expect(fact('device-firmware-label')).toBeTruthy();
+      expect(fact('device-hardware-label')).toBeTruthy();
+      expect(fact('device-compatible-label')).toBeTruthy();
+      expect(fact('device-machine-label')).toBeNull();
+      expect(fact('device-video-label')).toBeNull();
+      expect(fact('device-clock-label')).toBeNull();
+    });
+  });
+
+  describe('Card layout', () => {
+    const fact = (testId: string): HTMLElement =>
+      fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+    const column = (testId: string): HTMLElement => fact(testId).parentElement as HTMLElement;
+    const testIds = (container: HTMLElement): (string | null)[] =>
+      Array.from(container.children).map((child) => child.getAttribute('data-testid'));
+
+    it('lists the cartridge facts in the left column, with FW Compatible directly under Firmware', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      expect(testIds(column('device-id-label'))).toEqual([
+        'device-id-label',
+        'device-hardware-label',
+        'device-firmware-label',
+        'device-compatible-label',
+      ]);
+      expect(fact('device-compatible-label').textContent).toContain('FW Compatible: Yes');
+    });
+
+    it('lists the host and link in the right column', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        todClockHz: 60,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-machine-label'))).toEqual([
+        'device-machine-label',
+        'device-video-label',
+        'device-clock-label',
+        'device-address-label',
+      ]);
+    });
+
+    it('shows a USB-connected device by its port at the end of the right column', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        todClockHz: 60,
+        ipAddress: undefined,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-port-label'))).toEqual([
+        'device-machine-label',
+        'device-video-label',
+        'device-clock-label',
+        'device-port-label',
+      ]);
+      expect(fact('device-port-label').textContent).toContain('Port: COM3');
+    });
+
+    it('leaves only the Offline row in the right column while offline', () => {
+      fixture.componentRef.setInput('device', {
+        ...mockDevice,
+        deviceState: DeviceState.ConnectionLost,
+      });
+      fixture.detectChanges();
+
+      expect(testIds(column('device-offline-label'))).toEqual(['device-offline-label']);
+      expect(column('device-offline-label')).not.toBe(column('device-id-label'));
+    });
+
+    it('keeps the storage tiles in their own container outside the facts', () => {
+      fixture.componentRef.setInput('device', mockDevice);
+      fixture.detectChanges();
+
+      const storage = fixture.nativeElement.querySelector('[data-testid="device-storage"]');
+      const info = fixture.nativeElement.querySelector('[data-testid="device-info"]');
+
+      expect(testIds(storage)).toEqual(['usb-storage-status', 'sd-storage-status']);
+      expect(info.contains(storage)).toBe(false);
     });
   });
 

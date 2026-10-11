@@ -35,5 +35,12 @@ namespace TeensyRom.Core.Abstractions
         /// </summary>
         /// <param name="deviceSettings">The device settings to save.</param>
         void SaveDeviceSettings(DeviceSettings deviceSettings);
+
+        /// <summary>
+        /// Removes a device's settings entry. Persists and emits <see cref="KnownDevices"/> like <see cref="SaveDeviceSettings"/>.
+        /// </summary>
+        /// <param name="deviceId">The unique device identifier (the device's chip ID).</param>
+        /// <returns>False when there was no entry for the device.</returns>
+        bool RemoveDeviceSettings(string deviceId);
     }
 }

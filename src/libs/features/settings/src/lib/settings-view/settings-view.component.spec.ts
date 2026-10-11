@@ -4,7 +4,19 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { computed, signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
-import { Settings, SETTINGS_SERVICE, ISettingsService, Device, AUDIO_STREAM_SERVICE, PlayerFilterType, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Settings,
+  SETTINGS_SERVICE,
+  ISettingsService,
+  Device,
+  AUDIO_STREAM_SERVICE,
+  PlayerFilterType,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
 import { AudioStore, DeviceStore } from '@teensyrom-nx/application';
 import { EMPTY } from 'rxjs';
@@ -132,6 +144,10 @@ describe('SettingsViewComponent', () => {
         comPort: '',
         name: '',
         fwVersion: '',
+        machine: DeviceMachine.C64,
+        videoStandard: DeviceVideoStandard.Ntsc,
+        todClockHz: null,
+        hardwareVariant: DeviceHardwareVariant.TeensyRom,
         isCompatible: false,
         deviceState: DeviceState.Connected,
         sdStorage: {
@@ -242,6 +258,14 @@ describe('SettingsViewComponent', () => {
       getFileTransferSettings: vi.fn(() => mockForm.get('fileTransferSettings') as FormGroup),
       getSearchSettings: vi.fn(() => mockForm.get('searchSettings') as FormGroup),
       getAppSettings: vi.fn(() => mockForm.get('appSettings') as FormGroup),
+      createDefaultDeviceFormGroup: vi.fn((deviceId: string) => {
+        const group = fb.group({
+          deviceId: [deviceId],
+          videoSettings: fb.group({ enableVideo: [false], videoDeviceId: [''] }),
+        });
+        group.disable();
+        return group;
+      }),
     };
 
     await TestBed.configureTestingModule({
@@ -571,6 +595,69 @@ describe('SettingsViewComponent', () => {
       const devicesSection = fixture.nativeElement.querySelector('lib-device-settings-section');
       expect(devicesSection).toBeTruthy();
       // FormArray is passed via input binding
+    });
+
+    describe('device cards', () => {
+      const device = (deviceId: string, name: string, overrides: Partial<Device> = {}): Device => ({
+        ...devicesSignal()[0],
+        deviceId,
+        name,
+        ...overrides,
+      });
+
+      beforeEach(() => {
+        component.setActiveSection('devices');
+        fixture.detectChanges();
+      });
+
+      const cardTitles = (): string[] =>
+        Array.from(
+          fixture.nativeElement.querySelectorAll(
+            'lib-device-settings-section .device-section .icon-label-text.primary'
+          ) as NodeListOf<Element>
+        ).map((el) => el.textContent?.trim() ?? '');
+
+      it('should render one card per device in the device store, titled by name', () => {
+        devicesSignal.set([device('test-device-123', 'Studio'), device('other-chip', 'Garage')]);
+        fixture.detectChanges();
+
+        expect(cardTitles()).toEqual(['Garage', 'Studio']);
+      });
+
+      it('should show a rename from the device store without a reload', () => {
+        devicesSignal.set([device('test-device-123', 'Studio')]);
+        fixture.detectChanges();
+        expect(cardTitles()).toEqual(['Studio']);
+
+        devicesSignal.set([device('test-device-123', 'Studio Rack')]);
+        fixture.detectChanges();
+
+        expect(cardTitles()).toEqual(['Studio Rack']);
+      });
+
+      it('should not render a card for a settings entry whose device is gone', () => {
+        devicesSignal.set([device('other-chip', 'Garage')]);
+        fixture.detectChanges();
+
+        expect(cardTitles()).toEqual(['Garage']);
+        expect(fixture.nativeElement.textContent).not.toContain('test-device-123');
+      });
+
+      it('should remove the card when the device is forgotten', () => {
+        devicesSignal.set([]);
+        fixture.detectChanges();
+
+        expect(cardTitles()).toEqual([]);
+        expect(fixture.nativeElement.querySelector('lib-device-settings-section .empty-state')).toBeTruthy();
+      });
+
+      it('should build a default group for a device that has no settings entry', () => {
+        devicesSignal.set([device('other-chip', 'Garage')]);
+        fixture.detectChanges();
+
+        expect(mockFormService.createDefaultDeviceFormGroup).toHaveBeenCalledWith('other-chip');
+        expect(component.getKnownDevices().length).toBe(1);
+      });
     });
 
     it('should update device settings through form', () => {

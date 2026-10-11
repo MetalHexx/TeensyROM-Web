@@ -9,13 +9,27 @@ import { AudioInputDeviceListComponent } from '../audio-settings-section/audio-i
 import { Device, DeviceState } from '@teensyrom-nx/domain';
 
 /**
+ * A device settings card: a device from the device list joined to its settings form group.
+ */
+export interface DeviceSettingsCard {
+  device: Device;
+  group: FormGroup;
+  /** Whether `group` is a saved entry in `knownDevicesArray` (false for a detached default). */
+  hasEntry: boolean;
+  isOnline: boolean;
+}
+
+/**
  * Presentational component for per-device settings section.
- * Displays a card for each known device with video and connection toggles.
+ * Displays a card for each device in the device list, joined to its settings form group.
+ * Settings entries with no matching device are not rendered.
  *
  * @example
  * ```html
  * <lib-device-settings-section
  *   [knownDevicesArray]="getKnownDevices()"
+ *   [devices]="devices()"
+ *   [createDefaultGroup]="createDefaultDeviceGroup"
  *   [animationTrigger]="activeSection() === 'devices'"
  * ></lib-device-settings-section>
  * ```
@@ -42,14 +56,19 @@ export class DeviceSettingsSectionComponent {
    * Each FormGroup contains:
    * - deviceId: FormControl<string>
    * - videoSettings: FormGroup { enableVideo: FormControl<boolean>, videoDeviceId: FormControl<string> }
-   * - connectionSettings: FormGroup { autoConnectEnabled: FormControl<boolean> }
+   * - audioSettings: FormGroup { enableAudioStream, audioDeviceIndex, ... }
    */
   knownDevicesArray = input.required<FormArray>();
 
   /**
-   * Map of deviceId to Device object for status lookups
+   * Devices to render a card for (the device list is the source of cards and names).
    */
-  deviceMap = input<Map<string, Device>>(new Map());
+  devices = input.required<readonly Device[]>();
+
+  /**
+   * Builds the detached, disabled default FormGroup for a device that has no settings entry.
+   */
+  createDefaultGroup = input.required<(deviceId: string) => FormGroup>();
 
   /**
    * Controls whether this section's card is visible via animation
@@ -57,46 +76,58 @@ export class DeviceSettingsSectionComponent {
   animationTrigger = input<boolean>(true);
 
   /**
-   * Sorted device controls - online devices first, then alphabetically by deviceId
+   * Default groups already handed out, so a device's fallback group keeps its identity
+   * across device list updates (e.g. renames).
    */
-  readonly sortedDeviceControls = computed(() => {
-    const controls = this.knownDevicesArray().controls;
-    const deviceMap = this.deviceMap();
+  private readonly defaultGroups = new Map<string, FormGroup>();
 
-    return [...controls].sort((a, b) => {
-      const deviceIdA = a.get('deviceId')?.value ?? '';
-      const deviceIdB = b.get('deviceId')?.value ?? '';
-      
-      const deviceA = deviceMap.get(deviceIdA);
-      const deviceB = deviceMap.get(deviceIdB);
-      
-      const isOnlineA = deviceA?.deviceState === DeviceState.Connected;
-      const isOnlineB = deviceB?.deviceState === DeviceState.Connected;
-      
-      // Online devices first
-      if (isOnlineA && !isOnlineB) return -1;
-      if (!isOnlineA && isOnlineB) return 1;
-      
-      // Then alphabetically by deviceId
-      return deviceIdA.localeCompare(deviceIdB);
+  /**
+   * One card per device - online devices first, then by name, then by deviceId.
+   */
+  readonly cards = computed<DeviceSettingsCard[]>(() => {
+    const controls = this.knownDevicesArray().controls;
+    const createDefaultGroup = this.createDefaultGroup();
+
+    const devices = this.devices();
+    this.pruneDefaultGroups(devices);
+
+    const cards = devices.map((device): DeviceSettingsCard => {
+      const entry = controls.find((c) => c.get('deviceId')?.value === device.deviceId);
+      return {
+        device,
+        group: entry ? (entry as FormGroup) : this.getDefaultGroup(device.deviceId, createDefaultGroup),
+        hasEntry: !!entry,
+        isOnline: device.deviceState !== DeviceState.ConnectionLost,
+      };
     });
+
+    return cards.sort(
+      (a, b) =>
+        Number(b.isOnline) - Number(a.isOnline) ||
+        a.device.name.localeCompare(b.device.name) ||
+        a.device.deviceId.localeCompare(b.device.deviceId)
+    );
   });
 
-  /**
-   * Gets a display-friendly title for a device card.
-   * Truncates long device IDs for readability.
-   */
-  getDeviceTitle(deviceGroup: AbstractControl): string {
-    const deviceId = deviceGroup.get('deviceId')?.value ?? 'Unknown';
-    const fullLabel = `Device: ${deviceId}`;
-    return fullLabel.length > 25 ? `Device: ${deviceId.slice(0, 12)}...` : fullLabel;
+  private pruneDefaultGroups(devices: readonly Device[]): void {
+    const knownIds = new Set(devices.map((device) => device.deviceId));
+    for (const deviceId of this.defaultGroups.keys()) {
+      if (!knownIds.has(deviceId)) {
+        this.defaultGroups.delete(deviceId);
+      }
+    }
   }
 
-  /**
-   * Casts AbstractControl to FormGroup for template usage.
-   */
-  asFormGroup(control: AbstractControl): FormGroup {
-    return control as FormGroup;
+  private getDefaultGroup(
+    deviceId: string,
+    createDefaultGroup: (deviceId: string) => FormGroup
+  ): FormGroup {
+    let group = this.defaultGroups.get(deviceId);
+    if (!group) {
+      group = createDefaultGroup(deviceId);
+      this.defaultGroups.set(deviceId, group);
+    }
+    return group;
   }
 
   /**
@@ -107,28 +138,10 @@ export class DeviceSettingsSectionComponent {
   }
 
   /**
-   * Gets the Device object for a given device FormGroup.
+   * Checks if a card's device is disabled (not enabled in device store).
    */
-  getDevice(deviceGroup: AbstractControl): Device | undefined {
-    const deviceId = deviceGroup.get('deviceId')?.value;
-    return this.deviceMap().get(deviceId);
-  }
-
-  /**
-   * Checks if a device is disabled (not enabled in device store).
-   */
-  isDeviceDisabled(deviceGroup: AbstractControl): boolean {
-    const device = this.getDevice(deviceGroup);
-    return device ? !device.isEnabled : true;
-  }
-
-  /**
-   * Checks if a device is currently online/connected.
-   * Uses deviceState === 'Connected' for more accurate status.
-   */
-  isDeviceOnline(deviceGroup: AbstractControl): boolean {
-    const device = this.getDevice(deviceGroup);
-    return device?.deviceState === DeviceState.Connected;
+  isDeviceDisabled(card: DeviceSettingsCard): boolean {
+    return !card.device.isEnabled;
   }
 
   /**

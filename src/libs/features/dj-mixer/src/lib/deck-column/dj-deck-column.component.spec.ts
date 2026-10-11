@@ -3,9 +3,10 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
-import { StorageType } from '@teensyrom-nx/domain';
+import { StorageType, type Device } from '@teensyrom-nx/domain';
 import {
   DeckService,
+  DeviceStore,
   DjStore,
   type DeckBindingSummary,
   type DeckTransportSummary,
@@ -77,12 +78,14 @@ interface RenderOptions {
   transport?: Partial<DeckTransportSummary>;
   binding?: Partial<DeckBindingSummary>;
   subtune?: number;
+  devices?: Device[];
 }
 
 function render(deck: DeckRef, options: RenderOptions = {}) {
   const transportSummary = signal(idleTransportSummary(options.transport));
   const bindingSummary = signal(idleBindingSummary(options.binding));
   const deckState = signal({ subtune: options.subtune ?? 0 });
+  const devices = signal<Device[]>(options.devices ?? []);
   const deckService = createDeckServiceStub();
 
   TestBed.configureTestingModule({
@@ -98,6 +101,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
         },
       },
       { provide: DeckService, useValue: deckService },
+      { provide: DeviceStore, useValue: { devices } },
     ],
   });
 
@@ -106,7 +110,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   fixture.componentRef.setInput('dropActive', options.dropActive ?? false);
   fixture.detectChanges();
 
-  return { fixture, transportSummary, bindingSummary, deckService };
+  return { fixture, transportSummary, bindingSummary, deckService, devices };
 }
 
 /** A `DragEvent` carrying only the `types` list — enough for `isDjFileDrag`'s `dragenter`/`dragover`/`dragleave` check. */
@@ -340,8 +344,8 @@ describe('DjDeckColumnComponent', () => {
         {
           binding: {
             portOptions: [
-              { id: 'p1', label: 'Port 1', takenBy: null },
-              { id: 'p2', label: 'Port 2', takenBy: 'B' },
+              { id: 'p1', portName: 'Port 1', label: 'Port 1', takenBy: null },
+              { id: 'p2', portName: 'Port 2', label: 'Port 2', takenBy: 'B' },
             ],
           },
         }
@@ -354,13 +358,73 @@ describe('DjDeckColumnComponent', () => {
       ]);
     });
 
+    describe('port labels', () => {
+      const matchedOption = {
+        id: 'p1',
+        portName: 'TeensyROM-19277260',
+        label: 'TeensyROM-19277260 (PJRC)',
+        takenBy: null,
+      };
+      const unmatchedOption = {
+        id: 'p2',
+        portName: 'Some Other Synth',
+        label: 'Some Other Synth (Acme)',
+        takenBy: null,
+      };
+
+      it("prefixes a port that belongs to a known device with that device's name", () => {
+        const { fixture } = render(
+          { slot: 'A', letter: 'A', index: 0 },
+          {
+            binding: { portOptions: [matchedOption, unmatchedOption] },
+            devices: [{ deviceId: '19277260', name: 'TR-1' } as Device],
+          }
+        );
+
+        expect(fixture.componentInstance.bindingModel().ports.map((p) => p.label)).toEqual([
+          'TR-1: TeensyROM-19277260 (PJRC)',
+          'Some Other Synth (Acme)',
+        ]);
+      });
+
+      it('leaves the plain label when no device matches the port', () => {
+        const { fixture } = render(
+          { slot: 'A', letter: 'A', index: 0 },
+          {
+            binding: { portOptions: [matchedOption] },
+            devices: [{ deviceId: '99999999', name: 'Elsewhere' } as Device],
+          }
+        );
+
+        expect(fixture.componentInstance.bindingModel().ports[0].label).toBe(
+          'TeensyROM-19277260 (PJRC)'
+        );
+      });
+
+      it('relabels the options when the store renames the device', () => {
+        const { fixture, devices } = render(
+          { slot: 'A', letter: 'A', index: 0 },
+          {
+            binding: { portOptions: [matchedOption] },
+            devices: [{ deviceId: '19277260', name: 'TR-1' } as Device],
+          }
+        );
+
+        devices.set([{ deviceId: '19277260', name: 'Living Room' } as Device]);
+
+        expect(fixture.componentInstance.bindingModel().ports[0].label).toBe(
+          'Living Room: TeensyROM-19277260 (PJRC)'
+        );
+      });
+    });
+
     it('renders a taken option disabled', () => {
       const { fixture } = render(
         { slot: 'A', letter: 'A', index: 0 },
         {
           binding: {
             portsEnabled: true,
-            portOptions: [{ id: 'p1', label: 'Port 1', takenBy: 'B' }],
+            portOptions: [{ id: 'p1', portName: 'Port 1', label: 'Port 1', takenBy: 'B' }],
           },
         }
       );
