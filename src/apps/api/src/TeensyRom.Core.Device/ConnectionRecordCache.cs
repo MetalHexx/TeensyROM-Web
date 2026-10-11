@@ -11,7 +11,8 @@ namespace TeensyRom.Core.Device;
 /// A connection record as persisted to the whole-file cache: an online row (<see cref="Offline"/> false)
 /// confirmed this session, or an offline row kept so the unit can be found or reconnected later. The
 /// trailing members are optional so a file written before P09 - only the first four - still loads, read
-/// as online with its facts unknown.
+/// as online with its facts unknown. <see cref="Name"/> is the unit's saved device name; a file written
+/// before names existed loads it as null and the manager assigns one at start.
 /// </summary>
 public sealed record CachedConnectionRecord(
     string ChipId,
@@ -21,7 +22,8 @@ public sealed record CachedConnectionRecord(
     bool Offline = false,
     string? FwVersion = null,
     HardwareVariant HardwareVariant = HardwareVariant.Unknown,
-    bool IsCompatible = false);
+    bool IsCompatible = false,
+    string? Name = null);
 
 /// <summary>
 /// Whole-file cache of confirmed device connection records, read by the API start occasion to

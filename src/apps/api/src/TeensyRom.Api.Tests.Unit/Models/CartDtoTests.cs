@@ -48,7 +48,7 @@ public class CartDtoTests
     [Fact]
     public void FromOffline_SetsDisconnectedStateAndUnavailableStorage()
     {
-        var offline = new OfflineDevice("OFFLINE01", "COM7", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true);
+        var offline = new OfflineDevice("OFFLINE01", "COM7", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true, "TR-1");
 
         var dto = CartDto.FromOffline(offline, _settingsProvider);
 
@@ -64,7 +64,7 @@ public class CartDtoTests
     [Fact]
     public void FromOffline_ParsesTcpEndpoint_WhenPresent()
     {
-        var offline = new OfflineDevice("OFFLINE02", null, "192.168.1.50:80", ConnectionType.Tcp, "1.0.0", HardwareVariant.TeensyRom, true);
+        var offline = new OfflineDevice("OFFLINE02", null, "192.168.1.50:80", ConnectionType.Tcp, "1.0.0", HardwareVariant.TeensyRom, true, "TR-1");
 
         var dto = CartDto.FromOffline(offline, _settingsProvider);
 
@@ -75,7 +75,7 @@ public class CartDtoTests
     [Fact]
     public void FromOffline_NoTcpEndpoint_LeavesIpAddressEmptyAndPortAtDefault()
     {
-        var offline = new OfflineDevice("OFFLINE03", "COM9", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true);
+        var offline = new OfflineDevice("OFFLINE03", "COM9", null, ConnectionType.Serial, "1.0.0", HardwareVariant.TeensyRom, true, "TR-1");
 
         var dto = CartDto.FromOffline(offline, _settingsProvider);
 

@@ -519,6 +519,68 @@
         }
       }
     },
+    "/api/devices/{deviceId}/name": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Rename Device",
+        "description": "Sets the saved name of a known TeensyROM device.\n\n- Works whether the device is available or offline; no device is contacted.\n- Not queued behind a running discovery: the rename is applied and saved immediately.",
+        "operationId": "RenameDevice",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameDeviceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenameDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{deviceId}/reconnect": {
       "post": {
         "tags": [
@@ -2401,6 +2463,29 @@
         ],
         "type": "object",
         "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "RenameDeviceBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "RenameDeviceResponse": {
+        "required": [
+          "device",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/CartDto"
+          },
           "message": {
             "type": "string"
           }

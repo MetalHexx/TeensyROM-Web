@@ -6,7 +6,7 @@ namespace TeensyRom.Core.Abstractions
 
     /// <summary>
     /// Owns the discovery occasions - API start, full discovery, records-only listing, and the explicit
-    /// Reconnect/Forget pair - and the devices they confirm. A unit the manager has ever known this
+    /// Reconnect/Forget pair - the devices they confirm, and each known unit's saved name. A unit the manager has ever known this
     /// session, reachable or not, stays in its knowledge: an unreachable or file-only unit's record is
     /// the manager's private state, kept internally so a later occasion can find or restore it, and is
     /// never surfaced through <see cref="GetAvailableDevices"/> or <see cref="GetAvailableDevice"/> -
@@ -59,5 +59,13 @@ namespace TeensyRom.Core.Abstractions
         /// nothing can save between the availability check and the removal.
         /// </summary>
         Task<ForgetResult> ForgetAsync(string deviceId, CancellationToken ct);
+
+        /// <summary>
+        /// Sets a known unit's name, reachable or not; no device contact. A name failing
+        /// <see cref="TeensyRom.Core.Common.DeviceNameRules"/> is <see cref="RenameResult.InvalidName"/>;
+        /// an unknown chip or a stand-in is <see cref="RenameResult.UnknownDevice"/>. Does not wait behind
+        /// a running discovery occasion.
+        /// </summary>
+        Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct);
     }
 }

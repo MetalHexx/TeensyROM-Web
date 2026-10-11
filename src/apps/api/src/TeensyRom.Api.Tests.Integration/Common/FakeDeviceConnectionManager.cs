@@ -84,6 +84,24 @@ namespace TeensyRom.Api.Tests.Integration.Common
             return Task.FromResult(result);
         }
 
+        public Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct)
+        {
+            if (!DeviceNameRules.TryNormalize(name, out var normalized))
+            {
+                return Task.FromResult(new RenameOutcome(RenameResult.InvalidName, null, null));
+            }
+
+            var device = _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+
+            if (device is null)
+            {
+                return Task.FromResult(new RenameOutcome(RenameResult.UnknownDevice, null, null));
+            }
+
+            device.Cart.Name = normalized;
+            return Task.FromResult(new RenameOutcome(RenameResult.Renamed, device, null));
+        }
+
         /// <summary>
         /// Makes <see cref="GetAvailableDevice"/> return null for this device, as if it vanished from the
         /// connection manager mid-transfer - the only way the pump's device-null branch is reachable,

@@ -20,6 +20,8 @@ import type {
   PingDeviceResponse,
   ProblemDetails,
   ReconnectDeviceResponse,
+  RenameDeviceBody,
+  RenameDeviceResponse,
   ResetDeviceResponse,
   StartLogsResponse,
   StopLogsResponse,
@@ -35,6 +37,10 @@ import {
     ProblemDetailsToJSON,
     ReconnectDeviceResponseFromJSON,
     ReconnectDeviceResponseToJSON,
+    RenameDeviceBodyFromJSON,
+    RenameDeviceBodyToJSON,
+    RenameDeviceResponseFromJSON,
+    RenameDeviceResponseToJSON,
     ResetDeviceResponseFromJSON,
     ResetDeviceResponseToJSON,
     StartLogsResponseFromJSON,
@@ -57,6 +63,11 @@ export interface PingDeviceRequest {
 
 export interface ReconnectDeviceRequest {
     deviceId: string;
+}
+
+export interface RenameDeviceRequest {
+    deviceId: string;
+    renameDeviceBody: RenameDeviceBody;
 }
 
 export interface ResetDeviceRequest {
@@ -209,6 +220,51 @@ export class DevicesApiService extends runtime.BaseAPI {
      */
     async reconnectDevice(requestParameters: ReconnectDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ReconnectDeviceResponse> {
         const response = await this.reconnectDeviceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Sets the saved name of a known TeensyROM device.  - Works whether the device is available or offline; no device is contacted. - Not queued behind a running discovery: the rename is applied and saved immediately.
+     * Rename Device
+     */
+    async renameDeviceRaw(requestParameters: RenameDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RenameDeviceResponse>> {
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling renameDevice().'
+            );
+        }
+
+        if (requestParameters['renameDeviceBody'] == null) {
+            throw new runtime.RequiredError(
+                'renameDeviceBody',
+                'Required parameter "renameDeviceBody" was null or undefined when calling renameDevice().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/name`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RenameDeviceBodyToJSON(requestParameters['renameDeviceBody']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RenameDeviceResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Sets the saved name of a known TeensyROM device.  - Works whether the device is available or offline; no device is contacted. - Not queued behind a running discovery: the rename is applied and saved immediately.
+     * Rename Device
+     */
+    async renameDevice(requestParameters: RenameDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RenameDeviceResponse> {
+        const response = await this.renameDeviceRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

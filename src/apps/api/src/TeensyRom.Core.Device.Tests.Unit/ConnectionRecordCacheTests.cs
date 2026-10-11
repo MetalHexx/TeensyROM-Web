@@ -80,6 +80,7 @@ public class ConnectionRecordCacheTests : IDisposable
         row.FwVersion.Should().BeNull();
         row.HardwareVariant.Should().Be(HardwareVariant.Unknown);
         row.IsCompatible.Should().BeFalse();
+        row.Name.Should().BeNull();
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public class ConnectionRecordCacheTests : IDisposable
         var records = new[]
         {
             new CachedConnectionRecord("chip-1", "COM12", null, ConnectionType.Serial),
-            new CachedConnectionRecord("chip-2", null, "192.168.1.37:2112", ConnectionType.Tcp)
+            new CachedConnectionRecord("chip-2", null, "192.168.1.37:2112", ConnectionType.Tcp, Name: "Kitchen")
         };
 
         _sut.Save(records);

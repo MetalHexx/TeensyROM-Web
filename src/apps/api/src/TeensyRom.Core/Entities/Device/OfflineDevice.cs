@@ -13,7 +13,8 @@ public sealed record OfflineDevice(
     ConnectionType LastTransport,
     string FwVersion,
     HardwareVariant HardwareVariant,
-    bool IsCompatible);
+    bool IsCompatible,
+    string Name);
 
 /// <summary>The outcome of a <see cref="TeensyRom.Core.Abstractions.IDeviceConnectionManager.ReconnectAsync"/> attempt.</summary>
 public enum ReconnectResult
@@ -34,3 +35,14 @@ public enum ForgetResult
     StillAvailable,
     UnknownDevice
 }
+
+/// <summary>The outcome of a <see cref="TeensyRom.Core.Abstractions.IDeviceConnectionManager.RenameAsync"/> attempt.</summary>
+public enum RenameResult
+{
+    Renamed,
+    InvalidName,
+    UnknownDevice
+}
+
+/// <summary>On <see cref="RenameResult.Renamed"/>, exactly one of <see cref="Device"/> (the unit is available) or <see cref="OfflineDevice"/> (it is not) is set.</summary>
+public sealed record RenameOutcome(RenameResult Result, TeensyRomDevice? Device, OfflineDevice? OfflineDevice);

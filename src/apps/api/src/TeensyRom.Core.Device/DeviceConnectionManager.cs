@@ -24,6 +24,10 @@ namespace TeensyRom.Core.Device
     /// <see cref="GetAvailableDevices"/>, <see cref="GetAvailableDevice"/> and <see cref="GetOfflineDevices"/>
     /// ever surface this knowledge to a caller outside this class.
     /// </para>
+    /// <para>
+    /// It also owns each known chip's saved name (<see cref="_names"/>): assigned <c>TR-n</c> on first
+    /// sight, changed by <see cref="RenameAsync"/>, dropped on forget, and written onto every saved row.
+    /// </para>
     /// </summary>
     public class DeviceConnectionManager : IDeviceConnectionManager
     {
@@ -45,6 +49,18 @@ namespace TeensyRom.Core.Device
 
         /// <summary>Units known only from the saved connection file this session: never yet confirmed, so there is no <see cref="TeensyRomDevice"/> to hold them.</summary>
         private readonly ConcurrentDictionary<string, CachedConnectionRecord> _offlineOnly = new();
+
+        /// <summary>
+        /// Each known chip's saved name - the authority. <see cref="Cart.Name"/> is only a stamped copy,
+        /// since the device object (and its cart) is rebuilt on every confirm. Stand-in ids never appear here.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, string> _names = new();
+
+        /// <summary>Makes name assignment, adoption's stamp-and-publish, rename, and forget's removal atomic against each other.</summary>
+        private readonly object _namesLock = new();
+
+        /// <summary>Serializes cache writes - Rename saves outside the occasion queue - so the file always ends at the latest rows.</summary>
+        private readonly object _saveLock = new();
 
         private readonly SemaphoreSlim _occasionGate = new(1, 1);
 
@@ -87,14 +103,7 @@ namespace TeensyRom.Core.Device
                     continue;
                 }
 
-                result.Add(new OfflineDevice(
-                    device.DeviceId,
-                    device.Connection.SerialPortName,
-                    device.Connection.TcpEndpoint,
-                    device.Connection.TransportInUse ?? device.ConnectionType,
-                    device.Cart.FwVersion,
-                    device.Cart.HardwareVariant,
-                    device.Cart.IsCompatible));
+                result.Add(ToOfflineDevice(device));
             }
 
             foreach (var row in _offlineOnly.Values)
@@ -104,18 +113,33 @@ namespace TeensyRom.Core.Device
                     continue;
                 }
 
-                result.Add(new OfflineDevice(
-                    row.ChipId,
-                    row.SerialPortName,
-                    row.TcpEndpoint,
-                    row.TransportInUse,
-                    row.FwVersion ?? string.Empty,
-                    row.HardwareVariant,
-                    row.IsCompatible));
+                result.Add(ToOfflineDevice(row));
             }
 
             return result;
         }
+
+        private OfflineDevice ToOfflineDevice(TeensyRomDevice device) =>
+            new(
+                device.DeviceId,
+                device.Connection.SerialPortName,
+                device.Connection.TcpEndpoint,
+                device.Connection.TransportInUse ?? device.ConnectionType,
+                device.Cart.FwVersion,
+                device.Cart.HardwareVariant,
+                device.Cart.IsCompatible,
+                _names.GetValueOrDefault(device.DeviceId, string.Empty));
+
+        private OfflineDevice ToOfflineDevice(CachedConnectionRecord row) =>
+            new(
+                row.ChipId,
+                row.SerialPortName,
+                row.TcpEndpoint,
+                row.TransportInUse,
+                row.FwVersion ?? string.Empty,
+                row.HardwareVariant,
+                row.IsCompatible,
+                _names.GetValueOrDefault(row.ChipId, string.Empty));
 
         public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
         {
@@ -153,6 +177,52 @@ namespace TeensyRom.Core.Device
 
         public Task<ForgetResult> ForgetAsync(string deviceId, CancellationToken ct) =>
             RunExclusive(DiscoveryOccasion.Forget, token => RunForget(deviceId), ct);
+
+        /// <summary>
+        /// Deliberately outside the occasion queue: a rename contacts no device and must not wait behind a
+        /// multi-second discovery. It shares the one save path and the names lock instead.
+        /// </summary>
+        public Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct)
+        {
+            if (!DeviceNameRules.TryNormalize(name, out var normalized))
+            {
+                return Task.FromResult(new RenameOutcome(RenameResult.InvalidName, null, null));
+            }
+
+            TeensyRomDevice? device = null;
+            CachedConnectionRecord? offlineRow = null;
+
+            lock (_namesLock)
+            {
+                var known = !IsStandInDeviceId(deviceId) &&
+                    (_byChip.TryGetValue(deviceId, out device) || _offlineOnly.TryGetValue(deviceId, out offlineRow));
+
+                if (!known)
+                {
+                    return Task.FromResult(new RenameOutcome(RenameResult.UnknownDevice, null, null));
+                }
+
+                // Names first: an adoption racing this rename then reads the new name either way.
+                _names[deviceId] = normalized;
+
+                if (device is not null)
+                {
+                    device.Cart.Name = normalized;
+                }
+            }
+
+            SaveRecords();
+
+            _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Rename ({deviceId}): renamed");
+
+            var outcome = device is not null
+                ? device.Connection.Mode != DeviceMode.Unreachable
+                    ? new RenameOutcome(RenameResult.Renamed, device, null)
+                    : new RenameOutcome(RenameResult.Renamed, null, ToOfflineDevice(device))
+                : new RenameOutcome(RenameResult.Renamed, null, ToOfflineDevice(offlineRow!));
+
+            return Task.FromResult(outcome);
+        }
 
         /// <summary>
         /// Joins a running occasion whose kind is in <paramref name="joinableKinds"/>; otherwise waits
@@ -283,7 +353,7 @@ namespace TeensyRom.Core.Device
             // Every known unit is saved, online or offline, even when this sweep found nothing: a unit
             // that's merely away right now must not be dropped from the file and force a full scan on
             // every later start.
-            _cache.Save(BuildCacheRows());
+            SaveRecords();
 
             stopwatch.Stop();
             _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Discovery ({occasion}): {discovered.Count} device(s) ready in {stopwatch.ElapsedMilliseconds} ms");
@@ -318,6 +388,18 @@ namespace TeensyRom.Core.Device
             foreach (var row in cached)
             {
                 _offlineOnly.TryAdd(row.ChipId, row);
+
+                if (!IsStandInDeviceId(row.ChipId) && !string.IsNullOrWhiteSpace(row.Name))
+                {
+                    _names.TryAdd(row.ChipId, row.Name);
+                }
+            }
+
+            // Rows from a file written before names existed get their TR-N now, in chip-id order, so
+            // the backfill is saved by this same occasion.
+            foreach (var row in cached.Where(r => !IsStandInDeviceId(r.ChipId)).OrderBy(r => r.ChipId, StringComparer.Ordinal))
+            {
+                EnsureName(row.ChipId);
             }
 
             var stopwatch = Stopwatch.StartNew();
@@ -354,7 +436,7 @@ namespace TeensyRom.Core.Device
                 {
                     // Nothing new to look for - either every row confirmed, or only already-offline rows
                     // missed - but still saved whole so facts and flags stay current.
-                    _cache.Save(BuildCacheRows());
+                    SaveRecords();
                 }
 
                 stopwatch.Stop();
@@ -395,7 +477,8 @@ namespace TeensyRom.Core.Device
                     Offline: true,
                     existing.Cart.FwVersion,
                     existing.Cart.HardwareVariant,
-                    existing.Cart.IsCompatible);
+                    existing.Cart.IsCompatible,
+                    Name: _names.GetValueOrDefault(existing.DeviceId));
             }
             else if (_offlineOnly.TryGetValue(deviceId, out var offlineRow))
             {
@@ -414,7 +497,7 @@ namespace TeensyRom.Core.Device
                 CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
                 CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
                 AdoptConfirmedDevice(device);
-                _cache.Save(BuildCacheRows());
+                SaveRecords();
                 _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Reconnect ({deviceId}): reconnected in {stopwatch.ElapsedMilliseconds} ms");
                 return new ReconnectOutcome(ReconnectResult.Reconnected, device);
             }
@@ -437,15 +520,34 @@ namespace TeensyRom.Core.Device
                     return Task.FromResult(ForgetResult.StillAvailable);
                 }
 
-                _byChip.TryRemove(deviceId, out _);
-                _cache.Save(BuildCacheRows());
+                // A returning unit gets a fresh TR-N, so its name goes with it - under the names lock so a
+                // concurrent rename cannot leave a name behind for a unit that is no longer known.
+                lock (_namesLock)
+                {
+                    _byChip.TryRemove(deviceId, out _);
+                    _names.TryRemove(deviceId, out _);
+                }
+
+                SaveRecords();
                 _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): forgotten");
                 return Task.FromResult(ForgetResult.Forgotten);
             }
 
-            if (_offlineOnly.TryRemove(deviceId, out _))
+            bool removedOfflineRow;
+
+            lock (_namesLock)
             {
-                _cache.Save(BuildCacheRows());
+                removedOfflineRow = _offlineOnly.TryRemove(deviceId, out _);
+
+                if (removedOfflineRow)
+                {
+                    _names.TryRemove(deviceId, out _);
+                }
+            }
+
+            if (removedOfflineRow)
+            {
+                SaveRecords();
                 _log.InternalSuccess($"DeviceConnectionManager.FindDevices: Forget ({deviceId}): forgotten");
                 return Task.FromResult(ForgetResult.Forgotten);
             }
@@ -467,7 +569,7 @@ namespace TeensyRom.Core.Device
 
             MergeDiscovered(discovered);
 
-            _cache.Save(BuildCacheRows());
+            SaveRecords();
         }
 
         /// <summary>
@@ -477,7 +579,7 @@ namespace TeensyRom.Core.Device
         /// </summary>
         private void MergeDiscovered(IEnumerable<TeensyRomDevice> discovered)
         {
-            foreach (var device in discovered)
+            foreach (var device in discovered.OrderBy(d => d.DeviceId, StringComparer.Ordinal))
             {
                 if (_byChip.TryGetValue(device.DeviceId, out var previous))
                 {
@@ -532,7 +634,42 @@ namespace TeensyRom.Core.Device
             }
 
             _offlineOnly.TryRemove(device.DeviceId, out _);
-            _byChip[device.DeviceId] = device;
+
+            // The device object (and its cart) is rebuilt on every confirm, so the saved name is stamped
+            // back on here. Stand-ins are display-only: they show their own id and never take a TR-N.
+            lock (_namesLock)
+            {
+                device.Cart.Name = IsStandInDeviceId(device.DeviceId) ? device.DeviceId : EnsureName(device.DeviceId);
+                _byChip[device.DeviceId] = device;
+            }
+        }
+
+        /// <summary>
+        /// The chip's saved name, or - when it has none - the lowest free <c>TR-n</c> (n a positive
+        /// integer no current name already equals, ignoring case), recorded for it. Duplicates the user
+        /// typed by hand are allowed to exist; this only avoids handing out a taken default.
+        /// </summary>
+        private string EnsureName(string chipId)
+        {
+            lock (_namesLock)
+            {
+                if (_names.TryGetValue(chipId, out var existing))
+                {
+                    return existing;
+                }
+
+                var taken = new HashSet<string>(_names.Values, StringComparer.OrdinalIgnoreCase);
+                var n = 1;
+
+                while (taken.Contains($"TR-{n}"))
+                {
+                    n++;
+                }
+
+                var assigned = $"TR-{n}";
+                _names[chipId] = assigned;
+                return assigned;
+            }
         }
 
         /// <summary>Clears <paramref name="endpoint"/> from every other known chip's record on <paramref name="transport"/>, in memory and among the file-only rows.</summary>
@@ -748,6 +885,15 @@ namespace TeensyRom.Core.Device
             }
         }
 
+        /// <summary>Every cache write goes through here so a rename's save and an occasion's save cannot interleave.</summary>
+        private void SaveRecords()
+        {
+            lock (_saveLock)
+            {
+                _cache.Save(BuildCacheRows());
+            }
+        }
+
         /// <summary>
         /// Writes every known unit as a cache row: an available unit online from its record and
         /// <see cref="TeensyRomDevice.Cart"/> (<c>FwVersion</c>, <c>HardwareVariant</c>, <c>IsCompatible</c>),
@@ -768,12 +914,13 @@ namespace TeensyRom.Core.Device
                     Offline: device.Connection.Mode == DeviceMode.Unreachable,
                     device.Cart.FwVersion,
                     device.Cart.HardwareVariant,
-                    device.Cart.IsCompatible));
+                    device.Cart.IsCompatible,
+                    Name: _names.GetValueOrDefault(device.DeviceId)));
             }
 
             foreach (var row in _offlineOnly.Values)
             {
-                rows.Add(row with { Offline = true });
+                rows.Add(row with { Offline = true, Name = _names.GetValueOrDefault(row.ChipId) });
             }
 
             return rows;
