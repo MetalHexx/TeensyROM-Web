@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DeckStripComponent, DeckStripModel } from './deck-strip.component';
@@ -168,6 +169,44 @@ describe('DeckStripComponent', () => {
 
     expect(wrapper().classList.contains('deck-strip-fader--fixed')).toBe(true);
     expect(fader().hasAttribute('data-fixed-length')).toBe(true);
+  });
+
+  describe('the deckStripAfterKnobs hook', () => {
+    @Component({
+      imports: [DeckStripComponent],
+      template: `<lib-deck-strip [model]="model"
+        ><div deckStripAfterKnobs class="hooked"></div
+      ></lib-deck-strip>`,
+    })
+    class HostComponent {
+      readonly model = testModel();
+    }
+
+    function between(first: Element, middle: Element, last: Element): boolean {
+      const follows = (a: Element, b: Element) =>
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return follows(first, middle) && follows(middle, last);
+    }
+
+    it('renders nothing between the last knob and the fader when nothing is projected', () => {
+      const lastKnob = Array.from(
+        fixture.nativeElement.querySelectorAll('lib-rotary-knob')
+      ).pop() as HTMLElement;
+
+      expect(lastKnob.nextElementSibling?.classList.contains('deck-strip-fader')).toBe(true);
+    });
+
+    it('projects marked content between the last knob and the fader', () => {
+      const host = TestBed.createComponent(HostComponent);
+      host.detectChanges();
+      const root: HTMLElement = host.nativeElement;
+
+      const lastKnob = Array.from(root.querySelectorAll('lib-rotary-knob')).pop() as HTMLElement;
+      const hooked = root.querySelector('.hooked') as HTMLElement;
+      const fader = root.querySelector('.deck-strip-fader') as HTMLElement;
+
+      expect(between(lastKnob, hooked, fader)).toBe(true);
+    });
   });
 
   describe('disabled', () => {

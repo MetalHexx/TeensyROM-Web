@@ -19,6 +19,8 @@
   />
 }
 
+<ng-content select="[deckStripAfterKnobs]" />
+
 <div class="deck-strip-fader" [class.deck-strip-fader--fixed]="faderLength() !== null">
   <lib-channel-fader
     [value]="model().fader.value"

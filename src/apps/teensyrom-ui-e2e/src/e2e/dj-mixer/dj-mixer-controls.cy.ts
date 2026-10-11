@@ -1,3 +1,4 @@
+import { VIEWPORT } from '../../support/constants/test.constants';
 import { noDevices } from '../../support/test-data/fixtures';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { APP_ROUTES } from '../../support/constants/app-routes.constants';
@@ -50,6 +51,53 @@ describe('DJ Mixer — controls with no tune loaded', () => {
   it('keeps every key notation button enabled', () => {
     cy.get(`${KEY_NOTATION} button`).should('have.length', 2).each((button) => {
       cy.wrap(button).should('be.enabled');
+    });
+  });
+
+  [
+    { name: 'column', width: VIEWPORT.STANDARD.width, height: VIEWPORT.STANDARD.height },
+    { name: 'band', width: VIEWPORT.TABLET.width, height: VIEWPORT.TABLET.height },
+    { name: 'stacked', width: 400, height: 900 },
+  ].forEach(({ name, width, height }) => {
+    it(`centres the one key notation switch between the Key knobs and the faders, and keeps both halves clickable, at the ${name} width`, () => {
+      cy.viewport(width, height);
+
+      cy.get(KEY_NOTATION).should('have.length', 1);
+      cy.get(KEY_NOTATION).should(($switch) => {
+        const root = $switch[0].ownerDocument;
+        const rectOf = (el: Element | null | undefined) => (el as Element).getBoundingClientRect();
+        const keyKnobs = ['A', 'B'].map((letter) =>
+          rectOf(
+            root.querySelector(`[aria-label="Key deck ${letter}"]`)?.closest('lib-rotary-knob')
+          )
+        );
+        const faders = Array.from(root.querySelectorAll('lib-deck-strip .deck-strip-fader')).map(
+          rectOf
+        );
+        const crossfader = rectOf(root.querySelector('lib-crossfader'));
+        const bounds = rectOf($switch[0]);
+        const spanCentre = (faders[0].left + faders[1].right) / 2;
+
+        expect(bounds.top, 'below both Key knobs').to.be.at.least(
+          Math.max(...keyKnobs.map((knob) => knob.bottom)) - 1
+        );
+        expect(bounds.bottom, 'above both faders').to.be.at.most(
+          Math.min(...faders.map((fader) => fader.top)) + 1
+        );
+        expect(bounds.bottom, 'above the crossfader').to.be.at.most(crossfader.top + 1);
+        expect((bounds.left + bounds.right) / 2, 'centred across both decks').to.be.closeTo(
+          spanCentre,
+          1.5
+        );
+        expect(bounds.left, 'reaches the first deck').to.be.at.most(faders[0].left + 1);
+        expect(bounds.right, 'reaches the second deck').to.be.at.least(faders[1].right - 1);
+      });
+
+      // The switch is drawn over the second strip too; a real click proves nothing there covers it.
+      cy.contains(`${KEY_NOTATION} button`, 'Note').click();
+      cy.contains(`${KEY_NOTATION} button`, 'Note').should('have.attr', 'aria-pressed', 'true');
+      cy.contains(`${KEY_NOTATION} button`, 'Camelot').click();
+      cy.contains(`${KEY_NOTATION} button`, 'Camelot').should('have.attr', 'aria-pressed', 'true');
     });
   });
 

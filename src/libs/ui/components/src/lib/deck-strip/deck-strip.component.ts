@@ -59,6 +59,10 @@ export interface DeckStripModel {
  * the caller owns every value and every write. The filter selector and each knob can be disabled
  * through their own model entries; the channel fader, being the deck's level, is never disabled.
  *
+ * Content carrying the `deckStripAfterKnobs` attribute is projected between the last knob and the
+ * fader — a caller's way to put one control in that row, such as a switch shared across strips.
+ * Nothing is rendered there by default.
+ *
  * @example
  * ```html
  * <lib-deck-strip

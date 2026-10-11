@@ -298,6 +298,30 @@ describe('DjMixerCardComponent', () => {
 
       expect(keyNotationButton(fixture, 'Camelot')).toBeTruthy();
     });
+
+    it('is one control in the strips, between the Key knob and the fader and above the crossfader', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+      const root: HTMLElement = fixture.nativeElement;
+      const groups = root.querySelectorAll('[aria-label="Key notation"]');
+      const [firstSlot, secondSlot] = Array.from(root.querySelectorAll('.key-notation-slot'));
+      const crossfader = root.querySelector('lib-crossfader') as Element;
+      const follows = (a: Element, b: Element) =>
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+      expect(groups).toHaveLength(1);
+      expect(firstSlot.contains(groups[0])).toBe(true);
+      expect(secondSlot.childElementCount).toBe(0);
+      expect(follows(input(fixture, 'Key deck A'), groups[0])).toBe(true);
+      expect(follows(groups[0], input(fixture, 'Gain deck A'))).toBe(true);
+      expect(follows(groups[0], crossfader)).toBe(true);
+    });
+
+    it('spans as many strips as there are decks', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+      const strips: HTMLElement = fixture.nativeElement.querySelector('.strips');
+
+      expect(strips.style.getPropertyValue('--strip-count')).toBe('2');
+    });
   });
 
   describe('the Key knob readout', () => {
