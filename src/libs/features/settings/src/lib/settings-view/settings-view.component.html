@@ -54,7 +54,8 @@
 
         <lib-device-settings-section
           [knownDevicesArray]="getKnownDevices()"
-          [deviceMap]="deviceMap()"
+          [devices]="devices()"
+          [createDefaultGroup]="createDefaultDeviceGroup"
           [animationTrigger]="activeSection() === 'devices'" />
 
         <lib-file-transfer-settings-section

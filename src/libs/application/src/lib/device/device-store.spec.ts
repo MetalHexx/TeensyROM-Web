@@ -5,9 +5,18 @@ import {
   DEVICE_SERVICE,
   IStorageService,
   IDeviceService,
+  ICrtStorage,
+  CRT_STORAGE,
 } from '@teensyrom-nx/domain';
 import { of, throwError, Subject } from 'rxjs';
-import { StorageType, Device, DeviceState } from '@teensyrom-nx/domain';
+import {
+  StorageType,
+  Device,
+  DeviceState,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { PLAYER_CONTEXT, type IPlayerContext } from '../player/player-context.interface';
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -21,6 +30,10 @@ const createMockPlayerContext = (): IPlayerContext =>
     reflectDeviceReset: vi.fn(),
   }) as unknown as IPlayerContext;
 
+const createMockCrtStorage = (): Partial<ICrtStorage> => ({
+  clearDevice: vi.fn(),
+});
+
 describe('DeviceStore - indexStorage state updates', () => {
   let store: InstanceType<typeof DeviceStore>;
   let mockStorageService: IStorageService;
@@ -31,6 +44,10 @@ describe('DeviceStore - indexStorage state updates', () => {
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -69,6 +86,7 @@ describe('DeviceStore - indexStorage state updates', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
 
     TestBed.configureTestingModule({
@@ -77,6 +95,7 @@ describe('DeviceStore - indexStorage state updates', () => {
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
         { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
       ],
     });
 
@@ -359,6 +378,10 @@ describe('DeviceStore - indexStorageAllStorage', () => {
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -397,6 +420,7 @@ describe('DeviceStore - indexStorageAllStorage', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
 
     TestBed.configureTestingModule({
@@ -405,6 +429,7 @@ describe('DeviceStore - indexStorageAllStorage', () => {
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
         { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
       ],
     });
 
@@ -567,6 +592,10 @@ describe('DeviceStore - resetAllDevices and pingAllDevices', () => {
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -584,6 +613,7 @@ describe('DeviceStore - resetAllDevices and pingAllDevices', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
     mockPlayerContext = createMockPlayerContext();
 
@@ -604,6 +634,7 @@ describe('DeviceStore - resetAllDevices and pingAllDevices', () => {
           } as unknown as IStorageService,
         },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
       ],
     });
 
@@ -696,6 +727,10 @@ describe('DeviceStore - usableDevices and hasEnabledDevices', () => {
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,
@@ -714,6 +749,7 @@ describe('DeviceStore - usableDevices and hasEnabledDevices', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
 
     TestBed.configureTestingModule({
@@ -733,6 +769,7 @@ describe('DeviceStore - usableDevices and hasEnabledDevices', () => {
           } as unknown as IStorageService,
         },
         { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
       ],
     });
 
@@ -775,6 +812,10 @@ describe('DeviceStore - reconnectDevice', () => {
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.ConnectionLost,
@@ -793,6 +834,7 @@ describe('DeviceStore - reconnectDevice', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
 
     TestBed.configureTestingModule({
@@ -812,6 +854,7 @@ describe('DeviceStore - reconnectDevice', () => {
           } as unknown as IStorageService,
         },
         { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
       ],
     });
 
@@ -900,12 +943,17 @@ describe('DeviceStore - reconnectDevice', () => {
 describe('DeviceStore - forgetDevice', () => {
   let store: InstanceType<typeof DeviceStore>;
   let mockDeviceService: IDeviceService;
+  let mockCrtStorage: Partial<ICrtStorage>;
 
   const createMockDevice = (deviceId: string, overrides: Partial<Device> = {}): Device => ({
     deviceId,
     comPort: 'COM3',
     name: `Test Device ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.ConnectionLost,
@@ -924,7 +972,10 @@ describe('DeviceStore - forgetDevice', () => {
       pingDevice: vi.fn().mockReturnValue(of(void 0)),
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
     };
+
+    mockCrtStorage = createMockCrtStorage();
 
     TestBed.configureTestingModule({
       providers: [
@@ -943,6 +994,7 @@ describe('DeviceStore - forgetDevice', () => {
           } as unknown as IStorageService,
         },
         { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: mockCrtStorage },
       ],
     });
 
@@ -969,5 +1021,136 @@ describe('DeviceStore - forgetDevice', () => {
     await store.forgetDevice('device-1');
 
     expect(store.devices().map((d) => d.deviceId)).toEqual(['device-1']);
+  });
+
+  it('clears the CRT settings for that device after a successful forget', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    await store.forgetDevice('device-1');
+
+    expect(mockCrtStorage.clearDevice).toHaveBeenCalledTimes(1);
+    expect(mockCrtStorage.clearDevice).toHaveBeenCalledWith('device-1');
+  });
+
+  it('keeps the CRT settings when the forget fails', async () => {
+    const offline = createMockDevice('device-1');
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([offline]));
+    await store.findDevices();
+
+    mockDeviceService.forgetDevice = vi.fn().mockReturnValue(throwError(() => new Error('Failed to forget device')));
+
+    await store.forgetDevice('device-1');
+
+    expect(mockCrtStorage.clearDevice).not.toHaveBeenCalled();
+  });
+});
+
+describe('DeviceStore - renameDevice', () => {
+  let store: InstanceType<typeof DeviceStore>;
+  let mockDeviceService: IDeviceService;
+
+  const createMockDevice = (deviceId: string, overrides: Partial<Device> = {}): Device => ({
+    deviceId,
+    comPort: 'COM3',
+    name: `Test Device ${deviceId}`,
+    fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.Connected,
+    isEnabled: true,
+    ipAddress: undefined,
+    tcpPort: undefined,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    mockDeviceService = {
+      findDevices: vi.fn().mockReturnValue(of([])),
+      resetDevice: vi.fn().mockReturnValue(of(void 0)),
+      pingDevice: vi.fn().mockReturnValue(of(void 0)),
+      reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
+      forgetDevice: vi.fn().mockReturnValue(of(void 0)),
+      renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceStore,
+        { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        {
+          provide: DEVICE_STORAGE_SERVICE,
+          useValue: {
+            index: vi.fn(),
+            getDirectory: vi.fn(),
+            indexAll: vi.fn(),
+            search: vi.fn(),
+            saveFavorite: vi.fn(),
+            removeFavorite: vi.fn(),
+            getFavorites: vi.fn(),
+          } as unknown as IStorageService,
+        },
+        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        { provide: CRT_STORAGE, useValue: createMockCrtStorage() },
+      ],
+    });
+
+    store = TestBed.inject(DeviceStore);
+  });
+
+  async function loadDevices(...devices: Device[]): Promise<void> {
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of(devices));
+    await store.findDevices();
+  }
+
+  it('renames only the targeted device, keeps its isEnabled, and resolves true', async () => {
+    await loadDevices(createMockDevice('device-1'), createMockDevice('device-2'));
+    await store.disableDevice('device-1');
+    mockDeviceService.renameDevice = vi
+      .fn()
+      .mockReturnValue(of(createMockDevice('device-1', { name: 'Living Room' })));
+
+    const result = await store.renameDevice('device-1', 'Living Room');
+
+    expect(result).toBe(true);
+    expect(mockDeviceService.renameDevice).toHaveBeenCalledWith('device-1', 'Living Room');
+    const [renamed, untouched] = store.devices();
+    expect(renamed.name).toBe('Living Room');
+    expect(renamed.isEnabled).toBe(false);
+    expect(untouched.name).toBe('Test Device device-2');
+  });
+
+  it('resolves false and leaves the state untouched when the API call fails', async () => {
+    await loadDevices(createMockDevice('device-1'));
+    const before = store.devices();
+    mockDeviceService.renameDevice = vi
+      .fn()
+      .mockReturnValue(throwError(() => new Error('Failed to rename device')));
+
+    const result = await store.renameDevice('device-1', 'Living Room');
+
+    expect(result).toBe(false);
+    expect(store.devices()).toBe(before);
+    expect(store.devices()[0].name).toBe('Test Device device-1');
+  });
+
+  it('keeps the new name through a reconnect refresh, because the API now owns it', async () => {
+    await loadDevices(createMockDevice('device-1'));
+    const renamed = createMockDevice('device-1', { name: 'Living Room' });
+    mockDeviceService.renameDevice = vi.fn().mockReturnValue(of(renamed));
+    await store.renameDevice('device-1', 'Living Room');
+
+    mockDeviceService.reconnectDevice = vi.fn().mockReturnValue(of(renamed));
+    mockDeviceService.findDevices = vi.fn().mockReturnValue(of([renamed]));
+    await store.reconnectDevice('device-1');
+
+    expect(store.devices()[0].name).toBe('Living Room');
   });
 });

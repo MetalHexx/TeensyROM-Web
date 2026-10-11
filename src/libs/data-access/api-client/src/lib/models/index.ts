@@ -41,6 +41,8 @@ export * from './PlayerSettingsDto';
 export * from './ProblemDetails';
 export * from './ReconnectDeviceResponse';
 export * from './RemoveFavoriteResponse';
+export * from './RenameDeviceBody';
+export * from './RenameDeviceResponse';
 export * from './ResetDeviceResponse';
 export * from './SaveFavoriteResponse';
 export * from './SaveSettingsRequest';

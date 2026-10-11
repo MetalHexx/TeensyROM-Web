@@ -391,6 +391,35 @@ describe('CrtStorageService - Custom Preset Operations', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // clearDevice Tests
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('clearDevice', () => {
+    it('should remove every context for the device and nothing else', () => {
+      service.save('TR001', 'file-image', mockSettings);
+      service.save('TR001', 'video-compact', mockSettings);
+      service.save('TR001', 'video-dialog', mockSettings);
+      service.save('TR002', 'video-dialog', mockSettings);
+      service.saveCustomPreset('Keeper', mockSettings);
+
+      service.clearDevice('TR001');
+
+      expect([...storage.keys()].sort()).toEqual([
+        'teensyrom_crt_TR002_video-dialog',
+        'teensyrom_crt_custom_presets',
+      ]);
+    });
+
+    it('should do nothing when the device has no saved settings', () => {
+      service.save('TR002', 'file-image', mockSettings);
+
+      service.clearDevice('TR001');
+
+      expect(service.hasSavedSettings('TR002', 'file-image')).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Integration Tests
   // ═══════════════════════════════════════════════════════════════════════════
 

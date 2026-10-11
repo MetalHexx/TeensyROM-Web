@@ -5,11 +5,20 @@ import {
   Device,
   DEVICE_SERVICE,
   IDeviceService,
+  CRT_STORAGE,
+  ICrtStorage,
   DEVICE_STORAGE_SERVICE,
   IStorageService,
   DeviceState as DeviceConnectionState,
 } from '@teensyrom-nx/domain';
-import { findDevices, enableDevice, disableDevice, reconnectDevice, forgetDevice } from './methods/index';
+import {
+  findDevices,
+  enableDevice,
+  disableDevice,
+  reconnectDevice,
+  forgetDevice,
+  renameDevice,
+} from './methods/index';
 import { indexStorage } from './methods/index-storage';
 import { indexAllStorage } from './methods/index-all-storage';
 import { resetAllDevices } from './methods/reset-all-devices';
@@ -55,13 +64,15 @@ export const DeviceStore = signalStore(
     (
       store,
       deviceService: IDeviceService = inject(DEVICE_SERVICE),
-      storageService: IStorageService = inject(DEVICE_STORAGE_SERVICE)
+      storageService: IStorageService = inject(DEVICE_STORAGE_SERVICE),
+      crtStorage: ICrtStorage = inject(CRT_STORAGE)
     ) => ({
       ...findDevices(store, deviceService),
       ...enableDevice(store),
       ...disableDevice(store),
       ...reconnectDevice(store, deviceService),
-      ...forgetDevice(store, deviceService),
+      ...forgetDevice(store, deviceService, crtStorage),
+      ...renameDevice(store, deviceService),
       ...indexStorage(store, storageService),
       ...indexAllStorage(store, storageService),
       ...resetAllDevices(store, deviceService),

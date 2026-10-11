@@ -18,7 +18,8 @@ import {
   TooltipConfig,
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE, validatePresetName, CRT_PRESET_KEYS } from '@teensyrom-nx/domain';
+import { CrtSettings, CRT_STORAGE, validatePresetName, CRT_PRESET_KEYS, crtVideoStandardFor } from '@teensyrom-nx/domain';
+import { DeviceStore } from '@teensyrom-nx/application';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -56,6 +57,12 @@ export interface VideoDialogData {
 })
 export class VideoDialogComponent implements OnDestroy {
   private readonly crtStorage = inject(CRT_STORAGE);
+  private readonly deviceStore = inject(DeviceStore);
+
+  /** Video standard new CRT settings start in: the device's own, or PAL when unknown. */
+  private readonly deviceStandard = computed(() =>
+    crtVideoStandardFor(this.deviceStore.devices().find((d) => d.deviceId === this.data.deviceId))
+  );
 
   /** Reference to overlay container for fullscreen control */
   protected readonly overlayContainer = viewChild<ContentOverlayContainerComponent>('overlayContainer');
@@ -132,7 +139,10 @@ export class VideoDialogComponent implements OnDestroy {
           this.crtSettings.set(saved);
         } else {
           // Default to LARGE_VIDEO_WEBGL preset for new users
-          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
+          this.crtSettings.set({
+            ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
+            videoStandard: this.deviceStandard(),
+          });
         }
       }
     }, { allowSignalWrites: true });
@@ -222,7 +232,7 @@ export class VideoDialogComponent implements OnDestroy {
     // Branch on preset type using type guard
     if (isBuiltInPreset(presetName)) {
       // Built-in preset: load from CRT_PRESETS constant
-      settings = CRT_PRESETS[presetName];
+      settings = { ...CRT_PRESETS[presetName], videoStandard: this.deviceStandard() };
     } else {
       // Custom preset: load from storage
       const customPresets = this.crtStorage.loadCustomPresets();

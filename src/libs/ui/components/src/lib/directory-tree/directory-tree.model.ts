@@ -138,12 +138,16 @@ function buildStorageTypeNode(
   };
 }
 
+/** Builds the device -> storage -> directory tree. The device node is labelled with
+ *  `deviceName`; node ids are always derived from `deviceId`, never from the name, so a
+ *  rename relabels the node without disturbing selection or expansion. */
 export function buildDirectoryTree(args: {
   deviceId: string;
+  deviceName: string;
   storageTypes: readonly StorageType[];
   cache: DirectoryListingCache;
 }): DirectoryTreeNode[] {
-  const { deviceId, storageTypes, cache } = args;
+  const { deviceId, deviceName, storageTypes, cache } = args;
 
   const storageNodes = storageTypes.map((storageType) => buildStorageTypeNode(deviceId, storageType, cache));
   const children =
@@ -151,7 +155,7 @@ export function buildDirectoryTree(args: {
 
   const deviceNode: DirectoryTreeNode = {
     id: `device-${deviceId}`,
-    name: `Device ${deviceId}`,
+    name: deviceName,
     type: DirectoryTreeNodeType.Device,
     icon: 'desktop_windows',
     deviceId,

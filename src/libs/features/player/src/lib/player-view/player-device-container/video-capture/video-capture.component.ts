@@ -15,9 +15,9 @@ import {
   AnyPresetName,
   isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE, validatePresetName } from '@teensyrom-nx/domain';
+import { CrtSettings, CRT_STORAGE, validatePresetName, crtVideoStandardFor } from '@teensyrom-nx/domain';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
-import { SettingsStore } from '@teensyrom-nx/application';
+import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
 
 interface VideoDevice {
   deviceId: string;
@@ -43,8 +43,14 @@ export class VideoCaptureComponent implements OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly settingsStore = inject(SettingsStore);
   private readonly crtStorage = inject(CRT_STORAGE);
+  private readonly deviceStore = inject(DeviceStore);
 
   deviceId = input.required<string>();
+
+  /** Video standard new CRT settings start in: the device's own, or PAL when unknown. */
+  private readonly deviceStandard = computed(() =>
+    crtVideoStandardFor(this.deviceStore.devices().find((d) => d.deviceId === this.deviceId()))
+  );
 
   readonly crtConfig = CRT_CONFIGS.smallVideo;
 
@@ -94,7 +100,10 @@ export class VideoCaptureComponent implements OnDestroy {
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
         } else {
-          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
+          this.crtSettings.set({
+            ...CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL],
+            videoStandard: this.deviceStandard(),
+          });
         }
       }
     }, { allowSignalWrites: true });
@@ -282,7 +291,7 @@ export class VideoCaptureComponent implements OnDestroy {
     let settings: CrtSettings;
 
     if (isBuiltInPreset(presetName)) {
-      settings = CRT_PRESETS[presetName];
+      settings = { ...CRT_PRESETS[presetName], videoStandard: this.deviceStandard() };
     } else {
       const customPresets = this.crtStorage.loadCustomPresets();
       const preset = customPresets.find(p => p.name === presetName);

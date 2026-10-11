@@ -402,8 +402,8 @@ describe('DjStore', () => {
       const summary = store.bindingSummary('A')();
 
       expect(summary.portOptions).toEqual([
-        { id: 'port-1', label: 'Port One (Acme)', takenBy: 'B' },
-        { id: 'port-2', label: 'Port Two (Acme)', takenBy: null },
+        { id: 'port-1', portName: 'Port One', label: 'Port One (Acme)', takenBy: 'B' },
+        { id: 'port-2', portName: 'Port Two', label: 'Port Two (Acme)', takenBy: null },
       ]);
     });
 
@@ -419,7 +419,7 @@ describe('DjStore', () => {
       });
 
       expect(store.bindingSummary('B')().portOptions).toEqual([
-        { id: 'port-1', label: 'Port One (Acme)', takenBy: 'A' },
+        { id: 'port-1', portName: 'Port One', label: 'Port One (Acme)', takenBy: 'A' },
       ]);
     });
 

@@ -615,6 +615,57 @@ public class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void RemoveDeviceSettings_ShouldRemoveEntryAndPersist_WhenDeviceExists()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        service.GetOrCreateDeviceSettings("REMOVE_ME");
+        service.GetOrCreateDeviceSettings("KEEP_ME");
+
+        // Act
+        var removed = service.RemoveDeviceSettings("REMOVE_ME");
+
+        // Assert
+        removed.Should().BeTrue();
+        service.GetDeviceSettings("REMOVE_ME").Should().BeNull();
+        service.GetDeviceSettings("KEEP_ME").Should().NotBeNull();
+        var reloaded = new SettingsService(_mockLogger);
+        reloaded.GetDeviceSettings("REMOVE_ME").Should().BeNull();
+        reloaded.GetDeviceSettings("KEEP_ME").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RemoveDeviceSettings_ShouldReturnFalseAndLeaveEntriesAlone_WhenDeviceMissing()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        service.GetOrCreateDeviceSettings("STILL_HERE");
+
+        // Act
+        var removed = service.RemoveDeviceSettings("NOT_THERE");
+
+        // Assert
+        removed.Should().BeFalse();
+        service.GetDeviceSettings("STILL_HERE").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RemoveDeviceSettings_ShouldEmitKnownDevicesWithoutTheEntry()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        service.GetOrCreateDeviceSettings("EMITTED_AWAY");
+        var emissions = new List<List<DeviceSettings>>();
+        using var subscription = service.KnownDevices.Subscribe(emissions.Add);
+
+        // Act
+        service.RemoveDeviceSettings("EMITTED_AWAY");
+
+        // Assert
+        emissions.Last().Should().NotContain(d => d.DeviceId == "EMITTED_AWAY");
+    }
+
+    [Fact]
     public async Task KnownDevices_Observable_ShouldEmitInitialValue()
     {
         // Arrange

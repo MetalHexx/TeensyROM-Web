@@ -59,6 +59,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct)
             => Task.FromResult(_devices);
 
+        /// <summary>The fake reads no record cache, so a start never begins from saved records and the startup orphan cleanup stays off.</summary>
+        public bool StartedFromSavedRecords => false;
+
         public Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
             => Task.FromResult(_devices);
 
@@ -82,6 +85,24 @@ namespace TeensyRom.Api.Tests.Integration.Common
         {
             var result = _devices.Any(d => d.DeviceId == deviceId) ? ForgetResult.StillAvailable : ForgetResult.UnknownDevice;
             return Task.FromResult(result);
+        }
+
+        public Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct)
+        {
+            if (!DeviceNameRules.TryNormalize(name, out var normalized))
+            {
+                return Task.FromResult(new RenameOutcome(RenameResult.InvalidName, null, null));
+            }
+
+            var device = _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+
+            if (device is null)
+            {
+                return Task.FromResult(new RenameOutcome(RenameResult.UnknownDevice, null, null));
+            }
+
+            device.Cart.Name = normalized;
+            return Task.FromResult(new RenameOutcome(RenameResult.Renamed, device, null));
         }
 
         /// <summary>

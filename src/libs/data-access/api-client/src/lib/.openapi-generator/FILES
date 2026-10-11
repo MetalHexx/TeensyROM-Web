@@ -49,6 +49,8 @@ models/PlayerSettingsDto.ts
 models/ProblemDetails.ts
 models/ReconnectDeviceResponse.ts
 models/RemoveFavoriteResponse.ts
+models/RenameDeviceBody.ts
+models/RenameDeviceResponse.ts
 models/ResetDeviceResponse.ts
 models/SaveFavoriteResponse.ts
 models/SaveSettingsRequest.ts

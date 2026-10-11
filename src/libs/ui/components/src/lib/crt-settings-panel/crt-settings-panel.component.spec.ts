@@ -32,6 +32,7 @@ const mockCrtStorage = {
   load: vi.fn().mockReturnValue(null),
   hasSavedSettings: vi.fn().mockReturnValue(false),
   clear: vi.fn(),
+  clearDevice: vi.fn(),
 };
 
 /** Mock validation function for preset names */

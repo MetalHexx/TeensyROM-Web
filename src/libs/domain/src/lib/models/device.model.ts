@@ -1,5 +1,6 @@
 import { DeviceStorage } from './device-storage.model';
 import { DeviceState } from './device-state.enum';
+import { DeviceMachine, DeviceVideoStandard, DeviceHardwareVariant } from './device-facts.enum';
 
 export interface Device {
   deviceId: string;
@@ -14,4 +15,8 @@ export interface Device {
   tcpPort?: number;
   sdStorage: DeviceStorage;
   usbStorage: DeviceStorage;
+  machine: DeviceMachine;
+  videoStandard: DeviceVideoStandard;
+  todClockHz: number | null;
+  hardwareVariant: DeviceHardwareVariant;
 }

@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
+import { DeviceStore } from '@teensyrom-nx/application';
 import { ISettingsService, SETTINGS_SERVICE, STORAGE_SERVICE, StorageType } from '@teensyrom-nx/domain';
 import { createMockStorageService, createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { PlayerDeviceContainerComponent } from '../lib/player-view/player-device-container/player-device-container.component';
@@ -21,6 +22,7 @@ describe('renderPlayerComponent', () => {
   const providers = [
     { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
     { provide: STORAGE_SERVICE, useValue: createMockStorageService() },
+    { provide: DeviceStore, useValue: { devices: signal([]) } },
   ];
 
   const device = {

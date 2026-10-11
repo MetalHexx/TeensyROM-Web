@@ -1,7 +1,13 @@
 import { vi } from 'vitest';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { StorageStore } from '@teensyrom-nx/application';
-import { DirectoryTreeNodeType, StorageType, STORAGE_SERVICE } from '@teensyrom-nx/domain';
+import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import {
+  DirectoryTreeNodeType,
+  StorageType,
+  STORAGE_SERVICE,
+  type Device,
+} from '@teensyrom-nx/domain';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
 import { DirectoryTreeContainerComponent } from './directory-tree-container.component';
@@ -9,18 +15,47 @@ import { DirectoryTreeContainerComponent } from './directory-tree-container.comp
 describe('DirectoryTreeContainerComponent', () => {
   const deviceId = 'test-device-123';
 
-  function render() {
+  function render(devices: Device[] = [{ deviceId, name: 'TR-1' } as Device]) {
+    const devicesSignal = signal<Device[]>(devices);
     const result = renderPlayerComponent(DirectoryTreeContainerComponent, {
       inputs: { deviceId },
-      providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
+      providers: [
+        { provide: STORAGE_SERVICE, useValue: createMockStorageService() },
+        { provide: DeviceStore, useValue: { devices: devicesSignal } },
+      ],
     });
     const storageStore = TestBed.inject(StorageStore);
-    return { ...result, storageStore };
+    return { ...result, storageStore, devicesSignal };
   }
 
   it('creates the component', () => {
     const { component } = render();
     expect(component).toBeTruthy();
+  });
+
+  describe('nodes', () => {
+    it('labels the device node with the device name and keeps the id-derived node id', () => {
+      const { component } = render();
+
+      expect(component.nodes()[0]).toMatchObject({ id: `device-${deviceId}`, name: 'TR-1' });
+    });
+
+    it('falls back to the device id while the device is not in the store', () => {
+      const { component } = render([]);
+
+      expect(component.nodes()[0].name).toBe(deviceId);
+    });
+
+    it('relabels the device node when the store renames the device, leaving the selection alone', () => {
+      const { component, storageStore, devicesSignal } = render();
+      storageStore.navigateToDeviceLevel({ deviceId });
+      const selectedBefore = component.selectedNodeId();
+
+      devicesSignal.set([{ deviceId, name: 'Living Room' } as Device]);
+
+      expect(component.nodes()[0].name).toBe('Living Room');
+      expect(component.selectedNodeId()).toBe(selectedBefore);
+    });
   });
 
   describe('onNodeActivated', () => {

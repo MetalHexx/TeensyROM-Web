@@ -20,6 +20,7 @@ describe('DeviceService - Alert Integration', () => {
     pingDevice: ReturnType<typeof vi.fn>;
     reconnectDevice: ReturnType<typeof vi.fn>;
     forgetDevice: ReturnType<typeof vi.fn>;
+    renameDevice: ReturnType<typeof vi.fn>;
   };
   let mockAlertService: {
     error: ReturnType<typeof vi.fn>;
@@ -33,6 +34,7 @@ describe('DeviceService - Alert Integration', () => {
       pingDevice: vi.fn(),
       reconnectDevice: vi.fn(),
       forgetDevice: vi.fn(),
+      renameDevice: vi.fn(),
     };
 
     mockAlertService = {
@@ -289,6 +291,60 @@ describe('DeviceService - Alert Integration', () => {
       ).rejects.toThrow();
 
       expect(mockAlertService.error).toHaveBeenCalledWith('Failed to forget device');
+      logSpy.mockRestore();
+    });
+  });
+
+  describe('renameDevice', () => {
+    it('sends the name as the request body and maps the response device', async () => {
+      mockApiService.renameDevice.mockResolvedValue({
+        message: 'renamed',
+        device: {
+          deviceId: 'device-1',
+          name: 'Living Room',
+          comPort: 'COM3',
+          fwVersion: '1.0.0',
+          isCompatible: true,
+          isConnected: true,
+          deviceState: 'Connected',
+          machine: 'C128',
+          videoStandard: 'PAL',
+          todClockHz: 50,
+          hardwareVariant: 'TeensyRomPlus',
+          sdStorage: { deviceId: 'device-1', type: 'SD', available: true, indexExists: true },
+          usbStorage: unavailableStorage('device-1', 'USB'),
+        },
+      });
+
+      const result = await new Promise((resolve, reject) => {
+        service.renameDevice('device-1', 'Living Room').subscribe({ next: resolve, error: reject });
+      });
+
+      expect(mockApiService.renameDevice).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        renameDeviceBody: { name: 'Living Room' },
+      });
+      expect(result).toMatchObject({
+        deviceId: 'device-1',
+        name: 'Living Room',
+        machine: 'C128',
+        todClockHz: 50,
+      });
+    });
+
+    it('raises the rename alert and rethrows on failure', async () => {
+      const error = new ResponseError(new Response(null, { status: 400 }), 'Bad Request');
+      mockApiService.renameDevice.mockRejectedValue(error);
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          service.renameDevice('device-1', 'x').subscribe({ next: resolve, error: reject });
+        })
+      ).rejects.toBe(error);
+
+      expect(mockAlertService.error).toHaveBeenCalledTimes(1);
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to rename device');
       logSpy.mockRestore();
     });
   });

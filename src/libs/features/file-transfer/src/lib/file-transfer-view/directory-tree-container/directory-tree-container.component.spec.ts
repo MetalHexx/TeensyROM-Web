@@ -1,9 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentRef } from '@angular/core';
+import { ComponentRef, signal, type WritableSignal } from '@angular/core';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
-import { StorageStore } from '@teensyrom-nx/application';
-import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
+import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import { DirectoryTreeNodeType, StorageType, type Device } from '@teensyrom-nx/domain';
 import { DirectoryTreeContainerComponent } from './directory-tree-container.component';
 
 interface MockStorageStore {
@@ -20,6 +20,7 @@ describe('DirectoryTreeContainerComponent', () => {
   let fixture: ComponentFixture<DirectoryTreeContainerComponent>;
   let componentRef: ComponentRef<DirectoryTreeContainerComponent>;
   let mockStorageStore: MockStorageStore;
+  let devices: WritableSignal<Device[]>;
 
   function createComponent(deviceId = 'test-device-123') {
     fixture = TestBed.createComponent(DirectoryTreeContainerComponent);
@@ -30,6 +31,7 @@ describe('DirectoryTreeContainerComponent', () => {
   }
 
   beforeEach(async () => {
+    devices = signal<Device[]>([{ deviceId: 'test-device-123', name: 'TR-1' } as Device]);
     mockStorageStore = {
       getDeviceDirectories: vi.fn().mockReturnValue(() => []),
       navigateToDirectory: vi.fn(),
@@ -41,7 +43,11 @@ describe('DirectoryTreeContainerComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DirectoryTreeContainerComponent],
-      providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
+      providers: [
+        provideNoopAnimations(),
+        { provide: StorageStore, useValue: mockStorageStore },
+        { provide: DeviceStore, useValue: { devices } },
+      ],
     }).compileComponents();
 
     createComponent();
@@ -49,6 +55,25 @@ describe('DirectoryTreeContainerComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('nodes', () => {
+    it('should label the device node with the device name and keep the id-derived node id', () => {
+      expect(component.nodes()[0]).toMatchObject({ id: 'device-test-device-123', name: 'TR-1' });
+    });
+
+    it('should fall back to the device id while the device is not in the store', () => {
+      devices.set([]);
+
+      expect(component.nodes()[0].name).toBe('test-device-123');
+    });
+
+    it('should relabel the device node when the store renames the device', () => {
+      devices.set([{ deviceId: 'test-device-123', name: 'Living Room' } as Device]);
+
+      expect(component.nodes()[0].name).toBe('Living Room');
+      expect(component.nodes()[0].id).toBe('device-test-device-123');
+    });
   });
 
   describe('onNodeActivated', () => {

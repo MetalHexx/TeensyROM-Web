@@ -9,8 +9,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
     public record SaveSettingsRequest
     {
         /// <summary>
-        /// List of known devices with their per-device settings.
-        /// Each device has its own video and connection preferences.
+        /// Per-device settings, applied by device ID to devices that already have an entry.
+        /// Devices omitted here keep their saved settings, and IDs without an existing entry are ignored.
         /// </summary>
         [Required] public List<DeviceSettingsDto> KnownDevices { get; set; } = [];
 

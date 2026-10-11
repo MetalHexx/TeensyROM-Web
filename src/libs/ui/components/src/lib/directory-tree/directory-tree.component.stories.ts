@@ -16,7 +16,10 @@ const meta: Meta<DirectoryTreeComponent> = {
           'only child is a placeholder emits `nodeExpansionNeedsData` so the caller can ' +
           'fetch real children. Choose `lib-directory-tree` when the whole hierarchy needs ' +
           'to be visible and navigable at once; choose `DirectoryTrailComponent` for a ' +
-          'single-path breadcrumb header instead.',
+          'single-path breadcrumb header instead. The device row shows the device name ' +
+          '(passed to `buildDirectoryTree` as `deviceName`), not its id; node ids stay ' +
+          'derived from the device id, so renaming a device relabels the row without ' +
+          'disturbing selection or expansion.',
       },
     },
   },
@@ -26,8 +29,9 @@ export default meta;
 type Story = StoryObj<DirectoryTreeComponent>;
 
 /**
- * A fake TeensyROM device with SD storage, expanded to show a nested "Games" directory
- * (with an "Arcade" subfolder and a still-loading placeholder) alongside a "Music" leaf.
+ * A fake TeensyROM device (labelled by its name, "TeensyROM") with SD storage, expanded to show
+ * a nested "Games" directory (with an "Arcade" subfolder and a still-loading placeholder)
+ * alongside a "Music" leaf.
  * The device and its lone storage node auto-expand; the "Games" directory is pre-selected.
  */
 export const Default: Story = {

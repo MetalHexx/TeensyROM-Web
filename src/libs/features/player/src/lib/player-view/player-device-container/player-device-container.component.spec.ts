@@ -5,7 +5,14 @@ import { BreakpointObserver, type BreakpointState } from '@angular/cdk/layout';
 import { renderPlayerComponent } from '../../../testing/render-player-component';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { SettingsStore, StorageKeyUtil, type LaunchedFile } from '@teensyrom-nx/application';
-import { Device, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { PlayerDeviceContainerComponent } from './player-device-container.component';
 
 const PHONE_QUERY = '(max-width: 639px)';
@@ -18,6 +25,10 @@ function createDevice(overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: 'Test Device',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

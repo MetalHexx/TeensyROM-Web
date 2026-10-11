@@ -8,6 +8,7 @@ import {
   ALERT_SERVICE,
   STORAGE_SERVICE,
   PLAYER_SERVICE,
+  CRT_STORAGE,
   IDeviceService,
   IStorageService,
   IVersionService,
@@ -112,6 +113,8 @@ describe('LayoutComponent', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: MatDialog, useValue: mockDialog },
+        // DeviceStore injects the CRT storage at construction so Forget can clear a device's CRT settings.
+        { provide: CRT_STORAGE, useValue: { clearDevice: vi.fn() } },
         // PlayerStore's action factories inject these eagerly at construction. TransferPlaybackGuard
         // forces that construction (it injects PlayerStore), so they must be satisfied here too.
         { provide: PLAYER_SERVICE, useValue: {} },

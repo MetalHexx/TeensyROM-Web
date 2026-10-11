@@ -154,11 +154,17 @@ describe('Device Generators', () => {
         expect(device.fwVersion).toMatch(semverPattern);
       });
 
-      it('should generate name with TeensyROM prefix', () => {
+      it('should generate a TR-N name that satisfies the API name rule', () => {
         const device = generateDevice();
 
-        expect(device.name).toMatch(/^TeensyROM /);
-        expect(device.name.length).toBeGreaterThan('TeensyROM '.length);
+        expect(device.name).toMatch(/^TR-\d+$/);
+        expect(device.name.length).toBeLessThanOrEqual(24);
+      });
+
+      it('should generate the TOD clock rate matching the default NTSC video standard', () => {
+        const device = generateDevice();
+
+        expect(device.todClockHz).toBe(60);
       });
     });
 

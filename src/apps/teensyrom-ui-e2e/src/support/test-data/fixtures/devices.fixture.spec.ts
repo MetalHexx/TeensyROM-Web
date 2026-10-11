@@ -163,7 +163,7 @@ describe('singleDevice Fixture', () => {
     it('should have valid device name', () => {
       const device = singleDevice.devices[0];
       expect(device.name).toBeTruthy();
-      expect(device.name).toContain('TeensyROM');
+      expect(device.name).toMatch(/^TR-\d+$/);
     });
 
     it('should have valid firmware version', () => {
@@ -321,7 +321,7 @@ describe('disconnectedDevice Fixture', () => {
     it('should have valid device name', () => {
       const device = disconnectedDevice.devices[0];
       expect(device.name).toBeTruthy();
-      expect(device.name).toContain('TeensyROM');
+      expect(device.name).toMatch(/^TR-\d+$/);
     });
 
     it('should have valid firmware version', () => {

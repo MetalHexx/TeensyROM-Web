@@ -287,6 +287,28 @@ export class SettingsFormService {
   }
 
   /**
+   * Builds a disabled, default-valued device FormGroup for a device that has no saved settings
+   * entry. The group is detached: it is never added to the settings form, so it is never saved.
+   */
+  createDefaultDeviceFormGroup(deviceId: string): FormGroup {
+    const group = this.createDeviceFormGroup({
+      deviceId,
+      videoSettings: { enableVideo: false, videoDeviceId: '' },
+      audioSettings: {
+        enableAudioStream: false,
+        audioDeviceIndex: -1,
+        audioDeviceName: '',
+        captureChannelCount: 1,
+        sampleRate: 48000,
+        channels: [],
+        useOpusEncoding: true,
+      },
+    });
+    group.disable({ emitEvent: false });
+    return group;
+  }
+
+  /**
    * Custom validator: When audio streaming is enabled, a valid device must be selected (index >= 0)
    */
   private audioSettingsValidator(group: FormGroup): ValidationErrors | null {
