@@ -329,5 +329,42 @@ describe('RotaryKnobComponent', () => {
 
       expect(emitted).toHaveLength(1);
     });
+
+    it('abandons a drag disabled and re-enabled with no pointer event in between', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', 100));
+      input.dispatchEvent(pointerEvent('pointermove', 90));
+      expect(emitted).toHaveLength(1);
+
+      // The pointer stays down and still while the knob is disabled, and the value is reset
+      // underneath it (a new tune loading) — nothing reaches the knob to tell it the drag is over.
+      disable();
+      fixture.componentRef.setInput('value', 0);
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      input.dispatchEvent(pointerEvent('pointermove', 20));
+
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('takes a fresh drag after being re-enabled', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', 100));
+      disable();
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      input.dispatchEvent(pointerEvent('pointerup', 100));
+
+      input.dispatchEvent(pointerEvent('pointerdown', 100));
+      input.dispatchEvent(pointerEvent('pointermove', 50));
+
+      expect(emitted).toEqual([0.5]);
+    });
   });
 });

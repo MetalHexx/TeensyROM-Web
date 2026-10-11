@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import type { ControlSize } from '../shared/control-size';
 
 const CENTER = 40;
@@ -136,6 +136,17 @@ export class RotaryKnobComponent {
    * produces the same result, continuous knobs and stepped ones alike. */
   private drag: { pointerId: number; lastY: number; rawValue: number } | null = null;
 
+  /** Abandons a drag the moment the knob is disabled, not when the next pointer event happens to
+   *  arrive: a knob disabled and re-enabled with the pointer held still (a new tune loading resets
+   *  the value underneath it) would otherwise resume from the stale `rawValue` and jump. */
+  constructor() {
+    effect(() => {
+      if (this.disabled()) {
+        this.drag = null;
+      }
+    });
+  }
+
   /** Forwards the native range's raw value straight through as `valueChange`, unrounded. */
   protected onRangeInput(event: Event): void {
     if (this.disabled()) {
@@ -168,13 +179,7 @@ export class RotaryKnobComponent {
   /** Accumulates the move's `dy` into `drag.rawValue`, clamps to `[min, max]`, and emits — see
    *  `drag`'s doc for why this doesn't just add the delta to `value()`. */
   protected onPointerMove(event: PointerEvent): void {
-    if (this.disabled()) {
-      // Dropping the drag, rather than just ignoring the move, stops a knob re-enabled while the
-      // pointer is still down from resuming against a stale `lastY` and jumping.
-      this.drag = null;
-      return;
-    }
-    if (!this.drag || this.drag.pointerId !== event.pointerId) {
+    if (this.disabled() || !this.drag || this.drag.pointerId !== event.pointerId) {
       return;
     }
     const dy = this.drag.lastY - event.clientY;

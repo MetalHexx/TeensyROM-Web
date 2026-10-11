@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, effect, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnDestroy,
+  effect,
+  input,
+  output,
+} from '@angular/core';
 
 /** One voice's caller-composed state within a voice panel. */
 export interface VoiceRowModel {
@@ -24,7 +31,8 @@ export interface VoiceRowModel {
  *
  * Purely presentational: it holds no state of its own and never resolves latched-XOR-held itself —
  * `model().holdLabel` already carries whatever the caller decided that means. While `disabled()`,
- * both controls are inert and dimmed; a row disabled mid-hold releases it so no voice is left held.
+ * both controls are inert and dimmed; a row disabled or removed mid-hold releases it so no voice is
+ * left held.
  *
  * @example
  * ```html
@@ -44,7 +52,7 @@ export interface VoiceRowModel {
     '[attr.data-disabled]': "disabled() ? '' : null",
   },
 })
-export class VoiceRowComponent {
+export class VoiceRowComponent implements OnDestroy {
   /** The voice row's display model and state. */
   readonly model = input.required<VoiceRowModel>();
   /** Disables the mute checkbox and the hold button and dims the row. Defaults to `false`, so every
@@ -73,6 +81,17 @@ export class VoiceRowComponent {
         this.endHold();
       }
     });
+  }
+
+  /** Releases a hold still in progress when the row is removed (e.g. navigating away mid-hold): the
+   *  element goes before its release event, and the deck engine outlives the page, so without this
+   *  the voice would stay inverted. Emits from `ngOnDestroy` rather than a `DestroyRef` callback,
+   *  which runs after the parent's listeners are unsubscribed and so would reach no one. */
+  ngOnDestroy(): void {
+    if (this.held) {
+      this.keyHeld = false;
+      this.endHold();
+    }
   }
 
   /** Forwards the mute checkbox's toggled state. */

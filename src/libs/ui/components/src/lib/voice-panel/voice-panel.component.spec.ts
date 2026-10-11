@@ -62,6 +62,20 @@ describe('VoicePanelComponent', () => {
     expect(emitted).toEqual([{ index: 2, held: true }]);
   });
 
+  it('releases a row held when the panel is torn down, through the row to the panel', () => {
+    const emitted: { index: number; held: boolean }[] = [];
+    component.heldChange.subscribe((event) => emitted.push(event));
+
+    const button = fixture.nativeElement.querySelectorAll('.voice-hold')[1] as HTMLButtonElement;
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    fixture.destroy();
+
+    expect(emitted).toEqual([
+      { index: 1, held: true },
+      { index: 1, held: false },
+    ]);
+  });
+
   it('fires clearMutes when Clear is pressed', () => {
     let fired = false;
     component.clearMutes.subscribe(() => (fired = true));

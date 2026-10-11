@@ -232,4 +232,58 @@ describe('VoiceRowComponent', () => {
       expect(held).toEqual([]);
     });
   });
+
+  describe('removal', () => {
+    it('releases a pointer hold in progress when the row is destroyed', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(pointerEvent('pointerdown'));
+      fixture.destroy();
+
+      expect(held).toEqual([true, false]);
+    });
+
+    it('releases a keyboard hold in progress when the row is destroyed', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+      fixture.destroy();
+
+      expect(held).toEqual([true, false]);
+    });
+
+    it('emits no release when destroyed with nothing held', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      fixture.destroy();
+
+      expect(held).toEqual([]);
+    });
+
+    it('emits no second release when the hold already ended', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(pointerEvent('pointerdown'));
+      holdButton().dispatchEvent(pointerEvent('pointerup'));
+      fixture.destroy();
+
+      expect(held).toEqual([true, false]);
+    });
+
+    it('emits no second release when a hold was already released by becoming disabled', () => {
+      const held: boolean[] = [];
+      component.heldChange.subscribe((v) => held.push(v));
+
+      holdButton().dispatchEvent(pointerEvent('pointerdown'));
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      fixture.destroy();
+
+      expect(held).toEqual([true, false]);
+    });
+  });
 });
