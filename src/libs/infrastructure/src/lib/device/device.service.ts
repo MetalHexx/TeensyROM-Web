@@ -3,6 +3,7 @@ import {
   DevicesApiService,
   FindDevicesResponse,
   ReconnectDeviceResponse,
+  RenameDeviceResponse,
   ResponseError,
 } from '@teensyrom-nx/data-access/api-client';
 import { Device, IDeviceService, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
@@ -58,6 +59,13 @@ export class DeviceService implements IDeviceService {
     return from(this.apiService.forgetDevice({ deviceId })).pipe(
       map(() => void 0),
       catchError((error) => this.handleError(error, 'forgetDevice', 'Failed to forget device'))
+    );
+  }
+
+  renameDevice(deviceId: string, name: string): Observable<Device> {
+    return from(this.apiService.renameDevice({ deviceId, renameDeviceBody: { name } })).pipe(
+      map((response: RenameDeviceResponse) => DomainMapper.toDevice(response.device)),
+      catchError((error) => this.handleError(error, 'renameDevice', 'Failed to rename device'))
     );
   }
 

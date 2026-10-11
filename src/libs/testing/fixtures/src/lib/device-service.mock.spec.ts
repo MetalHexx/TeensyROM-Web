@@ -12,6 +12,9 @@ describe('createMockDeviceService', () => {
     expect(devices).toEqual([]);
     expect(service.resetDevice).toBeDefined();
     expect(service.pingDevice).toBeDefined();
+    expect(service.reconnectDevice).toBeDefined();
+    expect(service.forgetDevice).toBeDefined();
+    expect(service.renameDevice).toBeDefined();
   });
 
   it('lets an override replace one method while the rest keep their defaults', async () => {

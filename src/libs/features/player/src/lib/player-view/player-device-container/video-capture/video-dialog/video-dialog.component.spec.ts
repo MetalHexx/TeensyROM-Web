@@ -54,6 +54,7 @@ function createMockCrtStorage(overrides: Partial<ICrtStorage> = {}): ICrtStorage
     load: vi.fn(() => null),
     hasSavedSettings: vi.fn(() => false),
     clear: vi.fn(),
+    clearDevice: vi.fn(),
     loadCustomPresets: vi.fn().mockReturnValue([]),
     saveCustomPreset: vi.fn(),
     updateCustomPreset: vi.fn(),

@@ -21,6 +21,11 @@ export class CrtStorageService implements ICrtStorage {
   private readonly STORAGE_KEY_PREFIX = 'teensyrom_crt_';
   private readonly CUSTOM_PRESETS_KEY = 'teensyrom_crt_custom_presets';
   private readonly MAX_CUSTOM_PRESETS = 50;
+  private readonly CONTEXTS: readonly CrtStorageContext[] = [
+    'file-image',
+    'video-compact',
+    'video-dialog',
+  ];
 
   constructor(@Inject(ALERT_SERVICE) private readonly alertService: IAlertService) {}
 
@@ -82,6 +87,10 @@ export class CrtStorageService implements ICrtStorage {
         `CrtStorage: Failed to clear ${context} settings for device ${deviceId}: ${error}`
       );
     }
+  }
+
+  clearDevice(deviceId: string): void {
+    this.CONTEXTS.forEach((context) => this.clear(deviceId, context));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

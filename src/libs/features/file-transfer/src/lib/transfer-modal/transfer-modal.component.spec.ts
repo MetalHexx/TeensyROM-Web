@@ -11,7 +11,16 @@ import {
   TransferModalState,
   TransferStore,
 } from '@teensyrom-nx/application';
-import { Device, DeviceState, StorageType, TransferJobSnapshot, TransferJobState } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceState,
+  StorageType,
+  TransferJobSnapshot,
+  TransferJobState,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { TransferModalComponent } from './transfer-modal.component';
 
 function createDevice(overrides: Partial<Device> = {}): Device {
@@ -21,6 +30,10 @@ function createDevice(overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: 'My TeensyROM',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

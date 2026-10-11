@@ -2,7 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, computed } from '@angular/core';
 import { DeviceStore, TransferStore } from '@teensyrom-nx/application';
-import { Device, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { DeviceSelectorComponent } from './device-selector.component';
 
 function createDevice(overrides: Partial<Device> = {}): Device {
@@ -12,6 +19,10 @@ function createDevice(overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: 'Test Device',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

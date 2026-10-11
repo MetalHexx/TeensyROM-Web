@@ -10,7 +10,14 @@ import {
   ITransferContext,
   SelectedDirectory,
 } from '@teensyrom-nx/application';
-import { Device, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { DropzoneCardComponent } from './dropzone-card.component';
 
 function createDevice(overrides: Partial<Device> = {}): Device {
@@ -20,6 +27,10 @@ function createDevice(overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: 'Test Device',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

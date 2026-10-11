@@ -1,6 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { DeviceState, StorageType, type Device } from '@teensyrom-nx/domain';
+import {
+  DeviceState,
+  StorageType,
+  type Device,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { BrowseTreeComponent } from '@teensyrom-nx/ui/components';
 import { DjBrowseTreesComponent } from './dj-browse-trees.component';
 
@@ -10,6 +17,10 @@ function device(deviceId: string, overrides: Partial<Device> = {}): Device {
     comPort: 'COM3',
     name: `TeensyROM ${deviceId}`,
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

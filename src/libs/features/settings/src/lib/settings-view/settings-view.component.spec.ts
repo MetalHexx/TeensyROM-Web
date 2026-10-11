@@ -4,7 +4,19 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { computed, signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
-import { Settings, SETTINGS_SERVICE, ISettingsService, Device, AUDIO_STREAM_SERVICE, PlayerFilterType, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Settings,
+  SETTINGS_SERVICE,
+  ISettingsService,
+  Device,
+  AUDIO_STREAM_SERVICE,
+  PlayerFilterType,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
 import { AudioStore, DeviceStore } from '@teensyrom-nx/application';
 import { EMPTY } from 'rxjs';
@@ -132,6 +144,10 @@ describe('SettingsViewComponent', () => {
         comPort: '',
         name: '',
         fwVersion: '',
+        machine: DeviceMachine.C64,
+        videoStandard: DeviceVideoStandard.Ntsc,
+        todClockHz: null,
+        hardwareVariant: DeviceHardwareVariant.TeensyRom,
         isCompatible: false,
         deviceState: DeviceState.Connected,
         sdStorage: {

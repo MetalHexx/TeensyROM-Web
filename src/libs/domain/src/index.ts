@@ -6,6 +6,8 @@ export * from './lib/contracts';
 
 // Shared utilities
 export * from './lib/utils/file-utils';
+export * from './lib/utils/midi-port-device';
 
 // Validation
 export * from './lib/validation/preset-name-validation';
+export * from './lib/validation/device-name-validation';

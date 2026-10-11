@@ -1,7 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { DeviceItemComponent } from './device-item.component';
-import { Device, DeviceStorage, DeviceState, StorageType } from '@teensyrom-nx/domain';
+import {
+  Device,
+  DeviceStorage,
+  DeviceState,
+  StorageType,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
+} from '@teensyrom-nx/domain';
 import { DeviceStore } from '@teensyrom-nx/application';
 import { By } from '@angular/platform-browser';
 import { StorageStatusComponent } from '../storage-item/storage-item.component';
@@ -17,6 +25,10 @@ describe('DeviceItemComponent', () => {
     comPort: 'COM3',
     name: 'Test Device',
     fwVersion: '1.0.0',
+    machine: DeviceMachine.C64,
+    videoStandard: DeviceVideoStandard.Ntsc,
+    todClockHz: null,
+    hardwareVariant: DeviceHardwareVariant.TeensyRom,
     isCompatible: true,
     isConnected: true,
     deviceState: DeviceState.Connected,

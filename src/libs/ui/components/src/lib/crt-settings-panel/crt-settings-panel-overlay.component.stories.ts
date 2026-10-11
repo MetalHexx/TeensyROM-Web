@@ -21,6 +21,7 @@ const mockCrtStorage: ICrtStorage = {
   load: () => null,
   hasSavedSettings: () => false,
   clear: () => undefined,
+  clearDevice: () => undefined,
 };
 
 const meta: Meta<CrtSettingsPanelOverlayComponent> = {

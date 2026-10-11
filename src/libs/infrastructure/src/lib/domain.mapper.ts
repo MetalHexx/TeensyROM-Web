@@ -26,6 +26,9 @@ import {
 } from '@teensyrom-nx/data-access/api-client';
 import {
   Device,
+  DeviceMachine,
+  DeviceVideoStandard,
+  DeviceHardwareVariant,
   DeviceStorage,
   DeviceState,
   StorageType,
@@ -76,6 +79,10 @@ export class DomainMapper {
       tcpPort: cartDto.tcpPort,
       sdStorage: this.toDeviceStorage(cartDto.sdStorage),
       usbStorage: this.toDeviceStorage(cartDto.usbStorage),
+      machine: cartDto.machine as DeviceMachine,
+      videoStandard: cartDto.videoStandard as DeviceVideoStandard,
+      todClockHz: cartDto.todClockHz ?? null,
+      hardwareVariant: cartDto.hardwareVariant as DeviceHardwareVariant,
     };
   }
 

@@ -8,6 +8,7 @@ export interface IDeviceService {
   pingDevice(deviceId: string): Observable<void>;
   reconnectDevice(deviceId: string): Observable<Device>;
   forgetDevice(deviceId: string): Observable<void>;
+  renameDevice(deviceId: string, name: string): Observable<Device>;
 }
 
 export const DEVICE_SERVICE = new InjectionToken<IDeviceService>('DEVICE_SERVICE');
