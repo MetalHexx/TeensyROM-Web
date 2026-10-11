@@ -5,7 +5,7 @@ import { DeviceStore } from '@teensyrom-nx/application';
 import { PlayerViewComponent } from './player-view.component';
 
 function render(devices: unknown[] = []) {
-  const deviceStore = { devices: signal(devices) };
+  const deviceStore = { devices: signal(devices), usableDevices: signal(devices) };
 
   return {
     ...renderPlayerComponent(PlayerViewComponent, {

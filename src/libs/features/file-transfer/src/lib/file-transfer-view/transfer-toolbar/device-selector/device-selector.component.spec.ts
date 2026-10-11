@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { signal, computed } from '@angular/core';
 import { DeviceStore, TransferStore } from '@teensyrom-nx/application';
 import { Device, DeviceState, StorageType } from '@teensyrom-nx/domain';
 import { DeviceSelectorComponent } from './device-selector.component';
@@ -29,13 +29,16 @@ describe('DeviceSelectorComponent', () => {
 
   const setup = async (devices: Device[]) => {
     devicesSignal = signal(devices);
+    const usableDevicesSignal = computed(() =>
+      devicesSignal().filter((d) => d.isEnabled && d.deviceState !== DeviceState.ConnectionLost)
+    );
 
     await TestBed.configureTestingModule({
       imports: [DeviceSelectorComponent],
       providers: [
         provideNoopAnimations(),
         TransferStore,
-        { provide: DeviceStore, useValue: { devices: devicesSignal } },
+        { provide: DeviceStore, useValue: { devices: devicesSignal, usableDevices: usableDevicesSignal } },
       ],
     }).compileComponents();
 

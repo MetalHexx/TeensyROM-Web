@@ -56,6 +56,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public FakeCommunicationPort PortFor(string deviceId) => _portsByDeviceId[deviceId];
 
+        public Task<List<TeensyRomDevice>> ConnectAtStartAsync(CancellationToken ct)
+            => Task.FromResult(_devices);
+
         public Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
             => Task.FromResult(_devices);
 
@@ -63,6 +66,23 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public TeensyRomDevice? GetAvailableDevice(string deviceId)
             => _lostDeviceIds.Contains(deviceId) ? null : _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+
+        public IReadOnlyList<OfflineDevice> GetOfflineDevices() => [];
+
+        public Task<ReconnectOutcome> ReconnectAsync(string deviceId, CancellationToken ct)
+        {
+            var device = _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+            var outcome = device is not null
+                ? new ReconnectOutcome(ReconnectResult.AlreadyAvailable, device)
+                : new ReconnectOutcome(ReconnectResult.UnknownDevice, null);
+            return Task.FromResult(outcome);
+        }
+
+        public Task<ForgetResult> ForgetAsync(string deviceId, CancellationToken ct)
+        {
+            var result = _devices.Any(d => d.DeviceId == deviceId) ? ForgetResult.StillAvailable : ForgetResult.UnknownDevice;
+            return Task.FromResult(result);
+        }
 
         /// <summary>
         /// Makes <see cref="GetAvailableDevice"/> return null for this device, as if it vanished from the

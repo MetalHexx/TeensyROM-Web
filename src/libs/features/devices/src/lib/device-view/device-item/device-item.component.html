@@ -2,19 +2,35 @@
   [title]="device()?.name"
   [enableOverflow]="false"
   data-testid="device-card"
-  [ngClass]="{ dimmed: !isEnabled() }"
+  [ngClass]="{ dimmed: !isEnabled() && !isOffline() }"
+  [cardClass]="isOffline() ? 'offline' : ''"
   animationEntry="from-left"
 >
-  <!-- Power button in corner slot - repurposed for enable/disable -->
+  <!-- Forget button in corner slot - shown only when offline, left of the power button -->
+  @if (isOffline()) {
+    <lib-icon-button
+      slot="corner"
+      icon="delete"
+      ariaLabel="Forget device"
+      data-testid="device-forget-button"
+      size="medium"
+      [tooltip]="forgetTooltip"
+      (buttonClick)="onForget()"
+    >
+    </lib-icon-button>
+  }
+
+  <!-- Power button in corner slot - repurposed for enable/disable, or reconnect when offline -->
   <lib-icon-button
     slot="corner"
     icon="power_settings_new"
     ariaLabel="Toggle Enabled"
     data-testid="device-power-button"
-    [color]="isEnabled() ? 'highlight' : 'normal'"
+    [color]="powerColor()"
     size="medium"
-    [tooltip]="toggleTooltip()"
-    (buttonClick)="onToggleEnabled()"
+    [tooltip]="powerTooltip()"
+    [disabled]="reconnecting()"
+    (buttonClick)="onPowerClick()"
   >
   </lib-icon-button>
 
@@ -32,8 +48,15 @@
         [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
       ></lib-icon-label>
 
-      <!-- Show connection info: prefer TCP details when available -->
-      @if (device()?.ipAddress) {
+      <!-- Show connection info: offline takes priority, then prefer TCP details when available -->
+      @if (isOffline()) {
+        <lib-icon-label
+          icon="cloud_off"
+          data-testid="device-offline-label"
+          [label]="offlineLabel()"
+          color="error"
+        ></lib-icon-label>
+      } @else if (device()?.ipAddress) {
         <lib-icon-label
           icon="wifi"
           data-testid="device-address-label"
@@ -60,6 +83,7 @@
         data-testid="usb-storage-status"
         [status]="usbStatus()"
         [indexExists]="usbIndexExists()"
+        [unknown]="isOffline()"
         (index)="onIndex(StorageType.Usb)"
       ></lib-storage-status>
       <lib-storage-status
@@ -68,6 +92,7 @@
         data-testid="sd-storage-status"
         [status]="sdStatus()"
         [indexExists]="sdIndexExists()"
+        [unknown]="isOffline()"
         (index)="onIndex(StorageType.Sd)"
       ></lib-storage-status>
     </div>

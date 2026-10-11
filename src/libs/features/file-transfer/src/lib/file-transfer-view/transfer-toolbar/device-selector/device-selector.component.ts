@@ -23,7 +23,7 @@ export class DeviceSelectorComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly transferStore = inject(TransferStore);
 
-  readonly enabledDevices = computed(() => this.deviceStore.devices().filter((d) => d.isEnabled));
+  readonly enabledDevices = computed(() => this.deviceStore.usableDevices());
   readonly targetDeviceId = this.transferStore.getTargetDeviceId();
   readonly targetDevice = computed(
     () => this.enabledDevices().find((d) => d.deviceId === this.targetDeviceId()) ?? null

@@ -7,8 +7,9 @@ import {
   IDeviceService,
   DEVICE_STORAGE_SERVICE,
   IStorageService,
+  DeviceState as DeviceConnectionState,
 } from '@teensyrom-nx/domain';
-import { findDevices, enableDevice, disableDevice } from './methods/index';
+import { findDevices, enableDevice, disableDevice, reconnectDevice, forgetDevice } from './methods/index';
 import { indexStorage } from './methods/index-storage';
 import { indexAllStorage } from './methods/index-all-storage';
 import { resetAllDevices } from './methods/reset-all-devices';
@@ -20,6 +21,7 @@ export type DeviceState = {
   isLoading: boolean;
   isIndexing: boolean;
   error: string | null;
+  reconnectingDeviceIds: string[];
 };
 
 const initialState: DeviceState = {
@@ -28,15 +30,27 @@ const initialState: DeviceState = {
   isLoading: true,
   isIndexing: false,
   error: null,
+  reconnectingDeviceIds: [],
 };
 
 export const DeviceStore = signalStore(
   { providedIn: 'root' },
   withDevtools('devices'),
   withState(initialState),
-  withComputed((store) => ({
-    hasEnabledDevices: computed(() => store.devices().some((device) => device.isEnabled)),
-  })),
+  withComputed((store) => {
+    const usableDevices = computed(() =>
+      store
+        .devices()
+        .filter(
+          (device) => device.isEnabled && device.deviceState !== DeviceConnectionState.ConnectionLost
+        )
+    );
+
+    return {
+      usableDevices,
+      hasEnabledDevices: computed(() => usableDevices().length > 0),
+    };
+  }),
   withMethods(
     (
       store,
@@ -46,6 +60,8 @@ export const DeviceStore = signalStore(
       ...findDevices(store, deviceService),
       ...enableDevice(store),
       ...disableDevice(store),
+      ...reconnectDevice(store, deviceService),
+      ...forgetDevice(store, deviceService),
       ...indexStorage(store, storageService),
       ...indexAllStorage(store, storageService),
       ...resetAllDevices(store, deviceService),

@@ -1,64 +1,124 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace TeensyRom.Core.Serial;
 
+/// <summary>
+/// A snapshot of one local network adapter - just the facts <see cref="NetworkHelper.SelectSubnetRanges"/>
+/// needs to decide whether its subnet is worth sweeping.
+/// </summary>
+public sealed record LocalAdapter(
+    string Name,
+    string Description,
+    NetworkInterfaceType Type,
+    OperationalStatus Status,
+    IReadOnlyList<IPAddress> IPv4Addresses,
+    bool HasIPv4Gateway);
+
 public static class NetworkHelper
 {
+    private static readonly string[] _virtualDescriptionMarkers = ["hyper-v", "virtual", "vmware", "virtualbox", "wsl", "docker"];
+    private static readonly string[] _virtualNamePrefixes = ["vethernet", "docker", "br-", "veth", "virbr", "vmnet", "vboxnet", "lxcbr", "podman", "cni"];
+
     /// <summary>
-    /// Gets the local subnet range for the network interface that carries the machine's real
-    /// outbound traffic. Returns a /24 subnet range (e.g., for 192.168.1.13, returns 192.168.1.1 to 192.168.1.254).
+    /// Gets a /24 range (x.x.x.1 to x.x.x.254) for every real network adapter the machine is on, so a
+    /// device on any of them is found - not only on the adapter that carries internet traffic (a
+    /// phone hotspot for internet plus a wired LAN for the TeensyROM is an ordinary setup).
     /// </summary>
-    /// <returns>A tuple of start and end IP addresses, or null if the local IP could not be determined.</returns>
-    public static (IPAddress Start, IPAddress End)? GetLocalSubnetRange()
+    /// <returns>One range per distinct /24; empty when no adapter qualifies or the adapters cannot be read.</returns>
+    public static List<(IPAddress Start, IPAddress End)> GetLocalSubnetRanges()
     {
         try
         {
-            var localIp = GetOutboundIpAddress();
-
-            if (localIp == null)
-            {
-                return null;
-            }
-
-            // Generate the /24 subnet range
-            var ipBytes = localIp.GetAddressBytes();
-
-            // Create start address: x.x.x.1
-            ipBytes[3] = 1;
-            var startIp = new IPAddress(ipBytes);
-
-            // Create end address: x.x.x.254
-            ipBytes[3] = 254;
-            var endIp = new IPAddress(ipBytes);
-
-            return (startIp, endIp);
+            return SelectSubnetRanges(ReadAdapters());
         }
         catch
         {
-            return null;
+            return [];
         }
     }
 
     /// <summary>
-    /// Determines the local IPv4 address the OS would use to route outbound traffic, by opening
-    /// a UDP socket "connected" to an external address (no packets are actually sent for UDP
-    /// connect) and reading back the local endpoint the OS bound to. This reflects the real,
-    /// routable interface rather than whichever adapter happens to enumerate first (e.g. a
-    /// Hyper-V/WSL/Docker virtual switch).
+    /// Picks the subnets worth sweeping. Skips adapters that are not up, loopback and tunnel adapters,
+    /// self-assigned 169.254.x.x addresses, and host-side virtual switches (Hyper-V, WSL, Docker,
+    /// VMware, VirtualBox) - those only lead to VMs and containers. A virtual adapter that has a
+    /// default gateway is kept: a Hyper-V external switch moves the machine's real LAN address onto a
+    /// vEthernet adapter. Two adapters on the same /24 yield one range.
     /// </summary>
-    /// <returns>The local IPv4 address, or null if it could not be determined.</returns>
-    private static IPAddress? GetOutboundIpAddress()
+    public static List<(IPAddress Start, IPAddress End)> SelectSubnetRanges(IEnumerable<LocalAdapter> adapters)
     {
-        try
+        var ranges = new List<(IPAddress Start, IPAddress End)>();
+
+        foreach (var adapter in adapters)
         {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            socket.Connect("8.8.8.8", 65530);
-            return (socket.LocalEndPoint as IPEndPoint)?.Address;
+            if (adapter.Status != OperationalStatus.Up
+                || adapter.Type is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel
+                || (IsVirtual(adapter) && !adapter.HasIPv4Gateway))
+            {
+                continue;
+            }
+
+            foreach (var address in adapter.IPv4Addresses)
+            {
+                if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+                {
+                    continue;
+                }
+
+                var bytes = address.GetAddressBytes();
+
+                if (bytes[0] == 169 && bytes[1] == 254)
+                {
+                    continue;
+                }
+
+                bytes[3] = 1;
+                var start = new IPAddress(bytes);
+
+                if (ranges.Any(r => r.Start.Equals(start)))
+                {
+                    continue;
+                }
+
+                bytes[3] = 254;
+                ranges.Add((start, new IPAddress(bytes)));
+            }
         }
-        catch
+
+        return ranges;
+    }
+
+    private static bool IsVirtual(LocalAdapter adapter)
+    {
+        var description = adapter.Description.ToLowerInvariant();
+        var name = adapter.Name.ToLowerInvariant();
+
+        return _virtualDescriptionMarkers.Any(description.Contains)
+            || _virtualNamePrefixes.Any(name.StartsWith);
+    }
+
+    private static IEnumerable<LocalAdapter> ReadAdapters()
+    {
+        foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
         {
-            return null;
+            var properties = networkInterface.GetIPProperties();
+
+            var ipv4Addresses = properties.UnicastAddresses
+                .Select(u => u.Address)
+                .Where(a => a.AddressFamily == AddressFamily.InterNetwork)
+                .ToList();
+
+            var hasIPv4Gateway = properties.GatewayAddresses
+                .Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any));
+
+            yield return new LocalAdapter(
+                networkInterface.Name,
+                networkInterface.Description,
+                networkInterface.NetworkInterfaceType,
+                networkInterface.OperationalStatus,
+                ipv4Addresses,
+                hasIPv4Gateway);
         }
     }
 

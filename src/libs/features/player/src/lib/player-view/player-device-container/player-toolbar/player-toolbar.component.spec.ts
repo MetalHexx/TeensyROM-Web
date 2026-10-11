@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import type { DebugElement } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
+import type { TooltipConfig } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../testing/render-player-component';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { LaunchMode, PlayerStatus, FileItemType, StorageType } from '@teensyrom-nx/domain';
@@ -35,6 +36,7 @@ function render(deviceId = 'test-device-id') {
   const fileContext = signal<PlayerFileContext | null>(null);
   const launchMode = signal<LaunchMode>(LaunchMode.Directory);
   const fileCompatible = signal(true);
+  const stopping = signal(false);
   const audioStreamEnabled = signal(false);
 
   const context = {
@@ -44,6 +46,7 @@ function render(deviceId = 'test-device-id') {
     getFileContext: vi.fn().mockReturnValue(fileContext),
     getLaunchMode: vi.fn().mockReturnValue(launchMode),
     isCurrentFileCompatible: vi.fn().mockReturnValue(fileCompatible),
+    isStopping: vi.fn().mockReturnValue(stopping),
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
@@ -71,6 +74,7 @@ function render(deviceId = 'test-device-id') {
     fileContext,
     launchMode,
     fileCompatible,
+    stopping,
     audioStreamEnabled,
   };
 }
@@ -79,6 +83,17 @@ function render(deviceId = 'test-device-id') {
 function desktopButtons(fixture: ComponentFixture<PlayerToolbarComponent>): DebugElement[] {
   const desktopLayout = fixture.debugElement.query(By.css('.desktop-layout'));
   return desktopLayout.queryAll(By.css('lib-icon-button'));
+}
+
+/** The tablet-layout block's own icon-buttons, in the same order as {@link desktopButtons}. */
+function tabletButtons(fixture: ComponentFixture<PlayerToolbarComponent>): DebugElement[] {
+  const tabletLayout = fixture.debugElement.query(By.css('.tablet-layout'));
+  return tabletLayout.queryAll(By.css('lib-icon-button'));
+}
+
+/** Whether the middle button is the Stop button (static icon) rather than Play/Pause (bound icon). */
+function isStopButton(el: DebugElement): boolean {
+  return el.nativeElement.getAttribute('icon') === 'stop';
 }
 
 function prop(el: DebugElement, name: string): unknown {
@@ -364,15 +379,109 @@ describe('PlayerToolbarComponent', () => {
       expect(prop(playPause, 'icon')).toBe(component.getPlayPauseIconComputed());
     });
 
-    it('shows the stop button for non-music files', () => {
-      const { fixture, currentFile } = render();
+    it('shows the stop button while a non-music file is playing', () => {
+      const { fixture, currentFile, playerStatus } = render();
       currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
       fixture.detectChanges();
 
       const [, stopButton] = desktopButtons(fixture);
 
       expect(stopButton).toBeTruthy();
       expect(stopButton.nativeElement.getAttribute('icon')).toBe('stop');
+    });
+
+    it('turns the stop button into play once a non-music file has stopped', () => {
+      const { fixture, component, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      const [, playButton] = desktopButtons(fixture);
+
+      expect(isStopButton(playButton)).toBe(false);
+      expect(prop(playButton, 'icon')).toBe('play_arrow');
+      expect(prop(playButton, 'ariaLabel')).toBe('Play');
+      expect(component.playPauseTooltip().body).toBe('Launches the stopped file again.');
+    });
+
+    it('applies the same stop/play rule to the tablet layout', () => {
+      const { fixture, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      expect(isStopButton(tabletButtons(fixture)[1])).toBe(true);
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      expect(isStopButton(tabletButtons(fixture)[1])).toBe(false);
+      expect(prop(tabletButtons(fixture)[1], 'icon')).toBe('play_arrow');
+    });
+
+    it('keeps play/pause for a music file while it is playing', () => {
+      const { fixture, component, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      const [, playPause] = desktopButtons(fixture);
+
+      expect(isStopButton(playPause)).toBe(false);
+      expect(prop(playPause, 'icon')).toBe('pause');
+      expect(component.playPauseTooltip().body).toBeUndefined();
+    });
+
+    it('keeps the disabled play/pause button when the toolbar is disabled', () => {
+      const { fixture, currentFile, playerStatus, setInput } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      setInput('disabled', true);
+
+      const [, playPause] = desktopButtons(fixture);
+
+      expect(isStopButton(playPause)).toBe(false);
+      expect(prop(playPause, 'disabled')).toBe(true);
+    });
+
+    it('disables the stop button while a stop is in flight, in both layouts', () => {
+      const { fixture, currentFile, playerStatus, stopping } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      expect(prop(desktopButtons(fixture)[1], 'disabled')).toBe(false);
+      expect(prop(tabletButtons(fixture)[1], 'disabled')).toBe(false);
+
+      stopping.set(true);
+      fixture.detectChanges();
+
+      expect(prop(desktopButtons(fixture)[1], 'disabled')).toBe(true);
+      expect(prop(tabletButtons(fixture)[1], 'disabled')).toBe(true);
+    });
+
+    it('dims the stop button and says "Stopping…" while a stop is in flight, in both layouts', () => {
+      const { fixture, currentFile, playerStatus, stopping } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+
+      for (const stop of [desktopButtons(fixture)[1], tabletButtons(fixture)[1]]) {
+        expect(stop.nativeElement.classList.contains('stopping')).toBe(false);
+        expect((prop(stop, 'tooltip') as TooltipConfig).title).toBe('Stop');
+      }
+
+      stopping.set(true);
+      fixture.detectChanges();
+
+      for (const stop of [desktopButtons(fixture)[1], tabletButtons(fixture)[1]]) {
+        expect(stop.nativeElement.classList.contains('stopping')).toBe(true);
+        expect((prop(stop, 'tooltip') as TooltipConfig).title).toBe('Stopping…');
+      }
     });
 
     it('disables the navigation buttons when canNavigate is false', () => {
@@ -404,6 +513,63 @@ describe('PlayerToolbarComponent', () => {
     });
   });
 
+  describe('disabled play/pause for an incompatible file', () => {
+    it('disables play/pause in both layouts', () => {
+      const { fixture, currentFile, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, desktopPlayPause] = desktopButtons(fixture);
+      const [, tabletPlayPause] = tabletButtons(fixture);
+
+      expect(prop(desktopPlayPause, 'disabled')).toBe(true);
+      expect(prop(tabletPlayPause, 'disabled')).toBe(true);
+    });
+
+    it('re-enables play/pause once the file is compatible again', () => {
+      const { fixture, currentFile, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      fileCompatible.set(true);
+      fixture.detectChanges();
+
+      const [, desktopPlayPause] = desktopButtons(fixture);
+      expect(prop(desktopPlayPause, 'disabled')).toBe(false);
+    });
+
+    it('keeps Stop enabled for an incompatible non-song file that is still Playing', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      const [, stopButton] = desktopButtons(fixture);
+
+      expect(isStopButton(stopButton)).toBe(true);
+      expect(prop(stopButton, 'disabled')).toBe(false);
+    });
+
+    it('disables the red Play that would no-op once an incompatible non-song file is stopped', () => {
+      const { fixture, currentFile, playerStatus, fileCompatible } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fileCompatible.set(false);
+      fixture.detectChanges();
+
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      const [, playButton] = desktopButtons(fixture);
+
+      expect(isStopButton(playButton)).toBe(false);
+      expect(prop(playButton, 'disabled')).toBe(true);
+    });
+  });
+
   describe('button click wiring', () => {
     it('triggers playPause() when the play/pause button is clicked', () => {
       const { fixture, component, currentFile } = render();
@@ -413,6 +579,33 @@ describe('PlayerToolbarComponent', () => {
 
       const [, playPause] = desktopButtons(fixture);
       playPause.nativeElement.dispatchEvent(new Event('buttonClick'));
+
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it("sends play (not stop) when a stopped non-music file's play button is clicked", async () => {
+      const { fixture, context, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Stopped);
+      fixture.detectChanges();
+
+      const [, playButton] = desktopButtons(fixture);
+      playButton.nativeElement.dispatchEvent(new Event('buttonClick'));
+      await fixture.whenStable();
+
+      expect(context.play).toHaveBeenCalledWith('test-device-id');
+      expect(context.stop).not.toHaveBeenCalled();
+    });
+
+    it('triggers stop() when the stop button is clicked', () => {
+      const { fixture, component, currentFile, playerStatus } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      playerStatus.set(PlayerStatus.Playing);
+      fixture.detectChanges();
+      const spy = vi.spyOn(component, 'stop');
+
+      const [, stopButton] = desktopButtons(fixture);
+      stopButton.nativeElement.dispatchEvent(new Event('buttonClick'));
 
       expect(spy).toHaveBeenCalled();
     });

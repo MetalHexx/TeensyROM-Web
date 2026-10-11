@@ -21,6 +21,12 @@ namespace TeensyRom.Core.Serial
         public MachineType Machine { get; init; } = MachineType.Unknown;
         public VideoStandard VideoStandard { get; init; } = VideoStandard.Unknown;
         public int? TodClockHz { get; init; }
+        /// <summary>
+        /// The firmware's "Boot:" line: true once the C64 menu has finished booting ("complete"), false
+        /// while it is still booting ("in progress"), null when the reply has no such line - every
+        /// minimal-image reply, or a reply cut short.
+        /// </summary>
+        public bool? BootComplete { get; init; }
         /// <summary>Sanitized copy of the raw reply text, for logging.</summary>
         public string RawText { get; init; } = string.Empty;
         public static VersionReply Empty { get; } = new();

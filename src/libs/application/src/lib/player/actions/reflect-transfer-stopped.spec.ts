@@ -56,6 +56,7 @@ describe('reflectTransferStopped', () => {
             durationMs: 60000,
           },
           isLoading: false,
+          isStopping: false,
           lastUpdated: null,
           error: null,
         },

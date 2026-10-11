@@ -45,6 +45,14 @@ namespace TeensyRom.Core.Abstractions
     Unit SetPort(string port);
 
     /// <summary>
+    /// Sets the port to connect to, and (serial only) whether it is proven a TeensyROM by USB
+    /// vendor/product - the gate for asserting DTR, so a foreign serial device sharing the host is never
+    /// reset. The default forwards to <see cref="SetPort(string)"/>, leaving TCP and every existing fake
+    /// unaffected; only <c>SerialCommunicationPort</c> gives the flag meaning.
+    /// </summary>
+    Unit SetPort(string port, bool isTeensyRomPort) => SetPort(port);
+
+    /// <summary>
     /// Opens the port with the current set port
     /// </summary>
     /// <param name="useRetryLoop">When true, uses retry logic for stability. When false, attempts single connection for fast discovery.</param>
@@ -52,6 +60,18 @@ namespace TeensyRom.Core.Abstractions
     /// COM port successfully opened
     /// </returns>
     string? OpenPort(bool useRetryLoop = true);
+
+    /// <summary>
+    /// Opens the port with a single connect attempt bounded to <paramref name="connectTimeoutMs"/>, for
+    /// callers - recovery, start confirm - that poll a connect repeatedly and cannot afford a transport
+    /// whose unbounded attempt blocks for the OS's own connect timeout (TCP: tens of seconds). The
+    /// default implementation is correct for any transport with no real "connect" phase to bound, i.e.
+    /// serial, and falls back to <see cref="OpenPort(bool)"/> with no retry loop.
+    /// </summary>
+    /// <param name="connectTimeoutMs">Bound on the connect attempt.</param>
+    /// <returns>The endpoint if the connect succeeded, else null.</returns>
+    /// <exception cref="TimeoutException">The connect attempt exceeded <paramref name="connectTimeoutMs"/> (TCP only).</exception>
+    string? OpenPort(int connectTimeoutMs) => OpenPort(useRetryLoop: false);
 
     /// <summary>
     /// Closes the port

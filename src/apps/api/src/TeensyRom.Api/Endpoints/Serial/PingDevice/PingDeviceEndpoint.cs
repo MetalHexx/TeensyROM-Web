@@ -12,6 +12,8 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
             Get("/api/devices/{deviceId}/ping")
                 .Produces<PingDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
+                .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("PingDevice")
                 .WithSummary("Ping Device")
                 .WithTags("Devices")
@@ -29,11 +31,18 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
                 SendNotFound($"The device {r.DeviceId} was not found.");
                 return;
             }
-            await mediator.Send(new PingCommand
+            var result = await mediator.Send(new PingCommand
             {
                 DeviceId = device.Cart.DeviceId,
                 CommunicationPort = device.CommunicationPort
             });
+
+            if (!result.IsSuccess)
+            {
+                SendExternalError(result.Error);
+                return;
+            }
+
             Response = new();
             Send();
         }

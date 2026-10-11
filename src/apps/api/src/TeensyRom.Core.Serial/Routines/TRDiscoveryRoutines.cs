@@ -7,7 +7,7 @@ using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Core.Serial.Routines
 {
-    public enum StoragePresence { Unknown, Present, Absent }
+    public enum StoragePresence { Unknown, Present, Absent, Busy }
 
     /// <summary>
     /// Raw, MediatR-free port routines used to interrogate a device outside the command pipeline, so they
@@ -17,11 +17,13 @@ namespace TeensyRom.Core.Serial.Routines
     {
         private const string _logClass = $"{nameof(TRDiscoveryRoutines)}:";
 
+        public const int VersionAckTimeoutMs = 3000;
+
         /// <summary>
         /// Sends VersionInfo (0x6476), consumes the 2-byte Ack, and returns the reply text. Returns
         /// <see cref="string.Empty"/> on anything unexpected (non-Ack bytes, timeout). Never throws.
         /// </summary>
-        public static string ReadVersionReply(this ICommunicationPort port, ILoggingService log, int ackTimeoutMs = 3000, int idleTimeoutMs = 200)
+        public static string ReadVersionReply(this ICommunicationPort port, ILoggingService log, int ackTimeoutMs = VersionAckTimeoutMs, int idleTimeoutMs = 200)
         {
             try
             {
@@ -67,7 +69,7 @@ namespace TeensyRom.Core.Serial.Routines
                 catch (TeensyBusyException)
                 {
                     log.Internal($"{_logClass} ProbeStorageRoot: device busy ({storageType})");
-                    return StoragePresence.Unknown;
+                    return StoragePresence.Busy;
                 }
 
                 port.SendIntBytes(storageType.GetStorageToken(), 1);
@@ -90,7 +92,8 @@ namespace TeensyRom.Core.Serial.Routines
                     }
                     if (text.Contains("Busy!"))
                     {
-                        return StoragePresence.Unknown;
+                        log.Internal($"{_logClass} ProbeStorageRoot: device busy ({storageType}): {text.SanitizeForLogging()}");
+                        return StoragePresence.Busy;
                     }
                     log.InternalWarning($"{_logClass} ProbeStorageRoot: unexpected fail text ({storageType}): {text.SanitizeForLogging()}");
                     return StoragePresence.Unknown;
@@ -98,7 +101,8 @@ namespace TeensyRom.Core.Serial.Routines
 
                 if (reply != TeensyToken.Ack.Value)
                 {
-                    ReadTextUntilIdle(port, 200);
+                    var drained = ReadTextUntilIdle(port, 200);
+                    log.InternalWarning($"{_logClass} ProbeStorageRoot: non-Ack reply ({storageType}): 0x{reply:X4}, drained: {drained.SanitizeForLogging()}");
                     return StoragePresence.Unknown;
                 }
 
@@ -114,11 +118,13 @@ namespace TeensyRom.Core.Serial.Routines
                     return StoragePresence.Present;
                 }
 
-                ReadTextUntilIdle(port, 200);
+                var trailingText = ReadTextUntilIdle(port, 200);
+                log.InternalWarning($"{_logClass} ProbeStorageRoot: unexpected list tokens ({storageType}): start 0x{startToken:X4}, end 0x{endToken:X4}, drained: {trailingText.SanitizeForLogging()}");
                 return StoragePresence.Unknown;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                log.InternalWarning($"{_logClass} ProbeStorageRoot: {ex.GetType().Name} ({storageType}): {ex.Message}");
                 return StoragePresence.Unknown;
             }
         }
@@ -129,7 +135,7 @@ namespace TeensyRom.Core.Serial.Routines
         /// serial polls BytesToRead while TCP pulls arriving bytes into its receive buffer, so the same
         /// wait-then-read loop is correct on both, unlike <c>ICommunicationPort.ReadSerialAsString</c>.
         /// </summary>
-        private static string ReadTextUntilIdle(ICommunicationPort port, int idleTimeoutMs, int maxTotalMs = 2000)
+        internal static string ReadTextUntilIdle(ICommunicationPort port, int idleTimeoutMs, int maxTotalMs = 2000)
         {
             var received = new List<byte>();
             var stopwatch = Stopwatch.StartNew();
