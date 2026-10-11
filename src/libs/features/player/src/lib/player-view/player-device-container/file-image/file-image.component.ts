@@ -14,8 +14,8 @@ import {
   isBuiltInPreset,
   type CrtSettingsConfig,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE, validatePresetName } from '@teensyrom-nx/domain';
-import type { LaunchedFile } from '@teensyrom-nx/application';
+import { CrtSettings, CRT_STORAGE, validatePresetName, crtVideoStandardFor } from '@teensyrom-nx/domain';
+import { DeviceStore, type LaunchedFile } from '@teensyrom-nx/application';
 
 @Component({
   selector: 'lib-file-image',
@@ -33,9 +33,15 @@ import type { LaunchedFile } from '@teensyrom-nx/application';
 })
 export class FileImageComponent {
   private readonly crtStorage = inject(CRT_STORAGE);
+  private readonly deviceStore = inject(DeviceStore);
 
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
+
+  /** Video standard new CRT settings start in: the device's own, or PAL when unknown. */
+  private readonly deviceStandard = computed(() =>
+    crtVideoStandardFor(this.deviceStore.devices().find((d) => d.deviceId === this.deviceId()))
+  );
 
   readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.small;
 
@@ -67,7 +73,10 @@ export class FileImageComponent {
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
         } else {
-          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
+          this.crtSettings.set({
+            ...CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL],
+            videoStandard: this.deviceStandard(),
+          });
         }
       }
     }, { allowSignalWrites: true });
@@ -112,7 +121,7 @@ export class FileImageComponent {
     let settings: CrtSettings;
 
     if (isBuiltInPreset(presetName)) {
-      settings = CRT_PRESETS[presetName];
+      settings = { ...CRT_PRESETS[presetName], videoStandard: this.deviceStandard() };
     } else {
       const customPresets = this.crtStorage.loadCustomPresets();
       const preset = customPresets.find(p => p.name === presetName);
