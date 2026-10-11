@@ -84,7 +84,7 @@ export interface BrowseTreeStorageModel {
   readonly storageType: StorageType;
   readonly label: string; // 'SD Storage' | 'USB Storage'
   readonly icon: string; // 'sd_storage' | 'usb'
-  readonly accessibleName: string; // 'SD Storage, Device SGVISJTN'
+  readonly accessibleName: string; // 'SD Storage, Studio Rack'
 }
 
 /**
@@ -94,6 +94,6 @@ export interface BrowseTreeModel {
   readonly deviceId: string;
   readonly label: string; // the text rendered on the device row, e.g. the device name
   readonly icon: string; // 'desktop_windows'
-  readonly accessibleName: string; // 'Device SGVISJTN'
+  readonly accessibleName: string; // 'Device Studio Rack'
   readonly storages: readonly BrowseTreeStorageModel[];
 }

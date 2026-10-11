@@ -88,7 +88,10 @@ export class DeviceSettingsSectionComponent {
     const controls = this.knownDevicesArray().controls;
     const createDefaultGroup = this.createDefaultGroup();
 
-    const cards = this.devices().map((device): DeviceSettingsCard => {
+    const devices = this.devices();
+    this.pruneDefaultGroups(devices);
+
+    const cards = devices.map((device): DeviceSettingsCard => {
       const entry = controls.find((c) => c.get('deviceId')?.value === device.deviceId);
       return {
         device,
@@ -105,6 +108,15 @@ export class DeviceSettingsSectionComponent {
         a.device.deviceId.localeCompare(b.device.deviceId)
     );
   });
+
+  private pruneDefaultGroups(devices: readonly Device[]): void {
+    const knownIds = new Set(devices.map((device) => device.deviceId));
+    for (const deviceId of this.defaultGroups.keys()) {
+      if (!knownIds.has(deviceId)) {
+        this.defaultGroups.delete(deviceId);
+      }
+    }
+  }
 
   private getDefaultGroup(
     deviceId: string,
