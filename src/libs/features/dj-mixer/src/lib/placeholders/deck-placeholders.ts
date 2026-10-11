@@ -1,5 +1,4 @@
 import type {
-  DeckStripModel,
   LoopsCuesPanelModel,
   SpeedPanelModel,
   VoicePanelModel,
@@ -7,15 +6,14 @@ import type {
 import type { DeckRef } from '../deck-ref';
 
 /**
- * Everything one deck column and its mixer strip need to render the panels that stay inert —
- * Voice, Speed, Loops/Cues and the mixer strip. Transport and the binding card are wired live
- * from `DjStore` (see `DjDeckColumnComponent`) and no longer come from here.
+ * Everything one deck column needs to render the panels that stay inert — Voice, Speed and
+ * Loops/Cues. Transport, the binding card and the mixer strip are wired live from `DjStore` (see
+ * `DjDeckColumnComponent` and `DjMixerCardComponent`) and no longer come from here.
  */
 export interface DeckPlaceholderModels {
   readonly voice: VoicePanelModel;
   readonly speed: SpeedPanelModel;
   readonly loopsCues: LoopsCuesPanelModel;
-  readonly strip: DeckStripModel;
 }
 
 const VOICE_ROW_LABELS = ['V1', 'V2', 'V3'] as const;
@@ -66,35 +64,9 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
     rows: [],
   };
 
-  const strip: DeckStripModel = {
-    filter: {
-      engaged: 'lowPass',
-      groupAccessibleName: `Filter mode deck ${letter}`,
-      optionAccessibleNames: {
-        lowPass: `Filter mode low-pass deck ${letter}`,
-        bandPass: `Filter mode band-pass deck ${letter}`,
-        highPass: `Filter mode high-pass deck ${letter}`,
-        off: `Filter mode off deck ${letter}`,
-      },
-    },
-    knobs: [
-      { id: 'cutoff', label: 'Cutoff', accessibleName: `Cutoff deck ${letter}`, value: 0 },
-      { id: 'resonance', label: 'Resonance', accessibleName: `Resonance deck ${letter}`, value: 0 },
-      {
-        id: 'pulseWidth',
-        label: 'Pulse width',
-        accessibleName: `Pulse width deck ${letter}`,
-        value: 0,
-      },
-      { id: 'key', label: 'Key', accessibleName: `Key deck ${letter}`, value: 0, readout: null },
-    ],
-    fader: { value: 1, label: letter, accessibleName: `Gain deck ${letter}` },
-  };
-
   return {
     voice,
     speed,
     loopsCues,
-    strip,
   };
 }

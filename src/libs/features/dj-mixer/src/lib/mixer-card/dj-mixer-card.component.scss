@@ -36,6 +36,17 @@
     width: auto;
     flex: 1 1 0;
   }
+
+  // Content-sized beside the crossfader instead of a full-width row of its own.
+  .key-notation {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .key-notation-option {
+    flex: 0 0 auto;
+    padding: 0 var(--spacing-sm);
+  }
 }
 
 :host {
@@ -71,4 +82,37 @@
   // Two medium strips plus this gap have to fit the card's own content width — the same 148px the
   // crossfader's track is cut to at desktop.
   gap: var(--spacing-md);
+}
+
+// The Camelot / Note switch, styled like `lib-filter-mode-selector`'s medium option cells. It sits
+// last in `.mixer-body`, so it never moves the strips or the crossfader above it.
+.key-notation {
+  display: flex;
+  flex: 0 0 auto;
+  width: 100%;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.key-notation-option {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid var(--color-dimmed);
+  background: transparent;
+  color: var(--color-dimmed);
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.key-notation-option--engaged {
+  background: var(--color-primary);
+  color: var(--color-dimmed-light);
 }
