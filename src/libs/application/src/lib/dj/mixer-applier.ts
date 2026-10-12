@@ -6,13 +6,24 @@ import { DeckRuntime } from './deck-runtime';
 import { DECK_SLOTS, type Slot } from './slot';
 import { linearCrossfaderGain } from './mixer/crossfader-curve';
 import { scaleCoefficientFor, keyCoefficientFor } from './mixer/scale-taper';
+import {
+  cutoffSweepDrives,
+  resonanceDrive,
+  tuneFilterStateFrom,
+  type FieldDrive,
+} from './mixer/filter-sweep';
 
 /** Matches `DeckRuntime`'s refusal to hand out a slot whose engine bundle was never built. */
 const UNBUILT_SLOT = /has not been built/;
 
 /**
  * Turns each deck's stored mixer values into engine values: the crossfader-weighted output gain,
- * the three register scales, the key coefficient and the filter mode.
+ * the pulse-width scale, the key coefficient, the filter mode, and the held cutoff, filter-routing
+ * and resonance fields the cutoff and resonance knobs sweep. The cutoff and resonance register
+ * scales are never set; they stay at home.
+ *
+ * The filter type has one owner: the sweep holds it while the cutoff knob is off centre, and at
+ * centre the stored filter mode is applied instead of releasing the hold.
  *
  * One effect per slot re-applies the deck whenever its mix state or the crossfader changes, so a
  * crossfader move re-applies both decks and a deck change re-applies only that deck. Values are
@@ -62,11 +73,18 @@ export class MixerApplier {
 
     try {
       this.runtime.setOutputGain(slot, clamp(mix.level * linearCrossfaderGain(crossfader, side), 0, 1));
-      this.runtime.setRegisterScale(slot, 'cutoff', scaleCoefficientFor(mix.cutoff));
-      this.runtime.setRegisterScale(slot, 'resonance', scaleCoefficientFor(mix.resonance));
       this.runtime.setRegisterScale(slot, 'pulseWidth', scaleCoefficientFor(mix.pulseWidth));
       this.runtime.setKeyCoefficient(slot, keyCoefficientFor(mix.keySemitones));
-      this.runtime.setFilterMode(slot, mix.filterMode);
+
+      const tune = () => tuneFilterStateFrom(this.runtime.tuneRegisters(slot));
+      for (const drive of cutoffSweepDrives(mix.cutoff, tune)) {
+        if (drive.field.name === 'filterType' && drive.hold === null) {
+          this.runtime.setFilterMode(slot, mix.filterMode);
+        } else {
+          this.drive(slot, drive);
+        }
+      }
+      this.drive(slot, resonanceDrive(mix.resonance));
     } catch (error) {
       this.report(slot, error);
     }
@@ -78,6 +96,14 @@ export class MixerApplier {
   resetTuneShaping(slot: Slot): void {
     this.store.resetDeckTuneShaping({ slot });
     this.applyDeck(slot);
+  }
+
+  private drive(slot: Slot, { field, hold }: FieldDrive): void {
+    if (hold === null) {
+      this.runtime.releaseField(slot, field);
+    } else {
+      this.runtime.holdField(slot, field, hold.value, hold.amount);
+    }
   }
 
   private report(slot: Slot, error: unknown): void {

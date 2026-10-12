@@ -8,6 +8,13 @@ import { KEY_SEMITONE_RANGE } from './mixer/scale-taper';
 
 type ShapingKnob = 'cutoff' | 'resonance' | 'pulseWidth';
 
+/** Each knob's stored range: cutoff and pulse width are bipolar, resonance only opens upward. */
+const KNOB_RANGE: Record<ShapingKnob, { readonly min: number; readonly max: number }> = {
+  cutoff: { min: -1, max: 1 },
+  resonance: { min: 0, max: 1 },
+  pulseWidth: { min: -1, max: 1 },
+};
+
 /**
  * The mixer's command surface: bounds each control's value and writes it to `DjStore`, nothing
  * else. `MixerApplier` turns the stored values into engine values; this service never touches the
@@ -37,12 +44,13 @@ export class MixerService {
     this.store.setCrossfader({ position: clamp(position, -1, 1) });
   }
 
-  /** One tune-shaping knob's position, clamped to −1…+1. */
+  /** One tune-shaping knob's position: cutoff and pulse width clamp to −1…+1, resonance to 0…1. */
   setKnob(slot: Slot, knob: ShapingKnob, position: number): void {
     if (!Number.isFinite(position) || !this.canShape(slot, knob)) {
       return;
     }
-    this.store.setDeckMix({ slot, patch: { [knob]: clamp(position, -1, 1) } });
+    const { min, max } = KNOB_RANGE[knob];
+    this.store.setDeckMix({ slot, patch: { [knob]: clamp(position, min, max) } });
   }
 
   /** Key offset, rounded to a whole semitone and clamped to ±12. */

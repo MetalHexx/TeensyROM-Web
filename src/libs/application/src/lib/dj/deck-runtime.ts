@@ -8,6 +8,7 @@ import type {
   FrameClock,
   ReplayRunner,
   SidFilterMode,
+  SidField,
 } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
@@ -133,6 +134,21 @@ export class DeckRuntime {
   /** Overrides the SID filter mode; `null` plays the tune's own filter-mode bits. */
   setFilterMode(slot: Slot, mode: SidFilterMode | null): void {
     this.requireSlot(slot).player.setFilterMode(mode);
+  }
+
+  /** Holds one chip field on this slot's engine — see `SidPlayer.holdField`. */
+  holdField(slot: Slot, field: SidField, value: number, amount: number): void {
+    this.requireSlot(slot).player.holdField(field, value, amount);
+  }
+
+  /** Releases a field held by `holdField`; releasing one that is not held does nothing. */
+  releaseField(slot: Slot, field: SidField): void {
+    this.requireSlot(slot).player.releaseField(field);
+  }
+
+  /** The tune's own 25 register values as the engine reports them: raw, before any scale or hold. */
+  tuneRegisters(slot: Slot): Uint8Array {
+    return this.requireSlot(slot).player.getStats().emitted.written;
   }
 
   /** Sets this slot's tempo multiplier (1 = the tune's own speed). */

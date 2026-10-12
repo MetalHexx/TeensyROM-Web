@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
-import { FakeClock } from '@sidablist/core';
-import type { ReplayRunner } from '@sidablist/core';
+import { FakeClock, SID_FILTER_MODE_HIGH_PASS, SID_FILTER_MODE_LOW_PASS } from '@sidablist/core';
+import type { ReplayRunner, SidField } from '@sidablist/core';
 import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { MixerApplier } from './mixer-applier';
@@ -13,6 +13,7 @@ import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import { DECK_SLOTS, type Slot } from './slot';
 import { scaleCoefficientFor } from './mixer/scale-taper';
+import { FILTER_SWEEP, resonanceDrive } from './mixer/filter-sweep';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -59,6 +60,9 @@ describe('MixerApplier', () => {
   let setRegisterScale: MockInstance<DeckRuntime['setRegisterScale']>;
   let setKeyCoefficient: MockInstance<DeckRuntime['setKeyCoefficient']>;
   let setFilterMode: MockInstance<DeckRuntime['setFilterMode']>;
+  let holdField: MockInstance<DeckRuntime['holdField']>;
+  let releaseField: MockInstance<DeckRuntime['releaseField']>;
+  let tuneRegisters: MockInstance<DeckRuntime['tuneRegisters']>;
 
   function provide(): void {
     TestBed.configureTestingModule({
@@ -86,10 +90,21 @@ describe('MixerApplier', () => {
     setRegisterScale = vi.spyOn(runtime, 'setRegisterScale');
     setKeyCoefficient = vi.spyOn(runtime, 'setKeyCoefficient');
     setFilterMode = vi.spyOn(runtime, 'setFilterMode');
+    holdField = vi.spyOn(runtime, 'holdField');
+    releaseField = vi.spyOn(runtime, 'releaseField');
+    tuneRegisters = vi.spyOn(runtime, 'tuneRegisters');
   }
 
   function clearSpies(): void {
-    for (const spy of [setOutputGain, setRegisterScale, setKeyCoefficient, setFilterMode]) {
+    for (const spy of [
+      setOutputGain,
+      setRegisterScale,
+      setKeyCoefficient,
+      setFilterMode,
+      holdField,
+      releaseField,
+      tuneRegisters,
+    ]) {
       spy.mockClear();
     }
   }
@@ -101,6 +116,30 @@ describe('MixerApplier', () => {
 
   function gainFor(slot: Slot): number | undefined {
     return setOutputGain.mock.calls.filter(([calledSlot]) => calledSlot === slot).pop()?.[1];
+  }
+
+  /** The `$D418` byte the tune itself wrote, as `tuneRegisters` reports it. */
+  function tuneWrites(volumeAndMode: number): void {
+    const written = new Uint8Array(25);
+    written[24] = volumeAndMode;
+    tuneRegisters.mockReturnValue(written);
+  }
+
+  function heldOn(slot: Slot, name: string, voice?: number): { value: number; amount: number } | undefined {
+    const call = holdField.mock.calls
+      .filter(([calledSlot, field]) => calledSlot === slot && matches(field, name, voice))
+      .pop();
+    return call === undefined ? undefined : { value: call[2], amount: call[3] };
+  }
+
+  function releasedOn(slot: Slot, name: string, voice?: number): boolean {
+    return releaseField.mock.calls.some(
+      ([calledSlot, field]) => calledSlot === slot && matches(field, name, voice)
+    );
+  }
+
+  function matches(field: SidField, name: string, voice?: number): boolean {
+    return field.name === name && (voice === undefined || ('voice' in field && field.voice === voice));
   }
 
   beforeEach(() => {
@@ -131,28 +170,153 @@ describe('MixerApplier', () => {
       expect(gainFor('B')).toBe(1);
     });
 
-    it('pushes each knob to its own register group, the key coefficient and the filter mode', () => {
+    it('pushes the pulse-width scale, the key coefficient and the stored filter mode at centre', () => {
       makeShapeable('A');
-      service.setKnob('A', 'cutoff', 0.25);
-      service.setKnob('A', 'resonance', -0.5);
       service.setKnob('A', 'pulseWidth', 1);
       service.setKeySemitones('A', 12);
       service.setFilterMode('A', 'highPass');
 
       applier.applyDeck('A');
 
-      expect(setRegisterScale).toHaveBeenCalledWith('A', 'cutoff', scaleCoefficientFor(0.25));
-      expect(setRegisterScale).toHaveBeenCalledWith('A', 'resonance', scaleCoefficientFor(-0.5));
       expect(setRegisterScale).toHaveBeenCalledWith('A', 'pulseWidth', scaleCoefficientFor(1));
       expect(setKeyCoefficient).toHaveBeenCalledWith('A', 2);
-      expect(setFilterMode).toHaveBeenCalledWith('A', 'highPass');
+      expect(setFilterMode).toHaveBeenCalledExactlyOnceWith('A', 'highPass');
+    });
+
+    it('never sets the cutoff or resonance register scales', () => {
+      makeShapeable('A');
+      service.setKnob('A', 'cutoff', -0.6);
+      service.setKnob('A', 'resonance', 0.6);
+
+      applier.applyDeck('A');
+      applier.applyDeck('B');
+
+      expect(setRegisterScale.mock.calls.every(([, group]) => group === 'pulseWidth')).toBe(true);
     });
 
     it('never touches the other slot', () => {
+      makeShapeable('A');
+      service.setKnob('A', 'cutoff', 0.6);
+      service.setKnob('A', 'resonance', 0.6);
+
       applier.applyDeck('A');
 
-      expect(setOutputGain.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
-      expect(setRegisterScale.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      expect(holdField).toHaveBeenCalled();
+      for (const spy of [
+        setOutputGain,
+        setRegisterScale,
+        setKeyCoefficient,
+        setFilterMode,
+        holdField,
+        releaseField,
+        tuneRegisters,
+      ]) {
+        expect(spy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      }
+    });
+
+    describe('the cutoff sweep', () => {
+      const { deadZone, glideZone } = FILTER_SWEEP;
+
+      beforeEach(() => makeShapeable('A'));
+
+      it('releases every cutoff field at centre and applies the stored filter mode in place of the filter-type hold', () => {
+        service.setFilterMode('A', 'bandPass');
+
+        applier.applyDeck('A');
+
+        expect(holdField).not.toHaveBeenCalled();
+        expect(releasedOn('A', 'cutoff')).toBe(true);
+        for (const voice of [0, 1, 2]) {
+          expect(releasedOn('A', 'filtered', voice)).toBe(true);
+        }
+        expect(releasedOn('A', 'filterType')).toBe(false);
+        expect(setFilterMode).toHaveBeenCalledExactlyOnceWith('A', 'bandPass');
+        expect(tuneRegisters).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['left', -0.6, SID_FILTER_MODE_LOW_PASS],
+        ['right', 0.6, SID_FILTER_MODE_HIGH_PASS],
+      ])('holds the filter type, all three voices and the cutoff when the knob is %s of centre', (_side, position, type) => {
+        service.setKnob('A', 'cutoff', position);
+
+        applier.applyDeck('A');
+
+        expect(heldOn('A', 'filterType')).toEqual({ value: type, amount: 1 });
+        for (const voice of [0, 1, 2]) {
+          expect(heldOn('A', 'filtered', voice)).toEqual({ value: 1, amount: 1 });
+        }
+        expect(heldOn('A', 'cutoff')?.amount).toBe(1);
+        expect(releasedOn('A', 'cutoff')).toBe(false);
+        expect(setFilterMode).not.toHaveBeenCalled();
+      });
+
+      it('leaves the other deck at centre when only one deck is swept', () => {
+        service.setKnob('A', 'cutoff', 0.6);
+
+        applier.applyDeck('A');
+        applier.applyDeck('B');
+
+        expect(heldOn('A', 'cutoff')).toBeDefined();
+        expect(heldOn('B', 'cutoff')).toBeUndefined();
+        expect(releasedOn('B', 'cutoff')).toBe(true);
+        expect(setFilterMode).toHaveBeenCalledExactlyOnceWith('B', null);
+      });
+
+      it('releases voice 3 from the filter when the tune has switched it off', () => {
+        tuneWrites(0x80);
+        service.setKnob('A', 'cutoff', -0.6);
+
+        applier.applyDeck('A');
+
+        expect(releasedOn('A', 'filtered', 2)).toBe(true);
+        expect(heldOn('A', 'filtered', 0)).toBeDefined();
+        expect(heldOn('A', 'filtered', 1)).toBeDefined();
+        expect(heldOn('A', 'filtered', 2)).toBeUndefined();
+      });
+
+      it("glides in from the tune's own open cutoff and hands the filter type back to the stored mode", () => {
+        tuneWrites(0x40);
+        service.setKnob('A', 'cutoff', deadZone + glideZone / 2);
+        service.setFilterMode('A', 'lowPass');
+
+        applier.applyDeck('A');
+
+        const held = heldOn('A', 'cutoff');
+        expect(held?.value).toBe(0);
+        expect(held?.amount).toBeGreaterThan(0);
+        expect(held?.amount).toBeLessThan(1);
+        expect(releasedOn('A', 'filterType')).toBe(false);
+        expect(setFilterMode).toHaveBeenCalledExactlyOnceWith('A', 'lowPass');
+        expect(heldOn('A', 'filterType')).toBeUndefined();
+        expect(heldOn('A', 'filtered', 0)).toBeUndefined();
+      });
+    });
+
+    describe('the resonance knob', () => {
+      beforeEach(() => makeShapeable('A'));
+
+      it('holds the resonance field above rest', () => {
+        service.setKnob('A', 'resonance', 0.5);
+
+        applier.applyDeck('A');
+
+        expect(heldOn('A', 'resonance')).toEqual(resonanceDrive(0.5).hold);
+        expect(releasedOn('A', 'resonance')).toBe(false);
+      });
+
+      it('releases the resonance field at rest', () => {
+        service.setKnob('A', 'resonance', 0.5);
+        applier.applyDeck('A');
+        clearSpies();
+
+        service.setKnob('A', 'resonance', 0);
+        applier.applyDeck('A');
+
+        expect(releasedOn('A', 'resonance')).toBe(true);
+        expect(heldOn('A', 'resonance')).toBeUndefined();
+      });
     });
 
     it('warns once about an unbuilt slot and never throws', () => {
@@ -183,9 +347,10 @@ describe('MixerApplier', () => {
       service.setKnob('A', 'cutoff', 0.5);
       TestBed.flushEffects();
 
-      expect(setRegisterScale).toHaveBeenCalledWith('A', 'cutoff', scaleCoefficientFor(0.5));
-      expect(setRegisterScale.mock.calls.some(([slot]) => slot === 'B')).toBe(false);
-      expect(setOutputGain.mock.calls.some(([slot]) => slot === 'B')).toBe(false);
+      expect(heldOn('A', 'cutoff')).toBeDefined();
+      for (const spy of [holdField, releaseField, setOutputGain, setRegisterScale]) {
+        expect(spy.mock.calls.some(([slot]) => slot === 'B')).toBe(false);
+      }
     });
 
     it('re-applies both decks when the crossfader moves', () => {
@@ -226,7 +391,7 @@ describe('MixerApplier', () => {
 
       expect(logError).toHaveBeenCalledTimes(1);
       expect(vi.mocked(logError).mock.calls[0][0]).toContain('deck A');
-      expect(setRegisterScale).toHaveBeenCalledWith('B', 'cutoff', 1);
+      expect(releasedOn('B', 'cutoff')).toBe(true);
       expect(setFilterMode).toHaveBeenCalledWith('B', null);
     });
   });
@@ -237,11 +402,13 @@ describe('MixerApplier', () => {
       service.setLevel('A', 0.5);
       service.setCrossfader(-0.5);
       service.setKnob('A', 'cutoff', 0.75);
-      service.setKnob('A', 'resonance', -0.75);
+      service.setKnob('A', 'resonance', 0.75);
       service.setKnob('A', 'pulseWidth', 0.5);
       service.setKeySemitones('A', 7);
       service.setFilterMode('A', 'lowPass');
       applier.applyDeck('A');
+      expect(heldOn('A', 'cutoff')).toBeDefined();
+      expect(heldOn('A', 'resonance')).toBeDefined();
       clearSpies();
 
       applier.resetTuneShaping('A');
@@ -253,8 +420,12 @@ describe('MixerApplier', () => {
         keySemitones: 0,
         filterMode: null,
       });
-      expect(setRegisterScale).toHaveBeenCalledWith('A', 'cutoff', 1);
-      expect(setRegisterScale).toHaveBeenCalledWith('A', 'resonance', 1);
+      expect(holdField).not.toHaveBeenCalled();
+      expect(releasedOn('A', 'cutoff')).toBe(true);
+      expect(releasedOn('A', 'resonance')).toBe(true);
+      for (const voice of [0, 1, 2]) {
+        expect(releasedOn('A', 'filtered', voice)).toBe(true);
+      }
       expect(setRegisterScale).toHaveBeenCalledWith('A', 'pulseWidth', 1);
       expect(setKeyCoefficient).toHaveBeenCalledWith('A', 1);
       expect(setFilterMode).toHaveBeenCalledWith('A', null);
