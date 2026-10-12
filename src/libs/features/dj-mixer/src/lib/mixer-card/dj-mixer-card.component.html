@@ -1,21 +1,43 @@
 <lib-scaling-compact-card cardClass="compact-card--fill" animationEntry="from-bottom">
   <div class="mixer-body">
-    <div class="strips">
-      @for (deck of decks(); track deck.index) {
+    <div class="strips" [style.--strip-count]="decks().length">
+      @for (strip of strips(); track strip.deck.index; let first = $first) {
       <lib-deck-strip
-        [model]="stripFor(deck)"
+        [model]="strip.model"
         size="medium"
         [faderLength]="faderLength()"
-      ></lib-deck-strip>
+        (knobChange)="onKnobChange(strip.deck.slot, $event)"
+        (faderChange)="onFaderChange(strip.deck.slot, $event)"
+        (filterModeSelect)="onFilterModeSelect(strip.deck.slot, $event)"
+      >
+        <div deckStripAfterKnobs class="key-notation-slot">
+          @if (first) {
+          <div class="key-notation" role="group" aria-label="Key notation">
+            @for (option of keyFormatOptions; track option.format) {
+            <button
+              type="button"
+              class="key-notation-option"
+              [class.key-notation-option--engaged]="keyDisplayFormat() === option.format"
+              [attr.aria-pressed]="keyDisplayFormat() === option.format"
+              (click)="onKeyFormatSelect(option.format)"
+            >
+              {{ option.label }}
+            </button>
+            }
+          </div>
+          }
+        </div>
+      </lib-deck-strip>
       }
     </div>
     @if (showCrossfader()) {
     <lib-crossfader
-      [value]="0"
+      [value]="crossfader()"
       startLabel=""
       endLabel=""
       [accessibleName]="crossfaderName()"
       [trackLength]="faderLength()"
+      (valueChange)="onCrossfaderChange($event)"
     ></lib-crossfader>
     }
   </div>

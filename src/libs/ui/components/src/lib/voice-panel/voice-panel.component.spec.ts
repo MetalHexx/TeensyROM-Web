@@ -62,6 +62,20 @@ describe('VoicePanelComponent', () => {
     expect(emitted).toEqual([{ index: 2, held: true }]);
   });
 
+  it('releases a row held when the panel is torn down, through the row to the panel', () => {
+    const emitted: { index: number; held: boolean }[] = [];
+    component.heldChange.subscribe((event) => emitted.push(event));
+
+    const button = fixture.nativeElement.querySelectorAll('.voice-hold')[1] as HTMLButtonElement;
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    fixture.destroy();
+
+    expect(emitted).toEqual([
+      { index: 1, held: true },
+      { index: 1, held: false },
+    ]);
+  });
+
   it('fires clearMutes when Clear is pressed', () => {
     let fired = false;
     component.clearMutes.subscribe(() => (fired = true));
@@ -74,5 +88,44 @@ describe('VoicePanelComponent', () => {
     clearButton.click();
 
     expect(fired).toBe(true);
+  });
+
+  describe('disabled', () => {
+    function controls(): (HTMLInputElement | HTMLButtonElement)[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('input, button'));
+    }
+
+    function disable(): void {
+      fixture.componentRef.setInput('model', { ...testModel(), disabled: true });
+      fixture.detectChanges();
+    }
+
+    it('leaves every row and the Clear button enabled by default', () => {
+      expect(controls()).toHaveLength(7);
+      expect(controls().every((control) => !control.disabled)).toBe(true);
+    });
+
+    it('disables every row control and the Clear button', () => {
+      disable();
+
+      expect(controls()).toHaveLength(7);
+      expect(controls().every((control) => control.disabled)).toBe(true);
+    });
+
+    it('emits nothing from a row or Clear while disabled', () => {
+      disable();
+      const emitted: unknown[] = [];
+      component.mutedChange.subscribe((e) => emitted.push(e));
+      component.heldChange.subscribe((e) => emitted.push(e));
+      component.clearMutes.subscribe(() => emitted.push('clear'));
+
+      fixture.nativeElement.querySelector('input[type="checkbox"]').click();
+      fixture.nativeElement
+        .querySelector('.voice-hold')
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      fixture.nativeElement.querySelector('.voice-clear button').click();
+
+      expect(emitted).toEqual([]);
+    });
   });
 });

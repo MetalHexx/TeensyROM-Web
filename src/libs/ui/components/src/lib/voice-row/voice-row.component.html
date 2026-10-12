@@ -4,6 +4,7 @@
     [id]="model().checkboxId"
     [attr.aria-label]="model().muteAccessibleName"
     [checked]="model().muted"
+    [disabled]="disabled()"
     (change)="onMutedChange($event)"
   />
   <label [for]="model().checkboxId">{{ model().label }}</label>
@@ -13,6 +14,7 @@
   type="button"
   class="voice-hold"
   [attr.aria-label]="model().holdAccessibleName"
+  [disabled]="disabled()"
   (pointerdown)="onHoldStart($event)"
   (pointerup)="onHoldEnd()"
   (pointercancel)="onHoldEnd()"

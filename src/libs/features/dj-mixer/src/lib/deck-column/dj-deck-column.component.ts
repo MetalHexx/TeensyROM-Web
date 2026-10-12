@@ -7,12 +7,29 @@ import {
   TransportPanelComponent,
   VoicePanelComponent,
 } from '@teensyrom-nx/ui/components';
-import type { BindingCardModel, TransportPanelModel } from '@teensyrom-nx/ui/components';
+import type {
+  BindingCardModel,
+  SpeedPanelModel,
+  TransportPanelModel,
+  VoicePanelModel,
+} from '@teensyrom-nx/ui/components';
 import { DeckService, DeviceStore, DjStore } from '@teensyrom-nx/application';
 import { findDeviceForMidiPort } from '@teensyrom-nx/domain';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
 import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
+
+/** The speed fader's travel. Display only: the live multiplier can sit outside it after a jump
+ *  (0.3x–1.7x), and the thumb pins at the edge while the readout shows the true value. */
+const SPEED_FADER_MIN = 0.5;
+const SPEED_FADER_MAX = 1.5;
+
+type SpeedJump = 'up' | 'home' | 'down';
+
+/** The speed panel's `jump` id is an opaque string; this is the one place it is narrowed. */
+function isSpeedJump(id: string): id is SpeedJump {
+  return id === 'up' || id === 'home' || id === 'down';
+}
 
 @Component({
   selector: 'lib-dj-deck-column',
@@ -39,11 +56,13 @@ export class DjDeckColumnComponent {
   /** Whether a SID drag is currently in flight anywhere in the view — lights this deck's overlay. */
   readonly dropActive = input<boolean>(false);
 
-  /** Voice, Speed and Loops/Cues stay on the inert placeholders — present, but not yet wired. */
+  /** Loops/Cues stays on the inert placeholder — present, but not yet wired. */
   readonly models = computed(() => createDeckPlaceholders(this.deck()));
 
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
   private readonly binding = computed(() => this.djStore.bindingSummary(this.deck().slot)());
+  private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
+  private readonly canShape = computed(() => this.djStore.canShape(this.deck().slot)());
 
   // Non-null only mid-drag or mid-seek: the pointer's own value pins the thumb so a polled
   // position update can't fight it — the POC transport adapter's pin-until-landed rule, carried
@@ -80,6 +99,47 @@ export class DjDeckColumnComponent {
   /** The playhead as a percentage, or the drag pin while one is held. */
   readonly positionPercent = computed(() => this.scrubDragValue() ?? this.summary().scrubPercent);
   readonly frameLabel = computed(() => this.summary().frameLabel);
+
+  readonly speedModel = computed<SpeedPanelModel>(() => {
+    const { letter } = this.deck();
+    const { speed } = this.deckState();
+    return {
+      accessibleName: `Speed deck ${letter}`,
+      valueText: `${speed.toFixed(3)}x`,
+      faderValue: Math.min(Math.max(speed, SPEED_FADER_MIN), SPEED_FADER_MAX),
+      faderAccessibleName: `Speed multiplier deck ${letter}`,
+      min: SPEED_FADER_MIN,
+      max: SPEED_FADER_MAX,
+      step: 0.001,
+      jumpButtons: [
+        { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${letter}` },
+        { id: 'home', label: 'Home', accessibleName: `Speed home deck ${letter}` },
+        { id: 'down', label: '−50%', accessibleName: `Speed down 50% deck ${letter}` },
+      ],
+      disabled: !this.canShape(),
+    };
+  });
+
+  readonly voiceModel = computed<VoicePanelModel>(() => {
+    const { letter } = this.deck();
+    return {
+      accessibleName: `Voice deck ${letter}`,
+      rows: this.deckState().voices.map(({ muted }, i) => {
+        const n = i + 1;
+        const holdLabel = muted ? 'Punch' : 'Kill';
+        return {
+          label: `V${n}`,
+          muted,
+          holdLabel,
+          checkboxId: `voice-${letter}-${n}`,
+          muteAccessibleName: `Mute voice ${n} deck ${letter}`,
+          holdAccessibleName: `${holdLabel} voice ${n} deck ${letter}`,
+        };
+      }),
+      clearAccessibleName: `Clear all voice mutes deck ${letter}`,
+      disabled: !this.canShape(),
+    };
+  });
 
   readonly bindingModel = computed<BindingCardModel>(() => {
     const { letter } = this.deck();
@@ -185,6 +245,28 @@ export class DjDeckColumnComponent {
     if (this.scrubDragValue() === value) {
       this.scrubDragValue.set(null);
     }
+  }
+
+  onSpeedChange(multiplier: number): void {
+    this.deckService.setSpeed(this.deck().slot, multiplier);
+  }
+
+  onSpeedJump(id: string): void {
+    if (isSpeedJump(id)) {
+      this.deckService.jumpSpeed(this.deck().slot, id);
+    }
+  }
+
+  onVoiceMutedChange({ index, muted }: { index: number; muted: boolean }): void {
+    this.deckService.setVoiceMuted(this.deck().slot, index, muted);
+  }
+
+  onVoiceHeldChange({ index, held }: { index: number; held: boolean }): void {
+    this.deckService.setVoiceHeld(this.deck().slot, index, held);
+  }
+
+  onClearVoiceMutes(): void {
+    this.deckService.clearVoiceMutes(this.deck().slot);
   }
 
   onPortSelect(id: string): void {

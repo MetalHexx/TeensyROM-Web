@@ -26,6 +26,7 @@ import type { ControlSize } from '../shared/control-size';
     '[attr.data-size]': 'size()',
     '[style.--channel-fader-length]': 'length()',
     '[attr.data-fixed-length]': "length() !== null ? '' : null",
+    '[attr.data-disabled]': "disabled() ? '' : null",
   },
 })
 export class ChannelFaderComponent {
@@ -50,12 +51,18 @@ export class ChannelFaderComponent {
    *  column also holds the deck-letter label beneath the input, so a host height would make the
    *  travel `length − label − gap`. `null` (the default) keeps today's flex-grow behavior exactly. */
   readonly length = input<string | null>(null);
+  /** Disables the native range input and dims the fader; it emits nothing while disabled. Defaults
+   *  to `false`, so every existing use is unchanged. */
+  readonly disabled = input<boolean>(false);
   /** Emits the raw numeric value read off the native range input, unrounded. */
   readonly valueChange = output<number>();
 
   /** `step` is the input's own granularity; the model stores whatever value arrives and never
    *  re-rounds it. */
   protected onInput(event: Event): void {
+    if (this.disabled()) {
+      return;
+    }
     this.valueChange.emit(Number((event.target as HTMLInputElement).value));
   }
 }

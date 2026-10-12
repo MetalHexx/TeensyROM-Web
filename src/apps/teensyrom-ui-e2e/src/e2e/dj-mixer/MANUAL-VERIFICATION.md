@@ -134,6 +134,38 @@ deck beside that deck's own voice/speed column, the mixer band straight after th
 bottom band last. All three decks' Loops/Cues (439.6) and Speed (313.3) cards are at content
 height. `.router-content` overflows on neither axis.
 
+## Key-notation switch placement (final corrective)
+
+The one shared Camelot | Note switch sits between the Key-knob row and the fader row, centred across
+both decks, and nothing remains below the crossfader. It is drawn from the first strip's
+`.key-notation-slot` across both strips; every strip reserves a same-height slot so the Key knobs and
+the faders stay level between decks. The heights in the sections above predate the switch, the
+Key readout and the voice/speed wiring and are historical — the figures here are current. Driven the
+same way as above (a same-origin `<iframe>` at the target CSS size on `http://localhost:4200/dj-mixer`,
+`getBoundingClientRect()` on the live DOM, the entry animation's transform pinned off), compared with
+the same card before the switch moved (the switch last in `.mixer-body`):
+
+| width (CSS px) | form | `lib-dj-mixer-card` height, before → after | switch (w × h) | gap above / below the switch |
+| --- | --- | --- | --- | --- |
+| 1804 × 663 | column | 644.4 → **638.6** (−5.8) | 148 × 24 | 8 / 8 |
+| 1804 × 820 | column, card stretched by the deck row | 651.4 → **651.4** (0) | 148 × 24 | 14.4 / 14.4 |
+| 768 × 1024 | band, stacked page | 512.6 → **544.6** (+32.0) | 168.8 × 24 | 8 / 8 |
+| 400 × 900 | band, wrapped | 550.4 → **544.6** (−5.8) | 168.8 × 24 | 8 / 8 |
+
+- At every width the switch's horizontal centre is the centre of the two strips (offset 0.0), it
+  reaches both strips' outer edges (it is exactly as wide as the two strips and their gap), it sits
+  below both Key knobs and above both faders and the crossfader, no label clips, and nothing
+  overflows horizontally. The crossfader is the last element in the card (12px of card padding
+  below it in the column form).
+- Where the deck row sets the card's height (1804 × 820) the leftover height is split evenly above
+  and below the switch; at 1804 × 663 there is none.
+- **The band form at 768px grows by 32px** (24 for the switch row plus one 8px strip gap). In that
+  form the switch used to share the crossfader's line at no cost, and the card is now as tall as a
+  strip that holds one more row. It is a stacked, scrolling page with no height budget; the column
+  form, which has one, does not grow.
+- `dj-mixer-controls.cy.ts` asserts this geometry at the column, band and stacked widths and clicks
+  both halves of the switch, which proves the half drawn over the second strip is not covered.
+
 ## Byte fidelity (P03-T02)
 
 Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM

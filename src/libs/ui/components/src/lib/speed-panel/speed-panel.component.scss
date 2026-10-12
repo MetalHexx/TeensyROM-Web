@@ -73,3 +73,9 @@ lib-channel-fader {
 lib-jump-button-group {
   flex: 0 0 auto;
 }
+
+// The jump buttons are `JumpButtonGroupComponent`'s own; dimming its host is how a disabled panel
+// reaches them without piercing its encapsulation.
+.speed-jump-buttons--disabled {
+  opacity: 0.5;
+}

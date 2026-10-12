@@ -1,5 +1,6 @@
 <div
   class="filter-mode-selector"
+  [class.filter-mode-selector--disabled]="model().disabled"
   role="group"
   [attr.aria-label]="model().groupAccessibleName"
 >
@@ -11,6 +12,7 @@
       [class.filter-mode-option--engaged]="isEngaged(option)"
       [attr.aria-pressed]="isEngaged(option)"
       [attr.aria-label]="accessibleNameFor(option)"
+      [disabled]="model().disabled ?? false"
       (click)="onSelect(option)"
     >
       {{ option.label }}
@@ -23,6 +25,7 @@
     [class.filter-mode-option--engaged]="isEngaged(offOption)"
     [attr.aria-pressed]="isEngaged(offOption)"
     [attr.aria-label]="accessibleNameFor(offOption)"
+    [disabled]="model().disabled ?? false"
     (click)="onSelect(offOption)"
   >
     {{ offOption.label }}

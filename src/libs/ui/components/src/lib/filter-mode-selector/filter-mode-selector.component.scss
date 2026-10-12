@@ -61,6 +61,14 @@
   cursor: pointer;
 }
 
+.filter-mode-selector--disabled {
+  opacity: 0.5;
+
+  .filter-mode-option {
+    cursor: not-allowed;
+  }
+}
+
 // The engaged cell, filled and brightened — the same rest/engaged contrast `lib-rotary-knob` draws
 // between its dimmed ring-track and its brightened value-ring.
 .filter-mode-option--engaged {

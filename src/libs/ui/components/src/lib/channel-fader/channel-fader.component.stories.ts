@@ -15,7 +15,8 @@ const meta: Meta<ChannelFaderComponent> = {
           "— it holds no local state and never re-rounds the value it reads off the native range " +
           "input. `size` steps the label font and the width the host reserves; the native range " +
           "input's own thumb and track are the browser's and do not scale. `length` pins the " +
-          "input's own travel to a fixed CSS length instead of growing with its container.",
+          "input's own travel to a fixed CSS length instead of growing with its container. " +
+          '`disabled` dims the fader and makes it inert.',
       },
     },
   },
@@ -45,4 +46,14 @@ export const Sizes: Story = {
       </div>
     `,
   }),
+};
+
+/** `disabled` dims the fader and makes it inert — it emits nothing. */
+export const Disabled: Story = {
+  args: {
+    value: 0.5,
+    accessibleName: 'Channel fader deck A',
+    label: 'A',
+    disabled: true,
+  },
 };

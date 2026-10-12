@@ -15,7 +15,8 @@ const meta: Meta<FilterModeSelectorComponent> = {
           "same state. Always-visible buttons rather than a dropdown, matching the direct-manipulation " +
           "feel of the rest of a live-performance mixer strip. `size` steps each option's own height " +
           "and font across the shared `ControlSize` scale; `'large'` is the default and renders " +
-          "pixel-identical to every use that predates this input.",
+          "pixel-identical to every use that predates this input. " +
+          "`model.disabled` dims every option and makes the group inert.",
       },
     },
   },
@@ -56,4 +57,9 @@ export const Sizes: Story = {
       </div>
     `,
   }),
+};
+
+/** `model.disabled` dims every option and makes the group inert, whatever is engaged. */
+export const Disabled: Story = {
+  args: { model: { ...baseModel, engaged: 'bandPass', disabled: true } },
 };

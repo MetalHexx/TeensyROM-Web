@@ -129,4 +129,45 @@ describe('FilterModeSelectorComponent', () => {
 
     expect(host.getAttribute('data-size')).toBe('small');
   });
+
+  describe('disabled', () => {
+    function setDisabled(disabled: boolean | undefined): void {
+      fixture.componentRef.setInput('model', { ...modelWith(null), disabled });
+      fixture.detectChanges();
+    }
+
+    it('leaves every option enabled when the model does not say otherwise', () => {
+      expect(buttons().every((button) => !button.disabled)).toBe(true);
+    });
+
+    it('disables all four options', () => {
+      setDisabled(true);
+
+      expect(buttons()).toHaveLength(4);
+      expect(buttons().every((button) => button.disabled)).toBe(true);
+    });
+
+    it('emits nothing when a disabled option is clicked', () => {
+      setDisabled(true);
+      const emitted: (FilterModeValue | null)[] = [];
+      component.modeSelect.subscribe((mode) => emitted.push(mode));
+
+      for (const button of buttons()) {
+        button.click();
+      }
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('selects again once re-enabled', () => {
+      setDisabled(true);
+      setDisabled(false);
+      const emitted: (FilterModeValue | null)[] = [];
+      component.modeSelect.subscribe((mode) => emitted.push(mode));
+
+      buttonNamed('band-pass').click();
+
+      expect(emitted).toEqual(['bandPass']);
+    });
+  });
 });

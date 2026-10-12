@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import type { ControlSize } from '../shared/control-size';
 
 const CENTER = 40;
@@ -54,6 +54,7 @@ function pointOnCircle(angleDeg: number, radius: number): Point {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[attr.data-size]': 'size()',
+    '[attr.data-disabled]': "disabled() ? '' : null",
   },
 })
 export class RotaryKnobComponent {
@@ -77,6 +78,10 @@ export class RotaryKnobComponent {
   readonly home = input<number>(0);
   /** Rendered under the dial when present — Key's semitone offset, and nothing else. */
   readonly readout = input<string | null>(null);
+  /** Disables the native range input and dims the dial. A disabled knob ignores keyboard, vertical
+   *  drag and double-click-to-home, so it emits nothing. Defaults to `false`, so every existing use
+   *  is unchanged. */
+  readonly disabled = input<boolean>(false);
   /** Emits the dial's new position — on drag, keyboard input, or double-click-to-home. */
   readonly valueChange = output<number>();
 
@@ -131,19 +136,39 @@ export class RotaryKnobComponent {
    * produces the same result, continuous knobs and stepped ones alike. */
   private drag: { pointerId: number; lastY: number; rawValue: number } | null = null;
 
+  /** Abandons a drag the moment the knob is disabled, not when the next pointer event happens to
+   *  arrive: a knob disabled and re-enabled with the pointer held still (a new tune loading resets
+   *  the value underneath it) would otherwise resume from the stale `rawValue` and jump. */
+  constructor() {
+    effect(() => {
+      if (this.disabled()) {
+        this.drag = null;
+      }
+    });
+  }
+
   /** Forwards the native range's raw value straight through as `valueChange`, unrounded. */
   protected onRangeInput(event: Event): void {
+    if (this.disabled()) {
+      return;
+    }
     this.valueChange.emit(Number((event.target as HTMLInputElement).value));
   }
 
   /** Resets to `home()` — the value ring collapses and the pointer snaps back to `HOME_ANGLE_DEG`. */
   protected onDoubleClick(): void {
+    if (this.disabled()) {
+      return;
+    }
     this.valueChange.emit(this.home());
   }
 
   /** `preventDefault()` suppresses the native range's own click-to-position jump on `mousedown` —
    * that jump is what made the first click of a double-click move the knob before it landed home. */
   protected onPointerDown(event: PointerEvent): void {
+    if (this.disabled()) {
+      return;
+    }
     event.preventDefault();
     const target = event.target as HTMLElement;
     target.setPointerCapture?.(event.pointerId);
@@ -154,7 +179,7 @@ export class RotaryKnobComponent {
   /** Accumulates the move's `dy` into `drag.rawValue`, clamps to `[min, max]`, and emits — see
    *  `drag`'s doc for why this doesn't just add the delta to `value()`. */
   protected onPointerMove(event: PointerEvent): void {
-    if (!this.drag || this.drag.pointerId !== event.pointerId) {
+    if (this.disabled() || !this.drag || this.drag.pointerId !== event.pointerId) {
       return;
     }
     const dy = this.drag.lastY - event.clientY;

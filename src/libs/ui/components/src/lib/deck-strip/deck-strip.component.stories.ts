@@ -15,7 +15,9 @@ const meta: Meta<DeckStripComponent> = {
           '`ChannelFaderComponent`, and holds no state of its own; the caller owns every value and ' +
           "every write. `size` forwards to the filter selector, every knob and the fader; " +
           "`faderLength` pins the fader's own travel and stops the wrapper's grow-with-floor " +
-          'behavior along with it.',
+          'behavior along with it. The filter selector (`model.filter.disabled`) and each knob ' +
+          "(`DeckStripKnobModel.disabled`) disable independently; the channel fader is the deck's " +
+          'level and is never disabled.',
       },
     },
   },
@@ -70,4 +72,15 @@ export const Sizes: Story = {
       </div>
     `,
   }),
+};
+
+/** The filter selector and every knob disabled, as for an empty deck; the channel fader stays live. */
+export const Disabled: Story = {
+  args: {
+    model: {
+      ...model,
+      filter: { ...model.filter, disabled: true },
+      knobs: model.knobs.map((knob) => ({ ...knob, disabled: true })),
+    },
+  },
 };

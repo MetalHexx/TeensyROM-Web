@@ -10,6 +10,7 @@ import {
   DjStore,
   type DeckBindingSummary,
   type DeckTransportSummary,
+  type Slot,
 } from '@teensyrom-nx/application';
 import {
   BindingCardComponent,
@@ -22,9 +23,12 @@ import { DjDeckColumnComponent } from './dj-deck-column.component';
 import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
 
-// Voice, Speed and Loops/Cues stay on the inert placeholders; Transport and the binding card are
+// Loops/Cues stays on the inert placeholder; Transport, Voice, Speed and the binding card are
 // wired live and covered by their own describe blocks below.
-const INERT_PANEL_TYPES = [VoicePanelComponent, SpeedPanelComponent, LoopsCuesPanelComponent] as const;
+const INERT_PANEL_TYPES = [LoopsCuesPanelComponent] as const;
+
+type Store = InstanceType<typeof DjStore>;
+type TuneReference = Parameters<Store['setDeckLoaded']>[0]['reference'];
 
 function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): DeckTransportSummary {
   return {
@@ -70,6 +74,11 @@ function createDeckServiceStub() {
     bindPort: vi.fn().mockResolvedValue(undefined),
     enableMidi: vi.fn().mockResolvedValue(undefined),
     identify: vi.fn(),
+    setSpeed: vi.fn(),
+    jumpSpeed: vi.fn(),
+    setVoiceMuted: vi.fn(),
+    setVoiceHeld: vi.fn(),
+    clearVoiceMutes: vi.fn(),
   };
 }
 
@@ -84,7 +93,15 @@ interface RenderOptions {
 function render(deck: DeckRef, options: RenderOptions = {}) {
   const transportSummary = signal(idleTransportSummary(options.transport));
   const bindingSummary = signal(idleBindingSummary(options.binding));
-  const deckState = signal({ subtune: options.subtune ?? 0 });
+  const deckState = signal({
+    subtune: options.subtune ?? 0,
+    speed: 1,
+    voices: [
+      { muted: false, held: false },
+      { muted: false, held: false },
+      { muted: false, held: false },
+    ],
+  });
   const devices = signal<Device[]>(options.devices ?? []);
   const deckService = createDeckServiceStub();
 
@@ -98,6 +115,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
           transportSummary: () => transportSummary,
           bindingSummary: () => bindingSummary,
           deck: () => deckState,
+          canShape: () => signal(false),
         },
       },
       { provide: DeckService, useValue: deckService },
@@ -111,6 +129,42 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   fixture.detectChanges();
 
   return { fixture, transportSummary, bindingSummary, deckService, devices };
+}
+
+/** Renders the column against a real `DjStore`, so the speed and voice models are built from
+ *  genuine store state and the real `canShape` gate. */
+function renderLive(deck: DeckRef) {
+  const deckService = createDeckServiceStub();
+
+  TestBed.configureTestingModule({
+    imports: [DjDeckColumnComponent],
+    providers: [
+      provideNoopAnimations(),
+      { provide: DeckService, useValue: deckService },
+      { provide: DeviceStore, useValue: { devices: signal<Device[]>([]) } },
+    ],
+  });
+
+  const store = TestBed.inject(DjStore);
+  const fixture = TestBed.createComponent(DjDeckColumnComponent);
+  fixture.componentRef.setInput('deck', deck);
+  fixture.detectChanges();
+
+  return { fixture, store, deckService };
+}
+
+/** Puts a settled, shapeable tune on the deck, so its tune-shaping controls are live. */
+function makeShapeable(store: Store, slot: Slot): void {
+  const reference = {
+    identity: { sidHash: `hash-${slot}`, subtune: 1 },
+    title: 'Test Tune',
+    author: 'Test Author',
+    released: '2024 Test',
+    subtuneCount: 1,
+    byteLength: 1024,
+  } as TuneReference;
+  store.setDeckLoaded({ slot, reference });
+  store.setDeckStatus({ slot, status: 'playing' });
 }
 
 /** A `DragEvent` carrying only the `types` list — enough for `isDjFileDrag`'s `dragenter`/`dragover`/`dragleave` check. */
@@ -153,6 +207,16 @@ function transportPanel(
     .componentInstance as TransportPanelComponent;
 }
 
+function speedPanel(fixture: ComponentFixture<DjDeckColumnComponent>): SpeedPanelComponent {
+  return fixture.debugElement.query(By.directive(SpeedPanelComponent))
+    .componentInstance as SpeedPanelComponent;
+}
+
+function voicePanel(fixture: ComponentFixture<DjDeckColumnComponent>): VoicePanelComponent {
+  return fixture.debugElement.query(By.directive(VoicePanelComponent))
+    .componentInstance as VoicePanelComponent;
+}
+
 function bindingCard(fixture: ComponentFixture<DjDeckColumnComponent>): BindingCardComponent {
   return fixture.debugElement.query(By.directive(BindingCardComponent))
     .componentInstance as BindingCardComponent;
@@ -183,12 +247,12 @@ describe('DjDeckColumnComponent', () => {
     expect(Array.from(stack.children)).toEqual(slots);
   });
 
-  it('feeds every inert lifted panel from the deck placeholders, letter-scoped', () => {
+  it('feeds the inert Loops/Cues panel from the deck placeholders, letter-scoped', () => {
     const { fixture } = render({ slot: 'B', letter: 'B', index: 1 });
-    const voice = fixture.debugElement.query(By.directive(VoicePanelComponent))
-      .componentInstance as VoicePanelComponent;
+    const loopsCues = fixture.debugElement.query(By.directive(LoopsCuesPanelComponent))
+      .componentInstance as LoopsCuesPanelComponent;
 
-    expect(voice.model().accessibleName).toBe('Voice deck B');
+    expect(loopsCues.model().accessibleName).toBe('Loops/Cues deck B');
   });
 
   it('lays the binding card out inline — one line at the bottom of the deck stack', () => {
@@ -197,7 +261,7 @@ describe('DjDeckColumnComponent', () => {
     expect(bindingCard(fixture).layout()).toBe('inline');
   });
 
-  it('binds no output handlers on the inert lifted panels', () => {
+  it('binds no output handlers on the inert Loops/Cues panel', () => {
     const { fixture } = render({ slot: 'A', letter: 'A', index: 0 });
     const before = fixture.nativeElement.textContent;
 
@@ -312,6 +376,187 @@ describe('DjDeckColumnComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.componentInstance.positionPercent()).toBe(0); // released back to the summary
+    });
+  });
+
+  describe('the speed panel', () => {
+    const DECK_B: DeckRef = { slot: 'B', letter: 'B', index: 1 };
+
+    it('shows the live multiplier and builds its names from the deck letter', () => {
+      const { fixture, store } = renderLive(DECK_B);
+      store.setDeckEngineControls({ slot: 'B', speed: 0.75, voices: store.decks().B.voices });
+      fixture.detectChanges();
+      const model = speedPanel(fixture).model();
+
+      expect(model.valueText).toBe('0.750x');
+      expect(model.faderValue).toBe(0.75);
+      expect([model.min, model.max, model.step]).toEqual([0.5, 1.5, 0.001]);
+      expect(model.accessibleName).toBe('Speed deck B');
+      expect(model.faderAccessibleName).toBe('Speed multiplier deck B');
+      expect(model.jumpButtons.map((b) => b.id)).toEqual(['up', 'home', 'down']);
+      expect(model.jumpButtons.map((b) => b.accessibleName)).toEqual([
+        'Speed up 50% deck B',
+        'Speed home deck B',
+        'Speed down 50% deck B',
+      ]);
+    });
+
+    it('pins the thumb at the edge of its range while the readout keeps the true multiplier', () => {
+      const { fixture, store, deckService } = renderLive(DECK_B);
+      const voices = store.decks().B.voices;
+
+      store.setDeckEngineControls({ slot: 'B', speed: 1.7, voices });
+      fixture.detectChanges();
+      expect(speedPanel(fixture).model().faderValue).toBe(1.5);
+      expect(speedPanel(fixture).model().valueText).toBe('1.700x');
+
+      store.setDeckEngineControls({ slot: 'B', speed: 0.3, voices });
+      fixture.detectChanges();
+      expect(speedPanel(fixture).model().faderValue).toBe(0.5);
+      expect(speedPanel(fixture).model().valueText).toBe('0.300x');
+
+      expect(deckService.setSpeed).not.toHaveBeenCalled();
+    });
+
+    it("dispatches the fader value to setSpeed with this deck's slot", () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      speedPanel(fixture).faderChange.emit(1.234);
+
+      expect(deckService.setSpeed).toHaveBeenCalledWith('B', 1.234);
+    });
+
+    it("dispatches each jump button to jumpSpeed with this deck's slot", () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      (['up', 'home', 'down'] as const).forEach((id) => speedPanel(fixture).jump.emit(id));
+
+      expect(deckService.jumpSpeed.mock.calls).toEqual([
+        ['B', 'up'],
+        ['B', 'home'],
+        ['B', 'down'],
+      ]);
+    });
+
+    it('ignores a jump id that is not one of the three buttons', () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      speedPanel(fixture).jump.emit('sideways');
+
+      expect(deckService.jumpSpeed).not.toHaveBeenCalled();
+    });
+
+    it('renders disabled on an empty deck and enabled once a tune is loaded', () => {
+      const { fixture, store } = renderLive(DECK_B);
+      const fader = () =>
+        fixture.nativeElement.querySelector(
+          '[aria-label="Speed multiplier deck B"]'
+        ) as HTMLInputElement;
+
+      expect(speedPanel(fixture).model().disabled).toBe(true);
+      expect(fader().disabled).toBe(true);
+
+      makeShapeable(store, 'B');
+      fixture.detectChanges();
+
+      expect(speedPanel(fixture).model().disabled).toBe(false);
+      expect(fader().disabled).toBe(false);
+    });
+  });
+
+  describe('the voice panel', () => {
+    const DECK_B: DeckRef = { slot: 'B', letter: 'B', index: 1 };
+
+    it('renders one row per voice with deck-scoped ids and names', () => {
+      const { fixture } = renderLive(DECK_B);
+      const model = voicePanel(fixture).model();
+
+      expect(model.accessibleName).toBe('Voice deck B');
+      expect(model.clearAccessibleName).toBe('Clear all voice mutes deck B');
+      expect(model.rows.map((r) => r.label)).toEqual(['V1', 'V2', 'V3']);
+      expect(model.rows.map((r) => r.checkboxId)).toEqual(['voice-B-1', 'voice-B-2', 'voice-B-3']);
+      expect(model.rows.map((r) => r.muteAccessibleName)).toEqual([
+        'Mute voice 1 deck B',
+        'Mute voice 2 deck B',
+        'Mute voice 3 deck B',
+      ]);
+    });
+
+    it('labels the hold Punch for a muted voice and Kill otherwise, following the store', () => {
+      const { fixture, store } = renderLive(DECK_B);
+      const rows = () => voicePanel(fixture).model().rows;
+
+      expect(rows().map((r) => r.holdLabel)).toEqual(['Kill', 'Kill', 'Kill']);
+      expect(rows()[0].holdAccessibleName).toBe('Kill voice 1 deck B');
+
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 1,
+        voices: [
+          { muted: true, held: false },
+          { muted: false, held: false },
+          { muted: false, held: false },
+        ],
+      });
+      fixture.detectChanges();
+
+      expect(rows().map((r) => r.muted)).toEqual([true, false, false]);
+      expect(rows().map((r) => r.holdLabel)).toEqual(['Punch', 'Kill', 'Kill']);
+      expect(rows()[0].holdAccessibleName).toBe('Punch voice 1 deck B');
+      expect(rows()[1].holdAccessibleName).toBe('Kill voice 2 deck B');
+    });
+
+    it("dispatches mute, hold and clear with this deck's slot", () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      voicePanel(fixture).mutedChange.emit({ index: 1, muted: true });
+      expect(deckService.setVoiceMuted).toHaveBeenCalledWith('B', 1, true);
+
+      voicePanel(fixture).heldChange.emit({ index: 2, held: true });
+      expect(deckService.setVoiceHeld).toHaveBeenCalledWith('B', 2, true);
+
+      voicePanel(fixture).heldChange.emit({ index: 2, held: false });
+      expect(deckService.setVoiceHeld).toHaveBeenCalledWith('B', 2, false);
+
+      voicePanel(fixture).clearMutes.emit();
+      expect(deckService.clearVoiceMutes).toHaveBeenCalledWith('B');
+    });
+
+    it('renders disabled on an empty deck and enabled once a tune is loaded', () => {
+      const { fixture, store } = renderLive(DECK_B);
+      const mute = () =>
+        fixture.nativeElement.querySelector(
+          'input[aria-label="Mute voice 1 deck B"]'
+        ) as HTMLInputElement;
+
+      expect(voicePanel(fixture).model().disabled).toBe(true);
+      expect(mute().disabled).toBe(true);
+
+      makeShapeable(store, 'B');
+      fixture.detectChanges();
+
+      expect(voicePanel(fixture).model().disabled).toBe(false);
+      expect(mute().disabled).toBe(false);
+    });
+
+    it("reads only its own deck's state", () => {
+      const { fixture, store } = renderLive(DECK_B);
+      store.setDeckEngineControls({
+        slot: 'A',
+        speed: 1.2,
+        voices: [
+          { muted: true, held: false },
+          { muted: true, held: false },
+          { muted: true, held: false },
+        ],
+      });
+      makeShapeable(store, 'A');
+      fixture.detectChanges();
+
+      const { rows, disabled } = voicePanel(fixture).model();
+      expect(rows.map((r) => r.muted)).toEqual([false, false, false]);
+      expect(disabled).toBe(true);
+      expect(speedPanel(fixture).model().valueText).toBe('1.000x');
     });
   });
 

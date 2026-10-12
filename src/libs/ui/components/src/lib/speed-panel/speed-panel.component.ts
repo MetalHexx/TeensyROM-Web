@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ChannelFaderComponent } from '../channel-fader/channel-fader.component';
 import { JumpButtonGroupComponent } from '../jump-button-group/jump-button-group.component';
 import type { JumpButtonModel } from '../jump-button-group/jump-button-group.component';
@@ -19,13 +19,16 @@ export interface SpeedPanelModel {
   readonly step: number;
   /** Rendered in this array's order, one button each. */
   readonly jumpButtons: readonly JumpButtonModel[];
+  /** Disables the fader and every jump button, whatever each button's own `disabled` says. Absent
+   *  means enabled. */
+  readonly disabled?: boolean;
 }
 
 /**
  * One deck's speed control: a readout, a vertical fader (`ChannelFaderComponent`) and a
  * `JumpButtonGroupComponent`. Purely presentational — it holds no state of its own and never
  * clamps or rounds anything itself; the caller has already pinned `faderValue` into `[min, max]`
- * and formatted `valueText`.
+ * and formatted `valueText`. `model().disabled` disables the fader and every jump button.
  *
  * @example
  * ```html
@@ -50,4 +53,10 @@ export class SpeedPanelComponent {
   readonly faderChange = output<number>();
   /** Emits the pressed jump button's own `id`. */
   readonly jump = output<string>();
+
+  /** The jump buttons with the panel-level `disabled` merged into each one's own. */
+  protected readonly jumpButtons = computed(() => {
+    const { jumpButtons, disabled } = this.model();
+    return disabled ? jumpButtons.map((button) => ({ ...button, disabled: true })) : jumpButtons;
+  });
 }

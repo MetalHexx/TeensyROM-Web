@@ -4,6 +4,7 @@ import { deck } from './deck';
 import { binding } from './binding';
 import { transportSummary } from './transport-summary';
 import { bindingSummary } from './binding-summary';
+import { canShape, deckMix, keyReadout } from './mixer';
 
 export function withDjSelectors() {
   return withMethods((store) => {
@@ -13,6 +14,9 @@ export function withDjSelectors() {
       ...binding(writableStore),
       ...transportSummary(writableStore),
       ...bindingSummary(writableStore),
+      ...deckMix(writableStore),
+      ...canShape(writableStore),
+      ...keyReadout(writableStore),
     };
   });
 }

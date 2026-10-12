@@ -88,6 +88,11 @@ svg {
   fill: var(--color-primary-bright);
 }
 
+// Dims the dial and its caption together; the invisible range input beneath carries the cursor.
+:host([data-disabled]) {
+  opacity: 0.5;
+}
+
 // Invisible but present: the dial's SVG is the whole visual, this is only what makes the control
 // operable — keyboard, drag and assistive-technology state all come from the native element beneath.
 .scale-knob-range {
@@ -98,6 +103,10 @@ svg {
   height: 100%;
   opacity: 0;
   cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
 .scale-knob-readout {
