@@ -221,3 +221,58 @@ needs a real browser to confirm:
 - In the browser's site settings, revoke the MIDI permission for the origin, then reload. Enable
   MIDI is showing again on both decks, and no alert was raised for a merely-not-yet-granted
   origin.
+
+## Filter sweep layout (ASID-DJ-6)
+
+Checked at `http://localhost:4201/dj-mixer` (this worktree's `teensyrom-ui` dev server) in a real
+Chrome tab, driven the same way as "How this was driven" above: a same-origin `<iframe>` at the
+target CSS size, the device count set through the live `DeviceStore` with the iframe's `fetch`
+patched to return fixture devices, and every number read with `getBoundingClientRect()`. The entry
+animation's transform was pinned off first. The filter-mode selector is gone from the strip, so the
+strip has no selector row at any width. No layout defect was found, so the mixer card's stylesheet
+was not changed in this task.
+
+| state | viewport (CSS px) | devices | card height | strip (top → bottom) | key switch | crossfader | page scroll |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| column | 1804 × 663 | 2 | 580.0 (66 → 646) | 528.0 (78 → 606) | 148 × 24, 396 → 420 | 148 × 16, 618 → 634, centred on the switch | 663 = 663 |
+| band | 768 × 1024 | 2 | 486.0 | 470.0 (697 → 1167) | 168.8 × 24, 1015 → 1039 | 432.8 × 16, 1151 → 1167, right of the strips | 1024 = 1024 |
+| stacked (wrapped) | 400 × 900 | 2 | 486.0 | 470.0 (647 → 1117) | 168.8 × 24, 965 → 989 | 160.8 × 16, 1101 → 1117, right of the strips | 900 = 900 |
+
+- In every state the strip reads top to bottom: the four knobs (Cutoff, Resonance, Pulse width,
+  Key), then the Camelot | Note switch, then the fader. Each gap between knob, switch and fader is
+  8 px. Nothing overlaps.
+- Column: the switch and crossfader share the same horizontal span (876 → 1024), so the crossfader
+  is aligned as before. The card keeps its 12 px bottom padding under the crossfader.
+- Column: `.router-content` reports `scrollHeight` 632 against `clientHeight` 613. The extra 19 px is
+  the zero-height bottom band's row gap, and it sits below the card's bottom edge (646) inside the
+  663 px viewport, so no visible content is clipped. The bottom band (Browse and the listing) stays
+  at 0 px at this viewport. This is the same squeeze recorded in the 1804 × 663 section above and is
+  not caused by the card's height. The fix would sit in the view's grid, outside this task's file
+  scope, so it is recorded here and reported for phase review rather than changed.
+- Band and stacked: `.router-content` scrolls by design (2012 against 974 at 768 wide, 2141 against
+  836 at 400 wide). Neither page scrolls on its own, and neither overflows horizontally.
+- Three devices at 1804 × 663 could not be measured. The mixer view in this build has two deck
+  slots (`DECK_SLOTS` in `dj-mixer-view.component.ts`) and no `dj-mixer-view--many` form, so a third
+  device is enabled but gets no deck. The three-device stacked check described above in
+  "Three devices at 1804 × 663 (the permanently-stacked form)" does not apply to the current build
+  and is not claimed here.
+
+## Filter sweep listening session (operator, real hardware)
+
+Run these three checks on your C64s with a real TeensyROM. Nothing here was run in the sandbox,
+because sound is judged on hardware.
+
+1. On a tune that never uses the filter, turning cutoff audibly changes the sound, and centre plays
+   the tune exactly as before. On a tune that uses the filter, its own filtering returns the moment
+   the knob is back at centre.
+2. Resonance is audible while sweeping, on any tune.
+3. Give a verdict on the sweep's feel, including whether passing through centre sounds smooth and
+   whether anything needs retuning.
+
+The verdict is recorded in the ASID-DJ portfolio's Decisions. The values to retune live in
+`FILTER_SWEEP` and `RESONANCE_SWEEP` in `libs/application/src/lib/dj/mixer/filter-sweep.ts`.
+
+Resonance knob at rest, checked in the live card and in Storybook (`pnpm nx storybook ui-components`,
+story `DJ/Rotary Knob / RestingAtMinimum`): the live knobs read min 0, max 1 and value 0, the
+pointer ends lower-left, and there is no ring and no top tick. In Storybook the "Turned" knob at
+0.6 draws its ring from the lower-left start clockwise up to the pointer.
