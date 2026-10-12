@@ -13,7 +13,6 @@ import {
   DeckStripComponent,
   ScalingCompactCardComponent,
   type DeckStripModel,
-  type FilterModeValue,
 } from '@teensyrom-nx/ui/components';
 import type { DeckRef } from '../deck-ref';
 
@@ -105,12 +104,6 @@ export class DjMixerCardComponent {
     this.mixerService.setLevel(slot, level);
   }
 
-  /** `FilterModeValue` and the service's `SidFilterMode` are the same union, so the mode passes
-   *  through unmapped; `null` plays the tune's own filter mode. */
-  onFilterModeSelect(slot: Slot, mode: FilterModeValue | null): void {
-    this.mixerService.setFilterMode(slot, mode);
-  }
-
   onCrossfaderChange(position: number): void {
     this.mixerService.setCrossfader(position);
   }
@@ -125,17 +118,6 @@ export class DjMixerCardComponent {
     const keyReadout = this.djStore.keyReadout(slot)();
 
     return {
-      filter: {
-        engaged: mix.filterMode,
-        disabled,
-        groupAccessibleName: `Filter mode deck ${letter}`,
-        optionAccessibleNames: {
-          lowPass: `Filter mode low-pass deck ${letter}`,
-          bandPass: `Filter mode band-pass deck ${letter}`,
-          highPass: `Filter mode high-pass deck ${letter}`,
-          off: `Filter mode off deck ${letter}`,
-        },
-      },
       knobs: [
         {
           id: 'cutoff',
@@ -149,6 +131,9 @@ export class DjMixerCardComponent {
           label: 'Resonance',
           accessibleName: `Resonance deck ${letter}`,
           value: mix.resonance,
+          min: 0,
+          max: 1,
+          home: 0,
           disabled,
         },
         {

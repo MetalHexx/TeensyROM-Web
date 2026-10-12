@@ -140,6 +140,95 @@ describe('RotaryKnobComponent', () => {
     expect(host.getAttribute('data-size')).toBe('small');
   });
 
+  describe('resting at its minimum (home equals min)', () => {
+    const CENTER = 40;
+    const POINTER_RADIUS = 26;
+
+    function needleEnd(): { x: number; y: number } {
+      const pointer = fixture.nativeElement.querySelector('.pointer') as SVGLineElement;
+      return { x: Number(pointer.getAttribute('x2')), y: Number(pointer.getAttribute('y2')) };
+    }
+
+    function expectedNeedleEnd(angleDeg: number): { x: number; y: number } {
+      const rad = (angleDeg * Math.PI) / 180;
+      return {
+        x: Math.round((CENTER + POINTER_RADIUS * Math.cos(rad)) * 100) / 100,
+        y: Math.round((CENTER + POINTER_RADIUS * Math.sin(rad)) * 100) / 100,
+      };
+    }
+
+    function arcFlags(): { largeArc: string; sweep: string } {
+      const d = valueRing()?.getAttribute('d') ?? '';
+      const match = /A \d+,\d+ 0 (\d),(\d)/.exec(d);
+      if (!match) throw new Error(`no arc in ring path "${d}"`);
+      return { largeArc: match[1], sweep: match[2] };
+    }
+
+    function setValue(value: number): void {
+      fixture.componentRef.setInput('value', value);
+      fixture.detectChanges();
+    }
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('min', 0);
+      fixture.componentRef.setInput('max', 1);
+      fixture.componentRef.setInput('home', 0);
+      setValue(0);
+    });
+
+    it('rests at the lower-left start, reaches the top halfway and the lower-right end at max', () => {
+      expect(needleEnd()).toEqual(expectedNeedleEnd(-225));
+
+      setValue(0.5);
+      expect(needleEnd()).toEqual(expectedNeedleEnd(-90));
+
+      setValue(1);
+      expect(needleEnd()).toEqual(expectedNeedleEnd(45));
+    });
+
+    it('draws no value ring at rest', () => {
+      expect(valueRing()).toBeNull();
+    });
+
+    it('grows the ring clockwise, taking the long way round only once past half a turn', () => {
+      setValue(0.25);
+      expect(arcFlags()).toEqual({ largeArc: '0', sweep: '1' });
+
+      setValue(0.75);
+      expect(arcFlags()).toEqual({ largeArc: '1', sweep: '1' });
+    });
+
+    it('draws no top home tick, leaving the lower-left end tick to mark rest', () => {
+      expect(fixture.nativeElement.querySelector('.home-tick')).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('.end-tick')).toHaveLength(2);
+    });
+
+    it('still draws the top home tick on a centre-home knob', () => {
+      fixture.componentRef.setInput('min', -1);
+      fixture.componentRef.setInput('home', 0);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.home-tick')).not.toBeNull();
+    });
+
+    it('returns to its minimum on double-click', () => {
+      setValue(0.6);
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      rangeInput().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+      expect(emitted).toEqual([0]);
+    });
+
+    it('reports "home" at rest and the departure above it', () => {
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('home');
+
+      setValue(0.42);
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('+0.42');
+    });
+  });
+
   describe('vertical pointer drag', () => {
     // jsdom (this workspace's version) has no `PointerEvent` constructor — a `MouseEvent` carries
     // every field the component's handlers actually read (`clientY`, `shiftKey`, `target`) except
