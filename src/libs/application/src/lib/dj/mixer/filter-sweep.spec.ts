@@ -6,6 +6,7 @@ import {
 } from '@sidablist/core';
 import {
   cutoffSweepDrives,
+  dipSteps,
   FILTER_SWEEP,
   RESONANCE_SWEEP,
   resonanceDrive,
@@ -15,7 +16,7 @@ import {
 } from './filter-sweep';
 
 const CUTOFF_CEILING = 2047;
-const OWN_TUNE: TuneFilterState = { filterType: 0, voice3Off: false };
+const OWN_TUNE: TuneFilterState = { filterType: 0, voice3Off: false, routesVoice: false };
 
 function tuneOf(state: Partial<TuneFilterState> = {}): () => TuneFilterState {
   return () => ({ ...OWN_TUNE, ...state });
@@ -102,6 +103,11 @@ describe('cutoffSweepDrives', () => {
       expect(values[0]).toBeGreaterThan(values[values.length - 1]);
       expect(Math.min(...values)).toBeGreaterThan(0);
     });
+
+    it('starts from the fully open cutoff past the glide', () => {
+      const edge = FILTER_SWEEP.deadZone + FILTER_SWEEP.glideZone;
+      expect(cutoffValue(-edge, { routesVoice: true })).toBe(CUTOFF_CEILING);
+    });
   });
 
   describe('right sweep', () => {
@@ -126,6 +132,30 @@ describe('cutoffSweepDrives', () => {
       expect(values[values.length - 1]).toBeGreaterThan(values[0]);
       expect(Math.max(...values)).toBeLessThan(CUTOFF_CEILING);
     });
+
+    it('starts from the lowest cutoff past the glide', () => {
+      const edge = FILTER_SWEEP.deadZone + FILTER_SWEEP.glideZone;
+      expect(cutoffValue(edge, { routesVoice: true })).toBe(0);
+    });
+  });
+
+  describe('a tune that routes no voice through the filter', () => {
+    it('skips the glide: just past the dead zone the switches are held and the cutoff is fully open', () => {
+      const justPast = FILTER_SWEEP.deadZone + FILTER_SWEEP.glideZone * 0.1;
+
+      for (const [position, type] of [
+        [-justPast, SID_FILTER_MODE_LOW_PASS],
+        [justPast, SID_FILTER_MODE_HIGH_PASS],
+      ]) {
+        const drives = cutoffSweepDrives(position, tuneOf({ routesVoice: false }));
+
+        expect(driveFor(drives, 'filterType').hold).toEqual({ value: type, amount: 1 });
+        expect(driveFor(drives, 'filtered', 0).hold).toEqual({ value: 1, amount: 1 });
+        expect(driveFor(drives, 'cutoff').hold?.amount).toBe(1);
+      }
+      expect(cutoffValue(-(FILTER_SWEEP.deadZone + 1e-9))).toBe(CUTOFF_CEILING);
+      expect(cutoffValue(FILTER_SWEEP.deadZone + 1e-9)).toBe(0);
+    });
   });
 
   describe('a tune that has voice 3 switched off', () => {
@@ -148,10 +178,11 @@ describe('cutoffSweepDrives', () => {
     });
   });
 
-  describe('glide', () => {
+  describe('glide, on a tune that routes a voice through the filter', () => {
     const { deadZone, glideZone } = FILTER_SWEEP;
+    const routed: Partial<TuneFilterState> = { routesVoice: true };
     const amountAt = (travel: number): number => {
-      const hold = driveFor(cutoffSweepDrives(travel, tuneOf()), 'cutoff').hold;
+      const hold = driveFor(cutoffSweepDrives(travel, tuneOf(routed)), 'cutoff').hold;
       if (hold === null) {
         throw new Error('cutoff is released');
       }
@@ -171,7 +202,7 @@ describe('cutoffSweepDrives', () => {
     });
 
     it('releases the switches while it holds the cutoff', () => {
-      const drives = cutoffSweepDrives(deadZone + glideZone / 2, tuneOf());
+      const drives = cutoffSweepDrives(deadZone + glideZone / 2, tuneOf(routed));
 
       expect(driveFor(drives, 'filterType').hold).toBeNull();
       for (const voice of [0, 1, 2]) {
@@ -186,21 +217,17 @@ describe('cutoffSweepDrives', () => {
       ['high-pass', SID_FILTER_MODE_HIGH_PASS, 0],
     ])('opens the cutoff fully for a tune with %s', (_label, filterType, expected) => {
       for (const side of [-1, 1]) {
-        expect(cutoffValue(side * (deadZone + glideZone / 2), { filterType })).toBe(expected);
+        expect(cutoffValue(side * (deadZone + glideZone / 2), { ...routed, filterType })).toBe(expected);
       }
     });
 
-    it('opens the cutoff at the sweep’s own open value for a band-pass or mixed tune', () => {
+    it('opens the cutoff at the sweep’s own open end for a band-pass or mixed tune', () => {
       for (const filterType of [
         SID_FILTER_MODE_BAND_PASS,
         SID_FILTER_MODE_LOW_PASS | SID_FILTER_MODE_BAND_PASS,
       ]) {
-        expect(cutoffValue(-(deadZone + glideZone / 2), { filterType })).toBe(
-          FILTER_SWEEP.lowPass.openCutoff
-        );
-        expect(cutoffValue(deadZone + glideZone / 2, { filterType })).toBe(
-          FILTER_SWEEP.highPass.openCutoff
-        );
+        expect(cutoffValue(-(deadZone + glideZone / 2), { ...routed, filterType })).toBe(CUTOFF_CEILING);
+        expect(cutoffValue(deadZone + glideZone / 2, { ...routed, filterType })).toBe(0);
       }
     });
   });
@@ -262,12 +289,44 @@ describe('resonanceDrive', () => {
   });
 });
 
+describe('dipSteps', () => {
+  it('reaches silence before the flip and ends back at full volume', () => {
+    const { factors, flipAt } = dipSteps();
+
+    expect(factors[flipAt - 1]).toBe(0);
+    expect(factors.length).toBeGreaterThanOrEqual(flipAt);
+    for (const factor of factors) {
+      expect(factor).toBeGreaterThanOrEqual(0);
+      expect(factor).toBeLessThan(1);
+    }
+  });
+
+  it('falls without rising before the flip and rises without falling after it', () => {
+    const { factors, flipAt } = dipSteps();
+
+    for (let i = 1; i < flipAt; i++) {
+      expect(factors[i]).toBeLessThanOrEqual(factors[i - 1]);
+    }
+    for (let i = flipAt + 1; i < factors.length; i++) {
+      expect(factors[i]).toBeGreaterThanOrEqual(factors[i - 1]);
+    }
+  });
+});
+
 describe('tuneFilterStateFrom', () => {
-  function registers(volumeAndMode: number): Uint8Array {
+  function registers(volumeAndMode: number, routing = 0): Uint8Array {
     const written = new Uint8Array(25);
+    written[23] = routing;
     written[24] = volumeAndMode;
     return written;
   }
+
+  it('reads whether the tune routes any voice from bits 2–0 of $D417', () => {
+    expect(tuneFilterStateFrom(registers(0, 0x00)).routesVoice).toBe(false);
+    expect(tuneFilterStateFrom(registers(0, 0xf8)).routesVoice).toBe(false);
+    expect(tuneFilterStateFrom(registers(0, 0x01)).routesVoice).toBe(true);
+    expect(tuneFilterStateFrom(registers(0, 0x04)).routesVoice).toBe(true);
+  });
 
   it('reads the filter type from bits 6–4 of $D418', () => {
     expect(tuneFilterStateFrom(registers(0x4f)).filterType).toBe(SID_FILTER_MODE_HIGH_PASS);

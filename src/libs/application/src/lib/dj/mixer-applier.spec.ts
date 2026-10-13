@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
-import { FakeClock, SID_FILTER_MODE_HIGH_PASS, SID_FILTER_MODE_LOW_PASS } from '@sidablist/core';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { FakeClock, frames, SID_FILTER_MODE_HIGH_PASS, SID_FILTER_MODE_LOW_PASS } from '@sidablist/core';
 import type { ReplayRunner, SidField } from '@sidablist/core';
 import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
@@ -12,8 +12,15 @@ import { DjStore } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import { DECK_SLOTS, type Slot } from './slot';
+import { linearCrossfaderGain } from './mixer/crossfader-curve';
 import { scaleCoefficientFor } from './mixer/scale-taper';
-import { FILTER_SWEEP, resonanceDrive } from './mixer/filter-sweep';
+import {
+  cutoffSweepDrives,
+  dipSteps,
+  FILTER_SWEEP,
+  resonanceDrive,
+  tuneFilterStateFrom,
+} from './mixer/filter-sweep';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -118,9 +125,10 @@ describe('MixerApplier', () => {
     return setOutputGain.mock.calls.filter(([calledSlot]) => calledSlot === slot).pop()?.[1];
   }
 
-  /** The `$D418` byte the tune itself wrote, as `tuneRegisters` reports it. */
-  function tuneWrites(volumeAndMode: number): void {
+  /** The `$D418` byte (and `$D417`'s routing) the tune itself wrote, as `tuneRegisters` reports it. */
+  function tuneWrites(volumeAndMode: number, routing = 0): void {
     const written = new Uint8Array(25);
+    written[23] = routing;
     written[24] = volumeAndMode;
     tuneRegisters.mockReturnValue(written);
   }
@@ -277,7 +285,7 @@ describe('MixerApplier', () => {
       });
 
       it("glides in from the tune's own open cutoff and hands the filter type back to the stored mode", () => {
-        tuneWrites(0x40);
+        tuneWrites(0x40, 0x01);
         service.setKnob('A', 'cutoff', deadZone + glideZone / 2);
         service.setFilterMode('A', 'lowPass');
 
@@ -316,6 +324,265 @@ describe('MixerApplier', () => {
 
         expect(releasedOn('A', 'resonance')).toBe(true);
         expect(heldOn('A', 'resonance')).toBeUndefined();
+      });
+    });
+
+    describe('the volume dip around a filter switch', () => {
+      const { factors, flipAt } = dipSteps();
+      let frame: number;
+      let position: MockInstance<DeckRuntime['position']>;
+
+      function sentGain(slot: Slot): number {
+        const gain = gainFor(slot);
+        if (gain === undefined) {
+          throw new Error(`no gain was sent to deck ${slot}`);
+        }
+        return gain;
+      }
+
+      /** The engine builds `count` more frames, each seen by the dip's next poll. */
+      function framesGoOut(count: number): void {
+        for (let i = 0; i < count; i++) {
+          frame++;
+          vi.advanceTimersByTime(5);
+        }
+      }
+
+      function finishDip(): void {
+        framesGoOut(factors.length);
+      }
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        frame = 0;
+        position = vi.spyOn(runtime, 'position').mockImplementation(() => frames(frame));
+        makeShapeable('A');
+        store.setDeckStatus({ slot: 'A', status: 'playing' });
+        applier.applyDeck('A');
+        clearSpies();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('fades the gain out and holds the switches back until a silent frame has gone out', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+
+        expect(gainFor('A')).toBeCloseTo(factors[0], 10);
+        framesGoOut(flipAt - 1);
+        expect(gainFor('A')).toBe(0);
+        expect(heldOn('A', 'filterType')).toBeUndefined();
+        expect(heldOn('A', 'filtered', 0)).toBeUndefined();
+
+        framesGoOut(1);
+
+        expect(heldOn('A', 'filterType')).toEqual({ value: SID_FILTER_MODE_LOW_PASS, amount: 1 });
+        for (const voice of [0, 1, 2]) {
+          expect(heldOn('A', 'filtered', voice)).toEqual({ value: 1, amount: 1 });
+        }
+        expect(gainFor('A')).toBeCloseTo(factors[flipAt] ?? 1, 10);
+
+        finishDip();
+
+        expect(gainFor('A')).toBe(1);
+      });
+
+      it('keeps waiting while no frame goes out', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+
+        vi.advanceTimersByTime(50);
+
+        expect(heldOn('A', 'filterType')).toBeUndefined();
+        expect(gainFor('A')).toBeCloseTo(factors[0], 10);
+      });
+
+      it('steps on anyway once no frame has gone out for a while, so the gain is never left down', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+
+        vi.advanceTimersByTime(150 * (factors.length + 1));
+
+        expect(heldOn('A', 'filterType')).toEqual({ value: SID_FILTER_MODE_LOW_PASS, amount: 1 });
+        expect(gainFor('A')).toBe(1);
+      });
+
+      it('sends the latest knob position with the flip', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+        service.setKnob('A', 'cutoff', -0.9);
+        applier.applyDeck('A');
+
+        framesGoOut(flipAt);
+
+        const expected = cutoffSweepDrives(-0.9, () => tuneFilterStateFrom(new Uint8Array(25)))[0].hold;
+        expect(heldOn('A', 'cutoff')).toEqual(expected);
+      });
+
+      it('moves the cutoff at once, with no dip, while the switches stay as they are', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+        finishDip();
+        clearSpies();
+
+        service.setKnob('A', 'cutoff', -0.8);
+        applier.applyDeck('A');
+
+        expect(gainFor('A')).toBe(1);
+        expect(heldOn('A', 'cutoff')?.value).toBeLessThan(2047);
+      });
+
+      it('dips again to hand the switches back at centre', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+        finishDip();
+        clearSpies();
+
+        service.setKnob('A', 'cutoff', 0);
+        applier.applyDeck('A');
+
+        expect(gainFor('A')).toBeCloseTo(factors[0], 10);
+        framesGoOut(flipAt - 1);
+        expect(setFilterMode).not.toHaveBeenCalled();
+
+        framesGoOut(1);
+
+        expect(setFilterMode).toHaveBeenCalledExactlyOnceWith('A', null);
+        expect(releasedOn('A', 'filtered', 0)).toBe(true);
+
+        finishDip();
+
+        expect(gainFor('A')).toBe(1);
+      });
+
+      it('does not dip a deck that is not playing', () => {
+        store.setDeckStatus({ slot: 'A', status: 'paused' });
+        service.setKnob('A', 'cutoff', -0.6);
+
+        applier.applyDeck('A');
+
+        expect(heldOn('A', 'filterType')).toEqual({ value: SID_FILTER_MODE_LOW_PASS, amount: 1 });
+        expect(gainFor('A')).toBe(1);
+      });
+
+      it('keeps level and crossfader moves working during the dip, scaled by its current factor', () => {
+        service.setLevel('A', 0.5);
+        applier.applyDeck('A');
+        service.setKnob('A', 'cutoff', 0.6);
+        applier.applyDeck('A');
+        expect(gainFor('A')).toBeCloseTo(0.5 * factors[0], 10);
+
+        framesGoOut(1);
+        service.setLevel('A', 0.8);
+        applier.applyDeck('A');
+        expect(gainFor('A')).toBeCloseTo(0.8 * (factors[1] ?? 1), 10);
+
+        service.setCrossfader(0.5);
+        applier.applyDeck('A');
+        const crossfaded = 0.8 * linearCrossfaderGain(0.5, 'a');
+        expect(gainFor('A')).toBeCloseTo(crossfaded * (factors[1] ?? 1), 10);
+
+        finishDip();
+
+        expect(gainFor('A')).toBeCloseTo(crossfaded, 10);
+      });
+
+      it('starts a new dip, without raising the gain, when a switch changes during the fade back', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+        framesGoOut(flipAt + 1);
+        const before = sentGain('A');
+        expect(before).toBeLessThan(1);
+        clearSpies();
+
+        service.setKnob('A', 'cutoff', 0.6);
+        applier.applyDeck('A');
+
+        const sent = [sentGain('A')];
+        for (let i = 0; i < 2 * factors.length && heldOn('A', 'filterType') === undefined; i++) {
+          framesGoOut(1);
+          if (heldOn('A', 'filterType') === undefined) {
+            sent.push(sentGain('A'));
+          }
+        }
+        expect(sent[0]).toBeLessThanOrEqual(before);
+        for (let i = 1; i < sent.length; i++) {
+          expect(sent[i]).toBeLessThanOrEqual(sent[i - 1]);
+        }
+        expect(sent[sent.length - 1]).toBe(0);
+        expect(heldOn('A', 'filterType')).toEqual({ value: SID_FILTER_MODE_HIGH_PASS, amount: 1 });
+
+        finishDip();
+
+        expect(gainFor('A')).toBe(1);
+      });
+
+      describe('when the dip fails', () => {
+        const fault = new Error('engine fault');
+
+        function throwFault(): never {
+          throw fault;
+        }
+
+        it.each([
+          ['reading the frame position', () => position.mockImplementationOnce(throwFault), 1],
+          ['sending the switches', () => holdField.mockImplementationOnce(throwFault), flipAt],
+        ])(
+          'puts the gain back and applies the waiting switches when %s throws',
+          (_where, breakIt, failingStep) => {
+            service.setKnob('A', 'cutoff', -0.6);
+            applier.applyDeck('A');
+            framesGoOut(failingStep - 1);
+            breakIt();
+
+            framesGoOut(1);
+
+            expect(logError).toHaveBeenCalledTimes(1);
+            expect(vi.mocked(logError).mock.calls[0][0]).toContain('deck A');
+            expect(gainFor('A')).toBe(1);
+            expect(heldOn('A', 'filterType')).toEqual({
+              value: SID_FILTER_MODE_LOW_PASS,
+              amount: 1,
+            });
+            clearSpies();
+
+            vi.advanceTimersByTime(200);
+
+            expect(holdField).not.toHaveBeenCalled();
+            expect(setOutputGain).not.toHaveBeenCalled();
+          }
+        );
+
+        it('reports a failed recovery too and never throws out of the timer', () => {
+          service.setKnob('A', 'cutoff', -0.6);
+          applier.applyDeck('A');
+          position.mockImplementationOnce(throwFault);
+          setOutputGain.mockImplementation(throwFault);
+
+          expect(() => framesGoOut(1)).not.toThrow();
+
+          expect(logError).toHaveBeenCalledTimes(2);
+          expect(heldOn('A', 'filterType')).toEqual({ value: SID_FILTER_MODE_LOW_PASS, amount: 1 });
+        });
+      });
+
+      it('is dropped by a new-tune reset, which restores the gain at once and sends nothing late', () => {
+        service.setKnob('A', 'cutoff', -0.6);
+        applier.applyDeck('A');
+
+        applier.resetTuneShaping('A');
+
+        expect(gainFor('A')).toBe(1);
+        expect(releasedOn('A', 'filtered', 0)).toBe(true);
+        clearSpies();
+
+        finishDip();
+        vi.advanceTimersByTime(200);
+
+        expect(holdField).not.toHaveBeenCalled();
+        expect(setOutputGain).not.toHaveBeenCalled();
       });
     });
 

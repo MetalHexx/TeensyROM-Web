@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { FakeClock, replayToFrame } from '@sidablist/core';
+import { FakeClock, frames, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
@@ -1096,10 +1096,16 @@ describe('DeckService', () => {
         mixer.setCrossfader(0.3);
         shapeAway('A');
         const heldBefore = vi.spyOn(runtime, 'holdField');
+        // The deck is playing, so the sweep's switches wait behind a volume dip for the engine to
+        // build a frame; a position that moves every millisecond lets the dip finish.
+        const position = vi.spyOn(runtime, 'position').mockImplementation(() => frames(Date.now()));
         TestBed.inject(MixerApplier).applyDeck('A');
-        expect(heldBefore.mock.calls.map(([, field]) => field.name)).toEqual(
-          expect.arrayContaining(['cutoff', 'filtered', 'resonance'])
+        await vi.waitFor(() =>
+          expect(heldBefore.mock.calls.map(([, field]) => field.name)).toEqual(
+            expect.arrayContaining(['cutoff', 'filtered', 'resonance'])
+          )
         );
+        position.mockRestore();
         heldBefore.mockRestore();
         expect(store.deck('A')().speed).toBe(1.3);
         expect(store.deck('A')().voices[1].muted).toBe(true);

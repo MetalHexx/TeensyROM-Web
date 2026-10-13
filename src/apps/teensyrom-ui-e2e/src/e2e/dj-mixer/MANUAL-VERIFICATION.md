@@ -259,7 +259,7 @@ was not changed in this task.
 
 ## Filter sweep listening session (operator, real hardware)
 
-Run these three checks on your C64s with a real TeensyROM. Nothing here was run in the sandbox,
+Run these four checks on your C64s with a real TeensyROM. Nothing here was run in the sandbox,
 because sound is judged on hardware.
 
 1. On a tune that never uses the filter, turning cutoff audibly changes the sound, and centre plays
@@ -268,9 +268,15 @@ because sound is judged on hardware.
 2. Resonance is audible while sweeping, on any tune.
 3. Give a verdict on the sweep's feel, including whether passing through centre sounds smooth and
    whether anything needs retuning.
+4. Turn the knob out of centre, back into it, and across from one side to the other. Each time the
+   filter switches, the deck's volume fades out to silence, the switches change on a silent frame,
+   and the volume fades back in (`FILTER_SWEEP.dip` sets the number of frames each way). Say
+   whether the click is still audible, a gap is audible, or nothing is. If the click is still
+   there, lengthen the fades; if a gap is audible, shorten them.
 
 The verdict is recorded in the ASID-DJ portfolio's Decisions. The values to retune live in
-`FILTER_SWEEP` and `RESONANCE_SWEEP` in `libs/application/src/lib/dj/mixer/filter-sweep.ts`.
+`FILTER_SWEEP` and `RESONANCE_SWEEP` in `libs/application/src/lib/dj/mixer/filter-sweep.ts`. The
+sweep is tuned for a 6581 (`FILTER_SWEEP.chip`) until a settings page lets the user pick their chip.
 
 Resonance knob at rest, checked in the live card and in Storybook (`pnpm nx storybook ui-components`,
 story `DJ/Rotary Knob / RestingAtMinimum`): the live knobs read min 0, max 1 and value 0, the
