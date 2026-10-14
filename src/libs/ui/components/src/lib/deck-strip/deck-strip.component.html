@@ -1,8 +1,10 @@
-<lib-filter-mode-selector
-  [model]="model().filter"
-  [size]="size()"
-  (modeSelect)="onFilterModeSelect($event)"
-/>
+@if (model().filter; as filter) {
+  <lib-filter-mode-selector
+    [model]="filter"
+    [size]="size()"
+    (modeSelect)="onFilterModeSelect($event)"
+  />
+}
 
 @for (knob of model().knobs; track knob.id) {
   <lib-rotary-knob
@@ -12,6 +14,7 @@
     [min]="knob.min ?? -1"
     [max]="knob.max ?? 1"
     [step]="knob.step ?? 0.01"
+    [home]="knob.home ?? 0"
     [readout]="knob.readout ?? null"
     [disabled]="knob.disabled ?? false"
     [size]="size()"

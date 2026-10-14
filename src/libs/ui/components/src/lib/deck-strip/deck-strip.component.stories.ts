@@ -9,8 +9,9 @@ const meta: Meta<DeckStripComponent> = {
     docs: {
       description: {
         component:
-          "One deck's whole control strip, top to bottom: filter mode, then every knob in the " +
-          "model's own order, then the channel fader. Purely presentational — composes " +
+          "One deck's whole control strip, top to bottom: an optional filter mode selector " +
+          "(omitted when the model has no `filter`), then every knob in the model's own order, " +
+          "then the channel fader. Purely presentational — composes " +
           '`FilterModeSelectorComponent`, one `RotaryKnobComponent` per knob and ' +
           '`ChannelFaderComponent`, and holds no state of its own; the caller owns every value and ' +
           "every write. `size` forwards to the filter selector, every knob and the fader; " +
@@ -26,7 +27,7 @@ const meta: Meta<DeckStripComponent> = {
 export default meta;
 type Story = StoryObj<DeckStripComponent>;
 
-const model: DeckStripModel = {
+const model = {
   filter: {
     engaged: 'lowPass',
     groupAccessibleName: 'Filter mode deck A',
@@ -53,7 +54,7 @@ const model: DeckStripModel = {
     },
   ],
   fader: { value: 0.8, accessibleName: 'Channel fader deck A', label: 'A' },
-};
+} satisfies DeckStripModel;
 
 export const Default: Story = {
   args: { model },
@@ -81,6 +82,28 @@ export const Disabled: Story = {
       ...model,
       filter: { ...model.filter, disabled: true },
       knobs: model.knobs.map((knob) => ({ ...knob, disabled: true })),
+    },
+  },
+};
+
+/** No `filter` in the model: the strip renders no selector and leaves no space for one. A knob
+ *  with `home` equal to its `min` rests lower-left, as resonance does here. */
+export const WithoutSelector: Story = {
+  args: {
+    model: {
+      knobs: [
+        { id: 'cutoff', label: 'Cutoff', accessibleName: 'Cutoff deck A', value: 0.3 },
+        {
+          id: 'resonance',
+          label: 'Resonance',
+          accessibleName: 'Resonance deck A',
+          value: 0,
+          min: 0,
+          max: 1,
+          home: 0,
+        },
+      ],
+      fader: model.fader,
     },
   },
 };

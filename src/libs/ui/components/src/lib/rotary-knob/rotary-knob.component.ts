@@ -4,6 +4,12 @@ import type { ControlSize } from '../shared/control-size';
 const CENTER = 40;
 const HOME_ANGLE_DEG = -90;
 const TRAVEL_DEG = 135;
+/** Where a dial that rests at its minimum starts: the lower-left end of the sweep, -225°. */
+const START_ANGLE_DEG = HOME_ANGLE_DEG - TRAVEL_DEG;
+/** The whole lower-left to lower-right sweep, 270°. */
+const FULL_SWEEP_DEG = 2 * TRAVEL_DEG;
+/** An arc spanning more than this many degrees takes SVG's long way round (large-arc flag 1). */
+const HALF_TURN_DEG = 180;
 const POINTER_RADIUS = 26;
 const RING_RADIUS = 34;
 /** Vertical pixels of drag for a full min→max sweep — DAW convention (Ableton etc.), not the
@@ -74,7 +80,9 @@ export class RotaryKnobComponent {
   readonly max = input<number>(1);
   /** Granularity of the native range input. Defaults to `0.01`. */
   readonly step = input<number>(0.01);
-  /** The rest position the dial returns to on double-click. Defaults to `0`. */
+  /** The rest position the dial returns to on double-click. Defaults to `0`. When it equals `min()`
+   *  the dial rests at its minimum: it starts lower-left and sweeps the full 270° to `max()`
+   *  instead of splitting around a top-centre home. */
   readonly home = input<number>(0);
   /** Rendered under the dial when present — Key's semitone offset, and nothing else. */
   readonly readout = input<string | null>(null);
@@ -89,10 +97,21 @@ export class RotaryKnobComponent {
    *  branch on this rather than comparing floats independently. */
   protected readonly isAtHome = computed(() => this.value() === this.home());
 
-  /** The dial's own -225°..+45° sweep, home fixed at -90° (screen-up). */
+  /** Whether `home()` is the bottom of the range, so the dial rests lower-left and sweeps the full
+   *  270° to `max()` instead of splitting around a top-centre home. */
+  protected readonly restsAtMinimum = computed(() => this.home() === this.min());
+
+  /** The dial's own -225°..+45° sweep. Centre-home dials fix home at -90° (screen-up) and spread
+   *  each side over its own half; a dial that `restsAtMinimum()` starts at -225° and spreads the
+   *  whole range over 270°. */
   protected readonly angleDeg = computed(() => {
     const home = this.home();
     const value = this.value();
+    if (this.restsAtMinimum()) {
+      const range = this.max() - this.min();
+      const t = range === 0 ? 0 : (value - this.min()) / range;
+      return START_ANGLE_DEG + t * FULL_SWEEP_DEG;
+    }
     if (value === home) {
       return HOME_ANGLE_DEG;
     }
@@ -104,13 +123,20 @@ export class RotaryKnobComponent {
   /** The pointer needle's endpoint, `POINTER_RADIUS` out from center at `angleDeg()`. */
   protected readonly pointerEnd = computed(() => pointOnCircle(this.angleDeg(), POINTER_RADIUS));
 
-  /** `null` at home — the ring carries no state of its own, it is derived from `value()` alone. */
+  /** `null` at home — the ring carries no state of its own, it is derived from `value()` alone. A
+   *  dial that `restsAtMinimum()` grows its ring clockwise from the lower-left start. */
   protected readonly valueRingPath = computed(() => {
     if (this.isAtHome()) {
       return null;
     }
+    const angle = this.angleDeg();
+    const end = pointOnCircle(angle, RING_RADIUS);
+    if (this.restsAtMinimum()) {
+      const start = pointOnCircle(START_ANGLE_DEG, RING_RADIUS);
+      const largeArcFlag = angle - START_ANGLE_DEG > HALF_TURN_DEG ? 1 : 0;
+      return `M ${start.x},${start.y} A ${RING_RADIUS},${RING_RADIUS} 0 ${largeArcFlag},1 ${end.x},${end.y}`;
+    }
     const start = pointOnCircle(HOME_ANGLE_DEG, RING_RADIUS);
-    const end = pointOnCircle(this.angleDeg(), RING_RADIUS);
     const sweepFlag = this.value() > this.home() ? 1 : 0;
     return `M ${start.x},${start.y} A ${RING_RADIUS},${RING_RADIUS} 0 0,${sweepFlag} ${end.x},${end.y}`;
   });
@@ -155,7 +181,7 @@ export class RotaryKnobComponent {
     this.valueChange.emit(Number((event.target as HTMLInputElement).value));
   }
 
-  /** Resets to `home()` — the value ring collapses and the pointer snaps back to `HOME_ANGLE_DEG`. */
+  /** Resets to `home()` — the value ring collapses and the pointer snaps back to the dial's rest position. */
   protected onDoubleClick(): void {
     if (this.disabled()) {
       return;

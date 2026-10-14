@@ -81,7 +81,7 @@ describe('MixerService', () => {
   describe('tune shaping on a shapeable deck', () => {
     beforeEach(() => makeShapeable('A'));
 
-    it.each(['cutoff', 'resonance', 'pulseWidth'] as const)('clamps the %s knob to −1…+1', (knob) => {
+    it.each(['cutoff', 'pulseWidth'] as const)('clamps the %s knob to −1…+1', (knob) => {
       service.setKnob('A', knob, 2);
       expect(store.deckMix('A')()[knob]).toBe(1);
 
@@ -90,6 +90,17 @@ describe('MixerService', () => {
 
       service.setKnob('A', knob, -0.37);
       expect(store.deckMix('A')()[knob]).toBe(-0.37);
+    });
+
+    it('clamps the resonance knob to 0…1', () => {
+      service.setKnob('A', 'resonance', 1.5);
+      expect(store.deckMix('A')().resonance).toBe(1);
+
+      service.setKnob('A', 'resonance', -0.5);
+      expect(store.deckMix('A')().resonance).toBe(0);
+
+      service.setKnob('A', 'resonance', 0.37);
+      expect(store.deckMix('A')().resonance).toBe(0.37);
     });
 
     it('a knob write leaves the other controls and the other deck alone', () => {

@@ -101,7 +101,7 @@ describe('DJ Mixer — controls with no tune loaded', () => {
     });
   });
 
-  it('disables the speed, jump, shaping, filter, and voice controls on both decks', () => {
+  it('disables the speed, jump, shaping and voice controls on both decks', () => {
     DECK_LETTERS.forEach((letter) => {
       cy.get(`[aria-label="Speed multiplier deck ${letter}"]`).should('be.disabled');
       cy.get(`[aria-label="Speed up 50% deck ${letter}"]`).should('be.disabled');
@@ -112,9 +112,11 @@ describe('DJ Mixer — controls with no tune loaded', () => {
         cy.get(`[aria-label="${control} deck ${letter}"]`).should('be.disabled');
       });
 
-      ['low-pass', 'band-pass', 'high-pass', 'off'].forEach((mode) => {
-        cy.get(`[aria-label="Filter mode ${mode} deck ${letter}"]`).should('be.disabled');
-      });
+      cy.get(`[aria-label="Resonance deck ${letter}"]`)
+        .should('have.attr', 'min', '0')
+        .and('have.attr', 'max', '1');
+
+      cy.get('[aria-label^="Filter mode"]').should('not.exist');
 
       [1, 2, 3].forEach((voice) => {
         cy.get(`[aria-label="Mute voice ${voice} deck ${letter}"]`).should('be.disabled');

@@ -157,6 +157,8 @@ export function createFakeDeckPlayer(): FakeDeckPlayer {
     clearVoiceMutes: vi.fn(),
     setOutputGain: vi.fn(),
     setFilterMode: vi.fn(),
+    holdField: vi.fn(),
+    releaseField: vi.fn(),
     setRegisterScale: vi.fn(),
     setTargetClock: vi.fn(),
     setVoicePitch: vi.fn(),

@@ -9,8 +9,8 @@ import { RotaryKnobComponent } from '../rotary-knob/rotary-knob.component';
 import type { ControlSize } from '../shared/control-size';
 
 /** One rotary knob's caller-composed state within a deck strip. Nested one level under
- *  `DeckStripModel`, mirroring the composition exactly: the strip is a filter selector, this
- *  array of knobs, then a fader. */
+ *  `DeckStripModel`, mirroring the composition exactly: the strip is an optional filter selector,
+ *  this array of knobs, then a fader. */
 export interface DeckStripKnobModel {
   /** 'cutoff' | 'resonance' | 'pulseWidth' | 'key' in the caller that composes today's strip —
    *  opaque here, round-tripped verbatim into `knobChange`. */
@@ -28,6 +28,9 @@ export interface DeckStripKnobModel {
   /** Granularity of the dial's native range input. Defaults fall through to `RotaryKnobComponent`'s
    *  own when absent. */
   readonly step?: number;
+  /** The rest position the dial returns to on double-click. Absent means `0`. A `home` equal to
+   *  `min` makes the dial rest at its minimum, lower-left. */
+  readonly home?: number;
   /** Rendered under the dial when present — Key's transposed-key or semitone readout, and nothing
    *  else among today's four knobs. `null`/absent hides it entirely. */
   readonly readout?: string | null;
@@ -35,12 +38,13 @@ export interface DeckStripKnobModel {
   readonly disabled?: boolean;
 }
 
-/** The caller-composed state one whole deck strip renders: filter mode, its knobs in render
- *  order, and the channel fader beneath them. Each tune-shaping control carries its own
+/** The caller-composed state one whole deck strip renders: an optional filter mode, its knobs in
+ *  render order, and the channel fader beneath them. Each tune-shaping control carries its own
  *  `disabled` (`filter.disabled`, each knob's `disabled`); the channel fader has none. */
 export interface DeckStripModel {
-  /** The filter mode selector's own model, passed straight through. */
-  readonly filter: FilterModeSelectorModel;
+  /** The filter mode selector's own model, passed straight through. Absent means the strip renders
+   *  no selector, and leaves no space for one. */
+  readonly filter?: FilterModeSelectorModel;
   /** Rendered in this array's order — today Cutoff, Resonance, Pulse Width, Key, but the strip
    *  itself hard-codes none of that; adding or reordering an entry here is all a caller does. */
   readonly knobs: readonly DeckStripKnobModel[];
@@ -53,11 +57,12 @@ export interface DeckStripModel {
 }
 
 /**
- * One deck's whole control strip, top to bottom: filter mode, then every knob in `model().knobs`
- * order, then the channel fader. Purely presentational — composes `FilterModeSelectorComponent`,
- * one `RotaryKnobComponent` per knob and `ChannelFaderComponent`, and holds no state of its own;
- * the caller owns every value and every write. The filter selector and each knob can be disabled
- * through their own model entries; the channel fader, being the deck's level, is never disabled.
+ * One deck's whole control strip, top to bottom: an optional filter mode selector, then every knob
+ * in `model().knobs` order, then the channel fader. Purely presentational — composes
+ * `FilterModeSelectorComponent` (only when `model().filter` is present), one `RotaryKnobComponent`
+ * per knob and `ChannelFaderComponent`, and holds no state of its own; the caller owns every value
+ * and every write. The filter selector and each knob can be disabled through their own model
+ * entries; the channel fader, being the deck's level, is never disabled.
  *
  * Content carrying the `deckStripAfterKnobs` attribute is projected between the last knob and the
  * fader — a caller's way to put one control in that row, such as a switch shared across strips.
@@ -84,7 +89,7 @@ export interface DeckStripModel {
   imports: [FilterModeSelectorComponent, RotaryKnobComponent, ChannelFaderComponent],
 })
 export class DeckStripComponent {
-  /** The whole strip's state: filter, knobs and fader. */
+  /** The whole strip's state: optional filter, knobs and fader. */
   readonly model = input.required<DeckStripModel>();
   /** Forwarded to the filter selector, every knob and the fader. Defaults to `'large'`, today's
    *  only size, so every existing use renders pixel-identical. */
@@ -97,7 +102,8 @@ export class DeckStripComponent {
   readonly knobChange = output<{ id: string; value: number }>();
   /** Forwards the channel fader's `valueChange` unchanged. */
   readonly faderChange = output<number>();
-  /** Forwards the filter mode selector's `modeSelect` unchanged, `null` included. */
+  /** Forwards the filter mode selector's `modeSelect` unchanged, `null` included. Never emits when
+   *  `model().filter` is absent. */
   readonly filterModeSelect = output<FilterModeValue | null>();
 
   /** Re-packages one knob's `valueChange` with its own `id` for `knobChange`. */
