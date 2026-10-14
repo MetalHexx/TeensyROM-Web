@@ -221,11 +221,11 @@ describe('RotaryKnobComponent', () => {
       expect(emitted).toEqual([0]);
     });
 
-    it('reports "home" at rest and the departure above it', () => {
-      expect(rangeInput().getAttribute('aria-valuetext')).toBe('home');
+    it('reports its plain value as its aria-valuetext, at rest and turned', () => {
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('0');
 
       setValue(0.42);
-      expect(rangeInput().getAttribute('aria-valuetext')).toBe('+0.42');
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('0.42');
     });
   });
 

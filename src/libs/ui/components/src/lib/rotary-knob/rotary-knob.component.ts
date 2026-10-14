@@ -141,8 +141,13 @@ export class RotaryKnobComponent {
     return `M ${start.x},${start.y} A ${RING_RADIUS},${RING_RADIUS} 0 0,${sweepFlag} ${end.x},${end.y}`;
   });
 
-  /** "home" at rest, otherwise the signed departure from it. */
+  /** What assistive technology announces. A centre-home knob says "home" at rest and the signed
+   *  departure from it otherwise; a knob that `restsAtMinimum()` has no negative side, so it says
+   *  its plain value. */
   protected readonly valueText = computed(() => {
+    if (this.restsAtMinimum()) {
+      return `${roundTo2(this.value())}`;
+    }
     if (this.isAtHome()) {
       return 'home';
     }
