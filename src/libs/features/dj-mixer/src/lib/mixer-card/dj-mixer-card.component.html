@@ -8,7 +8,6 @@
         [faderLength]="faderLength()"
         (knobChange)="onKnobChange(strip.deck.slot, $event)"
         (faderChange)="onFaderChange(strip.deck.slot, $event)"
-        (filterModeSelect)="onFilterModeSelect(strip.deck.slot, $event)"
       >
         <div deckStripAfterKnobs class="key-notation-slot">
           @if (first) {

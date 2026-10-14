@@ -49,13 +49,14 @@ export interface DeckMixState {
   level: number;
   /** −1…+1, home 0. */
   cutoff: number;
-  /** −1…+1, home 0. */
+  /** 0…1, home 0 — 0 plays the tune's own resonance. */
   resonance: number;
   /** −1…+1, home 0. */
   pulseWidth: number;
   /** Integer −12…+12, home 0. */
   keySemitones: number;
-  /** `null` plays the tune's own filter-mode bits (home). */
+  /** `null` plays the tune's own filter-mode bits (home). The mixer card no longer offers a
+   *  selector, so this stays `null` in production; it is kept so the selector can come back. */
   filterMode: SidFilterMode | null;
 }
 

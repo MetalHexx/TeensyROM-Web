@@ -171,6 +171,73 @@ describe('DeckStripComponent', () => {
     expect(fader().hasAttribute('data-fixed-length')).toBe(true);
   });
 
+  describe('without a filter model', () => {
+    beforeEach(() => {
+      const { knobs, fader } = testModel();
+      fixture.componentRef.setInput('model', { knobs, fader } satisfies DeckStripModel);
+      fixture.detectChanges();
+    });
+
+    it('renders no selector element, and the knobs and fader still render', () => {
+      expect(fixture.nativeElement.querySelector('lib-filter-mode-selector')).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('lib-rotary-knob')).toHaveLength(4);
+      expect(
+        fixture.nativeElement.querySelector('input[aria-label="Channel fader deck A"]')
+      ).not.toBeNull();
+    });
+
+    it('starts the strip with its first knob, so no gap is reserved above it', () => {
+      const first = fixture.nativeElement.firstElementChild as HTMLElement;
+
+      expect(first.tagName.toLowerCase()).toBe('lib-rotary-knob');
+    });
+
+    it('never emits filterModeSelect', () => {
+      const emitted: (FilterModeValue | null)[] = [];
+      component.filterModeSelect.subscribe((mode) => emitted.push(mode));
+
+      knobInput('Cutoff').value = '0.4';
+      knobInput('Cutoff').dispatchEvent(new Event('input'));
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('renders the selector once a filter model is supplied', () => {
+      fixture.componentRef.setInput('model', testModel());
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('lib-filter-mode-selector')).not.toBeNull();
+    });
+  });
+
+  describe("a knob's home", () => {
+    it('reaches the inner knob, so one homed at its minimum rests there and double-clicks back to it', () => {
+      const model = testModel();
+      fixture.componentRef.setInput('model', {
+        ...model,
+        knobs: [
+          {
+            id: 'resonance',
+            label: 'Resonance',
+            accessibleName: 'Resonance deck A',
+            value: 0.6,
+            min: 0,
+            max: 1,
+            home: 0,
+          },
+        ],
+      });
+      fixture.detectChanges();
+      const emitted: { id: string; value: number }[] = [];
+      component.knobChange.subscribe((event) => emitted.push(event));
+
+      knobInput('Resonance').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+      expect(emitted).toEqual([{ id: 'resonance', value: 0 }]);
+      expect(fixture.nativeElement.querySelector('lib-rotary-knob .home-tick')).toBeNull();
+    });
+  });
+
   describe('the deckStripAfterKnobs hook', () => {
     @Component({
       imports: [DeckStripComponent],

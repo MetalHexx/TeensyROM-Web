@@ -13,7 +13,8 @@ const meta: Meta<RotaryKnobComponent> = {
           "transparent native range input layered over a decorative SVG dial, so keyboard operation " +
           "and assistive-technology state come for free. A vertical drag sweeps `min()`..`max()` " +
           "(DAW convention, not the native range's own click-and-drag), Shift quarters the " +
-          "sensitivity for fine adjustment, and a double-click snaps back to `home()`. Reach for it " +
+          "sensitivity for fine adjustment, and a double-click snaps back to `home()`. A `home()` equal " +
+          "to `min()` makes the dial rest lower-left and sweep the full 270° to `max()`. Reach for it " +
           "for any bounded numeric parameter that benefits from a compact rotary affordance rather " +
           "than a linear fader like `ChannelFaderComponent`. `size` steps the dial and its own " +
           "label/readout font across the shared `ControlSize` scale; `'large'` is the default and " +
@@ -45,6 +46,19 @@ export const Sizes: Story = {
         <lib-rotary-knob label="Medium" accessibleName="Medium demo" [value]="0" size="medium" />
         <lib-rotary-knob label="Large" accessibleName="Large demo" [value]="0" size="large" />
         <lib-rotary-knob label="Extra Large" accessibleName="Extra Large demo" [value]="0" size="extra-large" />
+      </div>
+    `,
+  }),
+};
+
+/** A knob whose `home` equals its `min` rests lower-left and sweeps the full 270° to `max`, its
+ *  ring growing clockwise from the start and no top tick drawn — one at rest, one turned. */
+export const RestingAtMinimum: Story = {
+  render: () => ({
+    template: `
+      <div style="display: flex; align-items: flex-end; gap: 24px;">
+        <lib-rotary-knob label="At rest" accessibleName="At rest demo" [value]="0" [min]="0" [max]="1" [home]="0" />
+        <lib-rotary-knob label="Turned" accessibleName="Turned demo" [value]="0.6" [min]="0" [max]="1" [home]="0" />
       </div>
     `,
   }),

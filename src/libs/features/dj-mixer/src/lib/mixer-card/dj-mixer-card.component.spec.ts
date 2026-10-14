@@ -149,30 +149,63 @@ describe('DjMixerCardComponent', () => {
         patch: {
           level: 0.4,
           cutoff: 0.25,
-          resonance: -0.5,
+          resonance: 0.5,
           pulseWidth: 0.75,
           keySemitones: 3,
-          filterMode: 'bandPass',
         },
       });
       fixture.detectChanges();
 
       const [a, b] = strips(fixture).map((s) => s.model());
 
-      expect(a.filter.engaged).toBeNull();
       expect(a.fader.value).toBe(1);
       expect(a.knobs.map((k) => k.value)).toEqual([0, 0, 0, 0]);
 
-      expect(b.filter.engaged).toBe('bandPass');
-      expect(b.filter.groupAccessibleName).toBe('Filter mode deck B');
-      expect(b.filter.optionAccessibleNames.highPass).toBe('Filter mode high-pass deck B');
       expect(b.fader).toEqual({ value: 0.4, label: 'B', accessibleName: 'Gain deck B' });
       expect(b.knobs.map((k) => [k.id, k.accessibleName, k.value])).toEqual([
         ['cutoff', 'Cutoff deck B', 0.25],
-        ['resonance', 'Resonance deck B', -0.5],
+        ['resonance', 'Resonance deck B', 0.5],
         ['pulseWidth', 'Pulse width deck B', 0.75],
         ['key', 'Key deck B', 3],
       ]);
+    });
+
+    it('carry no filter selector model, and render no selector', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+
+      for (const model of strips(fixture).map((s) => s.model())) {
+        expect(model.filter).toBeUndefined();
+      }
+      expect(fixture.nativeElement.querySelector('lib-filter-mode-selector')).toBeNull();
+    });
+
+    it('give resonance a 0..1 range resting at 0, and leave cutoff and pulse width on the default range', () => {
+      const { fixture } = render([DECK_A], false);
+
+      const [cutoff, resonance, pulseWidth] = strips(fixture)[0].model().knobs;
+      expect(resonance).toMatchObject({ min: 0, max: 1, home: 0 });
+      for (const knob of [cutoff, pulseWidth]) {
+        expect(knob.min).toBeUndefined();
+        expect(knob.max).toBeUndefined();
+        expect(knob.home).toBeUndefined();
+      }
+
+      const resonanceInput = input(fixture, 'Resonance deck A');
+      expect(resonanceInput.min).toBe('0');
+      expect(resonanceInput.max).toBe('1');
+    });
+
+    it('return resonance to 0 on double-click', () => {
+      const { fixture, store, mixer } = render([DECK_A], false);
+      makeShapeable(store, 'A');
+      store.setDeckMix({ slot: 'A', patch: { resonance: 0.6 } });
+      fixture.detectChanges();
+
+      input(fixture, 'Resonance deck A').dispatchEvent(
+        new MouseEvent('dblclick', { bubbles: true })
+      );
+
+      expect(mixer.setKnob).toHaveBeenCalledWith('A', 'resonance', 0);
     });
 
     it("give the key knob a whole-semitone ±12 range and the store's readout", () => {
@@ -182,11 +215,10 @@ describe('DjMixerCardComponent', () => {
       expect(key).toMatchObject({ min: -12, max: 12, step: 1, readout: '0' });
     });
 
-    it('disable the filter and every knob on a deck that cannot be shaped, never the fader', () => {
+    it('disable every knob on a deck that cannot be shaped, never the fader', () => {
       const { fixture } = render([DECK_A, DECK_B], true);
 
       for (const model of strips(fixture).map((s) => s.model())) {
-        expect(model.filter.disabled).toBe(true);
         expect(model.knobs.every((k) => k.disabled === true)).toBe(true);
       }
       expect(input(fixture, 'Cutoff deck A').disabled).toBe(true);
@@ -195,15 +227,14 @@ describe('DjMixerCardComponent', () => {
       expect(fixture.nativeElement.querySelector('lib-crossfader input').disabled).toBe(false);
     });
 
-    it('enable the controls of the deck that can be shaped and leave the other disabled', () => {
+    it('enable the knobs of the deck that can be shaped and leave the other disabled', () => {
       const { fixture, store } = render([DECK_A, DECK_B], true);
       makeShapeable(store, 'A');
       fixture.detectChanges();
 
       const [a, b] = strips(fixture).map((s) => s.model());
-      expect(a.filter.disabled).toBe(false);
       expect(a.knobs.every((k) => k.disabled === false)).toBe(true);
-      expect(b.filter.disabled).toBe(true);
+      expect(b.knobs.every((k) => k.disabled === true)).toBe(true);
       expect(input(fixture, 'Cutoff deck A').disabled).toBe(false);
       expect(input(fixture, 'Cutoff deck B').disabled).toBe(true);
     });
@@ -243,18 +274,13 @@ describe('DjMixerCardComponent', () => {
       expect(mixer.setLevel).toHaveBeenCalledWith('B', 0.25);
     });
 
-    it('sends a filter mode straight to setFilterMode, and null when the engaged mode is clicked again', () => {
+    it('never sets a filter mode, having no selector to set one from', () => {
       const { fixture, mixer } = render([DECK_A, DECK_B], true);
 
       strips(fixture)[0].filterModeSelect.emit('highPass');
-      strips(fixture)[0].filterModeSelect.emit('off');
-      strips(fixture)[1].filterModeSelect.emit(null);
+      strips(fixture)[1].knobChange.emit({ id: 'cutoff', value: 0.2 });
 
-      expect(mixer.setFilterMode.mock.calls).toEqual([
-        ['A', 'highPass'],
-        ['A', 'off'],
-        ['B', null],
-      ]);
+      expect(mixer.setFilterMode).not.toHaveBeenCalled();
     });
 
     it("sends a moved crossfader to setCrossfader and shows the store's position", () => {

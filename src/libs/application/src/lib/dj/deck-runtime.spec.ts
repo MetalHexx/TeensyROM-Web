@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
-import type { FrameClock, ReplayRunner, SidPlayer } from '@sidablist/core';
+import type { FrameClock, PlayerStats, ReplayRunner, SidPlayer } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import { DeckRuntime } from './deck-runtime';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
@@ -208,6 +208,30 @@ describe('DeckRuntime', () => {
 
       expect(spy).toHaveBeenNthCalledWith(1, 'lowPass');
       expect(spy).toHaveBeenNthCalledWith(2, null);
+    });
+
+    it('holdField and releaseField reach only the named slot player, with the field, value and amount', () => {
+      const heldOnA = vi.spyOn(playerFor(0), 'holdField');
+      const releasedOnA = vi.spyOn(playerFor(0), 'releaseField');
+      const heldOnB = vi.spyOn(playerFor(1), 'holdField');
+      const releasedOnB = vi.spyOn(playerFor(1), 'releaseField');
+
+      runtime.holdField('A', { name: 'filtered', voice: 1 }, 1, 0.5);
+      runtime.releaseField('A', { name: 'cutoff' });
+
+      expect(heldOnA).toHaveBeenCalledExactlyOnceWith({ name: 'filtered', voice: 1 }, 1, 0.5);
+      expect(releasedOnA).toHaveBeenCalledExactlyOnceWith({ name: 'cutoff' });
+      expect(heldOnB).not.toHaveBeenCalled();
+      expect(releasedOnB).not.toHaveBeenCalled();
+    });
+
+    it("tuneRegisters returns the registers the slot's player reports as written", () => {
+      const written = Uint8Array.from({ length: 25 }, (_, index) => index);
+      vi.spyOn(playerFor(0), 'getStats').mockReturnValue({
+        emitted: { written, sent: new Uint8Array(25) },
+      } as PlayerStats);
+
+      expect(runtime.tuneRegisters('A')).toBe(written);
     });
 
     it('setTempo reaches the player and reads back through the snapshot', () => {

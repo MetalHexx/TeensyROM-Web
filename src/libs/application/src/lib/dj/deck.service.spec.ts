@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { FakeClock, replayToFrame } from '@sidablist/core';
+import { FakeClock, frames, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
@@ -781,7 +781,7 @@ describe('DeckService', () => {
     /** Pushes every tune-shaping control, speed and voice state of `slot` off home. */
     function shapeAway(slot: 'A' | 'B'): void {
       mixer.setKnob(slot, 'cutoff', 0.6);
-      mixer.setKnob(slot, 'resonance', -0.4);
+      mixer.setKnob(slot, 'resonance', 0.4);
       mixer.setKnob(slot, 'pulseWidth', 0.8);
       mixer.setKeySemitones(slot, 3);
       mixer.setFilterMode(slot, 'lowPass');
@@ -1095,6 +1095,18 @@ describe('DeckService', () => {
         mixer.setLevel('A', 0.6);
         mixer.setCrossfader(0.3);
         shapeAway('A');
+        const heldBefore = vi.spyOn(runtime, 'holdField');
+        // The deck is playing, so the sweep's switches wait behind a volume dip for the engine to
+        // build a frame; a position that moves every millisecond lets the dip finish.
+        const position = vi.spyOn(runtime, 'position').mockImplementation(() => frames(Date.now()));
+        TestBed.inject(MixerApplier).applyDeck('A');
+        await vi.waitFor(() =>
+          expect(heldBefore.mock.calls.map(([, field]) => field.name)).toEqual(
+            expect.arrayContaining(['cutoff', 'filtered', 'resonance'])
+          )
+        );
+        position.mockRestore();
+        heldBefore.mockRestore();
         expect(store.deck('A')().speed).toBe(1.3);
         expect(store.deck('A')().voices[1].muted).toBe(true);
         expect(store.deck('A')().detectedKey).not.toBeNull();
@@ -1103,17 +1115,33 @@ describe('DeckService', () => {
         const keySpy = vi.spyOn(runtime, 'setKeyCoefficient');
         const filterSpy = vi.spyOn(runtime, 'setFilterMode');
         const gainSpy = vi.spyOn(runtime, 'setOutputGain');
+        const releaseSpy = vi.spyOn(runtime, 'releaseField');
+        const holdSpy = vi.spyOn(runtime, 'holdField');
+        const playSpy = vi.spyOn(runtime, 'play');
         resolveUnkeyed();
 
         await loadAndWait('A', register(makeFixture()));
 
         expectHome('A');
         expect(store.deck('A')().detectedKey).toBeNull();
-        expect(scaleSpy).toHaveBeenCalledWith('A', 'cutoff', scaleCoefficientFor(0));
-        expect(scaleSpy).toHaveBeenCalledWith('A', 'resonance', scaleCoefficientFor(0));
+        const released = releaseSpy.mock.calls.filter(([slot]) => slot === 'A').map(([, field]) => field);
+        expect(released).toEqual(
+          expect.arrayContaining([
+            { name: 'cutoff' },
+            { name: 'filtered', voice: 0 },
+            { name: 'filtered', voice: 1 },
+            { name: 'filtered', voice: 2 },
+            { name: 'resonance' },
+          ])
+        );
+        expect(releaseSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+        expect(holdSpy).not.toHaveBeenCalled();
+        expect(scaleSpy.mock.calls.every(([, group]) => group === 'pulseWidth')).toBe(true);
         expect(scaleSpy).toHaveBeenCalledWith('A', 'pulseWidth', scaleCoefficientFor(0));
         expect(keySpy).toHaveBeenCalledWith('A', keyCoefficientFor(0));
         expect(filterSpy).toHaveBeenCalledWith('A', null);
+        expect(filterSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+        expect(Math.max(...releaseSpy.mock.invocationCallOrder)).toBeLessThan(playSpy.mock.invocationCallOrder[0]);
         expect(store.deckMix('A')().level).toBe(0.6);
         expect(store.crossfader()).toBe(0.3);
         expect(gainSpy).toHaveBeenLastCalledWith('A', 0.6 * linearCrossfaderGain(0.3, 'a'));
