@@ -2,8 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { ALERT_SERVICE, type IAlertService } from '@teensyrom-nx/domain';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DjStore } from './dj-store';
+import { MidiMappingStore } from './mapping/midi-mapping-store';
 import { MIDI_SETTINGS_REPOSITORY } from './ports';
-import type { DeckDeviceBindingRecord, IMidiSettingsRepository, MidiSettingsRecord } from './ports';
+import type {
+  ControlMappingRecord,
+  DeckDeviceBindingRecord,
+  IMidiSettingsRepository,
+  MidiSettingsRecord,
+} from './ports';
+import type { ControlMapping } from './mapping/mapping.models';
 import { DECK_SLOTS } from './slot';
 
 const SAVE_DEBOUNCE_MS = 300;
@@ -15,8 +22,8 @@ const EMPTY_SETTINGS: MidiSettingsRecord = { controllers: [], mappings: [], deck
 
 /**
  * The only writer of the whole MIDI settings set. The server stores the set whole, so every save
- * sends all three lists: the deck bindings from `DjStore`, and the controllers and mappings
- * exactly as `load` returned them.
+ * sends all three lists: the deck bindings from `DjStore`, and the controllers and mappings from
+ * `MidiMappingStore` once it has loaded them, exactly as `load` returned them until then.
  *
  * A failed load resolves an empty set and suppresses every save for the rest of the session, so a
  * partial set can never overwrite the server's.
@@ -26,6 +33,7 @@ export class MidiSettingsPersistence {
   private readonly repository: IMidiSettingsRepository = inject(MIDI_SETTINGS_REPOSITORY);
   private readonly alertService: IAlertService = inject(ALERT_SERVICE);
   private readonly store = inject(DjStore);
+  private readonly mappingStore = inject(MidiMappingStore);
 
   private loading: Promise<MidiSettingsRecord> | null = null;
   private loaded: MidiSettingsRecord = EMPTY_SETTINGS;
@@ -75,7 +83,14 @@ export class MidiSettingsPersistence {
             },
           ];
     });
-    return { controllers: this.loaded.controllers, mappings: this.loaded.mappings, deckBindings };
+    if (!this.mappingStore.loaded()) {
+      return { controllers: this.loaded.controllers, mappings: this.loaded.mappings, deckBindings };
+    }
+    return {
+      controllers: this.mappingStore.controllers(),
+      mappings: this.mappingStore.mappings().map(toRecord),
+      deckBindings,
+    };
   }
 
   private async fetch(): Promise<MidiSettingsRecord> {
@@ -116,6 +131,16 @@ export class MidiSettingsPersistence {
       this.alertService.error('The MIDI settings could not be saved.');
     }
   }
+}
+
+function toRecord(mapping: ControlMapping): ControlMappingRecord {
+  return {
+    id: mapping.id,
+    source: mapping.source,
+    owner: mapping.control.owner,
+    control: mapping.control.control,
+    style: mapping.style,
+  };
 }
 
 function describe(error: unknown): string {

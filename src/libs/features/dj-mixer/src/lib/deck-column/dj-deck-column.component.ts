@@ -226,13 +226,11 @@ export class DjDeckColumnComponent {
   }
 
   onPreviousSubtune(): void {
-    const slot = this.deck().slot;
-    void this.deckService.selectSubtune(slot, this.djStore.deck(slot)().subtune - 1);
+    void this.deckService.previousSubtune(this.deck().slot);
   }
 
   onNextSubtune(): void {
-    const slot = this.deck().slot;
-    void this.deckService.selectSubtune(slot, this.djStore.deck(slot)().subtune + 1);
+    void this.deckService.nextSubtune(this.deck().slot);
   }
 
   /** Pins the thumb at the dragged value for as long as the drag lasts. */

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DeckService, MixerApplier } from '@teensyrom-nx/application';
+import { DeckService, MidiMappings, MixerApplier } from '@teensyrom-nx/application';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DjBootstrapService } from './dj-bootstrap.service';
 
@@ -12,6 +12,7 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 describe('DjBootstrapService', () => {
   let hydrateMock: ReturnType<typeof vi.fn>;
   let installMock: ReturnType<typeof vi.fn>;
+  let mappingsHydrateMock: ReturnType<typeof vi.fn>;
 
   function configure(): DjBootstrapService {
     TestBed.configureTestingModule({
@@ -19,6 +20,7 @@ describe('DjBootstrapService', () => {
         DjBootstrapService,
         { provide: DeckService, useValue: { hydrate: hydrateMock } },
         { provide: MixerApplier, useValue: { install: installMock } },
+        { provide: MidiMappings, useValue: { hydrate: mappingsHydrateMock } },
       ],
     });
     return TestBed.inject(DjBootstrapService);
@@ -27,6 +29,7 @@ describe('DjBootstrapService', () => {
   beforeEach(() => {
     hydrateMock = vi.fn().mockResolvedValue(undefined);
     installMock = vi.fn();
+    mappingsHydrateMock = vi.fn().mockResolvedValue(undefined);
     vi.mocked(logWarn).mockClear();
   });
 
@@ -66,6 +69,26 @@ describe('DjBootstrapService', () => {
     await vi.waitFor(() => expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1));
 
     expect(vi.mocked(logWarn)).toHaveBeenCalledWith('DjBootstrap: bindings hydration failed — boom');
+  });
+
+  it('init hydrates the MIDI mappings alongside the bindings', () => {
+    const service = configure();
+
+    service.init();
+
+    expect(mappingsHydrateMock).toHaveBeenCalledTimes(1);
+    expect(hydrateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rejected mappings hydrate logs a warning, never throws, and leaves the bindings hydrate alone', async () => {
+    mappingsHydrateMock.mockRejectedValueOnce(new Error('offline'));
+    const service = configure();
+
+    expect(() => service.init()).not.toThrow();
+    await vi.waitFor(() => expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(logWarn)).toHaveBeenCalledWith('DjBootstrap: mappings hydration failed — offline');
+    expect(hydrateMock).toHaveBeenCalledTimes(1);
   });
 
   it('a rejection with a non-Error value still logs, stringified', async () => {

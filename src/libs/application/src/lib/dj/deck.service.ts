@@ -293,6 +293,16 @@ export class DeckService {
     }
   }
 
+  /** Steps one subtune down. `selectSubtune` clamps to the tune's range and applies its own gates. */
+  previousSubtune(slot: Slot): Promise<void> {
+    return this.selectSubtune(slot, this.store.deck(slot)().subtune - 1);
+  }
+
+  /** Steps one subtune up. `selectSubtune` clamps to the tune's range and applies its own gates. */
+  nextSubtune(slot: Slot): Promise<void> {
+    return this.selectSubtune(slot, this.store.deck(slot)().subtune + 1);
+  }
+
   setRepeat(slot: Slot, on: boolean): void {
     this.runtime.setRepeat(slot, on);
     this.store.setDeckRepeat({ slot, repeat: on });

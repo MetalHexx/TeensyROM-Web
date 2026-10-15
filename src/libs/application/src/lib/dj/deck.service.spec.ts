@@ -597,6 +597,34 @@ describe('DeckService', () => {
       expect(store.deck('A')().status).toBe('playing');
     });
 
+    it('previousSubtune and nextSubtune step one subtune and stop at either end', async () => {
+      const fixture = register(makeFixture({ subtuneCount: 3 }));
+      await loadAndWait('A', fixture);
+      expect(store.deck('A')().subtune).toBe(1);
+
+      await service.previousSubtune('A');
+      expect(store.deck('A')().subtune).toBe(1);
+
+      await service.nextSubtune('A');
+      await service.nextSubtune('A');
+      expect(store.deck('A')().subtune).toBe(3);
+
+      await service.nextSubtune('A');
+      expect(store.deck('A')().subtune).toBe(3);
+
+      await service.previousSubtune('A');
+      expect(store.deck('A')().subtune).toBe(2);
+    });
+
+    it('previousSubtune and nextSubtune do nothing on an empty deck', async () => {
+      const resolveSubtuneSpy = vi.spyOn(TuneLoader.prototype, 'resolveSubtune');
+
+      await service.previousSubtune('A');
+      await service.nextSubtune('A');
+
+      expect(resolveSubtuneSpy).not.toHaveBeenCalled();
+    });
+
     it('holds the new subtune paused when it started paused', async () => {
       const fixture = register(makeFixture({ subtuneCount: 3 }));
       await loadAndWait('A', fixture);

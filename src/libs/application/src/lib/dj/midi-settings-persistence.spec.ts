@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ALERT_SERVICE } from '@teensyrom-nx/domain';
 import { DjStore } from './dj-store';
 import { MidiSettingsPersistence } from './midi-settings-persistence';
+import { MidiMappingStore } from './mapping/midi-mapping-store';
 import { MIDI_SETTINGS_REPOSITORY } from './ports';
 import type { IMidiSettingsRepository, MidiSettingsRecord } from './ports';
 
@@ -121,6 +122,30 @@ describe('MidiSettingsPersistence', () => {
 
       expect(snapshot.controllers).toEqual(SERVER_SET.controllers);
       expect(snapshot.mappings).toEqual(SERVER_SET.mappings);
+    });
+
+    it('takes controllers and mappings from the mapping store once it has loaded them', async () => {
+      await persistence.load();
+      const source = { controllerId: 'pad', channel: 2, kind: 'note', number: 36 } as const;
+      const controller = { id: 'pad', name: 'Pad', lastPortId: null, listening: false };
+      TestBed.inject(MidiMappingStore).setMidiMappingData({
+        controllers: [controller],
+        mappings: [
+          {
+            id: 'm9',
+            source,
+            control: { owner: 'mixer', control: 'crossfader' },
+            style: { kind: 'step', amount: 0.1 },
+          },
+        ],
+      });
+
+      const snapshot = persistence.snapshot();
+
+      expect(snapshot.controllers).toEqual([controller]);
+      expect(snapshot.mappings).toEqual([
+        { id: 'm9', source, owner: 'mixer', control: 'crossfader', style: { kind: 'step', amount: 0.1 } },
+      ]);
     });
 
     it('cuts a last seen name to 128 characters', async () => {
