@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
 import type { FrameClock, PlayerStats, ReplayRunner, SidPlayer } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
+import type { Playable } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
@@ -58,6 +59,36 @@ function fakeMidiAccess(outputPortFor: (id: string) => MidiOutputPort | null): I
     release: (): void => undefined,
     outputPortFor,
   };
+}
+
+const PSID_HEADER_SIZE = 0x7c;
+const SID_MODEL_6581 = 0b01;
+const SID_MODEL_8580 = 0b10;
+
+/** A minimal well-formed PSID v2 file whose header names the given SID model. */
+function sidBytes(model: number): Uint8Array {
+  const payload = [0xa9, 0x00, 0x60];
+  const buffer = new Uint8Array(PSID_HEADER_SIZE + payload.length);
+  const view = new DataView(buffer.buffer);
+  buffer.set([0x50, 0x53, 0x49, 0x44], 0x00); // 'PSID'
+  view.setUint16(0x04, 2, false);
+  view.setUint16(0x06, PSID_HEADER_SIZE, false);
+  view.setUint16(0x08, 0x1000, false);
+  view.setUint16(0x0a, 0x1000, false);
+  view.setUint16(0x0c, 0x1003, false);
+  view.setUint16(0x0e, 1, false);
+  view.setUint16(0x10, 1, false);
+  view.setUint16(0x76, model << 4, false);
+  buffer.set(payload, PSID_HEADER_SIZE);
+  return buffer;
+}
+
+function playableOf(model: number): Playable {
+  return {
+    bytes: sidBytes(model),
+    reference: { identity: { sidHash: 'tune', subtune: 1 } },
+    index: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+  } as unknown as Playable;
 }
 
 describe('DeckRuntime', () => {
@@ -138,6 +169,62 @@ describe('DeckRuntime', () => {
     runtime.identify('A', 'two');
 
     expect(port.sent).toHaveLength(1);
+  });
+
+  describe('resync', () => {
+    /** The SID-type packet's chip flag, then the start packet — what `AsidSink.begin` sends. */
+    function handshake(port: { readonly sent: readonly Uint8Array[] }) {
+      return { count: port.sent.length, is8580: port.sent[0]?.[4] === 1, startLength: port.sent[1]?.length };
+    }
+
+    it("re-sends the loaded tune's SID type and the start packet through the slot's port", () => {
+      runtime.build('A');
+      const port = recordingPort('port-1');
+      outputPortFor.mockReturnValue(port);
+      runtime.setPort('A', 'port-1');
+      runtime.load('A', playableOf(SID_MODEL_8580));
+
+      runtime.resync('A');
+
+      expect(handshake(port)).toEqual({ count: 2, is8580: true, startLength: 4 });
+    });
+
+    it('uses the chip model of the tune loaded last', () => {
+      runtime.build('A');
+      const port = recordingPort('port-1');
+      outputPortFor.mockReturnValue(port);
+      runtime.setPort('A', 'port-1');
+      runtime.load('A', playableOf(SID_MODEL_8580));
+      runtime.load('A', playableOf(SID_MODEL_6581));
+
+      runtime.resync('A');
+
+      expect(handshake(port).is8580).toBe(false);
+    });
+
+    it('does nothing when no tune is loaded', () => {
+      runtime.build('A');
+      const port = recordingPort('port-1');
+      outputPortFor.mockReturnValue(port);
+      runtime.setPort('A', 'port-1');
+
+      runtime.resync('A');
+
+      expect(port.sent).toHaveLength(0);
+    });
+
+    it("sends nothing to the other slot's port", () => {
+      runtime.build('A');
+      runtime.build('B');
+      const portB = recordingPort('port-b');
+      outputPortFor.mockImplementation((id: string) => (id === 'port-b' ? portB : null));
+      runtime.setPort('B', 'port-b');
+      runtime.load('A', playableOf(SID_MODEL_8580));
+
+      runtime.resync('A');
+
+      expect(portB.sent).toHaveLength(0);
+    });
   });
 
   it('disposes the built player, releasing its replay thread', () => {

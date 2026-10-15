@@ -9,6 +9,7 @@ import type {
   ReplayRunner,
   SidFilterMode,
   SidField,
+  SidModel,
 } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
@@ -49,6 +50,8 @@ export class DeckRuntime {
 
   private readonly slots = new Map<Slot, SlotRuntime>();
   private readonly facades = new Map<Slot, FacadeState>();
+  /** The chip model of the tune each slot last loaded — what `resync` hands the sink's `begin`. */
+  private readonly chipModels = new Map<Slot, SidModel>();
 
   /** Builds this slot's engine bundle, once. A second call is a no-op — the sink, the player, the
    *  clock and the replay thread are never rebuilt for a slot already built. */
@@ -78,11 +81,24 @@ export class DeckRuntime {
     facade.warned = false;
   }
 
+  /** Re-sends the ASID start handshake — SID type, then start — to this slot's cartridge. A
+   *  cartridge that went away was power-cycled and missed the one `begin` a tune sends when it
+   *  starts, so it must hear it again once its port returns. Does nothing with no tune loaded. */
+  resync(slot: Slot): void {
+    const { sink } = this.requireSlot(slot);
+    const chipModel = this.chipModels.get(slot);
+    if (chipModel !== undefined) {
+      sink.begin({ chipModel });
+    }
+  }
+
   /** Hands a resolved tune to this slot's player: loads it, selects its subtune, and lands
    *  whatever structure the tune's index carries. */
   load(slot: Slot, playable: Playable): void {
     const { player } = this.requireSlot(slot);
-    player.loadTune(parseSidFile(playable.bytes));
+    const file = parseSidFile(playable.bytes);
+    player.loadTune(file);
+    this.chipModels.set(slot, file.model);
     player.selectSubtune(playable.reference.identity.subtune);
 
     const { index } = playable;

@@ -8,8 +8,10 @@ import {
   DeckService,
   DeviceStore,
   DjStore,
+  type DeckBindingState,
   type DeckBindingSummary,
   type DeckTransportSummary,
+  type MidiPortOption,
   type Slot,
 } from '@teensyrom-nx/application';
 import {
@@ -51,10 +53,9 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
 
 function idleBindingSummary(overrides: Partial<DeckBindingSummary> = {}): DeckBindingSummary {
   return {
-    portOptions: [],
-    selectedPortId: null,
-    portPlaceholder: '— MIDI not enabled —',
-    portsEnabled: false,
+    selectedDeviceId: null,
+    present: false,
+    placeholder: '— select a cartridge —',
     enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
@@ -71,7 +72,7 @@ function createDeckServiceStub() {
     setRepeat: vi.fn(),
     selectSubtune: vi.fn().mockResolvedValue(undefined),
     seek: vi.fn().mockResolvedValue(undefined),
-    bindPort: vi.fn().mockResolvedValue(undefined),
+    bindDevice: vi.fn(),
     enableMidi: vi.fn().mockResolvedValue(undefined),
     identify: vi.fn(),
     setSpeed: vi.fn(),
@@ -88,6 +89,14 @@ interface RenderOptions {
   binding?: Partial<DeckBindingSummary>;
   subtune?: number;
   devices?: Device[];
+  outputs?: MidiPortOption[];
+  bindings?: Partial<Record<Slot, DeckBindingState>>;
+}
+
+const UNBOUND: DeckBindingState = { device: null, portId: null, present: false, error: null };
+
+function boundTo(id: string, name: string): DeckBindingState {
+  return { device: { id, name }, portId: null, present: false, error: null };
 }
 
 function render(deck: DeckRef, options: RenderOptions = {}) {
@@ -103,6 +112,16 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     ],
   });
   const devices = signal<Device[]>(options.devices ?? []);
+  const bindings = signal<Record<Slot, DeckBindingState>>({
+    A: UNBOUND,
+    B: UNBOUND,
+    ...options.bindings,
+  });
+  const midi = signal({
+    accessState: 'granted',
+    ports: options.outputs ?? [],
+    lastError: null,
+  });
   const deckService = createDeckServiceStub();
 
   TestBed.configureTestingModule({
@@ -116,6 +135,8 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
           bindingSummary: () => bindingSummary,
           deck: () => deckState,
           canShape: () => signal(false),
+          bindings,
+          midi,
         },
       },
       { provide: DeckService, useValue: deckService },
@@ -128,7 +149,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   fixture.componentRef.setInput('dropActive', options.dropActive ?? false);
   fixture.detectChanges();
 
-  return { fixture, transportSummary, bindingSummary, deckService, devices };
+  return { fixture, transportSummary, bindingSummary, deckService, devices, bindings, midi };
 }
 
 /** Renders the column against a real `DjStore`, so the speed and voice models are built from
@@ -561,134 +582,111 @@ describe('DjDeckColumnComponent', () => {
   });
 
   describe('the binding card', () => {
+    const TR_1 = { deviceId: '14470230', name: 'TR-1' } as Device;
+    const TR_2 = { deviceId: '19277260', name: 'TR-2' } as Device;
+    const PORT_1: MidiPortOption = {
+      id: 'port-1',
+      name: 'TeensyROM-14470230',
+      manufacturer: 'Microsoft Corporation',
+    };
+
     it('builds accessible names from the deck letter and passes the summary through', () => {
       const { fixture } = render(
         { slot: 'B', letter: 'B', index: 1 },
-        {
-          binding: {
-            selectedPortId: 'port-1',
-            portsEnabled: true,
-            enableVisible: false,
-          },
-        }
+        { binding: { selectedDeviceId: '14470230', enableVisible: false } }
       );
       const model = fixture.componentInstance.bindingModel();
 
       expect(model.accessibleName).toBe('MIDI binding deck B');
       expect(model.heading).toBe('Deck B');
-      expect(model.selectAccessibleName).toBe('Output port deck B');
+      expect(model.selectAccessibleName).toBe('Cartridge deck B');
       expect(model.enableAccessibleName).toBe('Enable MIDI deck B');
       expect(model.identifyAccessibleName).toBe('Identify deck B');
-      expect(model.selectedPortId).toBe('port-1');
+      expect(model.selectedPortId).toBe('14470230');
+      expect(model.portPlaceholder).toBe('— select a cartridge —');
       expect(model.enableVisible).toBe(false);
     });
 
-    it('maps a null takenBy to undefined and a bound slot through as-is', () => {
+    it('lists the cartridges, a present one with its port and an absent one flagged', () => {
       const { fixture } = render(
         { slot: 'A', letter: 'A', index: 0 },
-        {
-          binding: {
-            portOptions: [
-              { id: 'p1', portName: 'Port 1', label: 'Port 1', takenBy: null },
-              { id: 'p2', portName: 'Port 2', label: 'Port 2', takenBy: 'B' },
-            ],
-          },
-        }
+        { devices: [TR_1, TR_2], outputs: [PORT_1] }
       );
-      const model = fixture.componentInstance.bindingModel();
 
-      expect(model.ports).toEqual([
-        { id: 'p1', label: 'Port 1', takenBy: undefined },
-        { id: 'p2', label: 'Port 2', takenBy: 'B' },
+      expect(fixture.componentInstance.bindingModel().ports).toEqual([
+        {
+          id: '14470230',
+          label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)',
+          takenBy: undefined,
+        },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent', takenBy: undefined },
       ]);
     });
 
-    describe('port labels', () => {
-      const matchedOption = {
-        id: 'p1',
-        portName: 'TeensyROM-19277260',
-        label: 'TeensyROM-19277260 (PJRC)',
-        takenBy: null,
-      };
-      const unmatchedOption = {
-        id: 'p2',
-        portName: 'Some Other Synth',
-        label: 'Some Other Synth (Acme)',
-        takenBy: null,
-      };
+    it('maps the other deck holding a cartridge to takenBy', () => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { devices: [TR_1, TR_2], bindings: { B: boundTo('19277260', 'TR-2') } }
+      );
 
-      it("prefixes a port that belongs to a known device with that device's name", () => {
-        const { fixture } = render(
-          { slot: 'A', letter: 'A', index: 0 },
-          {
-            binding: { portOptions: [matchedOption, unmatchedOption] },
-            devices: [{ deviceId: '19277260', name: 'TR-1' } as Device],
-          }
-        );
+      expect(fixture.componentInstance.bindingModel().ports.map((p) => p.takenBy)).toEqual([
+        undefined,
+        'B',
+      ]);
+    });
 
-        expect(fixture.componentInstance.bindingModel().ports.map((p) => p.label)).toEqual([
-          'TR-1: TeensyROM-19277260 (PJRC)',
-          'Some Other Synth (Acme)',
-        ]);
-      });
+    it('does not list an output that is not a cartridge', () => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { outputs: [{ id: 'synth', name: 'Wavetable Synth', manufacturer: 'Acme' }] }
+      );
 
-      it('leaves the plain label when no device matches the port', () => {
-        const { fixture } = render(
-          { slot: 'A', letter: 'A', index: 0 },
-          {
-            binding: { portOptions: [matchedOption] },
-            devices: [{ deviceId: '99999999', name: 'Elsewhere' } as Device],
-          }
-        );
+      expect(fixture.componentInstance.bindingModel().ports).toEqual([]);
+    });
 
-        expect(fixture.componentInstance.bindingModel().ports[0].label).toBe(
-          'TeensyROM-19277260 (PJRC)'
-        );
-      });
+    it('relabels the options when the store renames the device', () => {
+      const { fixture, devices } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { devices: [TR_1], outputs: [PORT_1] }
+      );
 
-      it('relabels the options when the store renames the device', () => {
-        const { fixture, devices } = render(
-          { slot: 'A', letter: 'A', index: 0 },
-          {
-            binding: { portOptions: [matchedOption] },
-            devices: [{ deviceId: '19277260', name: 'TR-1' } as Device],
-          }
-        );
+      devices.set([{ deviceId: '14470230', name: 'Living Room' } as Device]);
 
-        devices.set([{ deviceId: '19277260', name: 'Living Room' } as Device]);
+      expect(fixture.componentInstance.bindingModel().ports[0].label).toBe(
+        'Living Room: TeensyROM-14470230 (Microsoft Corporation)'
+      );
+    });
 
-        expect(fixture.componentInstance.bindingModel().ports[0].label).toBe(
-          'Living Room: TeensyROM-19277260 (PJRC)'
-        );
-      });
+    it('enables the selector when there is a cartridge to choose, MIDI enabled or not', () => {
+      const { fixture } = render({ slot: 'A', letter: 'A', index: 0 }, { devices: [TR_1] });
+      expect(fixture.componentInstance.bindingModel().portsEnabled).toBe(true);
+
+      TestBed.resetTestingModule();
+      const empty = render({ slot: 'A', letter: 'A', index: 0 });
+      expect(empty.fixture.componentInstance.bindingModel().portsEnabled).toBe(false);
     });
 
     it('renders a taken option disabled', () => {
       const { fixture } = render(
         { slot: 'A', letter: 'A', index: 0 },
-        {
-          binding: {
-            portsEnabled: true,
-            portOptions: [{ id: 'p1', portName: 'Port 1', label: 'Port 1', takenBy: 'B' }],
-          },
-        }
+        { devices: [TR_1], bindings: { B: boundTo('14470230', 'TR-1') } }
       );
 
       const option = fixture.nativeElement.querySelector(
-        '[aria-label="Output port deck A"] option[value="p1"]'
+        '[aria-label="Cartridge deck A"] option[value="14470230"]'
       ) as HTMLOptionElement;
 
       expect(option.disabled).toBe(true);
     });
 
-    it("dispatches bindPort with this deck's slot, mapping the placeholder to null", () => {
+    it("dispatches bindDevice with this deck's slot, mapping the placeholder to null", () => {
       const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
-      bindingCard(fixture).portSelect.emit('port-9');
-      expect(deckService.bindPort).toHaveBeenCalledWith('B', 'port-9');
+      bindingCard(fixture).portSelect.emit('19277260');
+      expect(deckService.bindDevice).toHaveBeenCalledWith('B', '19277260');
 
       bindingCard(fixture).portSelect.emit('');
-      expect(deckService.bindPort).toHaveBeenCalledWith('B', null);
+      expect(deckService.bindDevice).toHaveBeenCalledWith('B', null);
     });
 
     it('dispatches enableMidi and identify with this deck\'s slot', () => {

@@ -9,10 +9,10 @@ const meta: Meta<BindingCardComponent> = {
     docs: {
       description: {
         component:
-          "One deck's own MIDI binding: its Output port selector, Enable MIDI beside Identify, " +
-          'and whichever of its three distinct error states apply. Purely presentational — it ' +
-          'holds no state of its own; the caller owns the permission grant, the enumerated port ' +
-          "list and this deck's own persisted selection. " +
+          "One deck's own MIDI binding: its selector of options — cartridges, or output ports — " +
+          'Enable MIDI beside Identify, and whichever of its three distinct error states apply. ' +
+          'Purely presentational — it holds no state of its own; the caller owns the permission ' +
+          "grant, the option list and this deck's own persisted selection. " +
           '`layout="inline"` lays the heading, the control and the two buttons on one row ' +
           'instead of the default `"stacked"` column.',
       },
@@ -30,11 +30,11 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
     ports: [],
     selectedPortId: null,
     portsEnabled: false,
-    portPlaceholder: '— MIDI not enabled —',
+    portPlaceholder: '— select a cartridge —',
     enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
-    selectAccessibleName: 'Output port deck A',
+    selectAccessibleName: 'Cartridge deck A',
     enableAccessibleName: 'Enable MIDI deck A',
     identifyAccessibleName: 'Identify deck A',
     errors: [],
@@ -42,8 +42,8 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
   };
 }
 
-/** Before the permission grant: the select shows its single disabled placeholder, Identify is
- *  out of reach, and the Enable MIDI button is showing. */
+/** Nothing to choose from: the select shows its single disabled placeholder, Identify is out of
+ *  reach, and the Enable MIDI button is showing. */
 export const NotEnabled: Story = {
   args: { model: bindingModel() },
 };
@@ -54,28 +54,46 @@ export const Granted: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
-      ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
-      selectedPortId: 'port-1',
+      ports: [{ id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' }],
+      selectedPortId: '14470230',
       identifyDisabled: false,
     }),
   },
 };
 
-/** Granted, with a port list to choose from and one already selected. */
+/** Granted, with a cartridge list to choose from and one already selected. */
 export const GrantedWithPorts: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       ports: [
-        { id: 'port-1', label: 'TeensyROM (PJRC)' },
-        { id: 'port-2', label: 'Cart B (Acme)' },
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 (Microsoft Corporation)' },
       ],
-      selectedPortId: 'port-1',
+      selectedPortId: '14470230',
       identifyDisabled: false,
+    }),
+  },
+};
+
+/** The bound cartridge is not plugged in: it stays selected, its label says `· absent` in text,
+ *  and Identify is out of reach. */
+export const Absent: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a cartridge —',
+      enableVisible: false,
+      ports: [
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent' },
+      ],
+      selectedPortId: '19277260',
+      identifyDisabled: true,
     }),
   },
 };
@@ -86,7 +104,7 @@ export const GrantedNoPortsFound: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       errors: [
         'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.',
@@ -95,32 +113,32 @@ export const GrantedNoPortsFound: Story = {
   },
 };
 
-/** Another deck already holds the port this one just tried to claim. */
+/** Another deck already holds the cartridge this one just tried to claim. */
 export const BindingError: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
-      ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
-      errors: ['Deck B is already bound to that port. Pick a different one.'],
+      ports: [{ id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' }],
+      errors: ['Deck B is already bound to that cartridge.'],
     }),
   },
 };
 
-/** `layout="inline"`: heading, port control and the two buttons share one row instead of
+/** `layout="inline"`: heading, cartridge control and the two buttons share one row instead of
  *  stacking, for a host with less vertical room to give. */
 export const Inline: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       ports: [
-        { id: 'port-1', label: 'TeensyROM (PJRC)' },
-        { id: 'port-2', label: 'Cart B (Acme)' },
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 (Microsoft Corporation)' },
       ],
-      selectedPortId: 'port-1',
+      selectedPortId: '14470230',
       identifyDisabled: false,
     }),
     layout: 'inline',
@@ -132,60 +150,66 @@ export const Unbound: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       ports: [
-        { id: 'port-1', label: 'TeensyROM (PJRC)' },
-        { id: 'port-2', label: 'Cart B (Acme)' },
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 (Microsoft Corporation)' },
       ],
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, a port already selected. */
+/** `layout="inline"`, a cartridge already selected. */
 export const Bound: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       ports: [
-        { id: 'port-1', label: 'TeensyROM (PJRC)' },
-        { id: 'port-2', label: 'Cart B (Acme)' },
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 (Microsoft Corporation)' },
       ],
-      selectedPortId: 'port-1',
+      selectedPortId: '14470230',
       identifyDisabled: false,
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, Deck B already holds one port — the taken option renders the deck letter as
- *  text, never colour alone, and is disabled. */
+/** `layout="inline"`, Deck B already holds one cartridge — the taken option renders the deck
+ *  letter as text, never colour alone, and is disabled. */
 export const Taken: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
-      portPlaceholder: '— select a port —',
+      portPlaceholder: '— select a cartridge —',
       enableVisible: false,
       ports: [
-        { id: 'port-1', label: 'TeensyROM (PJRC)' },
-        { id: 'port-2', label: 'Cart B (Acme)', takenBy: 'B' },
+        { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
+        {
+          id: '19277260',
+          label: 'TR-2: TeensyROM-19277260 (Microsoft Corporation)',
+          takenBy: 'B',
+        },
       ],
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, before the Enable gesture with a previously bound port now absent — the
- *  stored name still shows rather than the generic placeholder, on every reload. */
-export const LastSaw: Story = {
+/** `layout="inline"`, before the Enable gesture with a bound cartridge not yet seen on a MIDI port
+ *  — it still reads as the selection, flagged absent in text. */
+export const AbsentInline: Story = {
   args: {
     model: bindingModel({
-      portsEnabled: false,
-      portPlaceholder: '— last saw TeensyROM (PJRC) —',
+      portsEnabled: true,
+      portPlaceholder: '— select a cartridge —',
       enableVisible: true,
+      ports: [{ id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent' }],
+      selectedPortId: '19277260',
     }),
     layout: 'inline',
   },

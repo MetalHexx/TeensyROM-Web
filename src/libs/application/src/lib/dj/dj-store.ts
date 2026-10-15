@@ -83,9 +83,14 @@ export interface DeckState {
   switching: boolean;
 }
 
+/** One deck slot's cartridge binding. The binding is to the device; the MIDI output is only where
+ *  that device currently shows up. */
 export interface DeckBindingState {
-  port: { id: string; name: string } | null;
-  portPresent: boolean;
+  /** The bound cartridge; `name` is the last one seen. */
+  device: { id: string; name: string } | null;
+  /** The device's resolved MIDI output, `null` while it is absent. */
+  portId: string | null;
+  present: boolean;
   error: string | null;
 }
 
@@ -137,8 +142,9 @@ const initialMixState: DeckMixState = {
 };
 
 const initialBindingState: DeckBindingState = {
-  port: null,
-  portPresent: false,
+  device: null,
+  portId: null,
+  present: false,
   error: null,
 };
 
