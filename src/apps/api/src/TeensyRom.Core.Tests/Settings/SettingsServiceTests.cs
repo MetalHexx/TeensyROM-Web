@@ -12,6 +12,7 @@ namespace TeensyRom.Core.Tests.Settings;
 /// Tests focus on service behavior, file I/O, observable patterns, and provider interfaces.
 /// File operations write to the throwaway test home for isolation.
 /// </summary>
+[Collection(ConfigFolderCollection.Name)]
 public class SettingsServiceTests : IDisposable
 {
     private readonly IFixture _fixture;

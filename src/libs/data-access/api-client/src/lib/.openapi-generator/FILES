@@ -3,6 +3,7 @@ apis/AudioApi.ts
 apis/DevicesApi.ts
 apis/EngineApi.ts
 apis/FilesApi.ts
+apis/MidiSettingsApi.ts
 apis/PlayerApi.ts
 apis/SettingsApi.ts
 apis/TransfersApi.ts
@@ -21,6 +22,7 @@ models/CompetitionDto.ts
 models/ConnectionType.ts
 models/CreateJobBody.ts
 models/CreateJobResponse.ts
+models/DeckDeviceBindingDto.ts
 models/DeviceSettingsDto.ts
 models/DeviceState.ts
 models/DirectoryItemDto.ts
@@ -34,6 +36,7 @@ models/ForgetDeviceResponse.ts
 models/GetActiveJobResponse.ts
 models/GetDirectoryResponse.ts
 models/GetJobResponse.ts
+models/GetMidiSettingsResponse.ts
 models/GetSettingsResponse.ts
 models/GetVersionResponse.ts
 models/HardwareVariant.ts
@@ -41,10 +44,14 @@ models/HttpValidationProblemDetails.ts
 models/IndexAllResponse.ts
 models/IndexResponse.ts
 models/IndexingStatusDto.ts
+models/KnownMidiControllerDto.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
 models/ListDevicesResponse.ts
 models/MachineType.ts
+models/MidiControlMappingDto.ts
+models/MidiMappingStyleDto.ts
+models/MidiSourceDto.ts
 models/NullableOfTeensyFilterType.ts
 models/PingDeviceResponse.ts
 models/PlayerSettingsDto.ts
@@ -55,6 +62,8 @@ models/RenameDeviceBody.ts
 models/RenameDeviceResponse.ts
 models/ResetDeviceResponse.ts
 models/SaveFavoriteResponse.ts
+models/SaveMidiSettingsRequest.ts
+models/SaveMidiSettingsResponse.ts
 models/SaveSettingsRequest.ts
 models/SaveSettingsResponse.ts
 models/SealJobResponse.ts
