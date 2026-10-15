@@ -7,6 +7,7 @@ import { Configuration, MidiSettingsApiService } from '@teensyrom-nx/data-access
 import {
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
+  MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
   REPLAY_RUNNER_FACTORY,
   TUNE_INSERTER,
@@ -16,6 +17,7 @@ import { IndexedDbTuneStore } from './database';
 import { ApiMidiSettingsRepository } from './midi-settings';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
 import { MidiAccessService } from './midi/midi-access.service';
+import { MidiInputService } from './midi/midi-input.service';
 import { ScriptProcessorFrameClock } from './clock/script-processor-frame-clock';
 
 /**
@@ -56,6 +58,7 @@ export const DJ_STORAGE_PROVIDERS: Provider[] = [
  */
 export const DJ_ENGINE_PROVIDERS: Provider[] = [
   { provide: MIDI_ACCESS, useExisting: MidiAccessService },
+  { provide: MIDI_INPUT, useExisting: MidiInputService },
   { provide: FRAME_CLOCK_FACTORY, useValue: (): FrameClock => new ScriptProcessorFrameClock() },
   {
     provide: REPLAY_RUNNER_FACTORY,

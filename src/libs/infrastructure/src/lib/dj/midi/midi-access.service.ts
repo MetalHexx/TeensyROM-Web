@@ -3,6 +3,7 @@ import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import type {
   IMidiAccess,
   MidiAccessState,
+  MidiInputPort,
   MidiPermission,
   MidiPortOption,
 } from '@teensyrom-nx/application';
@@ -28,7 +29,18 @@ export interface MIDIOutputLike {
    */
   clear?: () => void;
 }
+export interface MIDIInputLike {
+  id: string;
+  name: string | null;
+  manufacturer: string | null;
+  state: 'connected' | 'disconnected';
+  connection: 'open' | 'closed' | 'pending';
+  open(): Promise<unknown>;
+  close(): Promise<unknown>;
+  onmidimessage: ((event: { data: Uint8Array | null }) => void) | null;
+}
 interface MIDIAccessLike {
+  inputs: Map<string, MIDIInputLike>;
   outputs: Map<string, MIDIOutputLike>;
   onstatechange: ((e: unknown) => void) | null;
 }
@@ -44,6 +56,9 @@ interface MIDIAccessLike {
 export class MidiAccessService implements IMidiAccess {
   readonly accessState = signal<MidiAccessState>('idle');
   readonly ports = signal<readonly MidiPortOption[]>([]);
+  /** Equality is by value because every `open()` and `close()` on an input fires a `statechange`,
+   *  and a refresh that changed nothing must not wake input consumers. */
+  readonly inputPorts = signal<readonly MidiInputPort[]>([], { equal: samePorts });
   readonly lastError = signal<string | null>(null);
 
   private access: MIDIAccessLike | null = null;
@@ -202,6 +217,11 @@ export class MidiAccessService implements IMidiAccess {
     return this.access?.outputs.get(portId) ?? null;
   }
 
+  /** The bound input object for `portId`, or null when it names no currently enumerated input. */
+  inputFor(portId: string): MIDIInputLike | null {
+    return this.access?.inputs.get(portId) ?? null;
+  }
+
   /** `portId` wrapped for an ASID sink, memoised on the underlying output object's identity rather
    *  than on `portId` alone — a same-id reconnect that replaces the output object re-wraps instead
    *  of sending into the detached one, and a steady stream of sends costs one map lookup rather
@@ -246,7 +266,33 @@ export class MidiAccessService implements IMidiAccess {
       });
     });
     this.ports.set(nextPorts);
+
+    const nextInputs: MidiInputPort[] = [];
+    this.access?.inputs.forEach((input, id) => {
+      nextInputs.push({
+        id,
+        name: input.name ?? 'Unnamed input',
+        manufacturer: input.manufacturer ?? 'Unknown manufacturer',
+        connected: input.state === 'connected',
+      });
+    });
+    this.inputPorts.set(nextInputs);
   }
+}
+
+function samePorts(a: readonly MidiInputPort[], b: readonly MidiInputPort[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((port, index) => {
+      const other = b[index];
+      return (
+        port.id === other.id &&
+        port.name === other.name &&
+        port.manufacturer === other.manufacturer &&
+        port.connected === other.connected
+      );
+    })
+  );
 }
 
 function describeAccessDenial(error: unknown): string {

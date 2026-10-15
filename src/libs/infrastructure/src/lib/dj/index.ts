@@ -1,6 +1,7 @@
 export * from './database';
 export * from './midi-settings';
 export * from './midi/midi-access.service';
+export * from './midi/midi-input.service';
 export * from './clock/script-processor-frame-clock';
 export * from './analysis/worker-analysis-scanner';
 export * from './analysis/worker-tune-indexer';
