@@ -1,6 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DeckService, MidiMappings, MixerApplier } from '@teensyrom-nx/application';
+import {
+  DeckService,
+  MidiControllers,
+  MidiInputRouter,
+  MixerApplier,
+} from '@teensyrom-nx/application';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DjBootstrapService } from './dj-bootstrap.service';
 
@@ -13,6 +18,7 @@ describe('DjBootstrapService', () => {
   let hydrateMock: ReturnType<typeof vi.fn>;
   let installMock: ReturnType<typeof vi.fn>;
   let mappingsHydrateMock: ReturnType<typeof vi.fn>;
+  let routerStartMock: ReturnType<typeof vi.fn>;
 
   function configure(): DjBootstrapService {
     TestBed.configureTestingModule({
@@ -20,7 +26,8 @@ describe('DjBootstrapService', () => {
         DjBootstrapService,
         { provide: DeckService, useValue: { hydrate: hydrateMock } },
         { provide: MixerApplier, useValue: { install: installMock } },
-        { provide: MidiMappings, useValue: { hydrate: mappingsHydrateMock } },
+        { provide: MidiControllers, useValue: { hydrate: mappingsHydrateMock } },
+        { provide: MidiInputRouter, useValue: { start: routerStartMock } },
       ],
     });
     return TestBed.inject(DjBootstrapService);
@@ -30,6 +37,7 @@ describe('DjBootstrapService', () => {
     hydrateMock = vi.fn().mockResolvedValue(undefined);
     installMock = vi.fn();
     mappingsHydrateMock = vi.fn().mockResolvedValue(undefined);
+    routerStartMock = vi.fn();
     vi.mocked(logWarn).mockClear();
   });
 
@@ -80,7 +88,19 @@ describe('DjBootstrapService', () => {
     expect(hydrateMock).toHaveBeenCalledTimes(1);
   });
 
-  it('a rejected mappings hydrate logs a warning, never throws, and leaves the bindings hydrate alone', async () => {
+  it('starts routing controller input once the controllers have hydrated', async () => {
+    const service = configure();
+
+    service.init();
+    await vi.waitFor(() => expect(routerStartMock).toHaveBeenCalledTimes(1));
+
+    expect(mappingsHydrateMock).toHaveBeenCalledTimes(1);
+    expect(mappingsHydrateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      routerStartMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('a rejected mappings hydrate logs a warning, never throws, starts no routing, and leaves the bindings hydrate alone', async () => {
     mappingsHydrateMock.mockRejectedValueOnce(new Error('offline'));
     const service = configure();
 
@@ -88,6 +108,7 @@ describe('DjBootstrapService', () => {
     await vi.waitFor(() => expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1));
 
     expect(vi.mocked(logWarn)).toHaveBeenCalledWith('DjBootstrap: mappings hydration failed — offline');
+    expect(routerStartMock).not.toHaveBeenCalled();
     expect(hydrateMock).toHaveBeenCalledTimes(1);
   });
 

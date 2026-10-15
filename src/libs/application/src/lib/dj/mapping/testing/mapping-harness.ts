@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
@@ -13,6 +13,7 @@ import { MixerService } from '../../mixer.service';
 import {
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
+  MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
   REPLAY_RUNNER_FACTORY,
   TUNE_INSERTER,
@@ -27,7 +28,11 @@ import type {
 } from '../../ports';
 import type { Slot } from '../../slot';
 import { MappableControls } from '../mappable-controls';
+import { FakeMidiInput } from './fake-midi-input';
 import type { MidiSource, SourceEvent } from '../mapping.models';
+import { MidiControllers } from '../midi-controllers';
+import { MidiInputRouter } from '../midi-input-router';
+import { MidiLearn } from '../midi-learn';
 import { MidiMappingEngine } from '../midi-mapping-engine';
 import { MidiMappingStore } from '../midi-mapping-store';
 import { MidiMappings } from '../midi-mappings';
@@ -56,6 +61,13 @@ export interface MappingHarness {
   readonly deckService: DeckService;
   readonly mixerService: MixerService;
   readonly persistence: MidiSettingsPersistence;
+  readonly controllers: MidiControllers;
+  readonly learn: MidiLearn;
+  readonly router: MidiInputRouter;
+  readonly midiInput: FakeMidiInput;
+  readonly accessState: WritableSignal<MidiAccessState>;
+  readonly requestAccess: ReturnType<typeof vi.fn>;
+  readonly alerts: { warning: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
   readonly repository: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   /** Puts a tune on the slot at a settled status, which is what makes its controls live. */
   makeShapeable(slot: Slot): void;
@@ -72,12 +84,16 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     load: vi.fn().mockResolvedValue(settings),
     save: vi.fn().mockResolvedValue(undefined),
   };
+  const midiInput = new FakeMidiInput();
+  const alerts = { warning: vi.fn(), error: vi.fn() };
+  const accessState = signal<MidiAccessState>('granted');
+  const requestAccess = vi.fn(async (): Promise<void> => accessState.set('granted'));
   const midiAccess: IMidiAccess = {
-    accessState: signal<MidiAccessState>('granted'),
+    accessState,
     ports: signal<readonly MidiPortOption[]>([]),
     lastError: signal<string | null>(null),
     queryPermission: (): Promise<MidiPermission> => Promise.resolve('granted'),
-    requestAccess: (): Promise<void> => Promise.resolve(),
+    requestAccess,
     holderOf: (): string | null => null,
     claim: (): boolean => true,
     release: (): void => undefined,
@@ -91,7 +107,7 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
   TestBed.configureTestingModule({
     providers: [
       { provide: MIDI_SETTINGS_REPOSITORY, useValue: repository },
-      { provide: ALERT_SERVICE, useValue: { warning: vi.fn(), error: vi.fn() } },
+      { provide: ALERT_SERVICE, useValue: alerts },
       {
         provide: DeckBindings,
         useValue: { hydrate: vi.fn(), bindDevice: vi.fn(), enableMidi: vi.fn(), identify: vi.fn() },
@@ -99,6 +115,7 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
       { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
       { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => idleReplay },
       { provide: MIDI_ACCESS, useValue: midiAccess },
+      { provide: MIDI_INPUT, useValue: midiInput },
       { provide: FILE_CONTENT_SERVICE, useValue: { getFileContent: vi.fn() } },
       { provide: TUNE_INSERTER, useValue: { insert: vi.fn() } },
       { provide: TUNE_RESOLVER, useValue: { resolve: vi.fn() } },
@@ -115,6 +132,13 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     deckService: TestBed.inject(DeckService),
     mixerService: TestBed.inject(MixerService),
     persistence: TestBed.inject(MidiSettingsPersistence),
+    controllers: TestBed.inject(MidiControllers),
+    learn: TestBed.inject(MidiLearn),
+    router: TestBed.inject(MidiInputRouter),
+    midiInput,
+    accessState,
+    requestAccess,
+    alerts,
     repository,
     makeShapeable: (slot) => {
       djStore.setDeckLoaded({ slot, reference: TUNE });
