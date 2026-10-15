@@ -5,6 +5,7 @@ import { setMidiMappingData } from './set-midi-mapping-data';
 import { upsertMapping } from './upsert-mapping';
 import { removeMapping } from './remove-mapping';
 import { upsertController } from './upsert-controller';
+import { removeController } from './remove-controller';
 import { setMappingMode } from './set-mapping-mode';
 import { setLearn } from './set-learn';
 import { setControllerRuntime } from './set-controller-runtime';
@@ -18,6 +19,7 @@ export function withMidiMappingActions() {
       ...upsertMapping(writableStore),
       ...removeMapping(writableStore),
       ...upsertController(writableStore),
+      ...removeController(writableStore),
       ...setMappingMode(writableStore),
       ...setLearn(writableStore),
       ...setControllerRuntime(writableStore),

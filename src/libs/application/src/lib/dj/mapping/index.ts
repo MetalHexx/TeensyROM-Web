@@ -5,3 +5,6 @@ export * from './mapping-labels';
 export * from './midi-mapping-store';
 export * from './midi-mappings';
 export * from './midi-mapping-engine';
+export * from './midi-controllers';
+export * from './midi-learn';
+export * from './midi-input-router';
