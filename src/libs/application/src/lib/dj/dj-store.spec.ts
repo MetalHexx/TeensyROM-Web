@@ -25,8 +25,9 @@ function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
 }
 
 const emptyBinding = (): DeckBindingState => ({
-  port: null,
-  portPresent: false,
+  device: null,
+  portId: null,
+  present: false,
   error: null,
 });
 
@@ -164,8 +165,9 @@ describe('DjStore', () => {
 
     it('setBinding replaces the slot binding wholesale, leaving the other slot untouched', () => {
       const binding: DeckBindingState = {
-        port: { id: 'port-1', name: 'Port One' },
-        portPresent: true,
+        device: { id: '1234', name: 'TR-1' },
+        portId: 'port-1',
+        present: true,
         error: null,
       };
       store.setBinding({ slot: 'A', binding });
@@ -647,86 +649,38 @@ describe('DjStore', () => {
   describe('bindingSummary', () => {
     beforeEach(() => setup());
 
-    it('flags ports already taken by the other slot', () => {
-      store.setMidi({
-        accessState: 'granted',
-        ports: [
-          { id: 'port-1', name: 'Port One', manufacturer: 'Acme' },
-          { id: 'port-2', name: 'Port Two', manufacturer: 'Acme' },
-        ],
-        lastError: null,
-      });
-      store.setBinding({
-        slot: 'B',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
-      });
+    const presentBinding = (): DeckBindingState => ({
+      device: { id: '1234', name: 'TR-1' },
+      portId: 'port-1',
+      present: true,
+      error: null,
+    });
 
+    it('reports the bound cartridge as selected whether it is present or absent', () => {
+      store.setBinding({ slot: 'A', binding: presentBinding() });
+      expect(store.bindingSummary('A')().selectedDeviceId).toBe('1234');
+      expect(store.bindingSummary('A')().present).toBe(true);
+
+      store.setBinding({
+        slot: 'A',
+        binding: { ...presentBinding(), portId: null, present: false },
+      });
+      expect(store.bindingSummary('A')().selectedDeviceId).toBe('1234');
+      expect(store.bindingSummary('A')().present).toBe(false);
+    });
+
+    it('selects nothing for an unbound slot, with the cartridge placeholder', () => {
       const summary = store.bindingSummary('A')();
 
-      expect(summary.portOptions).toEqual([
-        { id: 'port-1', portName: 'Port One', label: 'Port One (Acme)', takenBy: 'B' },
-        { id: 'port-2', portName: 'Port Two', label: 'Port Two (Acme)', takenBy: null },
-      ]);
+      expect(summary.selectedDeviceId).toBeNull();
+      expect(summary.placeholder).toBe('— select a cartridge —');
     });
 
-    it('flags taken in the other direction too', () => {
-      store.setMidi({
-        accessState: 'granted',
-        ports: [{ id: 'port-1', name: 'Port One', manufacturer: 'Acme' }],
-        lastError: null,
-      });
-      store.setBinding({
-        slot: 'A',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
-      });
-
-      expect(store.bindingSummary('B')().portOptions).toEqual([
-        { id: 'port-1', portName: 'Port One', label: 'Port One (Acme)', takenBy: 'A' },
-      ]);
-    });
-
-    it('reports the selected id only while present, and null while stored-but-absent', () => {
-      store.setBinding({
-        slot: 'A',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
-      });
-      expect(store.bindingSummary('A')().selectedPortId).toBe('port-1');
-
-      store.setBinding({
-        slot: 'A',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: false, error: null },
-      });
-      expect(store.bindingSummary('A')().selectedPortId).toBeNull();
-    });
-
-    it('portPlaceholder shows the last-saw name whenever a port is bound but absent, whatever the access state', () => {
-      store.setBinding({
-        slot: 'A',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: false, error: null },
-      });
-
-      expect(store.bindingSummary('A')().portPlaceholder).toBe('— last saw Port One —');
-
-      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
-      expect(store.bindingSummary('A')().portPlaceholder).toBe('— last saw Port One —');
-    });
-
-    it('portPlaceholder is "MIDI not enabled" with nothing stored, and "select a port" once granted', () => {
-      expect(store.bindingSummary('A')().portPlaceholder).toBe('— MIDI not enabled —');
-
-      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
-      expect(store.bindingSummary('A')().portPlaceholder).toBe('— select a port —');
-    });
-
-    it('portsEnabled and enableDisabled follow accessState', () => {
-      expect(store.bindingSummary('A')().portsEnabled).toBe(false);
+    it('enableDisabled follows accessState', () => {
       expect(store.bindingSummary('A')().enableDisabled).toBe(false);
 
       store.setMidi({ accessState: 'requesting', ports: [], lastError: null });
       expect(store.bindingSummary('A')().enableDisabled).toBe(true);
-
-      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
-      expect(store.bindingSummary('A')().portsEnabled).toBe(true);
     });
 
     it('enableVisible is true for every access state except granted', () => {
@@ -739,21 +693,28 @@ describe('DjStore', () => {
       expect(store.bindingSummary('A')().enableVisible).toBe(false);
     });
 
-    it('identifyDisabled unless granted, a present port is bound, and the deck is not playing', () => {
+    it('identifyDisabled unless granted, the cartridge is present, and the deck is not playing', () => {
       expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
 
       store.setMidi({
         accessState: 'granted',
-        ports: [{ id: 'port-1', name: 'Port One', manufacturer: 'Acme' }],
+        ports: [{ id: 'port-1', name: 'TeensyROM-1234', manufacturer: 'Acme' }],
         lastError: null,
       });
-      store.setBinding({
-        slot: 'A',
-        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
-      });
+      store.setBinding({ slot: 'A', binding: presentBinding() });
       expect(store.bindingSummary('A')().identifyDisabled).toBe(false);
 
       store.setDeckStatus({ slot: 'A', status: 'playing' });
+      expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
+    });
+
+    it('identifyDisabled while the bound cartridge is absent, even with MIDI granted', () => {
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      store.setBinding({
+        slot: 'A',
+        binding: { ...presentBinding(), portId: null, present: false },
+      });
+
       expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
     });
 
@@ -768,9 +729,12 @@ describe('DjStore', () => {
       store.setMidi({ accessState: 'idle', ports: [], lastError: 'Web MIDI unavailable' });
       store.setBinding({
         slot: 'A',
-        binding: { port: null, portPresent: false, error: 'port missing' },
+        binding: { ...emptyBinding(), error: 'cartridge missing' },
       });
-      expect(store.bindingSummary('A')().errors).toEqual(['Web MIDI unavailable', 'port missing']);
+      expect(store.bindingSummary('A')().errors).toEqual([
+        'Web MIDI unavailable',
+        'cartridge missing',
+      ]);
     });
   });
 });

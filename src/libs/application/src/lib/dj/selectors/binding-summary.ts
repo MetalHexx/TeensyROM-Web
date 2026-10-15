@@ -1,21 +1,12 @@
 import { computed } from '@angular/core';
-import { DeckBindingState, DjState, WritableStore } from '../dj-store';
-import { otherSlot, type Slot } from '../slot';
-import type { MidiAccessState } from '../ports/midi-access';
-
-export interface BindingOption {
-  id: string;
-  /** The raw port name, kept apart from `label` so a consumer can match it to a device. */
-  portName: string;
-  label: string;
-  takenBy: Slot | null;
-}
+import { DjState, WritableStore } from '../dj-store';
+import type { Slot } from '../slot';
 
 export interface DeckBindingSummary {
-  portOptions: readonly BindingOption[];
-  selectedPortId: string | null;
-  portPlaceholder: string;
-  portsEnabled: boolean;
+  /** The bound cartridge's id, whether or not it is currently present. */
+  selectedDeviceId: string | null;
+  present: boolean;
+  placeholder: string;
   enableVisible: boolean;
   enableDisabled: boolean;
   identifyDisabled: boolean;
@@ -28,51 +19,32 @@ export interface DeckBindingSummary {
 const NO_PORTS_FOUND_ERROR =
   'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.';
 
-/** After a reload and before the Enable gesture, every stored port is absent — the name is the
- *  whole point of remembering it, so the last-saw placeholder wins regardless of access state. */
-function portPlaceholderFor(binding: DeckBindingState, accessState: MidiAccessState): string {
-  if (binding.port && !binding.portPresent) return `— last saw ${binding.port.name} —`;
-  return accessState === 'granted' ? '— select a port —' : '— MIDI not enabled —';
-}
-
 /**
- * The binding card's whole display model for one deck: the port option list (with which slot, if
- * any, already holds each one), the current selection, placeholder, and the gates on
- * Enable/Identify.
+ * The binding card's display model for one deck, apart from its cartridge list (see
+ * `cartridgeOptions`): the current selection, whether that cartridge is present, the placeholder,
+ * and the gates on Enable/Identify. Identify needs MIDI access, the cartridge present, and the
+ * deck not playing.
  */
 export function bindingSummary(store: WritableStore<DjState>) {
   return {
     bindingSummary: (slot: Slot) =>
       computed<DeckBindingSummary>(() => {
-        const other = otherSlot(slot);
         const midi = store.midi();
-        const bindings = store.bindings();
-        const binding = bindings[slot];
-        const otherBinding = bindings[other];
+        const binding = store.bindings()[slot];
         const deck = store.decks()[slot];
-
-        const portOptions: BindingOption[] = midi.ports.map((port) => ({
-          id: port.id,
-          portName: port.name,
-          label: `${port.name} (${port.manufacturer})`,
-          takenBy: otherBinding.port?.id === port.id ? other : null,
-        }));
-
-        const selectedPortId = binding.portPresent ? (binding.port?.id ?? null) : null;
 
         const noPortsFound =
           midi.accessState === 'granted' && midi.ports.length === 0 ? NO_PORTS_FOUND_ERROR : null;
 
         return {
-          portOptions,
-          selectedPortId,
-          portPlaceholder: portPlaceholderFor(binding, midi.accessState),
-          portsEnabled: midi.accessState === 'granted',
+          selectedDeviceId: binding.device?.id ?? null,
+          present: binding.present,
+          placeholder: '— select a cartridge —',
           enableVisible: midi.accessState !== 'granted',
           enableDisabled: midi.accessState === 'requesting',
           identifyDisabled: !(
             midi.accessState === 'granted' &&
-            selectedPortId !== null &&
+            binding.present &&
             deck.status !== 'playing'
           ),
           errors: [midi.lastError, noPortsFound, binding.error].filter(

@@ -86,10 +86,9 @@ function idleTransportSummary(): DeckTransportSummary {
 
 function idleBindingSummary(): DeckBindingSummary {
   return {
-    portOptions: [],
-    selectedPortId: null,
-    portPlaceholder: '— MIDI not enabled —',
-    portsEnabled: false,
+    selectedDeviceId: null,
+    present: false,
+    placeholder: '— select a cartridge —',
     enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
@@ -101,6 +100,11 @@ function createDjStoreStub() {
   return {
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
+    bindings: signal({
+      A: { device: null, portId: null, present: false, error: null },
+      B: { device: null, portId: null, present: false, error: null },
+    }),
+    midi: signal({ accessState: 'idle', ports: [], lastError: null }),
     deck: () =>
       signal({
         speed: 1,
@@ -134,7 +138,7 @@ function createDeckServiceStub() {
     setRepeat: vi.fn(),
     selectSubtune: vi.fn(),
     seek: vi.fn(),
-    bindPort: vi.fn(),
+    bindDevice: vi.fn(),
     enableMidi: vi.fn(),
     identify: vi.fn(),
   };

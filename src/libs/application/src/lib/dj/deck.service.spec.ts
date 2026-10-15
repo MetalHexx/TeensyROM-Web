@@ -147,7 +147,7 @@ describe('DeckService', () => {
   let store: InstanceType<typeof DjStore>;
   let fakeBindings: {
     hydrate: ReturnType<typeof vi.fn>;
-    bindPort: ReturnType<typeof vi.fn>;
+    bindDevice: ReturnType<typeof vi.fn>;
     enableMidi: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
   };
@@ -224,11 +224,11 @@ describe('DeckService', () => {
     const fileContentService: IFileContentService = { getFileContent: fileContentMock };
 
     // `DeckBindings` is faked wholesale here: `DeckService` only ever delegates to it, and this
-    // spec's own coverage of `hydrate`/`bindPort`/`enableMidi`/`identify` is exactly that
+    // spec's own coverage of `hydrate`/`bindDevice`/`enableMidi`/`identify` is exactly that
     // delegation, never the reconcile behaviour `deck-bindings.spec.ts` owns.
     fakeBindings = {
       hydrate: vi.fn().mockResolvedValue(undefined),
-      bindPort: vi.fn().mockResolvedValue(undefined),
+      bindDevice: vi.fn(),
       enableMidi: vi.fn().mockResolvedValue(undefined),
       identify: vi.fn(),
     };
@@ -1264,9 +1264,9 @@ describe('DeckService', () => {
       expect(fakeBindings.hydrate).toHaveBeenCalledTimes(1);
     });
 
-    it('bindPort delegates the slot and port id', async () => {
-      await service.bindPort('A', 'port-1');
-      expect(fakeBindings.bindPort).toHaveBeenCalledWith('A', 'port-1');
+    it('bindDevice delegates the slot and device id', () => {
+      service.bindDevice('A', '19277260');
+      expect(fakeBindings.bindDevice).toHaveBeenCalledWith('A', '19277260');
     });
 
     it('enableMidi delegates', async () => {

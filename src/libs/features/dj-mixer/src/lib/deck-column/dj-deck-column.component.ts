@@ -9,12 +9,12 @@ import {
 } from '@teensyrom-nx/ui/components';
 import type {
   BindingCardModel,
+  BindingPortModel,
   SpeedPanelModel,
   TransportPanelModel,
   VoicePanelModel,
 } from '@teensyrom-nx/ui/components';
-import { DeckService, DeviceStore, DjStore } from '@teensyrom-nx/application';
-import { findDeviceForMidiPort } from '@teensyrom-nx/domain';
+import { DeckService, DeviceStore, DjStore, cartridgeOptions } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
 import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
@@ -142,27 +142,31 @@ export class DjDeckColumnComponent {
   });
 
   readonly bindingModel = computed<BindingCardModel>(() => {
-    const { letter } = this.deck();
+    const { slot, letter } = this.deck();
     const binding = this.binding();
-    const devices = this.deviceStore.devices();
+    const options = cartridgeOptions(
+      slot,
+      this.djStore.bindings(),
+      this.djStore.midi().ports,
+      this.deviceStore.devices()
+    );
     return {
       accessibleName: `MIDI binding deck ${letter}`,
       heading: `Deck ${letter}`,
-      ports: binding.portOptions.map((option) => {
-        const device = findDeviceForMidiPort(option.portName, devices);
-        return {
+      ports: options.map(
+        (option): BindingPortModel => ({
           id: option.id,
-          label: device ? `${device.name}: ${option.label}` : option.label,
+          label: option.label,
           takenBy: option.takenBy ?? undefined,
-        };
-      }),
-      selectedPortId: binding.selectedPortId,
-      portsEnabled: binding.portsEnabled,
-      portPlaceholder: binding.portPlaceholder,
+        })
+      ),
+      selectedPortId: binding.selectedDeviceId,
+      portsEnabled: options.length > 0,
+      portPlaceholder: binding.placeholder,
       enableVisible: binding.enableVisible,
       enableDisabled: binding.enableDisabled,
       identifyDisabled: binding.identifyDisabled,
-      selectAccessibleName: `Output port deck ${letter}`,
+      selectAccessibleName: `Cartridge deck ${letter}`,
       enableAccessibleName: `Enable MIDI deck ${letter}`,
       identifyAccessibleName: `Identify deck ${letter}`,
       errors: binding.errors,
@@ -270,7 +274,7 @@ export class DjDeckColumnComponent {
   }
 
   onPortSelect(id: string): void {
-    void this.deckService.bindPort(this.deck().slot, id || null);
+    this.deckService.bindDevice(this.deck().slot, id || null);
   }
 
   onEnableMidi(): void {
