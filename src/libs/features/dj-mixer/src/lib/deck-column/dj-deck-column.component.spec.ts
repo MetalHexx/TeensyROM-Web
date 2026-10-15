@@ -70,7 +70,8 @@ function createDeckServiceStub() {
     togglePlayPause: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
     setRepeat: vi.fn(),
-    selectSubtune: vi.fn().mockResolvedValue(undefined),
+    previousSubtune: vi.fn().mockResolvedValue(undefined),
+    nextSubtune: vi.fn().mockResolvedValue(undefined),
     seek: vi.fn().mockResolvedValue(undefined),
     bindDevice: vi.fn(),
     enableMidi: vi.fn().mockResolvedValue(undefined),
@@ -366,14 +367,14 @@ describe('DjDeckColumnComponent', () => {
       expect(deckService.setRepeat).toHaveBeenCalledWith('B', false);
     });
 
-    it('dispatches selectSubtune one below/above the store\'s current subtune on previous/next', () => {
-      const { fixture, deckService } = render({ slot: 'A', letter: 'A', index: 0 }, { subtune: 3 });
+    it('dispatches previousSubtune and nextSubtune with this deck\'s slot', () => {
+      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
       transportPanel(fixture).previousSubtune.emit();
-      expect(deckService.selectSubtune).toHaveBeenCalledWith('A', 2);
+      expect(deckService.previousSubtune).toHaveBeenCalledWith('B');
 
       transportPanel(fixture).nextSubtune.emit();
-      expect(deckService.selectSubtune).toHaveBeenCalledWith('A', 4);
+      expect(deckService.nextSubtune).toHaveBeenCalledWith('B');
     });
 
     it('pins the position on scrubCommit, dispatches seek, and releases the pin once it lands', async () => {

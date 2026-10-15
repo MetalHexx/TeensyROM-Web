@@ -19,6 +19,7 @@ export * from './lib/dj/tune-loader';
 export * from './lib/dj/deck.service';
 export * from './lib/dj/mixer.service';
 export * from './lib/dj/mixer-applier';
+export * from './lib/dj/mapping';
 
 // Player state management
 export * from './lib/player/player-store';
