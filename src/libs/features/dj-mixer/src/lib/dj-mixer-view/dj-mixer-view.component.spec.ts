@@ -2,17 +2,31 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 import {
   DeckService,
   DeviceStore,
   DjStore,
+  MappableControls,
+  MidiControllers,
+  MidiLearn,
+  MidiMappings,
+  MidiMappingStore,
   StorageStore,
+  type ControlIdentity,
   type DeckBindingSummary,
   type DeckTransportSummary,
+  type MappableControl,
 } from '@teensyrom-nx/application';
+import {
+  MappingOverlayLayerComponent,
+  SlidingContainerComponent,
+} from '@teensyrom-nx/ui/components';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
+import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
 import { DjBrowseTreesComponent } from '../browse-trees/dj-browse-trees.component';
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
 
@@ -144,8 +158,52 @@ function createDeckServiceStub() {
   };
 }
 
-function render(devices: unknown[], storageStoreOverrides: Record<string, unknown> = {}) {
+const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
+const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
+
+const STUB_CONTROLS: readonly MappableControl[] = [
+  {
+    identity: SPEED_A,
+    name: 'Speed',
+    nature: 'value',
+    min: 0.5,
+    max: 1.5,
+    home: 1,
+    step: null,
+    defaults: { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 },
+    read: () => 1,
+    set: () => undefined,
+  },
+  { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
+];
+
+function createMidiStubs() {
+  return {
+    controls: {
+      all: STUB_CONTROLS,
+      find: (identity: ControlIdentity) =>
+        STUB_CONTROLS.find(
+          (c) => c.identity.owner === identity.owner && c.identity.control === identity.control
+        ) ?? null,
+    },
+    controllers: {
+      connectedInputs: signal<{ id: string; name: string }[]>([]),
+      setMappingMode: vi.fn().mockResolvedValue(undefined),
+      setListening: vi.fn(),
+      pointAt: vi.fn(),
+    },
+    learn: { select: vi.fn(), cancel: vi.fn(), relearn: vi.fn() },
+    mappings: { setStyle: vi.fn(), remove: vi.fn() },
+  };
+}
+
+function render(
+  devices: unknown[],
+  storageStoreOverrides: Record<string, unknown> = {},
+  { reducedMotion = false } = {}
+) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
+  const midi = createMidiStubs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const usableDevices = signal(devices.filter((d: any) => d.isEnabled));
 
@@ -157,6 +215,17 @@ function render(devices: unknown[], storageStoreOverrides: Record<string, unknow
       { provide: StorageStore, useValue: storageStore },
       { provide: DjStore, useValue: createDjStoreStub() },
       { provide: DeckService, useValue: createDeckServiceStub() },
+      { provide: MappableControls, useValue: midi.controls },
+      { provide: MidiControllers, useValue: midi.controllers },
+      { provide: MidiLearn, useValue: midi.learn },
+      { provide: MidiMappings, useValue: midi.mappings },
+      {
+        provide: BreakpointObserver,
+        useValue: {
+          observe: (query: string) =>
+            of({ matches: reducedMotion && query.includes('reduced-motion'), breakpoints: {} }),
+        },
+      },
     ],
   });
 
@@ -164,11 +233,17 @@ function render(devices: unknown[], storageStoreOverrides: Record<string, unknow
     TestBed.createComponent(DjMixerViewComponent);
   fixture.detectChanges();
 
-  return { fixture, component: fixture.componentInstance, storageStore };
+  return {
+    fixture,
+    component: fixture.componentInstance,
+    storageStore,
+    midi,
+    midiStore: TestBed.inject(MidiMappingStore),
+  };
 }
 
 function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] {
-  return Array.from(fixture.nativeElement.querySelectorAll('[data-deck]')).map((el) =>
+  return Array.from(fixture.nativeElement.querySelectorAll('lib-dj-deck-column')).map((el) =>
     (el as HTMLElement).getAttribute('data-deck')
   ) as string[];
 }
@@ -393,6 +468,133 @@ describe('DjMixerViewComponent', () => {
       listing.dragEnded.emit();
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelectorAll('.drop-overlay').length).toBe(0);
+    });
+  });
+
+  describe('the bindings panel', () => {
+    function bindingsButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(
+        'lib-dj-mixer-card button[aria-label$="bindings panel"]'
+      );
+    }
+
+    function press(fixture: ComponentFixture<DjMixerViewComponent>): void {
+      bindingsButton(fixture).click();
+      fixture.detectChanges();
+    }
+
+    function slot(fixture: ComponentFixture<DjMixerViewComponent>): SlidingContainerComponent {
+      return fixture.debugElement.query(By.directive(SlidingContainerComponent))
+        .componentInstance as SlidingContainerComponent;
+    }
+
+    it('shows neither the panel nor its container before it is first opened', () => {
+      const { fixture, component } = render([]);
+
+      expect(component.panelOpen()).toBe(false);
+      expect(fixture.nativeElement.querySelector('lib-sliding-container')).toBeNull();
+      expect(fixture.nativeElement.querySelector('lib-dj-bindings-panel')).toBeNull();
+      expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
+    });
+
+    it('opens the panel from the mixer card and closes it from the same button', () => {
+      const { fixture } = render([]);
+
+      press(fixture);
+      expect(fixture.debugElement.query(By.directive(DjBindingsPanelComponent))).toBeTruthy();
+      expect(slot(fixture).animationTrigger()).toBe(true);
+      expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Close bindings panel');
+
+      press(fixture);
+      expect(slot(fixture).animationTrigger()).toBe(false);
+      expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
+    });
+
+    it("closes from the panel's own close button", () => {
+      const { fixture, component } = render([]);
+      press(fixture);
+
+      fixture.debugElement
+        .query(By.directive(DjBindingsPanelComponent))
+        .componentInstance.closePanel.emit();
+      fixture.detectChanges();
+
+      expect(component.panelOpen()).toBe(false);
+    });
+
+    it('turns mapping mode off when the panel closes', () => {
+      const { fixture, midi } = render([]);
+      press(fixture);
+      expect(midi.controllers.setMappingMode).not.toHaveBeenCalled();
+
+      press(fixture);
+
+      expect(midi.controllers.setMappingMode).toHaveBeenCalledWith(false);
+    });
+
+    it('slides the panel in at 22.5rem, and with no duration for reduced motion', () => {
+      const normal = render([]);
+      press(normal.fixture);
+      expect(slot(normal.fixture).containerWidth()).toBe('22.5rem');
+      expect(slot(normal.fixture).animationDuration()).toBe(400);
+      TestBed.resetTestingModule();
+
+      const reduced = render([], {}, { reducedMotion: true });
+      press(reduced.fixture);
+      expect(slot(reduced.fixture).animationDuration()).toBe(0);
+    });
+  });
+
+  describe('the mapping overlays', () => {
+    function layer(fixture: ComponentFixture<DjMixerViewComponent>) {
+      return fixture.debugElement.query(By.directive(MappingOverlayLayerComponent));
+    }
+
+    it('renders no overlay layer outside mapping mode', () => {
+      const { fixture } = render([]);
+
+      expect(layer(fixture)).toBeNull();
+    });
+
+    it('renders the layer over the grid, one target per control in the store state, in mapping mode', () => {
+      const { fixture, midiStore } = render([]);
+      midiStore.setMappingMode({ on: true });
+      midiStore.setLearn({
+        learn: { control: SPEED_A, phase: 'waiting', replacing: null, source: null },
+      });
+      fixture.detectChanges();
+
+      const instance = layer(fixture).componentInstance as MappingOverlayLayerComponent;
+      expect(instance.scope()).toBe(fixture.nativeElement.querySelector('.mixer-grid'));
+      expect(instance.targets().map((t) => [t.id, t.state])).toEqual([
+        ['A:speed', 'selected'],
+        ['B:stop', 'selectable'],
+      ]);
+    });
+
+    it('starts learning for the selected control and cancels learning on dismiss', () => {
+      const { fixture, midi, midiStore } = render([]);
+      midiStore.setMappingMode({ on: true });
+      fixture.detectChanges();
+      const instance = layer(fixture).componentInstance as MappingOverlayLayerComponent;
+
+      instance.targetSelect.emit('B:stop');
+      instance.dismiss.emit();
+
+      expect(midi.learn.select).toHaveBeenCalledWith(STOP_B);
+      expect(midi.learn.cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a target it does not know', () => {
+      const { fixture, midi, midiStore } = render([]);
+      midiStore.setMappingMode({ on: true });
+      fixture.detectChanges();
+
+      (layer(fixture).componentInstance as MappingOverlayLayerComponent).targetSelect.emit(
+        'A:gone'
+      );
+
+      expect(midi.learn.select).not.toHaveBeenCalled();
     });
   });
 });
