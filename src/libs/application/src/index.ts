@@ -12,12 +12,14 @@ export * from './lib/dj/slot';
 export * from './lib/dj/ports';
 export * from './lib/dj/selectors/transport-summary';
 export * from './lib/dj/selectors/binding-summary';
+export * from './lib/dj/cartridge-options';
 export * from './lib/dj/load-source';
 export * from './lib/dj/deck-runtime';
 export * from './lib/dj/tune-loader';
 export * from './lib/dj/deck.service';
 export * from './lib/dj/mixer.service';
 export * from './lib/dj/mixer-applier';
+export * from './lib/dj/mapping';
 
 // Player state management
 export * from './lib/player/player-store';

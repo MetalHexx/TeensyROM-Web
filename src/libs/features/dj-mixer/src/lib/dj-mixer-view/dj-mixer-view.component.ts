@@ -1,21 +1,42 @@
+import { DOCUMENT } from '@angular/common';
 import {
   Component,
   ChangeDetectionStrategy,
   DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
-import { DECK_SLOTS, DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { map } from 'rxjs/operators';
+import {
+  DECK_SLOTS,
+  DeviceStore,
+  MappableControls,
+  MidiControllers,
+  MidiLearn,
+  MidiMappingStore,
+  StorageStore,
+  controlKey,
+} from '@teensyrom-nx/application';
 import {
   EmptyStateMessageComponent,
+  MappingOverlayLayerComponent,
   ScalingCompactCardComponent,
+  SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjMixerCardComponent } from '../mixer-card/dj-mixer-card.component';
+import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
+import { buildOverlayTargets } from '../mapping/mapping-overlay-targets';
 import {
   DjBrowseTreesComponent,
   type DjStorageSelectEvent,
@@ -34,6 +55,9 @@ import type { DeckRef } from '../deck-ref';
     DjMixerCardComponent,
     DjBrowseTreesComponent,
     DjDirectoryListingComponent,
+    DjBindingsPanelComponent,
+    MappingOverlayLayerComponent,
+    SlidingContainerComponent,
   ],
   templateUrl: './dj-mixer-view.component.html',
   styleUrl: './dj-mixer-view.component.scss',
@@ -42,6 +66,18 @@ export class DjMixerViewComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly storageStore = inject(StorageStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly midiStore = inject(MidiMappingStore);
+  private readonly controls = inject(MappableControls);
+  private readonly midiControllers = inject(MidiControllers);
+  private readonly midiLearn = inject(MidiLearn);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+
+  private readonly mixerCard = viewChild(DjMixerCardComponent);
+  private readonly bindingsPanel = viewChild(DjBindingsPanelComponent);
+  private readonly panelSlot = viewChild<unknown, ElementRef<HTMLElement>>('panelSlot', {
+    read: ElementRef,
+  });
 
   readonly enabledDevices = computed<Device[]>(() => this.deviceStore.usableDevices());
 
@@ -59,6 +95,36 @@ export class DjMixerViewComponent {
 
   /** Whether a SID drag from the listing is currently in flight — lights every deck's overlay. */
   readonly dragging = signal(false);
+
+  /** Whether the bindings panel is open. */
+  readonly panelOpen = signal(false);
+
+  /** Whether the panel has ever been opened. The sliding container renders at full width until its
+   *  first animation, so it is only created at the first open and stays after that. */
+  readonly panelEverOpened = signal(false);
+
+  /** Whether the user prefers no motion, which makes the panel's slide instant. */
+  readonly reducedMotion = toSignal(
+    inject(BreakpointObserver)
+      .observe('(prefers-reduced-motion: reduce)')
+      .pipe(map((state) => state.matches)),
+    { initialValue: false }
+  );
+
+  /** How long the panel's slide and its card's own entry take: instant for reduced motion. */
+  readonly panelAnimationDuration = computed(() => (this.reducedMotion() ? 0 : 400));
+
+  /** Whether controls are overlaid for picking what a hardware input maps onto. */
+  readonly mappingMode = this.midiStore.mappingMode;
+
+  /** One overlay per mappable control, in the state the mapping store implies. */
+  readonly overlayTargets = computed(() =>
+    buildOverlayTargets(this.controls.all, {
+      learn: this.midiStore.learn(),
+      mappings: this.midiStore.mappings(),
+      controllers: this.midiStore.controllers(),
+    })
+  );
 
   /** deviceId currently holding the navigation pin taken by this view. */
   private pinnedDeviceId: string | null = null;
@@ -125,11 +191,48 @@ export class DjMixerViewComponent {
 
     // Release the pin this view instance actually holds, not the recomputed active storage — the
     // two diverge when the active storage changes and the pin-take effect has not re-run yet.
+    // Mapping mode lives in a root store, so leaving the view has to end it (and any learn) too,
+    // or the hidden mode keeps unmapped ports open and can bind a control off-screen.
     this.destroyRef.onDestroy(() => {
       if (this.pinnedDeviceId) {
         this.storageStore.clearNavigationPin({ deviceId: this.pinnedDeviceId });
       }
+      void this.midiControllers.setMappingMode(false);
     });
+  }
+
+  /** Opens the panel and moves focus into it, or closes it. */
+  togglePanel(): void {
+    if (this.panelOpen()) {
+      this.closePanel();
+    } else {
+      this.panelEverOpened.set(true);
+      this.panelOpen.set(true);
+      afterNextRender(() => this.bindingsPanel()?.focusEntry(), { injector: this.injector });
+    }
+  }
+
+  /** Closes the panel and ends mapping mode with it, so no hidden mode keeps running. Focus that
+   *  was inside the panel returns to the Bindings button, as the panel's DOM leaves with it. */
+  closePanel(): void {
+    const focusWasInPanel = this.panelSlot()?.nativeElement.contains(this.document.activeElement);
+    this.panelOpen.set(false);
+    void this.midiControllers.setMappingMode(false);
+    if (focusWasInPanel) {
+      this.mixerCard()?.focusBindingsButton();
+    }
+  }
+
+  /** Starts learning for the control whose overlay was chosen. */
+  onTargetSelect(id: string): void {
+    const control = this.controls.all.find(({ identity }) => controlKey(identity) === id);
+    if (control) {
+      this.midiLearn.select(control.identity);
+    }
+  }
+
+  onOverlayDismiss(): void {
+    this.midiLearn.cancel();
   }
 
   onStorageSelect(event: DjStorageSelectEvent): void {

@@ -147,7 +147,7 @@ describe('DeckService', () => {
   let store: InstanceType<typeof DjStore>;
   let fakeBindings: {
     hydrate: ReturnType<typeof vi.fn>;
-    bindPort: ReturnType<typeof vi.fn>;
+    bindDevice: ReturnType<typeof vi.fn>;
     enableMidi: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
   };
@@ -224,11 +224,11 @@ describe('DeckService', () => {
     const fileContentService: IFileContentService = { getFileContent: fileContentMock };
 
     // `DeckBindings` is faked wholesale here: `DeckService` only ever delegates to it, and this
-    // spec's own coverage of `hydrate`/`bindPort`/`enableMidi`/`identify` is exactly that
+    // spec's own coverage of `hydrate`/`bindDevice`/`enableMidi`/`identify` is exactly that
     // delegation, never the reconcile behaviour `deck-bindings.spec.ts` owns.
     fakeBindings = {
       hydrate: vi.fn().mockResolvedValue(undefined),
-      bindPort: vi.fn().mockResolvedValue(undefined),
+      bindDevice: vi.fn(),
       enableMidi: vi.fn().mockResolvedValue(undefined),
       identify: vi.fn(),
     };
@@ -595,6 +595,34 @@ describe('DeckService', () => {
 
       expect(store.deck('A')().subtune).toBe(3);
       expect(store.deck('A')().status).toBe('playing');
+    });
+
+    it('previousSubtune and nextSubtune step one subtune and stop at either end', async () => {
+      const fixture = register(makeFixture({ subtuneCount: 3 }));
+      await loadAndWait('A', fixture);
+      expect(store.deck('A')().subtune).toBe(1);
+
+      await service.previousSubtune('A');
+      expect(store.deck('A')().subtune).toBe(1);
+
+      await service.nextSubtune('A');
+      await service.nextSubtune('A');
+      expect(store.deck('A')().subtune).toBe(3);
+
+      await service.nextSubtune('A');
+      expect(store.deck('A')().subtune).toBe(3);
+
+      await service.previousSubtune('A');
+      expect(store.deck('A')().subtune).toBe(2);
+    });
+
+    it('previousSubtune and nextSubtune do nothing on an empty deck', async () => {
+      const resolveSubtuneSpy = vi.spyOn(TuneLoader.prototype, 'resolveSubtune');
+
+      await service.previousSubtune('A');
+      await service.nextSubtune('A');
+
+      expect(resolveSubtuneSpy).not.toHaveBeenCalled();
     });
 
     it('holds the new subtune paused when it started paused', async () => {
@@ -1264,9 +1292,9 @@ describe('DeckService', () => {
       expect(fakeBindings.hydrate).toHaveBeenCalledTimes(1);
     });
 
-    it('bindPort delegates the slot and port id', async () => {
-      await service.bindPort('A', 'port-1');
-      expect(fakeBindings.bindPort).toHaveBeenCalledWith('A', 'port-1');
+    it('bindDevice delegates the slot and device id', () => {
+      service.bindDevice('A', '19277260');
+      expect(fakeBindings.bindDevice).toHaveBeenCalledWith('A', '19277260');
     });
 
     it('enableMidi delegates', async () => {

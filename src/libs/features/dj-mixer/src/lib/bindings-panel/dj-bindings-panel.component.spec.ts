@@ -1,0 +1,486 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { signal } from '@angular/core';
+import { vi } from 'vitest';
+import {
+  MappableControls,
+  MidiControllers,
+  MidiLearn,
+  MidiMappings,
+  MidiMappingStore,
+  type ControlIdentity,
+  type ControlMapping,
+  type ControllerStatus,
+  type KnownController,
+  type MappableControl,
+  type MappingStyle,
+  type MidiSourceKind,
+} from '@teensyrom-nx/application';
+import { BindingRowComponent, ControllerRowComponent } from '@teensyrom-nx/ui/components';
+import { DjBindingsPanelComponent } from './dj-bindings-panel.component';
+
+const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
+const STOP_A: ControlIdentity = { owner: 'A', control: 'stop' };
+const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
+const CROSSFADER: ControlIdentity = { owner: 'mixer', control: 'crossfader' };
+
+const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
+
+const CONTROLS: readonly MappableControl[] = [
+  { identity: STOP_A, name: 'Stop', nature: 'trigger', fire: () => undefined },
+  {
+    identity: SPEED_A,
+    name: 'Speed',
+    nature: 'value',
+    min: 0.5,
+    max: 1.5,
+    home: 1,
+    step: null,
+    defaults: DEFAULTS,
+    read: () => 1,
+    set: () => undefined,
+  },
+  { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
+  {
+    identity: CROSSFADER,
+    name: 'Crossfader',
+    nature: 'value',
+    min: -1,
+    max: 1,
+    home: 0,
+    step: null,
+    defaults: { ...DEFAULTS, ccStyle: 'absolute' },
+    read: () => 0,
+    set: () => undefined,
+  },
+];
+
+const XL: KnownController = {
+  id: 'xl',
+  name: 'Launch Control XL',
+  lastPortId: 'p-xl',
+  listening: true,
+};
+const NANO: KnownController = {
+  id: 'nano',
+  name: 'nanoKONTROL',
+  lastPortId: null,
+  listening: true,
+};
+
+function mapping(
+  id: string,
+  control: ControlIdentity,
+  style: MappingStyle,
+  {
+    controllerId = 'xl',
+    kind = 'cc',
+    number = 21,
+  }: { controllerId?: string; kind?: MidiSourceKind; number?: number } = {}
+): ControlMapping {
+  return { id, control, style, source: { controllerId, channel: 1, kind, number } };
+}
+
+function render() {
+  const controllers = {
+    connectedInputs: signal<{ id: string; name: string }[]>([]),
+    setMappingMode: vi.fn().mockResolvedValue(undefined),
+    setListening: vi.fn(),
+    pointAt: vi.fn(),
+  };
+  const learn = { select: vi.fn(), cancel: vi.fn(), relearn: vi.fn().mockResolvedValue(undefined) };
+  const mappings = { setStyle: vi.fn(), remove: vi.fn() };
+
+  TestBed.configureTestingModule({
+    imports: [DjBindingsPanelComponent],
+    providers: [
+      provideNoopAnimations(),
+      {
+        provide: MappableControls,
+        useValue: {
+          all: CONTROLS,
+          find: (identity: ControlIdentity) =>
+            CONTROLS.find(
+              (c) => c.identity.owner === identity.owner && c.identity.control === identity.control
+            ) ?? null,
+        },
+      },
+      { provide: MidiControllers, useValue: controllers },
+      { provide: MidiLearn, useValue: learn },
+      { provide: MidiMappings, useValue: mappings },
+    ],
+  });
+
+  const store = TestBed.inject(MidiMappingStore);
+  const fixture: ComponentFixture<DjBindingsPanelComponent> =
+    TestBed.createComponent(DjBindingsPanelComponent);
+  fixture.detectChanges();
+
+  const seed = (
+    known: readonly KnownController[],
+    mapped: readonly ControlMapping[],
+    statuses: Record<string, ControllerStatus> = {}
+  ) => {
+    for (const controller of known) {
+      store.upsertController({ controller });
+    }
+    for (const entry of mapped) {
+      store.upsertMapping({ mapping: entry });
+    }
+    for (const [id, status] of Object.entries(statuses)) {
+      store.setControllerRuntime({ id, status, portId: null });
+    }
+    fixture.detectChanges();
+  };
+
+  return { fixture, store, controllers, learn, mappings, seed };
+}
+
+type Fixture = ComponentFixture<DjBindingsPanelComponent>;
+
+function rows(fixture: Fixture): BindingRowComponent[] {
+  return fixture.debugElement
+    .queryAll(By.directive(BindingRowComponent))
+    .map((row) => row.componentInstance as BindingRowComponent);
+}
+
+function controllerRows(fixture: Fixture): ControllerRowComponent[] {
+  return fixture.debugElement
+    .queryAll(By.directive(ControllerRowComponent))
+    .map((row) => row.componentInstance as ControllerRowComponent);
+}
+
+function groupRows(fixture: Fixture, heading: string): string[] {
+  const group = Array.from(fixture.nativeElement.querySelectorAll('section.group')).find(
+    (section) => (section as HTMLElement).querySelector('h3')?.textContent?.trim() === heading
+  ) as HTMLElement;
+  return Array.from(group.querySelectorAll('.binding-line')).map((line) =>
+    (line.querySelector('.binding-name')?.textContent ?? '').trim()
+  );
+}
+
+function clickButton(fixture: Fixture, label: string): void {
+  const button = fixture.nativeElement.querySelector(`button[aria-label="${label}"]`);
+  if (!button) throw new Error(`no button labelled ${label}`);
+  (button as HTMLButtonElement).click();
+  fixture.detectChanges();
+}
+
+describe('DjBindingsPanelComponent', () => {
+  describe('the groups', () => {
+    it('headed Deck A, Deck B and Mixer, with a placeholder for a group without bindings', () => {
+      const { fixture, seed } = render();
+      seed([XL], [mapping('m1', CROSSFADER, { kind: 'absolute', amount: null })]);
+
+      const headings = Array.from(fixture.nativeElement.querySelectorAll('h3')).map((h) =>
+        (h as HTMLElement).textContent?.trim()
+      );
+      expect(headings).toEqual(['Deck A', 'Deck B', 'Mixer', 'Controllers']);
+      expect(groupRows(fixture, 'Mixer')).toEqual(['Crossfader']);
+      expect(fixture.nativeElement.textContent.match(/No bindings yet/g)).toHaveLength(2);
+    });
+
+    it('places each mapping under its owner, in control-list order and then by source', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL, NANO],
+        [
+          mapping(
+            'm1',
+            SPEED_A,
+            { kind: 'absolute', amount: null },
+            { controllerId: 'nano', number: 3 }
+          ),
+          mapping('m2', SPEED_A, { kind: 'absolute', amount: null }, { number: 9 }),
+          mapping('m3', STOP_A, { kind: 'press', amount: null }, { kind: 'note', number: 36 }),
+          mapping('m4', STOP_B, { kind: 'press', amount: null }, { kind: 'note', number: 37 }),
+        ]
+      );
+
+      expect(groupRows(fixture, 'Deck A')).toEqual(['Stop', 'Speed', 'Speed']);
+      expect(rows(fixture).map((r) => r.model().sourceText)).toEqual([
+        'Launch Control XL · ch 1 · Note 36',
+        'Launch Control XL · ch 1 · CC 9',
+        'nanoKONTROL · ch 1 · CC 3',
+        'Launch Control XL · ch 1 · Note 37',
+      ]);
+      expect(groupRows(fixture, 'Deck B')).toEqual(['Stop']);
+    });
+  });
+
+  describe('the row models', () => {
+    function modelOf(fixture: Fixture, index = 0) {
+      return rows(fixture)[index].model();
+    }
+
+    it('offers the styles the control and source allow, labelled as the chips are', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [
+          mapping('trigger', STOP_A, { kind: 'press', amount: null }, { kind: 'note', number: 1 }),
+          mapping('value-cc', SPEED_A, { kind: 'absolute', amount: null }),
+          mapping(
+            'value-note',
+            CROSSFADER,
+            { kind: 'step', amount: 0.1 },
+            { kind: 'note', number: 2 }
+          ),
+        ]
+      );
+
+      expect(modelOf(fixture, 0).styleOptions).toEqual([
+        { id: 'press', label: 'On press' },
+        { id: 'release', label: 'On release' },
+      ]);
+      expect(modelOf(fixture, 1).styleOptions.map((o) => o.label)).toEqual([
+        'Absolute',
+        'Relative',
+        'Relative ±',
+        'Step',
+      ]);
+      expect(modelOf(fixture, 2).styleOptions.map((o) => o.label)).toEqual(['Step']);
+    });
+
+    it('shows a relative style as a sensitivity in percent and a step style as a signed amount', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [
+          mapping('relative', SPEED_A, { kind: 'relative-offset', amount: 0.015 }),
+          mapping('step', CROSSFADER, { kind: 'step', amount: -0.1 }, { number: 22 }),
+          mapping('trigger', STOP_B, { kind: 'press', amount: null }, { number: 23 }),
+        ]
+      );
+
+      expect(modelOf(fixture, 0)).toMatchObject({
+        selectedStyleId: 'relative-offset',
+        styleText: 'Relative · 1.5%',
+        amount: { label: 'Sensitivity', value: 1.5, min: 0.1, max: 100, suffix: '%' },
+      });
+      expect(modelOf(fixture, 2).amount).toEqual(
+        expect.objectContaining({ label: 'Amount', value: -10, min: -100, max: 100 })
+      );
+      expect(modelOf(fixture, 1).amount).toBeNull();
+    });
+
+    it('names the edit and delete controls after the control and its owner', () => {
+      const { fixture, seed } = render();
+      seed([XL], [mapping('m1', SPEED_A, { kind: 'absolute', amount: null })]);
+
+      expect(modelOf(fixture)).toMatchObject({
+        name: 'Speed',
+        editAccessibleName: 'Edit Speed binding, deck A',
+        deleteAccessibleName: 'Delete Speed binding, deck A',
+      });
+    });
+
+    it('gives a status only when the controller is not listening', () => {
+      const { fixture, seed, store } = render();
+      seed([XL], [mapping('m1', SPEED_A, { kind: 'absolute', amount: null })], { xl: 'listening' });
+      expect(modelOf(fixture).statusText).toBeNull();
+
+      store.setControllerRuntime({ id: 'xl', status: 'missing', portId: null });
+      fixture.detectChanges();
+      expect(modelOf(fixture).statusText).toBe('Controller not connected');
+
+      store.setControllerRuntime({ id: 'xl', status: 'off', portId: null });
+      fixture.detectChanges();
+      expect(modelOf(fixture).statusText).toBe('Controller off');
+    });
+  });
+
+  describe('editing in place', () => {
+    function seedTwo() {
+      const rendered = render();
+      rendered.seed(
+        [XL],
+        [
+          mapping('relative', SPEED_A, { kind: 'relative-offset', amount: 0.01 }),
+          mapping('trigger', STOP_A, { kind: 'press', amount: null }, { kind: 'note', number: 1 }),
+        ]
+      );
+      return rendered;
+    }
+
+    it('expands one row at a time, and collapses it from the same button', () => {
+      const { fixture } = seedTwo();
+
+      clickButton(fixture, 'Edit Stop binding, deck A');
+      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([true, false]);
+
+      clickButton(fixture, 'Edit Speed binding, deck A');
+      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([false, true]);
+
+      clickButton(fixture, 'Edit Speed binding, deck A');
+      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([false, false]);
+    });
+
+    it('applies a chosen style with that style default amount for the control', () => {
+      const { fixture, mappings } = seedTwo();
+      clickButton(fixture, 'Edit Speed binding, deck A');
+
+      rows(fixture)[1].styleSelect.emit('step');
+      rows(fixture)[1].styleSelect.emit('absolute');
+      rows(fixture)[1].styleSelect.emit('not-a-style');
+
+      expect(mappings.setStyle.mock.calls).toEqual([
+        ['relative', { kind: 'step', amount: DEFAULTS.stepAmount }],
+        ['relative', { kind: 'absolute', amount: null }],
+      ]);
+    });
+
+    it('divides an edited amount by 100 before applying it, keeping the style', () => {
+      const { fixture, mappings } = seedTwo();
+      clickButton(fixture, 'Edit Speed binding, deck A');
+
+      const amount = fixture.nativeElement.querySelector(
+        'input[type="number"]'
+      ) as HTMLInputElement;
+      expect(amount.value).toBe('1');
+      amount.value = '2.5';
+      amount.dispatchEvent(new Event('change'));
+
+      expect(mappings.setStyle).toHaveBeenCalledWith('relative', {
+        kind: 'relative-offset',
+        amount: 0.025,
+      });
+    });
+
+    it('starts re-learning the source, and deletes the binding', () => {
+      const { fixture, learn, mappings } = seedTwo();
+
+      rows(fixture)[1].relearn.emit();
+      rows(fixture)[0].deleteBinding.emit();
+
+      expect(learn.relearn).toHaveBeenCalledWith('relative');
+      expect(mappings.remove).toHaveBeenCalledWith('trigger');
+    });
+
+    it('speaks the store announcement in a polite live region', () => {
+      const { fixture, store } = render();
+      const region = fixture.nativeElement.querySelector('[aria-live="polite"].visually-hidden');
+      expect(region.textContent.trim()).toBe('');
+
+      store.announce({ text: 'Binding deleted: Speed, deck A' });
+      fixture.detectChanges();
+
+      expect(region.textContent.trim()).toBe('Binding deleted: Speed, deck A');
+    });
+  });
+
+  describe('mapping mode and learn', () => {
+    it('reflects the store and asks MidiControllers to switch mapping mode on a flip', () => {
+      const { fixture, store, controllers } = render();
+      const toggle = fixture.nativeElement.querySelector(
+        'mat-slide-toggle button[role="switch"]'
+      ) as HTMLButtonElement;
+      expect(toggle.getAttribute('aria-checked')).toBe('false');
+
+      toggle.click();
+      fixture.detectChanges();
+      expect(controllers.setMappingMode).toHaveBeenLastCalledWith(true);
+
+      store.setMappingMode({ on: true });
+      fixture.detectChanges();
+      expect(toggle.getAttribute('aria-checked')).toBe('true');
+
+      toggle.click();
+      expect(controllers.setMappingMode).toHaveBeenLastCalledWith(false);
+    });
+
+    it('prompts for the control being learned while it waits, and again while it samples', () => {
+      const { fixture, store } = render();
+      expect(fixture.nativeElement.querySelector('.learn-prompt')).toBeNull();
+
+      store.setLearn({
+        learn: { control: STOP_B, phase: 'waiting', replacing: null, source: null },
+      });
+      fixture.detectChanges();
+      const prompt = fixture.nativeElement.querySelector('.learn-prompt') as HTMLElement;
+      expect(prompt.textContent).toContain('Deck B · Stop');
+      expect(prompt.textContent).toContain('Move a control on your hardware');
+
+      store.setLearn({
+        learn: {
+          control: SPEED_A,
+          phase: 'sampling',
+          replacing: null,
+          source: { controllerId: 'xl', channel: 1, kind: 'cc', number: 5 },
+        },
+      });
+      fixture.detectChanges();
+      const sampling = fixture.nativeElement.querySelector('.learn-prompt') as HTMLElement;
+      expect(sampling.textContent).toContain('Deck A · Speed');
+      expect(sampling.textContent).toContain('Turn it both ways…');
+    });
+
+    it('cancels learning from the prompt', () => {
+      const { fixture, store, learn } = render();
+      store.setLearn({
+        learn: { control: SPEED_A, phase: 'waiting', replacing: null, source: null },
+      });
+      fixture.detectChanges();
+
+      clickButton(fixture, 'Cancel mapping');
+
+      expect(learn.cancel).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('the controllers section', () => {
+    it('gives each controller its status as text and its listening switch', () => {
+      const { fixture, seed, controllers } = render();
+      seed([XL, { ...NANO, listening: false }], [], { xl: 'listening', nano: 'off' });
+
+      expect(controllerRows(fixture).map((r) => [r.model().name, r.model().statusText])).toEqual([
+        ['Launch Control XL', 'Listening'],
+        ['nanoKONTROL', 'Off'],
+      ]);
+
+      controllerRows(fixture)[1].listeningChange.emit(true);
+      expect(controllers.setListening).toHaveBeenCalledWith('nano', true);
+    });
+
+    it('offers a port choice only to an unmatched or missing controller', () => {
+      const { fixture, seed } = render();
+      seed([XL, NANO], [], { xl: 'listening', nano: 'missing' });
+
+      const [xl, nano] = controllerRows(fixture).map((r) => r.model());
+      expect(xl.portChoice).toBeNull();
+      expect(nano.portChoice?.accessibleName).toBe('Port for nanoKONTROL');
+    });
+
+    it('lists the connected inputs no other controller holds, and points the controller at the pick', () => {
+      const { fixture, seed, store, controllers } = render();
+      seed([XL, NANO], [], { xl: 'listening', nano: 'unmatched' });
+      store.setControllerRuntime({ id: 'xl', status: 'listening', portId: 'p-xl' });
+      controllers.connectedInputs.set([
+        { id: 'p-xl', name: 'Launch Control XL' },
+        { id: 'p-nano-1', name: 'nanoKONTROL' },
+        { id: 'p-nano-2', name: 'nanoKONTROL' },
+      ]);
+      fixture.detectChanges();
+
+      const choice = controllerRows(fixture)[1].model().portChoice;
+      expect(choice?.options).toEqual([
+        { id: 'p-nano-1', label: 'nanoKONTROL' },
+        { id: 'p-nano-2', label: 'nanoKONTROL' },
+      ]);
+
+      controllerRows(fixture)[1].portSelect.emit('p-nano-2');
+      expect(controllers.pointAt).toHaveBeenCalledWith('nano', 'p-nano-2');
+    });
+  });
+
+  it('emits closePanel from the side panel close button', () => {
+    const { fixture } = render();
+    const closed = vi.fn();
+    fixture.componentInstance.closePanel.subscribe(closed);
+
+    clickButton(fixture, 'Close panel');
+
+    expect(closed).toHaveBeenCalledTimes(1);
+  });
+});

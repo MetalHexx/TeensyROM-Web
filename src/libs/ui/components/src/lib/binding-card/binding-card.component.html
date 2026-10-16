@@ -3,6 +3,7 @@
 
   <label class="control">
     <select
+      [class.absent]="selectedAbsent()"
       [disabled]="!model().portsEnabled || model().ports.length === 0"
       [attr.aria-label]="model().selectAccessibleName"
       (change)="onSelectPort($event)"

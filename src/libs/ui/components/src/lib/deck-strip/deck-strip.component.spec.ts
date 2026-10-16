@@ -341,4 +341,18 @@ describe('DeckStripComponent', () => {
       expect(knobEmitted).toEqual([]);
     });
   });
+
+  it('marks each knob by its own id and the fader wrapper as the level anchor', () => {
+    const knobs = Array.from(fixture.nativeElement.querySelectorAll('lib-rotary-knob')) as HTMLElement[];
+
+    expect(knobs.map((knob) => knob.getAttribute('data-control'))).toEqual([
+      'cutoff',
+      'resonance',
+      'pulseWidth',
+      'key',
+    ]);
+
+    const level = fixture.nativeElement.querySelector('[data-control="level"]') as HTMLElement;
+    expect(level.querySelector('lib-channel-fader')).not.toBeNull();
+  });
 });

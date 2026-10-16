@@ -199,4 +199,21 @@ describe('IconButtonComponent', () => {
     expect(button.getAttribute('aria-label')).toBe('Accessibility Test Button');
     expect(button.tagName.toLowerCase()).toBe('button');
   });
+
+  it('should reflect ariaExpanded on the underlying button, and render nothing when unset', () => {
+    componentRef.setInput('icon', 'edit');
+    componentRef.setInput('ariaLabel', 'Edit');
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('button');
+
+    expect(button.hasAttribute('aria-expanded')).toBe(false);
+
+    componentRef.setInput('ariaExpanded', false);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    componentRef.setInput('ariaExpanded', true);
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+  });
 });

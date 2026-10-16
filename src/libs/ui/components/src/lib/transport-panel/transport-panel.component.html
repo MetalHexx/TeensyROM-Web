@@ -2,6 +2,7 @@
   <div class="line line-position">
     <span class="caption">Position</span>
     <lib-scrub-position-bar
+      data-control="seek"
       [barState]="model().bar"
       [positionPercent]="positionPercent()"
       [accessibleName]="model().scrubAccessibleName"
@@ -15,6 +16,7 @@
     <div class="transport-controls">
       <button
         type="button"
+        data-control="play-pause"
         [attr.aria-label]="
           model().playPause.showing === 'play'
             ? model().actionAccessibleNames.play
@@ -28,6 +30,7 @@
       </button>
       <button
         type="button"
+        data-control="stop"
         [attr.aria-label]="model().actionAccessibleNames.stop"
         (click)="stopClick.emit()"
         [disabled]="!model().canStop"
@@ -35,7 +38,7 @@
         Stop
       </button>
 
-      <label class="repeat-toggle">
+      <label class="repeat-toggle" data-control="repeat">
         <input
           type="checkbox"
           class="repeat-toggle-input"
@@ -50,6 +53,7 @@
     <span class="transport-spacer"></span>
 
     <lib-stepper
+      data-control="subtune"
       [text]="model().subtune.text"
       [previousDisabled]="model().subtune.disabled"
       [nextDisabled]="model().subtune.disabled"

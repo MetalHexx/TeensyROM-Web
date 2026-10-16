@@ -293,6 +293,16 @@ export class DeckService {
     }
   }
 
+  /** Steps one subtune down. `selectSubtune` clamps to the tune's range and applies its own gates. */
+  previousSubtune(slot: Slot): Promise<void> {
+    return this.selectSubtune(slot, this.store.deck(slot)().subtune - 1);
+  }
+
+  /** Steps one subtune up. `selectSubtune` clamps to the tune's range and applies its own gates. */
+  nextSubtune(slot: Slot): Promise<void> {
+    return this.selectSubtune(slot, this.store.deck(slot)().subtune + 1);
+  }
+
   setRepeat(slot: Slot, on: boolean): void {
     this.runtime.setRepeat(slot, on);
     this.store.setDeckRepeat({ slot, repeat: on });
@@ -346,17 +356,18 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** Loads both slots' bindings from the repository, reconciles them against what is currently
-   *  enumerated, and installs the effect that keeps reconciling from then on. The constructor
-   *  above builds the runtimes a bind can target; this is the separate call `DjBootstrapService`
-   *  makes in the same startup beat, so a spec can construct this service without the repository
-   *  ever answering. */
+  /** Loads both slots' cartridge bindings from the saved MIDI settings, reconciles them against
+   *  what is currently enumerated, and installs the effects that keep reconciling from then on.
+   *  The constructor above builds the runtimes a bind can target; this is the separate call
+   *  `DjBootstrapService` makes in the same startup beat, so a spec can construct this service
+   *  without the settings ever loading. */
   async hydrate(): Promise<void> {
     await this.bindings.hydrate();
   }
 
-  async bindPort(slot: Slot, portId: string | null): Promise<void> {
-    await this.bindings.bindPort(slot, portId);
+  /** Binds the slot to a TeensyROM device by id; `null` clears it. */
+  bindDevice(slot: Slot, deviceId: string | null): void {
+    this.bindings.bindDevice(slot, deviceId);
   }
 
   async enableMidi(): Promise<void> {

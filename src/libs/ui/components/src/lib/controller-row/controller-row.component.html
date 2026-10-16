@@ -1,0 +1,26 @@
+<div class="controller-row" [class.controller-row--off]="!model().listening">
+  <div class="controller-line">
+    <div class="controller-text">
+      <span class="controller-name">{{ model().name }}</span>
+      <span class="controller-status">{{ model().statusText }}</span>
+    </div>
+    <mat-slide-toggle
+      [checked]="model().listening"
+      [aria-label]="model().toggleAccessibleName"
+      (change)="onToggle($event)"
+    />
+  </div>
+
+  @if (model().portChoice; as choice) {
+  <select
+    class="controller-port"
+    [attr.aria-label]="choice.accessibleName"
+    (change)="onPortChange($event)"
+  >
+    <option value="" selected disabled>— select a port —</option>
+    @for (port of choice.options; track port.id) {
+    <option [value]="port.id">{{ port.label }}</option>
+    }
+  </select>
+  }
+</div>

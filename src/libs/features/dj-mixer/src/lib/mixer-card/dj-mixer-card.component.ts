@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
@@ -11,6 +20,7 @@ import {
 import {
   CrossfaderComponent,
   DeckStripComponent,
+  IconButtonComponent,
   ScalingCompactCardComponent,
   type DeckStripModel,
 } from '@teensyrom-nx/ui/components';
@@ -50,7 +60,12 @@ const KEY_FORMAT_OPTIONS: readonly { readonly format: KeyDisplayFormat; readonly
   selector: 'lib-dj-mixer-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'grid-area: mx' },
-  imports: [ScalingCompactCardComponent, DeckStripComponent, CrossfaderComponent],
+  imports: [
+    ScalingCompactCardComponent,
+    DeckStripComponent,
+    CrossfaderComponent,
+    IconButtonComponent,
+  ],
   templateUrl: './dj-mixer-card.component.html',
   styleUrl: './dj-mixer-card.component.scss',
 })
@@ -60,6 +75,14 @@ export class DjMixerCardComponent {
 
   readonly decks = input.required<readonly DeckRef[]>();
   readonly showCrossfader = input.required<boolean>();
+
+  /** Whether the bindings panel is open: the button's pressed look and its accessible name. */
+  readonly bindingsOpen = input<boolean>(false);
+
+  /** Emits when the Bindings button is pressed, to open or close the panel. */
+  readonly bindingsToggle = output<void>();
+
+  private readonly bindingsRow = viewChild<ElementRef<HTMLElement>>('bindingsRow');
 
   /** Each deck paired with the strip model built from its store values. */
   readonly strips = computed(() =>
@@ -91,6 +114,11 @@ export class DjMixerCardComponent {
    * a fluid crossfader and a floor-based channel fader instead.
    */
   readonly faderLength = computed<string | null>(() => (this.columnForm() ? FADER_LENGTH : null));
+
+  /** Moves keyboard focus to the Bindings button. */
+  focusBindingsButton(): void {
+    this.bindingsRow()?.nativeElement.querySelector('button')?.focus();
+  }
 
   onKnobChange(slot: Slot, change: { id: string; value: number }): void {
     if (change.id === 'key') {

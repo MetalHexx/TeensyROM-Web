@@ -1,0 +1,24 @@
+<lib-scaling-compact-card
+  cardClass="compact-card--fill"
+  animationEntry="from-right"
+  [animationDuration]="animationDuration()"
+>
+  <div class="side-panel">
+    <header class="side-panel-header">
+      <h2 class="side-panel-title">{{ heading() }}</h2>
+      <div class="side-panel-actions">
+        <ng-content select="[sidePanelActions]" />
+      </div>
+      <lib-icon-button
+        icon="close"
+        size="small"
+        [ariaLabel]="closeAccessibleName()"
+        (buttonClick)="closePanel.emit()"
+      />
+    </header>
+
+    <div class="side-panel-body">
+      <ng-content />
+    </div>
+  </div>
+</lib-scaling-compact-card>

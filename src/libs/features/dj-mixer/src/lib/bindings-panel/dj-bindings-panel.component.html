@@ -1,0 +1,65 @@
+<lib-side-panel
+  heading="Bindings"
+  [animationDuration]="animationDuration()"
+  (closePanel)="closePanel.emit()"
+>
+  <mat-slide-toggle
+    sidePanelActions
+    [checked]="mappingMode()"
+    (change)="onMappingModeChange($event.checked)"
+  >
+    Mapping mode
+  </mat-slide-toggle>
+
+  <div class="bindings-content">
+    @if (learnPrompt(); as prompt) {
+    <div class="learn-prompt" role="status">
+      <div class="learn-text">
+        <span class="learn-name">{{ prompt.name }}</span>
+        <span class="learn-hint">{{ prompt.hint }}</span>
+      </div>
+      <lib-icon-button
+        icon="close"
+        size="small"
+        ariaLabel="Cancel mapping"
+        (buttonClick)="onCancelLearn()"
+      />
+    </div>
+    } @for (group of groups(); track group.owner) {
+    <section class="group">
+      <h3 class="group-title">{{ group.heading }}</h3>
+      @if (group.rows.length > 0) {
+      <div class="group-rows">
+        @for (row of group.rows; track row.mapping.id) {
+        <lib-binding-row
+          [model]="row.model"
+          (editToggle)="onEditToggle(row.mapping.id)"
+          (styleSelect)="onStyleSelect(row, $event)"
+          (amountChange)="onAmountChange(row, $event)"
+          (relearn)="onRelearn(row.mapping.id)"
+          (deleteBinding)="onDelete(row.mapping.id)"
+        />
+        }
+      </div>
+      } @else {
+      <p class="group-empty">No bindings yet</p>
+      }
+    </section>
+    }
+
+    <section class="group">
+      <h3 class="group-title">Controllers</h3>
+      @for (controller of controllerRows(); track controller.id) {
+      <lib-controller-row
+        [model]="controller.model"
+        (listeningChange)="onListeningChange(controller.id, $event)"
+        (portSelect)="onPortSelect(controller.id, $event)"
+      />
+      } @empty {
+      <p class="group-empty">No controllers yet</p>
+      }
+    </section>
+  </div>
+
+  <div class="visually-hidden" aria-live="polite">{{ announcement() }}</div>
+</lib-side-panel>

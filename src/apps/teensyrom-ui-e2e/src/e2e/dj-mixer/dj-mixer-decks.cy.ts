@@ -48,9 +48,9 @@ describe('DJ Mixer — fixed decks with no enabled devices', () => {
     });
   });
 
-  it('renders both binding cards with their output port select', () => {
+  it('renders both binding cards with their cartridge select', () => {
     DECK_LETTERS.forEach((letter) => {
-      cy.get(`[aria-label="Output port deck ${letter}"]`).should('exist');
+      cy.get(`[aria-label="Cartridge deck ${letter}"]`).should('exist');
     });
   });
 

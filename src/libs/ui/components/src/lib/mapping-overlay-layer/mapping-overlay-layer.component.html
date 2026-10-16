@@ -1,0 +1,15 @@
+@for (overlay of placed(); track overlay.target.id) {
+<button
+  type="button"
+  class="mapping-overlay"
+  [attr.data-state]="overlay.target.state"
+  [attr.aria-pressed]="overlay.target.state === 'selected'"
+  [attr.aria-label]="overlay.target.accessibleName"
+  [style.top.px]="overlay.top"
+  [style.left.px]="overlay.left"
+  [style.width.px]="overlay.width"
+  [style.height.px]="overlay.height"
+  (click)="targetSelect.emit(overlay.target.id)"
+  (keydown.escape)="dismiss.emit()"
+></button>
+}

@@ -38,6 +38,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IMidiSettingsService, MidiSettingsService>();
             services.AddSingleton<IDeviceInterrogator, DeviceInterrogator>();
 			services.AddSingleton<ICartFinder, CartFinder>();
             // WindowsRegistryDescriptorReader is [SupportedOSPlatform("windows")], but registering the

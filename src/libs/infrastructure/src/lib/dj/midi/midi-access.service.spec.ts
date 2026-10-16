@@ -10,9 +10,39 @@ interface FakeMidiOutput {
   readonly clear?: () => void;
 }
 
+interface FakeMidiInput {
+  id: string;
+  name: string | null;
+  manufacturer: string | null;
+  state: 'connected' | 'disconnected';
+  connection: 'open' | 'closed' | 'pending';
+  open: () => Promise<unknown>;
+  close: () => Promise<unknown>;
+  onmidimessage: ((event: { data: Uint8Array | null }) => void) | null;
+}
+
 interface FakeMidiAccess {
+  inputs: Map<string, FakeMidiInput>;
   outputs: Map<string, FakeMidiOutput>;
   onstatechange: ((e: unknown) => void) | null;
+}
+
+function makeInput(
+  id: string,
+  name: string | null,
+  manufacturer: string | null,
+  state: 'connected' | 'disconnected' = 'connected'
+): FakeMidiInput {
+  return {
+    id,
+    name,
+    manufacturer,
+    state,
+    connection: 'closed',
+    open: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
+    onmidimessage: null,
+  };
 }
 
 /** `withClear` attaches a spy `clear()` — the unsupported path is the default, since that is the one
@@ -27,8 +57,12 @@ function makeOutput(
   return withClear ? { ...output, clear: vi.fn() } : output;
 }
 
-function makeAccess(outputs: FakeMidiOutput[]): FakeMidiAccess {
-  return { outputs: new Map(outputs.map((output) => [output.id, output])), onstatechange: null };
+function makeAccess(outputs: FakeMidiOutput[], inputs: FakeMidiInput[] = []): FakeMidiAccess {
+  return {
+    inputs: new Map(inputs.map((input) => [input.id, input])),
+    outputs: new Map(outputs.map((output) => [output.id, output])),
+    onstatechange: null,
+  };
 }
 
 /** Replaces `navigator.requestMIDIAccess` for the duration of a test. `undefined` simulates a
@@ -182,6 +216,65 @@ describe('MidiAccessService', () => {
     access.onstatechange?.({});
 
     expect(service.ports().map((port) => port.id)).toEqual(['port-1', 'port-2']);
+  });
+
+  describe('inputs', () => {
+    it('starts with no input ports and no input to look up', () => {
+      expect(service.inputPorts()).toEqual([]);
+      expect(service.inputFor('in-1')).toBeNull();
+    });
+
+    it('lists every input with its connected state once access is granted, leaving outputs alone', async () => {
+      const access = makeAccess(
+        [makeOutput('out-1', 'Cart', 'Acme')],
+        [makeInput('in-1', 'Pad', 'Acme'), makeInput('in-2', null, null, 'disconnected')]
+      );
+      stubRequestMidiAccess(() => Promise.resolve(access));
+
+      await service.requestAccess();
+
+      expect(service.inputPorts()).toEqual([
+        { id: 'in-1', name: 'Pad', manufacturer: 'Acme', connected: true },
+        {
+          id: 'in-2',
+          name: 'Unnamed input',
+          manufacturer: 'Unknown manufacturer',
+          connected: false,
+        },
+      ]);
+      expect(service.ports()).toEqual([{ id: 'out-1', name: 'Cart', manufacturer: 'Acme' }]);
+      expect(service.inputFor('in-1')).toBe(access.inputs.get('in-1'));
+      expect(service.inputFor('nope')).toBeNull();
+    });
+
+    it('updates the input list on a hot-plug event', async () => {
+      const pad = makeInput('in-1', 'Pad', 'Acme');
+      const access = makeAccess([], [pad]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+
+      access.inputs.set('in-2', makeInput('in-2', 'Knobs', 'Acme'));
+      pad.state = 'disconnected';
+      access.onstatechange?.({});
+
+      expect(service.inputPorts().map((port) => [port.id, port.connected])).toEqual([
+        ['in-1', false],
+        ['in-2', true],
+      ]);
+    });
+
+    it('keeps the same list instance when a state change altered nothing listed', async () => {
+      const pad = makeInput('in-1', 'Pad', 'Acme');
+      const access = makeAccess([], [pad]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+      const before = service.inputPorts();
+
+      pad.connection = 'open';
+      access.onstatechange?.({});
+
+      expect(service.inputPorts()).toBe(before);
+    });
   });
 
   describe('claims', () => {
