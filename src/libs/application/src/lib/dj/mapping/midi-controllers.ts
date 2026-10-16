@@ -112,7 +112,8 @@ export class MidiControllers {
   private generation = 0;
 
   /** Loads the saved controllers and mappings, then installs, once, the effect that keeps the
-   *  ports and statuses in step with the inputs, mapping mode, controllers and mappings. */
+   *  ports and statuses in step with MIDI access, the inputs, mapping mode, controllers and
+   *  mappings. */
   async hydrate(): Promise<void> {
     await this.mappings.hydrate();
     if (this.effectInstalled) {
@@ -122,6 +123,7 @@ export class MidiControllers {
 
     runInInjectionContext(this.injector, () => {
       effect(() => {
+        this.midiAccess.accessState();
         this.midiInput.inputs();
         this.store.mappingMode();
         this.store.controllers();
@@ -260,7 +262,13 @@ export class MidiControllers {
     }
   }
 
+  /** Does nothing until MIDI access is granted: before then the input list is empty because it has
+   *  not been enumerated, not because the controllers are gone, so no status is set and no alert is
+   *  raised. Access being granted re-runs the policy. */
   private async runPolicy(): Promise<void> {
+    if (this.midiAccess.accessState() !== 'granted') {
+      return;
+    }
     const generation = this.generation;
     const connected = this.midiInput.inputs().filter((port) => port.connected);
     const controllers = this.store.controllers();

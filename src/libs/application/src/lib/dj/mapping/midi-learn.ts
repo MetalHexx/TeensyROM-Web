@@ -34,8 +34,9 @@ const OFFSET_MAX = 79;
 
 /**
  * Guesses how a CC control is turned from the values it sent: `relative-signed` or
- * `relative-offset` for an encoder that was turned both ways, `absolute` for a sweep, and `null`
- * when the samples say nothing, so the control's own default applies.
+ * `relative-offset` when a few distinct values all sit in that encoder's tick range, whether it was
+ * turned one way or both (the two ranges do not overlap), `absolute` for a sweep, and `null` when
+ * the samples say nothing, so the control's own default applies.
  */
 export function guessValueStyle(
   samples: readonly number[]
@@ -46,23 +47,13 @@ export function guessValueStyle(
   const isOffsetValue = (value: number): boolean =>
     value >= OFFSET_MIN && value <= OFFSET_MAX && value !== OFFSET_CENTRE;
 
-  if (
-    distinct <= MAX_RELATIVE_DISTINCT &&
-    samples.length > 0 &&
-    samples.every(isSignedValue) &&
-    samples.some((value) => value <= SIGNED_UP_MAX) &&
-    samples.some((value) => value >= SIGNED_DOWN_MIN)
-  ) {
-    return 'relative-signed';
-  }
-  if (
-    distinct <= MAX_RELATIVE_DISTINCT &&
-    samples.length > 0 &&
-    samples.every(isOffsetValue) &&
-    samples.some((value) => value < OFFSET_CENTRE) &&
-    samples.some((value) => value > OFFSET_CENTRE)
-  ) {
-    return 'relative-offset';
+  if (distinct > 0 && distinct <= MAX_RELATIVE_DISTINCT) {
+    if (samples.every(isSignedValue)) {
+      return 'relative-signed';
+    }
+    if (samples.every(isOffsetValue)) {
+      return 'relative-offset';
+    }
   }
   return distinct >= MIN_SWEEP_DISTINCT ? 'absolute' : null;
 }

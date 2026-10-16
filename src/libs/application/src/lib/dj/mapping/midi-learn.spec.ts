@@ -425,8 +425,12 @@ describe('guessValueStyle', () => {
     ['four distinct values in no pattern', [10, 10, 20, 30, 40], 'absolute'],
     ['seven distinct signed-bit values, which is too many to be an encoder', [1, 2, 3, 4, 127, 126, 125], 'absolute'],
     ['seven distinct 64-centred values', [49, 50, 51, 52, 77, 78, 79], 'absolute'],
-    ['one direction of a signed-bit encoder with few values', [1, 2, 3], null],
-    ['one direction of a 64-centred encoder with few values', [65, 66, 67], null],
+    ['a signed-bit encoder turned up only', [1, 1, 2], 'relative-signed'],
+    ['a signed-bit encoder turned down only', [127, 126, 127], 'relative-signed'],
+    ['a single signed-bit tick', [1], 'relative-signed'],
+    ['a 64-centred encoder turned up only', [65, 66, 65], 'relative-offset'],
+    ['a 64-centred encoder turned down only', [63, 62, 63], 'relative-offset'],
+    ['a single 64-centred tick', [63], 'relative-offset'],
     ['a signed-bit value just outside the range', [16, 127], null],
     ['a signed-bit value just below the downward range', [1, 112], null],
     ['a 64-centred value just outside the range', [48, 65], null],
@@ -434,7 +438,7 @@ describe('guessValueStyle', () => {
     ['64 itself, which an encoder never sends', [64, 65, 63], null],
     ['signed-bit and 64-centred values mixed', [1, 127, 65], null],
     ['three distinct values', [0, 40, 80], null],
-    ['one value repeated', [5, 5, 5, 5], null],
+    ['one value repeated outside both encoders', [100, 100, 100, 100], null],
     ['no samples', [], null],
   ])('%s', (_label, samples, expected) => {
     expect(guessValueStyle(samples)).toBe(expected);

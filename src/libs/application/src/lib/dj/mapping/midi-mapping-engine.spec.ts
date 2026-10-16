@@ -287,6 +287,26 @@ describe('MidiMappingEngine', () => {
 
       expect(seek).toHaveBeenCalledWith('A', 2);
     });
+
+    it('seek keeps every tick of a turn made while a seek is still in flight', async () => {
+      let land: () => void = () => undefined;
+      const seek = vi
+        .spyOn(h.deckService, 'seek')
+        .mockReturnValueOnce(new Promise<void>((resolve) => (land = resolve)))
+        .mockResolvedValue();
+      map(ccSource(12), { owner: 'A', control: 'seek' }, style('relative-offset', 0.01));
+
+      h.engine.handle(cc(12, 66));
+      h.engine.handle(cc(12, 66));
+      h.engine.handle(cc(12, 65));
+      expect(seek).toHaveBeenCalledTimes(1);
+      expect(seek).toHaveBeenLastCalledWith('A', 2);
+
+      land();
+      await vi.waitFor(() => expect(seek).toHaveBeenCalledTimes(2));
+
+      expect(seek).toHaveBeenLastCalledWith('A', 5);
+    });
   });
 
   describe('step', () => {

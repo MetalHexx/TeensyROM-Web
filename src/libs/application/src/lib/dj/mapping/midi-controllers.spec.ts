@@ -235,6 +235,22 @@ describe('MidiControllers', () => {
       expect(h.alerts.warning).toHaveBeenCalledTimes(1);
     });
 
+    it('waits for MIDI access: nothing is flagged missing or alerted before the inputs are enumerated', async () => {
+      await start(settings([controller()]), [], () => h.accessState.set('idle'));
+
+      expect(status()).toBeUndefined();
+      expect(h.alerts.warning).not.toHaveBeenCalled();
+      expect(h.midiInput.openCalls).toEqual([]);
+
+      h.midiInput.plug('port-1', NAME);
+      h.accessState.set('granted');
+      await settle();
+
+      expect(status()).toBe('listening');
+      expect(h.midiInput.isOpen('port-1')).toBe(true);
+      expect(h.alerts.warning).not.toHaveBeenCalled();
+    });
+
     it('alerts once when a plugged controller is pulled out', async () => {
       await start(settings([controller()]), [['port-1', NAME]]);
       expect(h.alerts.warning).not.toHaveBeenCalled();
