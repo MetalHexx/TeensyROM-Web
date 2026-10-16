@@ -49,22 +49,20 @@
 }
 
 // Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the subtune
-// stepper and the state indicator pinned to the row's far right. Below 1240px there is no longer
-// room for all of that on one line, so the row gives up the spacer and wraps instead, with the
-// stepper's and the state indicator's own `margin-left: auto` keeping them pinned right whichever
+// stepper and the state indicator pinned to the row's far right. The row wraps whenever its own
+// width runs out — in a narrowed deck column as much as at a narrow viewport — so it never clips.
+// The spacer takes the free space while everything fits on one line; once something wraps, the
+// stepper's and the state indicator's own `margin-left: auto` keep them pinned right whichever
 // line they land on.
 .line-transport {
   justify-content: space-between;
-
-  @media (max-width: 1240px) {
-    flex-wrap: wrap;
-  }
+  flex-wrap: wrap;
 }
 
 .transport-controls {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 
   button {
@@ -75,10 +73,6 @@
 
 .transport-spacer {
   flex: 1 1 auto;
-
-  @media (max-width: 1240px) {
-    display: none;
-  }
 }
 
 .repeat-toggle {
@@ -132,21 +126,15 @@
 // pins it.
 lib-status-led {
   flex: 0 0 auto;
-
-  @media (max-width: 1240px) {
-    margin-left: auto;
-  }
+  margin-left: auto;
 }
 
 // Line 3 (POC only): the tune buttons and, when `showFilePicker` is set, Choose File. Rendered at
-// all only when there is something to show — see the `@if` around it in the template. Gives up the
-// same ground the transport row does below 1240px: it wraps.
+// all only when there is something to show — see the `@if` around it in the template. Wraps when
+// its own width runs out, like the transport row.
 .line-tunes {
   justify-content: space-between;
-
-  @media (max-width: 1240px) {
-    flex-wrap: wrap;
-  }
+  flex-wrap: wrap;
 }
 
 .tune-sources {
@@ -177,10 +165,7 @@ lib-status-led {
 
 lib-stepper {
   flex: 0 0 auto;
-
-  @media (max-width: 1240px) {
-    margin-left: auto;
-  }
+  margin-left: auto;
 }
 
 .error-text {

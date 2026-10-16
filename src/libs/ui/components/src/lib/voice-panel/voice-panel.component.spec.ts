@@ -128,4 +128,13 @@ describe('VoicePanelComponent', () => {
       expect(emitted).toEqual([]);
     });
   });
+
+  it('numbers each voice row from 1 and marks the Clear button as its own anchor', () => {
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('lib-voice-row')) as HTMLElement[];
+
+    expect(rows.map((row) => row.getAttribute('data-voice'))).toEqual(['1', '2', '3']);
+    expect(
+      fixture.nativeElement.querySelector('[data-control="clear-voice-mutes"]')?.textContent.trim()
+    ).toBe('Clear');
+  });
 });

@@ -8,6 +8,7 @@
 
 @for (knob of model().knobs; track knob.id) {
   <lib-rotary-knob
+    [attr.data-control]="knob.id"
     [label]="knob.label"
     [accessibleName]="knob.accessibleName"
     [value]="knob.value"
@@ -24,7 +25,11 @@
 
 <ng-content select="[deckStripAfterKnobs]" />
 
-<div class="deck-strip-fader" [class.deck-strip-fader--fixed]="faderLength() !== null">
+<div
+  class="deck-strip-fader"
+  data-control="level"
+  [class.deck-strip-fader--fixed]="faderLength() !== null"
+>
   <lib-channel-fader
     [value]="model().fader.value"
     [accessibleName]="model().fader.accessibleName"

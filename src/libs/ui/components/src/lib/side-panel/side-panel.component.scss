@@ -1,0 +1,52 @@
+// Fills the height its container gives it. The card is stretched through the global
+// `compact-card--fill` class, the same way the other full-height compact cards are.
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.side-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-height: 0;
+}
+
+.side-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.side-panel-title {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+}
+
+// Takes the free space between the title and the close button, pushing the actions to the right.
+.side-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-left: auto;
+}
+
+// Only the body scrolls, and only vertically: `overflow-x: hidden` keeps the 48px touch targets of
+// small icon buttons, which spill past their 24px boxes, from adding a sideways scrollbar.
+.side-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}

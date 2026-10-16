@@ -80,3 +80,8 @@ export * from './lib/loops-cues-panel/loops-cues-panel.component';
 export * from './lib/binding-card/binding-card.component';
 export * from './lib/drag-chip/drag-chip.component';
 export * from './lib/inline-edit-title/inline-edit-title.component';
+export * from './lib/segmented-control/segmented-control.component';
+export * from './lib/mapping-overlay-layer/mapping-overlay-layer.component';
+export * from './lib/side-panel/side-panel.component';
+export * from './lib/binding-row/binding-row.component';
+export * from './lib/controller-row/controller-row.component';
