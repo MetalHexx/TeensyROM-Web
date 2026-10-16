@@ -152,8 +152,8 @@ export class MappableControls {
         'Seek',
         { min: 0, max: 100, home: 0, step: null },
         SEEK_DEFAULTS,
-        () => transport().scrubPercent,
-        seek
+        () => seek.pending() ?? transport().scrubPercent,
+        seek.request
       ),
       value(
         id('speed'),
@@ -242,10 +242,16 @@ export class MappableControls {
 
   /** A seek command that never queues: while one is in flight only the latest requested value is
    *  kept, and it is issued when the in-flight one settles, unless it is the same value. A knob
-   *  turn would otherwise stack a replay jump per tick. */
-  private coalescedSeek(slot: Slot): (percent: number) => void {
+   *  turn would otherwise stack a replay jump per tick. `pending` is the latest requested value
+   *  while a seek is unsettled, or `null`; a relative read starts from it, because the playhead
+   *  does not move until the seek lands and each tick would otherwise restart from the same spot. */
+  private coalescedSeek(slot: Slot): {
+    request: (percent: number) => void;
+    pending: () => number | null;
+  } {
     let inFlight = false;
     let latest: number | null = null;
+    let requested: number | null = null;
 
     const issue = (percent: number): void => {
       inFlight = true;
@@ -265,16 +271,22 @@ export class MappableControls {
           latest = null;
           if (next !== null && next !== percent) {
             issue(next);
+          } else {
+            requested = null;
           }
         });
     };
 
-    return (percent) => {
-      if (inFlight) {
-        latest = percent;
-      } else {
-        issue(percent);
-      }
+    return {
+      request: (percent) => {
+        requested = percent;
+        if (inFlight) {
+          latest = percent;
+        } else {
+          issue(percent);
+        }
+      },
+      pending: () => requested,
     };
   }
 }

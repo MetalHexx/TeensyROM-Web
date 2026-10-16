@@ -81,8 +81,9 @@ export function clampAmount(
 }
 
 /** How many ticks a relative encoder's raw CC value says it turned, signed.
- *  `relative-offset` is 64-centred (the desktop's "Relative1", two's complement in its code);
- *  `relative-signed` counts up from 0 to 64 and down from 127 (its "Relative2", binary offset). */
+ *  `relative-offset` is 64-centred (binary offset: 64 is no movement);
+ *  `relative-signed` counts up from 1 and down from 127 (two's complement: 127 is −1, and 64
+ *  itself reads as +64). */
 export function relativeTicks(kind: RelativeStyleKind, raw: number): number {
   if (kind === 'relative-offset') {
     return raw - 64;
