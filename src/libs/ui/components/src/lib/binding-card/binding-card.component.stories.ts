@@ -81,7 +81,7 @@ export const GrantedWithPorts: Story = {
 };
 
 /** The bound cartridge is not plugged in: it stays selected, its label says `· absent` in text,
- *  and Identify is out of reach. */
+ *  the select is drawn in the error colour, and Identify is out of reach. */
 export const Absent: Story = {
   args: {
     model: bindingModel({
@@ -90,7 +90,7 @@ export const Absent: Story = {
       enableVisible: false,
       ports: [
         { id: '14470230', label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' },
-        { id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent' },
+        { id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent', absent: true },
       ],
       selectedPortId: '19277260',
       identifyDisabled: true,
@@ -208,7 +208,7 @@ export const AbsentInline: Story = {
       portsEnabled: true,
       portPlaceholder: '— select a cartridge —',
       enableVisible: true,
-      ports: [{ id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent' }],
+      ports: [{ id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent', absent: true }],
       selectedPortId: '19277260',
     }),
     layout: 'inline',

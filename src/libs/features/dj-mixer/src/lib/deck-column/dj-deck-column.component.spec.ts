@@ -620,7 +620,12 @@ describe('DjDeckColumnComponent', () => {
           label: 'TR-1: TeensyROM-14470230 (Microsoft Corporation)',
           takenBy: undefined,
         },
-        { id: '19277260', label: 'TR-2: TeensyROM-19277260 · absent', takenBy: undefined },
+        {
+          id: '19277260',
+          label: 'TR-2: TeensyROM-19277260 · absent',
+          takenBy: undefined,
+          absent: true,
+        },
       ]);
     });
 

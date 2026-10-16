@@ -15,7 +15,7 @@
   margin: 0;
   padding: 0;
   border: 1px dashed var(--color-highlight);
-  border-radius: 8px;
+  border-radius: var(--border-radius-md);
   background: color-mix(in srgb, var(--color-highlight) 14%, transparent);
   box-shadow: 0 0 10px color-mix(in srgb, var(--color-highlight) 30%, transparent);
   cursor: pointer;
@@ -37,6 +37,7 @@
   }
 
   &:focus-visible {
+    // Plain white to stay visible on both the cyan and magenta fills; no token is pure white.
     outline: 2px solid #fff;
     outline-offset: 3px;
   }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 /** One selectable option — an output port, or a cartridge. `label` is caller-composed, e.g.
  *  'TeensyROM (PJRC)' or 'TR-1: TeensyROM-14470230 (Microsoft Corporation)' — this component
@@ -11,6 +11,10 @@ export interface BindingPortModel {
   /** The deck letter that already holds this option, if set. Rendered as text in the option
    *  (`{{ label }} — taken by Deck {{ takenBy }} —`) and disables it — never colour alone. */
   readonly takenBy?: string;
+  /** True when the option is not currently available (a cartridge that is not plugged in). The
+   *  select is drawn in the error colour while it is the selection; the caller's label carries the
+   *  text cue. */
+  readonly absent?: boolean;
 }
 
 /** One deck's whole MIDI binding: its own accessible name, the option list (output ports or
@@ -88,6 +92,12 @@ export class BindingCardComponent {
   readonly enableMidi = output<void>();
   /** Emits when the Identify button is pressed. */
   readonly identify = output<void>();
+
+  /** Whether the selected option is flagged `absent`. */
+  protected readonly selectedAbsent = computed(() => {
+    const { ports, selectedPortId, portsEnabled } = this.model();
+    return portsEnabled && ports.some((port) => port.id === selectedPortId && port.absent === true);
+  });
 
   /** Forwards the selected option's id, or '' for the placeholder. */
   protected onSelectPort(event: Event): void {

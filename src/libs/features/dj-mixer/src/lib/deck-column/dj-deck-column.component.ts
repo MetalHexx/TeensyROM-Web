@@ -158,6 +158,7 @@ export class DjDeckColumnComponent {
           id: option.id,
           label: option.label,
           takenBy: option.takenBy ?? undefined,
+          absent: option.present ? undefined : true,
         })
       ),
       selectedPortId: binding.selectedDeviceId,
