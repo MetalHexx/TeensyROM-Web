@@ -1,7 +1,11 @@
 import type { MappingStyleKind } from '../ports';
 import type { Slot } from '../slot';
 
-/** Every deck control a MIDI source can drive. The server's allow-list mirrors this list. */
+/** Every deck control a MIDI source can drive. The server's allow-list mirrors this list.
+ *
+ *  Adding a control also takes its `MappableControls` entry, an anchor in the dj-mixer feature's
+ *  `CONTROL_ANCHORS` (plus the `data-control` attribute on the element), and the name in the
+ *  backend's `MidiSettingsAllowLists.DeckControls`. */
 export const DECK_CONTROL_IDS = [
   'play-pause',
   'stop',

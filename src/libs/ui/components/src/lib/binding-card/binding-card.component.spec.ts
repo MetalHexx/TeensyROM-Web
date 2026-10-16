@@ -117,6 +117,22 @@ describe('BindingCardComponent', () => {
     expect(option.disabled).toBe(true);
   });
 
+  it('draws the select as absent only while the selected option is flagged absent', () => {
+    const ports = [
+      port('port-1', 'Cart A (Acme)'),
+      { ...port('port-2', 'Cart B · absent'), absent: true },
+    ];
+
+    setModel(model({ portsEnabled: true, ports, selectedPortId: 'port-2' }));
+    expect(select().classList.contains('absent')).toBe(true);
+
+    setModel(model({ portsEnabled: true, ports, selectedPortId: 'port-1' }));
+    expect(select().classList.contains('absent')).toBe(false);
+
+    setModel(model({ portsEnabled: true, ports, selectedPortId: null }));
+    expect(select().classList.contains('absent')).toBe(false);
+  });
+
   it('emits the chosen port id on portSelect, including the empty placeholder value', () => {
     setModel(
       model({

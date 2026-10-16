@@ -191,10 +191,13 @@ export class DjMixerViewComponent {
 
     // Release the pin this view instance actually holds, not the recomputed active storage — the
     // two diverge when the active storage changes and the pin-take effect has not re-run yet.
+    // Mapping mode lives in a root store, so leaving the view has to end it (and any learn) too,
+    // or the hidden mode keeps unmapped ports open and can bind a control off-screen.
     this.destroyRef.onDestroy(() => {
       if (this.pinnedDeviceId) {
         this.storageStore.clearNavigationPin({ deviceId: this.pinnedDeviceId });
       }
+      void this.midiControllers.setMappingMode(false);
     });
   }
 

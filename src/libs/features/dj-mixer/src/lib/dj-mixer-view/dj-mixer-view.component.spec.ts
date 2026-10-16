@@ -536,6 +536,16 @@ describe('DjMixerViewComponent', () => {
       expect(midi.controllers.setMappingMode).toHaveBeenCalledWith(false);
     });
 
+    it('turns mapping mode off when the view is destroyed with the panel still open', () => {
+      const { fixture, midi } = render([]);
+      press(fixture);
+      expect(midi.controllers.setMappingMode).not.toHaveBeenCalled();
+
+      fixture.destroy();
+
+      expect(midi.controllers.setMappingMode).toHaveBeenCalledWith(false);
+    });
+
     it('slides the panel in at 22.5rem, and with no duration for reduced motion', () => {
       const panel = (fixture: ComponentFixture<DjMixerViewComponent>) =>
         fixture.debugElement.query(By.directive(DjBindingsPanelComponent))
