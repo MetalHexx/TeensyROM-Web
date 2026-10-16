@@ -99,6 +99,47 @@ function keyNotationButton(
 }
 
 describe('DjMixerCardComponent', () => {
+  describe('the Bindings button', () => {
+    function bindingsButton(fixture: ComponentFixture<DjMixerCardComponent>): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('.bindings-row button');
+    }
+
+    it('offers to open the panel while it is closed, and to close it while it is open', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+
+      expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
+      expect(bindingsButton(fixture).getAttribute('aria-expanded')).toBe('false');
+
+      fixture.componentRef.setInput('bindingsOpen', true);
+      fixture.detectChanges();
+
+      expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Close bindings panel');
+      expect(bindingsButton(fixture).getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('emits bindingsToggle when pressed', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+      const toggled = vi.fn();
+      fixture.componentInstance.bindingsToggle.subscribe(toggled);
+
+      bindingsButton(fixture).click();
+
+      expect(toggled).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('the mapping anchors', () => {
+    it('marks each strip with its deck letter and the crossfader as the crossfader', () => {
+      const { fixture } = render([DECK_A, DECK_B], true);
+      const root: HTMLElement = fixture.nativeElement;
+
+      expect(
+        Array.from(root.querySelectorAll('lib-deck-strip')).map((s) => s.getAttribute('data-deck'))
+      ).toEqual(['A', 'B']);
+      expect(root.querySelector('lib-crossfader')?.getAttribute('data-control')).toBe('crossfader');
+    });
+  });
+
   it('renders one strip and no crossfader for a single deck', () => {
     const { fixture } = render([DECK_A], false);
 

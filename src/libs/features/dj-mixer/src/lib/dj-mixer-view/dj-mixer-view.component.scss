@@ -1,12 +1,11 @@
 @use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
 
-// The stacked forms are as tall as their content and scroll. `.dj-mixer-view` is a flex column, so
-// releasing `height: 100%` is not enough on its own — the grid is also that column's flex item, and
-// left shrinkable it is squeezed back to the column's height, which crushes its content-sized rows
-// to a few pixels each instead of letting them overflow into the scroll.
+// The stacked forms are as tall as their content and scroll. The grid is a flex item of the
+// `.dj-mixer-view` row and would be stretched to the row's height, which is not its content's;
+// `flex-start` lets it keep the height its rows add up to and overflow into the scroll.
 @mixin stacked-grid {
   height: auto;
-  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 :host {
@@ -26,18 +25,33 @@
   }
 }
 
+// A row: the deck grid takes the width the bindings panel, when open, does not.
 .dj-mixer-view {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   width: 100%;
   min-height: 0;
 }
 
+// The panel's slot is as wide as its container (22.5rem) and keeps that width; the decks give way.
+.panel-slot {
+  flex: 0 0 auto;
+  min-height: 0;
+
+  &.panel-slot--open {
+    margin-left: var(--spacing-md);
+  }
+}
+
 .mixer-grid {
+  // The overlays are positioned against the grid, so they cover exactly the controls it holds.
+  position: relative;
   display: grid;
+  flex: 1 1 0;
   height: 100%;
   min-height: 0;
+  min-width: 0;
   gap: var(--dj-card-gap);
 
   // The one gap between sibling cards anywhere in this view: the grid's own tracks, each deck's

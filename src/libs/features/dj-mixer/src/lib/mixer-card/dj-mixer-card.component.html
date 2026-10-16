@@ -1,8 +1,18 @@
 <lib-scaling-compact-card cardClass="compact-card--fill" animationEntry="from-bottom">
   <div class="mixer-body">
+    <div class="bindings-row">
+      <lib-icon-button
+        icon="tune"
+        [color]="bindingsOpen() ? 'highlight' : 'normal'"
+        [ariaLabel]="bindingsOpen() ? 'Close bindings panel' : 'Open bindings panel'"
+        [ariaExpanded]="bindingsOpen()"
+        (buttonClick)="bindingsToggle.emit()"
+      ></lib-icon-button>
+    </div>
     <div class="strips" [style.--strip-count]="decks().length">
       @for (strip of strips(); track strip.deck.index; let first = $first) {
       <lib-deck-strip
+        [attr.data-deck]="strip.deck.letter"
         [model]="strip.model"
         size="medium"
         [faderLength]="faderLength()"
@@ -31,6 +41,7 @@
     </div>
     @if (showCrossfader()) {
     <lib-crossfader
+      data-control="crossfader"
       [value]="crossfader()"
       startLabel=""
       endLabel=""
