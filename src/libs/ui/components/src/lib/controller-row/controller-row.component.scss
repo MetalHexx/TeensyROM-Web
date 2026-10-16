@@ -1,0 +1,49 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.controller-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) 0;
+}
+
+.controller-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-height: 32px;
+}
+
+.controller-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.controller-name {
+  font-size: var(--font-size-sm);
+}
+
+.controller-status {
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+}
+
+// A controller the app is not listening to dims its name; its status text stays readable.
+.controller-row--off .controller-name {
+  color: var(--color-dimmed);
+}
+
+.controller-port {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}

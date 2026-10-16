@@ -78,4 +78,9 @@ describe('StepperComponent', () => {
     expect(previousButton().getAttribute('aria-label')).toBe('Previous subtune deck A');
     expect(nextButton().getAttribute('aria-label')).toBe('Next subtune deck A');
   });
+
+  it('marks the buttons as the previous and next parts', () => {
+    expect(previousButton().getAttribute('data-part')).toBe('previous');
+    expect(nextButton().getAttribute('data-part')).toBe('next');
+  });
 });

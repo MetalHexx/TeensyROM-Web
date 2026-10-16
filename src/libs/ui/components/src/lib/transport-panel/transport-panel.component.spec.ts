@@ -295,4 +295,24 @@ describe('TransportPanelComponent', () => {
     }
     expect(stepper.compareDocumentPosition(led) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  describe('mapping anchors', () => {
+    function anchor(control: string): HTMLElement | null {
+      return root().querySelector(`[data-control="${control}"]`);
+    }
+
+    it('marks each mappable control with its own stable data-control', () => {
+      expect(anchor('play-pause')?.tagName).toBe('BUTTON');
+      expect(anchor('stop')?.tagName).toBe('BUTTON');
+      expect(anchor('repeat')?.tagName).toBe('LABEL');
+      expect(anchor('subtune')?.tagName).toBe('LIB-STEPPER');
+      expect(anchor('seek')?.tagName).toBe('LIB-SCRUB-POSITION-BAR');
+    });
+
+    it('keeps the play/pause anchor on the same button whichever way it reads', () => {
+      setModel({ playPause: { showing: 'pause', disabled: false } });
+
+      expect(anchor('play-pause')?.textContent?.trim()).toBe('Pause');
+    });
+  });
 });

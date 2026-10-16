@@ -1,0 +1,84 @@
+<div
+  class="binding-row"
+  [class.binding-row--expanded]="model().expanded"
+  [class.binding-row--dimmed]="model().statusText !== null"
+>
+  <div class="binding-line">
+    <span class="binding-name">{{ model().name }}</span>
+    @if (!model().expanded) {
+    <span class="binding-chip">{{ model().styleText }}</span>
+    }
+    <span class="binding-actions">
+      <lib-icon-button
+        icon="edit"
+        size="small"
+        [color]="model().expanded ? 'highlight' : 'normal'"
+        [ariaLabel]="model().editAccessibleName"
+        [ariaExpanded]="model().expanded"
+        (buttonClick)="editToggle.emit()"
+      />
+      @if (!model().expanded) {
+      <lib-icon-button
+        icon="delete"
+        size="small"
+        [ariaLabel]="model().deleteAccessibleName"
+        (buttonClick)="deleteBinding.emit()"
+      />
+      }
+    </span>
+  </div>
+
+  <span class="binding-source">{{ model().sourceText }}</span>
+
+  @if (model().statusText; as status) {
+  <span class="binding-status">{{ status }}</span>
+  } @if (model().expanded) {
+  <div class="binding-edit">
+    <div class="edit-row">
+      <span class="edit-label" aria-hidden="true">Style</span>
+      <lib-segmented-control
+        class="edit-control"
+        accessibleName="Style"
+        [options]="model().styleOptions"
+        [selectedId]="model().selectedStyleId"
+        (optionSelect)="styleSelect.emit($event)"
+      />
+    </div>
+
+    @if (model().amount; as amount) {
+    <div class="edit-row">
+      <label class="edit-label" [for]="amountInputId">{{ amount.label }}</label>
+      <input
+        class="edit-control edit-input"
+        type="number"
+        [id]="amountInputId"
+        [min]="amount.min"
+        [max]="amount.max"
+        [step]="amount.step"
+        [value]="amount.value"
+        [attr.aria-invalid]="amountError() ? true : null"
+        [attr.aria-describedby]="amountError() ? amountInputId + '-error' : null"
+        (change)="onAmountChange($event, amount)"
+      />
+      @if (amount.suffix) {
+      <span class="edit-suffix">{{ amount.suffix }}</span>
+      }
+    </div>
+    @if (amountError(); as error) {
+    <p class="error-text" role="alert" [id]="amountInputId + '-error'">{{ error }}</p>
+    } }
+
+    <div class="edit-row edit-actions">
+      <button type="button" class="pill-button" (click)="relearn.emit()">Re-learn source</button>
+      <button
+        type="button"
+        class="pill-button pill-button--danger"
+        [attr.aria-label]="model().deleteAccessibleName"
+        (click)="deleteBinding.emit()"
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+  }
+</div>

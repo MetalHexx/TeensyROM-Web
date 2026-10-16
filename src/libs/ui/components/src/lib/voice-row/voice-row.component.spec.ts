@@ -286,4 +286,12 @@ describe('VoiceRowComponent', () => {
       expect(held).toEqual([true, false]);
     });
   });
+
+  it('marks the mute line and the hold button as anchors', () => {
+    const muteLine = fixture.nativeElement.querySelector('[data-control="voice-mute"]');
+
+    expect(muteLine?.classList.contains('voice-row-line')).toBe(true);
+    expect(muteLine?.contains(checkbox())).toBe(true);
+    expect(fixture.nativeElement.querySelector('[data-control="voice-hold"]')).toBe(holdButton());
+  });
 });

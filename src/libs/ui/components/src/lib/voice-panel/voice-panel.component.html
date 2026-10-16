@@ -4,6 +4,7 @@
   <div class="voice-rows">
     @for (row of model().rows; track row.checkboxId) {
       <lib-voice-row
+        [attr.data-voice]="$index + 1"
         [model]="row"
         [disabled]="model().disabled ?? false"
         (mutedChange)="onMutedChange($index, $event)"
@@ -15,6 +16,7 @@
   <div class="voice-clear">
     <button
       type="button"
+      data-control="clear-voice-mutes"
       [attr.aria-label]="model().clearAccessibleName"
       [disabled]="model().disabled ?? false"
       (click)="clearMutes.emit()"

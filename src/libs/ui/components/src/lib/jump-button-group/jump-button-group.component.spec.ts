@@ -51,4 +51,12 @@ describe('JumpButtonGroupComponent', () => {
     expect(buttonEls()[0].disabled).toBe(false);
     expect(buttonEls()[1].disabled).toBe(false);
   });
+
+  it('marks each button as a jump anchor named for its own id', () => {
+    expect(buttonEls().map((button) => button.getAttribute('data-control'))).toEqual([
+      'jump-up',
+      'jump-home',
+      'jump-down',
+    ]);
+  });
 });

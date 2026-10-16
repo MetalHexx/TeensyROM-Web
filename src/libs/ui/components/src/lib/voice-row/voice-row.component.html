@@ -1,4 +1,4 @@
-<div class="voice-row-line">
+<div class="voice-row-line" data-control="voice-mute">
   <input
     type="checkbox"
     [id]="model().checkboxId"
@@ -13,6 +13,7 @@
 <button
   type="button"
   class="voice-hold"
+  data-control="voice-hold"
   [attr.aria-label]="model().holdAccessibleName"
   [disabled]="disabled()"
   (pointerdown)="onHoldStart($event)"
