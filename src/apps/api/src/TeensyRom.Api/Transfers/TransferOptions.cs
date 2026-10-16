@@ -43,11 +43,11 @@ namespace TeensyRom.Api.Transfers
 
         /// Root directory for staged uploads. Overridable so tests can redirect to a temp directory.
         public string StagingRoot { get; set; } =
-            Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "staging");
+Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "staging");
 
         /// Root directory for archive expansion scratch space. Separate from StagingRoot; overridable for tests.
         public string ScratchRoot { get; set; } =
-            Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "scratch");
+            Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "scratch");
 
         /// Ceiling on total scratch bytes across all jobs. Independent of MaxStagedBytes by design.
         public long MaxScratchBytes { get; set; } = 8L * 1024 * 1024 * 1024;

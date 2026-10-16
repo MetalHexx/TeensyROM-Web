@@ -1,0 +1,29 @@
+appId: com.teensyrom.desktop
+productName: TeensyROM
+directories:
+  output: dist/desktop
+files:
+  - apps/teensyrom-desktop/main.cjs
+  - apps/teensyrom-desktop/preload.cjs
+  - package.json
+extraResources:
+  - from: apps/teensyrom-desktop/resources/backend
+    to: backend
+    filter:
+      - '**/*'
+asar: true
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
