@@ -46,7 +46,10 @@
 
 .mixer-grid {
   // The overlays are positioned against the grid, so they cover exactly the controls it holds.
+  // `isolation` makes the grid its own stacking context: the overlay layer's z-index climbs above
+  // the cards' 1000 inside it, without climbing over the CDK overlays or the bindings panel.
   position: relative;
+  isolation: isolate;
   display: grid;
   flex: 1 1 0;
   height: 100%;

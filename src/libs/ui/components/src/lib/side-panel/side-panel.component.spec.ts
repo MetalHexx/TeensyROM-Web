@@ -1,7 +1,9 @@
 import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { ScalingCompactCardComponent } from '../scaling-compact-card/scaling-compact-card.component';
 import { SidePanelComponent } from './side-panel.component';
 
 @Component({
@@ -10,6 +12,7 @@ import { SidePanelComponent } from './side-panel.component';
     <lib-side-panel
       [heading]="heading()"
       [closeAccessibleName]="closeName()"
+      [animationDuration]="duration()"
       (closePanel)="closed = closed + 1"
     >
       <button sidePanelActions type="button" class="header-action">Mapping mode</button>
@@ -20,6 +23,7 @@ import { SidePanelComponent } from './side-panel.component';
 class HostComponent {
   readonly heading = signal('Bindings');
   readonly closeName = signal('Close panel');
+  readonly duration = signal(400);
   closed = 0;
 }
 
@@ -82,6 +86,19 @@ describe('SidePanelComponent', () => {
     fixture.detectChanges();
 
     expect(closeButton()?.getAttribute('aria-label')).toBe('Close bindings');
+  });
+
+  it("hands its animation duration to the card's entry", () => {
+    const card = () =>
+      fixture.debugElement.query(By.directive(ScalingCompactCardComponent))
+        .componentInstance as ScalingCompactCardComponent;
+
+    expect(card().animationDuration()).toBe(400);
+
+    fixture.componentInstance.duration.set(0);
+    fixture.detectChanges();
+
+    expect(card().animationDuration()).toBe(0);
   });
 
   it('emits closePanel when the close button is pressed', () => {

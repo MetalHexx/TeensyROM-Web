@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input, output } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
@@ -73,6 +82,8 @@ export class DjMixerCardComponent {
   /** Emits when the Bindings button is pressed, to open or close the panel. */
   readonly bindingsToggle = output<void>();
 
+  private readonly bindingsRow = viewChild<ElementRef<HTMLElement>>('bindingsRow');
+
   /** Each deck paired with the strip model built from its store values. */
   readonly strips = computed(() =>
     this.decks().map((deck) => ({ deck, model: this.stripModel(deck) }))
@@ -103,6 +114,11 @@ export class DjMixerCardComponent {
    * a fluid crossfader and a floor-based channel fader instead.
    */
   readonly faderLength = computed<string | null>(() => (this.columnForm() ? FADER_LENGTH : null));
+
+  /** Moves keyboard focus to the Bindings button. */
+  focusBindingsButton(): void {
+    this.bindingsRow()?.nativeElement.querySelector('button')?.focus();
+  }
 
   onKnobChange(slot: Slot, change: { id: string; value: number }): void {
     if (change.id === 'key') {

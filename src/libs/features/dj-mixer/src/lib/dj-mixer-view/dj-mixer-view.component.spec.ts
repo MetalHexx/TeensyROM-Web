@@ -6,6 +6,8 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 import {
+  DECK_CONTROL_IDS,
+  DECK_SLOTS,
   DeckService,
   DeviceStore,
   DjStore,
@@ -15,6 +17,7 @@ import {
   MidiMappings,
   MidiMappingStore,
   StorageStore,
+  controlKey,
   type ControlIdentity,
   type DeckBindingSummary,
   type DeckTransportSummary,
@@ -26,6 +29,7 @@ import {
 } from '@teensyrom-nx/ui/components';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
+import { anchorFor } from '../mapping/control-anchors';
 import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
 import { DjBrowseTreesComponent } from '../browse-trees/dj-browse-trees.component';
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
@@ -533,15 +537,66 @@ describe('DjMixerViewComponent', () => {
     });
 
     it('slides the panel in at 22.5rem, and with no duration for reduced motion', () => {
+      const panel = (fixture: ComponentFixture<DjMixerViewComponent>) =>
+        fixture.debugElement.query(By.directive(DjBindingsPanelComponent))
+          .componentInstance as DjBindingsPanelComponent;
+
       const normal = render([]);
       press(normal.fixture);
       expect(slot(normal.fixture).containerWidth()).toBe('22.5rem');
       expect(slot(normal.fixture).animationDuration()).toBe(400);
+      expect(panel(normal.fixture).animationDuration()).toBe(400);
       TestBed.resetTestingModule();
 
       const reduced = render([], {}, { reducedMotion: true });
       press(reduced.fixture);
       expect(slot(reduced.fixture).animationDuration()).toBe(0);
+      expect(panel(reduced.fixture).animationDuration()).toBe(0);
+    });
+
+    it('moves focus to the mapping mode switch when the panel opens', () => {
+      const { fixture } = render([]);
+
+      press(fixture);
+
+      const toggle = fixture.nativeElement.querySelector('lib-dj-bindings-panel mat-slide-toggle');
+      expect(toggle.contains(document.activeElement)).toBe(true);
+    });
+
+    it("returns focus to the Bindings button when the panel's own close button closes it", () => {
+      const { fixture } = render([]);
+      press(fixture);
+      const close: HTMLButtonElement = fixture.nativeElement.querySelector(
+        'lib-dj-bindings-panel button[aria-label="Close panel"]'
+      );
+      close.focus();
+
+      close.click();
+      fixture.detectChanges();
+
+      expect(document.activeElement).toBe(bindingsButton(fixture));
+    });
+  });
+
+  describe('the control anchors', () => {
+    const ALL_IDENTITIES: readonly ControlIdentity[] = [
+      ...DECK_SLOTS.flatMap((owner) =>
+        DECK_CONTROL_IDS.map((control): ControlIdentity => ({ owner, control }))
+      ),
+      { owner: 'mixer', control: 'crossfader' },
+    ];
+
+    it('finds every mappable control as exactly one element in the rendered grid', () => {
+      const { fixture } = render([]);
+      const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
+
+      const mismatched = ALL_IDENTITIES.map((identity) => ({
+        identity: controlKey(identity),
+        matches: grid.querySelectorAll(anchorFor(identity)).length,
+      })).filter(({ matches }) => matches !== 1);
+
+      expect(ALL_IDENTITIES).toHaveLength(45);
+      expect(mismatched).toEqual([]);
     });
   });
 

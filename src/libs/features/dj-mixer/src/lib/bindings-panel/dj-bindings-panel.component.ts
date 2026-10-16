@@ -3,10 +3,12 @@ import {
   Component,
   computed,
   inject,
+  input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSlideToggle, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {
   DECK_SLOTS,
   MappableControls,
@@ -145,8 +147,13 @@ export class DjBindingsPanelComponent {
   private readonly midiLearn = inject(MidiLearn);
   private readonly midiMappings = inject(MidiMappings);
 
+  /** Duration in milliseconds of the panel card's own entry animation; `0` for reduced motion. */
+  readonly animationDuration = input<number>(400);
+
   /** Emits when the panel's close button is pressed. */
   readonly closePanel = output<void>();
+
+  private readonly mappingSwitch = viewChild(MatSlideToggle);
 
   readonly mappingMode = this.store.mappingMode;
   readonly announcement = this.store.announcement;
@@ -230,6 +237,11 @@ export class DjBindingsPanelComponent {
       };
     });
   });
+
+  /** Moves keyboard focus to the mapping mode switch, the panel's first control. */
+  focusEntry(): void {
+    this.mappingSwitch()?.focus();
+  }
 
   /** Turns mapping mode on or off. The switch's click is the gesture MIDI access needs. */
   onMappingModeChange(on: boolean): void {

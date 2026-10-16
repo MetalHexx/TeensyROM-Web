@@ -38,6 +38,9 @@ export class SidePanelComponent {
   readonly heading = input.required<string>();
   /** Accessible name for the close button. Defaults to `'Close panel'`. */
   readonly closeAccessibleName = input<string>('Close panel');
+  /** Duration in milliseconds of the card's own slide-and-fade entry (default: `400`). Pass `0` for
+   *  users who prefer reduced motion. */
+  readonly animationDuration = input<number>(400);
   /** Emits when the close button is pressed. */
   readonly closePanel = output<void>();
 }

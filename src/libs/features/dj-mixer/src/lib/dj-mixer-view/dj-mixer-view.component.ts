@@ -1,12 +1,17 @@
+import { DOCUMENT } from '@angular/common';
 import {
   Component,
   ChangeDetectionStrategy,
   DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
@@ -65,6 +70,14 @@ export class DjMixerViewComponent {
   private readonly controls = inject(MappableControls);
   private readonly midiControllers = inject(MidiControllers);
   private readonly midiLearn = inject(MidiLearn);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+
+  private readonly mixerCard = viewChild(DjMixerCardComponent);
+  private readonly bindingsPanel = viewChild(DjBindingsPanelComponent);
+  private readonly panelSlot = viewChild<unknown, ElementRef<HTMLElement>>('panelSlot', {
+    read: ElementRef,
+  });
 
   readonly enabledDevices = computed<Device[]>(() => this.deviceStore.usableDevices());
 
@@ -97,6 +110,9 @@ export class DjMixerViewComponent {
       .pipe(map((state) => state.matches)),
     { initialValue: false }
   );
+
+  /** How long the panel's slide and its card's own entry take: instant for reduced motion. */
+  readonly panelAnimationDuration = computed(() => (this.reducedMotion() ? 0 : 400));
 
   /** Whether controls are overlaid for picking what a hardware input maps onto. */
   readonly mappingMode = this.midiStore.mappingMode;
@@ -182,19 +198,26 @@ export class DjMixerViewComponent {
     });
   }
 
+  /** Opens the panel and moves focus into it, or closes it. */
   togglePanel(): void {
     if (this.panelOpen()) {
       this.closePanel();
     } else {
       this.panelEverOpened.set(true);
       this.panelOpen.set(true);
+      afterNextRender(() => this.bindingsPanel()?.focusEntry(), { injector: this.injector });
     }
   }
 
-  /** Closes the panel and ends mapping mode with it, so no hidden mode keeps running. */
+  /** Closes the panel and ends mapping mode with it, so no hidden mode keeps running. Focus that
+   *  was inside the panel returns to the Bindings button, as the panel's DOM leaves with it. */
   closePanel(): void {
+    const focusWasInPanel = this.panelSlot()?.nativeElement.contains(this.document.activeElement);
     this.panelOpen.set(false);
     void this.midiControllers.setMappingMode(false);
+    if (focusWasInPanel) {
+      this.mixerCard()?.focusBindingsButton();
+    }
   }
 
   /** Starts learning for the control whose overlay was chosen. */

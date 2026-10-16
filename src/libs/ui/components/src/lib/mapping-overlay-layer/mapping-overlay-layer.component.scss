@@ -1,10 +1,11 @@
 // Fills the caller's `position: relative` container without catching its pointer events; only the
-// overlay buttons themselves take them. The z-index lifts the overlays above controls that
-// establish stacking contexts of their own.
+// overlay buttons themselves take them. The z-index has to beat the 1000 that
+// `lib-scaling-compact-card` and `lib-scaling-container` hold while animating, or the overlays sit
+// under every card; the caller isolates its container so this value stays local to it.
 :host {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 1001;
   pointer-events: none;
 }
 
