@@ -128,6 +128,22 @@ export const ExpandedStepAmount: Story = {
   },
 };
 
+/** A CC on a value control offers four styles: the longest label, "Relative ±", has to stay
+ *  readable beside "Relative" in the control's full-width cells. */
+export const ExpandedFourStyles: Story = {
+  args: {
+    model: baseModel({
+      expanded: true,
+      styleOptions: [
+        { id: 'absolute', label: 'Absolute' },
+        { id: 'relative', label: 'Relative' },
+        { id: 'relative-offset', label: 'Relative ±' },
+        { id: 'step', label: 'Step' },
+      ],
+    }),
+  },
+};
+
 /** Interactive: the story owns the model, as a caller would. Expand the row, change the style,
  *  and type an amount — a value outside its range, or no value, shows an inline error and is not
  *  applied. */

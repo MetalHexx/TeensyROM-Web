@@ -58,15 +58,19 @@
   </div>
   @if (panelEverOpened()) {
   <lib-sliding-container
+    #panelSlot
     class="panel-slot"
     [class.panel-slot--open]="panelOpen()"
     animationDirection="from-right"
     containerWidth="22.5rem"
     containerHeight="100%"
     [animationTrigger]="panelOpen()"
-    [animationDuration]="reducedMotion() ? 0 : 400"
+    [animationDuration]="panelAnimationDuration()"
   >
-    <lib-dj-bindings-panel (closePanel)="closePanel()"></lib-dj-bindings-panel>
+    <lib-dj-bindings-panel
+      [animationDuration]="panelAnimationDuration()"
+      (closePanel)="closePanel()"
+    ></lib-dj-bindings-panel>
   </lib-sliding-container>
   }
 </div>

@@ -35,6 +35,10 @@ const meta: Meta<SidePanelComponent> = {
     closeAccessibleName: {
       description: "Accessible name for the close button. Defaults to 'Close panel'.",
     },
+    animationDuration: {
+      description:
+        "Duration in milliseconds of the card's own slide-and-fade entry. Defaults to 400; pass 0 for reduced motion.",
+    },
     closePanel: { description: 'Emits when the close button is pressed.' },
   },
 };

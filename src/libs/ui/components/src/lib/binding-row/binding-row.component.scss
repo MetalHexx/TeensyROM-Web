@@ -98,6 +98,18 @@
   text-transform: uppercase;
 }
 
+// The label sits above its control, which takes the row's whole width: a side label would leave a
+// four-option segmented control too narrow to read its cells.
+.edit-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+
+  .edit-label {
+    flex: 0 0 auto;
+  }
+}
+
 .edit-control {
   flex: 1 1 auto;
   min-width: 0;

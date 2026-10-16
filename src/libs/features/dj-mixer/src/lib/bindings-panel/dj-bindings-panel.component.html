@@ -1,4 +1,8 @@
-<lib-side-panel heading="Bindings" (closePanel)="closePanel.emit()">
+<lib-side-panel
+  heading="Bindings"
+  [animationDuration]="animationDuration()"
+  (closePanel)="closePanel.emit()"
+>
   <mat-slide-toggle
     sidePanelActions
     [checked]="mappingMode()"
