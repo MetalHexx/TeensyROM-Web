@@ -126,11 +126,7 @@ namespace TeensyRom.Core.Storage
                 return null;
             }
 
-            var filteredContent = FilterBannedItems(dirContent, bans);
-
-            if (filteredContent is null) return null;
-
-            cacheItem = await SaveDirectoryToCache(filteredContent);
+            cacheItem = await SaveDirectoryToCache(dirContent);
 
             cache.WriteToDisk();
             return WithoutBannedItems(cacheItem, bans);
@@ -167,19 +163,13 @@ namespace TeensyRom.Core.Storage
 
             log.Internal($"Enriching music and games.", settings.CartStorage.DeviceId);
 
-            var bans = settings.GetBans();
-
             await Task.Run(async () =>
             {
                 foreach (var directory in response.DirectoryContent)
                 {
                     if (directory is null) continue;
 
-                    var filteredContent = FilterBannedItems(directory, bans);
-
-                    if (filteredContent is null) continue;
-
-                    await SaveDirectoryToCache(filteredContent);
+                    await SaveDirectoryToCache(directory);
                 }
                 cache.EnsureFavorites();
                 cache.EnsurePlaylists();
@@ -193,23 +183,10 @@ namespace TeensyRom.Core.Storage
         public void ClearCache() => cache.ClearCache();
         public void ClearCache(DirectoryPath path) => cache.DeleteDirectoryWithChildren(path);
 
-        private static DirectoryContent? FilterBannedItems(DirectoryContent directoryContent, BanLists bans)
-        {
-            if (BanMatcher.IsBannedDirectory(directoryContent.Path.Value, bans.Directories)) return null;
-
-            return new DirectoryContent
-            {
-                Path = directoryContent.Path,
-                Directories = directoryContent.Directories
-                    .Where(d => !BanMatcher.IsBannedDirectory(d.Path.Value, bans.Directories))
-                    .ToList(),
-                Files = directoryContent.Files
-                    .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
-                    .ToList()
-            };
-        }
-
-        /// <summary>A copy of the cached directory without banned entries; the shared cached object is left untouched.</summary>
+        /// <summary>
+        /// A copy of the cached directory without banned entries; the shared cached object is left untouched.
+        /// The cache holds what is on the device, so a ban only hides items here, on the way out.
+        /// </summary>
         private static StorageCacheItem WithoutBannedItems(IStorageCacheItem cacheItem, BanLists bans) => new()
         {
             Path = cacheItem.Path,
@@ -294,11 +271,6 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertTransferredFile(FilePath targetPath, long sizeBytes)
         {
-            var bans = settings.GetBans();
-
-            if (BanMatcher.IsBannedFile(targetPath.FileName, bans.Files) ||
-                BanMatcher.IsBannedDirectory(targetPath.Directory.Value, bans.Directories)) return;
-
             var item = new FileItem
             {
                 Name = targetPath.FileName,

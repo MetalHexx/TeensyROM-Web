@@ -9,7 +9,10 @@ using TeensyRom.Core.ValueObjects;
 namespace TeensyRom.Core.Storage
 {
     /// <summary>
-    /// Base class for storage cache implementations that contains common functionality
+    /// Base class for storage cache implementations that contains common functionality. The cache mirrors
+    /// what is on the device; bans are a view applied when the cache is read (see <see cref="Search"/> and
+    /// <see cref="GetRandomFile"/>, and the directory listing in the storage service), so removing a ban
+    /// brings its items back without re-indexing.
     /// </summary>
     public abstract class BaseStorageCache : Dictionary<string, IStorageCacheItem>, IStorageCache
     {
@@ -29,8 +32,6 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertDirectory(DirectoryPath path, IStorageCacheItem directory)
         {
-            if (IsBannedFolder(path)) return;
-
             DeleteDirectory(path);
             Insert(path, directory);
             InvalidateIdCache();
@@ -38,11 +39,6 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertFile(FileItem fileItem)
         {
-            var bans = Bans;
-
-            if (BanMatcher.IsBannedFile(fileItem.Name, bans.Files) ||
-                BanMatcher.IsBannedDirectory(fileItem.Path.Directory.Value, bans.Directories)) return;
-
             IStorageCacheItem parentStorageItem = null!;
 
             if (fileItem.Path.Directory.IsRoot)
@@ -61,8 +57,6 @@ namespace TeensyRom.Core.Storage
 
         public virtual void EnsureParents(DirectoryPath parentPath)
         {
-            if (IsBannedFolder(parentPath)) return;
-
             var parentDirectory = GetByDirPath(parentPath);
 
             if (parentDirectory is not null) return;
@@ -87,9 +81,6 @@ namespace TeensyRom.Core.Storage
 
         protected void Insert(DirectoryPath path, IStorageCacheItem cacheItem)
         {
-            if (IsBannedFolder(path)) return;
-
-            cacheItem = CleanBadFilesAndFolders(cacheItem);
             TryAdd(path.Value, cacheItem);
         }
 
@@ -131,8 +122,6 @@ namespace TeensyRom.Core.Storage
 
         public virtual IStorageCacheItem? GetByDirPath(DirectoryPath path)
         {
-            if (IsBannedFolder(path)) return null;
-
             if (!TryGetValue(path.Value, out var item)) return null;
 
             return item;
@@ -445,22 +434,5 @@ namespace TeensyRom.Core.Storage
         }
 
         public int GetCacheSize() => this.Aggregate(0, (acc, item) => acc + item.Value.Files.Count);
-
-        protected bool IsBannedFolder(DirectoryPath folder) => BanMatcher.IsBannedDirectory(folder.Value, Bans.Directories);
-
-        protected IStorageCacheItem CleanBadFilesAndFolders(IStorageCacheItem cacheItem)
-        {
-            var bans = Bans;
-
-            cacheItem.Directories = cacheItem.Directories
-                .Where(d => !BanMatcher.IsBannedDirectory(d.Path.Value, bans.Directories))
-                .ToList();
-
-            cacheItem.Files = cacheItem.Files
-                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
-                .ToList();
-
-            return cacheItem;
-        }
     }
 }
