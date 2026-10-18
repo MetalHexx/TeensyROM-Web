@@ -67,7 +67,7 @@ set — check for it before assuming this is where a given run actually wrote.
 ```bash
 rm -rf apps/api/src/TeensyRom.Api/bin
 dotnet build apps/api/src/TeensyRom.Api
-dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 213
+dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 10213
 ```
 
 (PowerShell's `Remove-Item -Recurse -Force apps/api/src/TeensyRom.Api/bin` works the same if that's the

@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const signalR = require('@microsoft/signalr');
 
 const out = process.argv[2];
-const base = 'http://localhost:213';
+const base = 'http://localhost:10213';
 const ts = () => new Date().toISOString().slice(11, 23);
 
 const conn = new signalR.HubConnectionBuilder()

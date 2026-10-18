@@ -37,7 +37,7 @@ class TeensyromWeb < Formula
         teensyrom-web
 
       Then open your browser to:
-        http://localhost:5000
+        http://localhost:10213
 
       Note: First launch may require granting permissions in
       System Preferences > Privacy & Security.

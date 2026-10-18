@@ -168,6 +168,10 @@ This application can be deployed in two ways:
 
 ### Installation & Setup
 
+> **Upgrading from 1.0.0-alpha.8 or earlier:** the address moved from `http://localhost:213` to `http://localhost:10213`, so update bookmarks and scripts to the new port.
+>
+> **Bans now take effect:** the banned files and directories in **Settings → Search** (including the shipped defaults such as `System Volume Information`, `FOUND.000`, `Docs`, and `Dumps`) hide matching items from browsing, search, and shuffle. Remove an entry there to show it again.
+
 #### Windows
 
 1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest) (`TeensyROM-Web-{version}-win-x64.zip`)
@@ -178,7 +182,7 @@ This application can be deployed in two ways:
 TeensyRom.Api.exe
 ```
 
-4. Open your browser to `http://localhost:213`
+4. Open your browser to `http://localhost:10213`
 
 > **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
 
@@ -198,7 +202,7 @@ brew install teensyrom-web
 teensyrom-web
 ```
 
-4. Open your browser to `http://localhost:213`
+4. Open your browser to `http://localhost:10213`
 
 > **Note**: macOS may block the app on first run. Go to System Settings > Privacy & Security and click "Open Anyway".
 
@@ -214,7 +218,7 @@ chmod +x TeensyRom.Api
 ./TeensyRom.Api
 ```
 
-3. Open your browser to `http://localhost:213`
+3. Open your browser to `http://localhost:10213`
 
 ## 🔌 Device Discovery & Connectivity
 
@@ -273,12 +277,12 @@ Once running, open your browser to access:
 
 **Web UI:**
 ```
-http://localhost:213
+http://localhost:10213
 ```
 
 **API Documentation (Scalar):**
 ```
-http://localhost:213/scalar/v1
+http://localhost:10213/scalar/v1
 ```
 
 ## 🤝 Contributing
