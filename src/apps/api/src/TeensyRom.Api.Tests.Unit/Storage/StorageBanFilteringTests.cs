@@ -147,6 +147,78 @@ public class StorageBanFilteringTests
         }
     }
 
+    public class FactoryWiring : IDisposable
+    {
+        private readonly ISearchSettingsProvider _settingsProvider = Substitute.For<ISearchSettingsProvider>();
+        private readonly IMediator _mediator = Substitute.For<IMediator>();
+        private readonly ISidMetadataService _sidMetadata = Substitute.For<ISidMetadataService>();
+        private readonly CartStorage _cart = new(TeensyStorageType.SD, available: true)
+        {
+            DeviceId = $"ban-wiring-{Guid.NewGuid():N}"
+        };
+        private SearchSettings _settings = Bans([], []);
+        private IStorageService? _service;
+
+        public FactoryWiring()
+        {
+            _settingsProvider.GetSearchSettings().Returns(_ => _settings);
+            _sidMetadata.EnrichSong(Arg.Any<SongItem>()).Returns(call => call.Arg<SongItem>());
+            _mediator.Send(Arg.Any<GetDirectoryRecursiveCommand>(), Arg.Any<CancellationToken>())
+                .Returns(new GetDirectoryRecursiveResult
+                {
+                    DirectoryContent =
+                    [
+                        new DirectoryContent
+                        {
+                            Path = new DirectoryPath("/music"),
+                            Files = [File("/music/1.sid"), File("/music/Commando_1.sid")]
+                        }
+                    ]
+                });
+        }
+
+        public void Dispose() => _service?.ClearCache();
+
+        private IStorageService CreateStorageService()
+        {
+            var factory = new StorageFactory(
+                _mediator,
+                Substitute.For<IGameMetadataService>(),
+                _sidMetadata,
+                Substitute.For<ILoggingService>(),
+                _settingsProvider);
+
+            _service = factory.Create(_cart, Substitute.For<ICommunicationPort>());
+            return _service;
+        }
+
+        [Fact]
+        public async Task GetDirectory_FileBannedAfterCreate_HiddenOnNextListing()
+        {
+            var service = CreateStorageService();
+
+            var before = await service.GetDirectory(new DirectoryPath("/music"));
+            _settings = Bans([], ["1.sid"]);
+            var after = await service.GetDirectory(new DirectoryPath("/music"));
+
+            before!.Files.Select(f => f.Name).Should().Equal("1.sid", "Commando_1.sid");
+            after!.Files.Select(f => f.Name).Should().Equal("Commando_1.sid");
+        }
+
+        [Fact]
+        public async Task GetDirectory_DirectoryBannedAfterCreate_ReturnsNullOnNextListing()
+        {
+            var service = CreateStorageService();
+
+            var before = await service.GetDirectory(new DirectoryPath("/music"));
+            _settings = Bans(["/music"], []);
+            var after = await service.GetDirectory(new DirectoryPath("/music"));
+
+            before.Should().NotBeNull();
+            after.Should().BeNull();
+        }
+    }
+
     public class CacheFiltering
     {
         private SearchSettings _bans = Bans([], []);

@@ -60,7 +60,7 @@ describe('DomainMapper (Storage)', () => {
       };
 
       // Act
-      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000');
+      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:10213');
 
       // Assert
       expect(result).toBeDefined();
@@ -82,7 +82,7 @@ describe('DomainMapper (Storage)', () => {
       };
 
       // Act
-      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000');
+      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:10213');
 
       // Assert
       expect(result.directories).toEqual([]);
@@ -95,9 +95,9 @@ describe('DomainMapper (Storage)', () => {
       const storageCacheDto = null as unknown as StorageCacheDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000')).toThrow(
-        'StorageCacheDto is required for transformation'
-      );
+      expect(() =>
+        DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:10213')
+      ).toThrow('StorageCacheDto is required for transformation');
     });
   });
 
@@ -186,7 +186,7 @@ describe('DomainMapper (Storage)', () => {
       };
 
       // Act
-      const result = DomainMapper.toFileItem(dto, 'http://localhost:5000');
+      const result = DomainMapper.toFileItem(dto, 'http://localhost:10213');
 
       // Assert
       expect(result.name).toBe('test.sid');
@@ -204,7 +204,7 @@ describe('DomainMapper (Storage)', () => {
       const dto = null as unknown as FileItemDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toFileItem(dto, 'http://localhost:5000')).toThrow(
+      expect(() => DomainMapper.toFileItem(dto, 'http://localhost:10213')).toThrow(
         'FileItemDto is required for transformation'
       );
     });
@@ -221,7 +221,7 @@ describe('DomainMapper (Storage)', () => {
       };
 
       // Act
-      const result = DomainMapper.toViewableItemImage(dto, 'http://localhost:5000');
+      const result = DomainMapper.toViewableItemImage(dto, 'http://localhost:10213');
 
       // Assert
       expect(result.fileName).toBe('screenshot.png');
@@ -234,7 +234,7 @@ describe('DomainMapper (Storage)', () => {
       const dto = null as unknown as ViewableItemImageDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toViewableItemImage(dto, 'http://localhost:5000')).toThrow(
+      expect(() => DomainMapper.toViewableItemImage(dto, 'http://localhost:10213')).toThrow(
         'ViewableItemImageDto is required for transformation'
       );
     });
