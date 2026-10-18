@@ -18,8 +18,9 @@ namespace TeensyRom.Core.Storage
 
         protected Dictionary<string, List<FileItem>>? _fileIdCache;
         protected abstract string CacheFilePath { get; }
-        protected abstract List<string> BannedFiles { get; }
-        protected abstract List<string> BannedDirectories { get; }
+
+        /// <summary>The ban lists in effect right now; read once per filtering operation.</summary>
+        protected abstract BanLists Bans { get; }
 
         // Shared lock for thread-safety
         private readonly ReaderWriterLockSlim _ioLock = new(LockRecursionPolicy.SupportsRecursion);
@@ -37,7 +38,10 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertFile(FileItem fileItem)
         {
-            if (IsBannedFile(fileItem.Path.Value)) return;
+            var bans = Bans;
+
+            if (BanMatcher.IsBannedFile(fileItem.Name, bans.Files) ||
+                BanMatcher.IsBannedDirectory(fileItem.Path.Directory.Value, bans.Directories)) return;
 
             IStorageCacheItem parentStorageItem = null!;
 
@@ -57,6 +61,8 @@ namespace TeensyRom.Core.Storage
 
         public virtual void EnsureParents(DirectoryPath parentPath)
         {
+            if (IsBannedFolder(parentPath)) return;
+
             var parentDirectory = GetByDirPath(parentPath);
 
             if (parentDirectory is not null) return;
@@ -167,9 +173,13 @@ namespace TeensyRom.Core.Storage
 
         public IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes)
         {
+            var bans = Bans;
+
             return this
                 .Where(FileExcludeFilter(excludePaths))
+                .Where(c => !BanMatcher.IsBannedDirectory(c.Key, bans.Directories))
                 .SelectMany(c => c.Value.Files)
+                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
                 .OfType<LaunchableItem>()
                 .Where(f => fileTypes.Contains(f.FileType) &&
                             (f.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
@@ -185,9 +195,12 @@ namespace TeensyRom.Core.Storage
             {
                 fileTypes = TeensyFileTypeExtensions.GetLaunchFileTypes();
             }
+            var bans = Bans;
             var selection = this
                 .Where(FileExcludeFilter(excludePaths))
+                .Where(c => !BanMatcher.IsBannedDirectory(c.Key, bans.Directories))
                 .SelectMany(c => c.Value.Files)
+                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
                 .Where(f => fileTypes.Contains(f.FileType))
                 .Where(f => scope switch
                 {
@@ -433,29 +446,18 @@ namespace TeensyRom.Core.Storage
 
         public int GetCacheSize() => this.Aggregate(0, (acc, item) => acc + item.Value.Files.Count);
 
-        protected bool IsBannedFolder(DirectoryPath folder)
-        {
-            if (folder.Equals(StorageHelper.Remote_Path_Root)) return false;
-
-            return BannedDirectories.Any(banned => folder.Equals(banned));
-        }
-
-        protected virtual bool IsBannedFile(string fileName)
-        {
-            return BannedFiles.Any(banned => 
-                banned.RemoveLeadingAndTrailingSlash().Equals(
-                    fileName.RemoveLeadingAndTrailingSlash(), 
-                    StringComparison.OrdinalIgnoreCase));
-        }
+        protected bool IsBannedFolder(DirectoryPath folder) => BanMatcher.IsBannedDirectory(folder.Value, Bans.Directories);
 
         protected IStorageCacheItem CleanBadFilesAndFolders(IStorageCacheItem cacheItem)
         {
+            var bans = Bans;
+
             cacheItem.Directories = cacheItem.Directories
-                .Where(d => !IsBannedFolder(d.Path))
+                .Where(d => !BanMatcher.IsBannedDirectory(d.Path.Value, bans.Directories))
                 .ToList();
 
             cacheItem.Files = cacheItem.Files
-                .Where(f => !IsBannedFile(f.Name))
+                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
                 .ToList();
 
             return cacheItem;
