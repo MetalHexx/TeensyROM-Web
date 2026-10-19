@@ -13,7 +13,7 @@
     working directory.
 
     On Windows, an engine running from its bin/Debug folder locks the files the build writes: stop it first
-    (pwsh apps/cli/scripts/test-api.ps1 stop).
+    (dotnet run --project apps/cli/src/TeensyRom.Cli -- stop).
 
     Exit code 0 on success. On failure: exit 1 with a single "generate-api-client: <reason>" line on stderr.
 #>
@@ -25,6 +25,7 @@ $ErrorActionPreference = 'Stop'
 $CliRoot = Split-Path $PSScriptRoot -Parent
 $AppsRoot = Split-Path $CliRoot -Parent
 $EngineProject = Join-Path $AppsRoot 'api/src/TeensyRom.Api/TeensyRom.Api.csproj'
+$CliProject = Join-Path $CliRoot 'src/TeensyRom.Cli/TeensyRom.Cli.csproj'
 $NswagConfig = 'src/TeensyRom.Cli/Api/nswag.json'
 
 function Fail([string]$Message) {
@@ -38,7 +39,7 @@ try {
     Write-Host 'generate-api-client: building the engine to refresh its spec...'
     & dotnet build $EngineProject --nologo -v:minimal
     if ($LASTEXITCODE -ne 0) {
-        Fail "engine build failed (exit $LASTEXITCODE) - if an engine is running from bin/Debug it locks its files; stop it with 'pwsh $(Join-Path $PSScriptRoot 'test-api.ps1') stop' and run this again"
+        Fail "engine build failed (exit $LASTEXITCODE) - if an engine is running from bin/Debug it locks its files; stop it with 'dotnet run --project $CliProject -- stop' and run this again"
     }
 
     Push-Location $CliRoot

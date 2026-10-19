@@ -1,0 +1,55 @@
+name: PR CLI Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/apps/cli/**'
+      - 'src/apps/api/**'
+      - 'src/apps/Version.props'
+      - '.github/workflows/pr-cli-checks.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  cli-checks:
+    name: CLI tests (unit + real engine)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build CLI
+        run: dotnet build src/apps/cli/TeensyRom.Cli.sln -c Debug
+
+      - name: Unit tests
+        run: dotnet test src/apps/cli/src/TeensyRom.Cli.Tests --no-build
+
+      # The real-engine scenarios build and start the engine from this checkout through the CLI's own source-mode
+      # start path. A Debug engine build skips the frontend, so no pnpm or SIDablist is needed. The runner has no
+      # TeensyROM attached, so hardware scenarios are excluded and device-dependent ones skip themselves.
+      - name: Real-engine tests
+        run: dotnet test src/apps/cli/src/TeensyRom.Cli.Tests.Integration --no-build --filter "Category!=Hardware"
+
+      - name: Upload engine logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-test-engine-logs
+          path: |
+            /tmp/teensyrom-cli-test-engine/*/api/Assets/System/Logs
+            /tmp/teensyrom-cli-test-engine/*/cli/Logs
+          if-no-files-found: ignore

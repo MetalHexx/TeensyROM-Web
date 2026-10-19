@@ -16,6 +16,7 @@ internal sealed class CliHarness : IDisposable
 {
     private readonly IAnsiConsole _original = AnsiConsole.Console;
     private CommandApp? _app;
+    private CliSession? _session;
 
     public TestConsole Console { get; } = NewConsole();
 
@@ -30,9 +31,19 @@ internal sealed class CliHarness : IDisposable
     /// <summary>Runs what the CLI runs before a command that needs the engine: readying the engine and the device prompt.</summary>
     public Task<bool> StartAsync() => Host.Gate.EnsureReadyAsync();
 
-    /// <summary>Runs a command line; one app serves every call on this harness.</summary>
-    public int Run(params string[] args) =>
-        (_app ??= CliHost.CreateApp(new TypeRegistrar(Host.Services))).Run(args);
+    private CommandApp App => _app ??= CliHost.CreateApp(new TypeRegistrar(Host.Services));
+
+    /// <summary>
+    /// Runs a command line straight on the app, skipping the engine and device checks; one app serves every call on this harness.
+    /// </summary>
+    public int Run(params string[] args) => App.Run(args);
+
+    /// <summary>
+    /// Runs a command line the way the CLI does: routing decides whether the engine is started or replaced first and
+    /// the device prompt follows. Returns 1 without running the command when the gate says it isn't ready.
+    /// </summary>
+    public Task<int> RunThroughSessionAsync(params string[] args) =>
+        (_session ??= new CliSession(App, Host.Gate)).RunCommandAsync(args);
 
     public string Output => Console.Output;
 
