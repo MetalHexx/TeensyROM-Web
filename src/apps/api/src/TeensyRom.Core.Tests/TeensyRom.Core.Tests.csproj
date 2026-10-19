@@ -32,4 +32,8 @@
     <ProjectReference Include="..\TeensyRom.Core.Serial\TeensyRom.Core.Serial.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\TestHome.cs" Link="TestHome.cs" />
+  </ItemGroup>
+
 </Project>

@@ -18,19 +18,19 @@ if (isBuildTimeDocumentGeneration)
 {
     UseThrowawayHome();
 }
+else if (!EngineInstanceLock.TryAcquire(TeensyRomHome.ApiPath))
+{
+    // Ahead of everything that writes to the home or the service container, so a second engine neither
+    // touches the serial port nor writes into the home it is refusing to share.
+    Console.Error.WriteLine($"Another TeensyROM engine is already running with the home {TeensyRomHome.Root}.");
+    Environment.Exit(1);
+}
 
-// Initialize global exception handlers BEFORE anything else
+// Initialize global exception handlers BEFORE anything else that can fail
 GlobalExceptionHandler.Initialize();
 
 if (!isBuildTimeDocumentGeneration)
 {
-    // Before the service container exists, so a second engine never touches the serial port.
-    if (!EngineInstanceLock.TryAcquire(TeensyRomHome.ApiPath))
-    {
-        Console.Error.WriteLine($"Another TeensyROM engine is already running with the home {TeensyRomHome.Root}.");
-        Environment.Exit(1);
-    }
-
     PackageAssetSync.Sync(
         packageAssets: Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "Assets"),
         homeAssets: Path.Combine(TeensyRomHome.ApiPath, "Assets"),

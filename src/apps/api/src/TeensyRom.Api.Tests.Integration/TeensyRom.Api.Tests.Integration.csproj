@@ -30,4 +30,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\TestHome.cs" Link="TestHome.cs" />
+  </ItemGroup>
+
 </Project>

@@ -3,6 +3,11 @@ using TeensyRom.Api.Services;
 
 namespace TeensyRom.Api.Endpoints.Engine.StopEngine
 {
+    /// <summary>
+    /// Stops the engine for a caller on the engine's own machine. Known limitation: loopback is the only gate and
+    /// the UI CORS policy allows any origin, so a web page open in a local browser can also stop the engine
+    /// (denial of service only).
+    /// </summary>
     public class StopEngineEndpoint(IEngineShutdown shutdown) : RadEndpointWithoutRequest<StopEngineResponse>
     {
         public override void Configure()

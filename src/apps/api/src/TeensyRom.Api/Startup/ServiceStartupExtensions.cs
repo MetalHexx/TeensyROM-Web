@@ -24,6 +24,7 @@ namespace TeensyRom.Api.Startup
         /// <summary>
         /// Registers TeensyROM application services as singletons.
         /// </summary>
+        /// <param name="services">The service collection.</param>
         /// <param name="registerHostedServices">
         /// False skips the background services (bootstrap sweep and discovery, transfer pumps); the build-time
         /// OpenAPI run starts the host and must not run them.

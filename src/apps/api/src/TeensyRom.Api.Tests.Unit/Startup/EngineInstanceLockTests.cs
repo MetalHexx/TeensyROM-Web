@@ -13,7 +13,7 @@ public class EngineInstanceLockTests : IDisposable
     private string LockPath => Path.Combine(_apiPath, TeensyRomHome.EngineLockFileName);
 
     // A successful acquire holds the file for the life of the process, so the folder can outlive the test;
-    // it sits in the throwaway test home, which is removed when the process exits.
+    // it sits in the throwaway test home, which the next test run sweeps once this process is gone.
     public void Dispose()
     {
         try { Directory.Delete(_apiPath, recursive: true); }
