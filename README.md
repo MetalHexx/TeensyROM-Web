@@ -85,6 +85,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Boolean / Phrase Search**: Group phrases in quotes or add a plus for required terms/phrases E.g., `Iron +Maiden +"Aces High"`
 - **Search Results View**: Dedicated view for browsing and launching search results
 - **File Type Filters**: Filter by All, Games, Music, Images, or Demos
+- **Banned Files & Directories**: Hide files and directories from browsing, search, and shuffle. Manage the list in **Settings → Search**; it starts with entries such as `System Volume Information`, `FOUND.000`, `Docs`, and `Dumps`, and removing an entry shows its items again
 
 ### Play History & Favorites
 - **Play History Tracking**: Complete history of all launched files with timestamps
@@ -167,10 +168,6 @@ This application can be deployed in two ways:
 - **Firmware**: TeensyROM firmware **v0.7.1** or higher (required for both Serial and TCP connectivity)
 
 ### Installation & Setup
-
-> **Upgrading from 1.0.0-alpha.8 or earlier:** the address moved from `http://localhost:213` to `http://localhost:10213`, so update bookmarks and scripts to the new port.
->
-> **Bans now take effect:** the banned files and directories in **Settings → Search** (including the shipped defaults such as `System Volume Information`, `FOUND.000`, `Docs`, and `Dumps`) hide matching items from browsing, search, and shuffle. Remove an entry there to show it again.
 
 #### Windows
 
