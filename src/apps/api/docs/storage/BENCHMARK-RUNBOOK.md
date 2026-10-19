@@ -29,7 +29,7 @@ The baseline measurement exercises the store against a synthetic index containin
 
 2. Run the harness with `--scenarios store` against a working data directory containing a device index (required for the `--device` parameter). The tool creates a temp database and seeds it from whichever fixture file resolves for the given `--device`/`--storage` — either the path passed via `--fixture`, or `{fixture-dir}/{Sd-|Usb-}<deviceId>.tsv` under `IndexFixturePaths.ResolveDirectory()` (`.local-fixtures` by default). There is no code path that fabricates index content: the store is seeded from a real, already-extracted `.tsv` fixture, the same mechanism the real-data comparison run below uses:
    ```bash
-   dotnet run -- --data-dir <path-to-index-directory> --device <deviceId> --scenarios store --out ../../docs/storage/STORAGE-BASELINE.md
+   dotnet run -- --data-dir <path-to-home-root> --device <deviceId> --scenarios store --out ../../docs/storage/STORAGE-BASELINE.md
    ```
 
    To reproduce the originally-committed 25,920-file synthetic baseline specifically, that fixture must exist locally — place it at `.local-fixtures/Sd-<deviceId>.tsv` (or pass `--fixture <path-to-that-file>`) before running the command above.
@@ -90,7 +90,7 @@ The fixture is a gitignored local artifact (`.local-fixtures/Sd-L5ZMCNBR.tsv`) u
 
 The benchmark harness is at `src/TeensyRom.Tools.StorageBenchmark/Program.cs`. It accepts the following command-line arguments:
 
-- `--data-dir <dir>` (required): Path to the directory containing real index files
+- `--data-dir <dir>` (required): A TeensyROM home root (for example `~/.teensyrom`); the real index files are read from `<dir>/api/Assets/System/Cache`
 - `--device <deviceId>` (required): The device identifier (e.g., `L5ZMCNBR`) for the index file
 - `--storage sd|usb` (optional, defaults to `sd`): Storage type
 - `--iterations <n>` (optional, defaults to `5`): Number of iterations per scenario (warm-up excluded)

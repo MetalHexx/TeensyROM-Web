@@ -24,7 +24,11 @@ namespace TeensyRom.Api.Startup
         /// <summary>
         /// Registers TeensyROM application services as singletons.
         /// </summary>
-        public static IServiceCollection AddTeensyRomServices(this IServiceCollection services)
+        /// <param name="registerHostedServices">
+        /// False skips the background services (bootstrap sweep and discovery, transfer pumps); the build-time
+        /// OpenAPI run starts the host and must not run them.
+        /// </param>
+        public static IServiceCollection AddTeensyRomServices(this IServiceCollection services, bool registerHostedServices = true)
         {
             services.AddSingleton<LoggingService>();
             services.AddSingleton<ILoggingService>(sp => sp.GetRequiredService<LoggingService>());
@@ -80,6 +84,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();
             services.AddSingleton<ArchiveExpansionService>();
             services.AddSingleton<ArchiveExpansionPump>();
+
+            if (!registerHostedServices) return services;
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();

@@ -1,3 +1,4 @@
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Music;
 
 namespace TeensyRom.Core.Storage.Tests.Integration
@@ -9,8 +10,10 @@ namespace TeensyRom.Core.Storage.Tests.Integration
     public sealed record MetadataSources(string HvscCsvPath);
 
     /// <summary>
-    /// Resolves the HVSC CSV beside the same data directory the real index file is read from, or explains
-    /// where it was looked for. Resolution happens once per process: it touches the file system.
+    /// Resolves the HVSC CSV beside the same home the real index file is read from, or explains
+    /// where it was looked for. <c>TEENSYROM_DATA_DIR</c> names a TeensyROM home root, so the CSV is read from
+    /// <c>&lt;TEENSYROM_DATA_DIR&gt;/api/Assets/Music/SidList</c>.
+    /// Resolution happens once per process: it touches the file system.
     /// </summary>
     /// <remarks>
     /// DeepSID is deliberately not resolved here. Its enrichment adds links, tags, ratings, videos, and
@@ -46,10 +49,10 @@ namespace TeensyRom.Core.Storage.Tests.Integration
             if (string.IsNullOrWhiteSpace(dataDirectory))
             {
                 return (null, $"No HVSC database: {Data_Dir_Environment_Variable} is not set, so there is " +
-                              $"nowhere to look for '{MusicConstants.SidList_Local_Path}'.");
+                              $"nowhere to look for '{TeensyRomHome.ApiFolderName}/{MusicConstants.SidList_Local_Path}'.");
             }
 
-            var sidListDirectory = Path.Combine(dataDirectory, MusicConstants.SidList_Local_Path);
+            var sidListDirectory = Path.Combine(dataDirectory, TeensyRomHome.ApiFolderName, MusicConstants.SidList_Local_Path);
 
             if (!Directory.Exists(sidListDirectory))
             {

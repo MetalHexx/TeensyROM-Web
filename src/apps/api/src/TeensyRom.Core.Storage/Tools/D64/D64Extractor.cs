@@ -12,7 +12,7 @@ namespace TeensyRom.Core.Storage.Tools.D64Extraction
     public class D64Extractor(ILoggingService log) : ID64Extractor
     {
         private readonly ILoggingService _log = log;
-        private string AssemblyBasePath => Assembly.GetExecutingAssembly().GetPath();
+        private string AssemblyBasePath => Assembly.GetExecutingAssembly().GetDataPath();
         private string OutputPath => Path.Combine(AssemblyBasePath, AssetConstants.VicePath, "output");
 
         public void ClearOutputDirectory()

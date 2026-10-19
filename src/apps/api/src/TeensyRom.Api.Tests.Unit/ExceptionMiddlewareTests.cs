@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using System.Text;
 using TeensyRom.Api.Middleware;
+using TeensyRom.Core.Common;
 
 namespace TeensyRom.Api.Tests.Middleware
 {
@@ -87,22 +88,17 @@ namespace TeensyRom.Api.Tests.Middleware
             // Assert - Give time for async file write
             await Task.Delay(100);
 
-            var logDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "System", "Logs");
-            
-            // Note: This test may fail if running in environment without write permissions
-            // In real scenarios, file logging gracefully degrades
-            if (Directory.Exists(logDirectory))
-            {
-                var logFiles = Directory.GetFiles(logDirectory, "MiddlewareExceptions-*.log");
+            var logDirectory = Path.Combine(TeensyRomHome.ApiPath, "Assets", "System", "Logs");
 
-                if (logFiles.Length > 0)
-                {
-                    var logContent = File.ReadAllText(logFiles[0]);
-                    logContent.Should().Contain("Test exception message");
-                    logContent.Should().Contain("POST /api/devices?filter=active");
-                    logContent.Should().Contain("InvalidOperationException");
-                }
-            }
+            Directory.Exists(logDirectory).Should().BeTrue();
+
+            var logFiles = Directory.GetFiles(logDirectory, "MiddlewareExceptions-*.log");
+            logFiles.Should().NotBeEmpty();
+
+            var logContent = File.ReadAllText(logFiles[0]);
+            logContent.Should().Contain("Test exception message");
+            logContent.Should().Contain("POST /api/devices?filter=active");
+            logContent.Should().Contain("InvalidOperationException");
         }
 
         [Fact]

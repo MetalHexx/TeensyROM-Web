@@ -62,7 +62,7 @@ public class HvscDatabase : IHvscDatabase
 
     private static string GetHvscFilePath()
     {
-        var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
+        var currentDirectory = Assembly.GetExecutingAssembly().GetDataPath();
 
         if (string.IsNullOrEmpty(currentDirectory)) return string.Empty;
 

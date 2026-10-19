@@ -1,3 +1,4 @@
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Storage.Index.Fixtures;
 using Xunit;
@@ -6,13 +7,16 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 {
     /// <summary>
     /// The pair of local, uncommitted inputs a full-scale comparison needs: an extracted index fixture and
-    /// the real index file of the same device.
+    /// the real index file of the same device. <paramref name="DataDirectory"/> is the home root
+    /// (<c>TEENSYROM_DATA_DIR</c>); the index file lives under its <c>api/</c> folder.
     /// </summary>
     public sealed record FixtureInputs(string FixturePath, IndexFixtureHeader Header, string DataDirectory, string IndexFilePath);
 
     /// <summary>
     /// Resolves the fixture/index pair, or explains which half is missing and where it was looked for.
     /// Resolution happens once per process: it touches the file system and every test in the suite asks.
+    /// <c>TEENSYROM_DATA_DIR</c> names a TeensyROM home root, so the real index file is read from
+    /// <c>&lt;TEENSYROM_DATA_DIR&gt;/api/Assets/System/Cache</c>.
     /// </summary>
     public static class FixtureAvailability
     {
@@ -44,14 +48,15 @@ namespace TeensyRom.Core.Storage.Tests.Integration
         /// Mirrors <see cref="SimpleStorageCache"/>'s own resolution so the cache and the comparison agree on
         /// which file is "the real index file" for a device.
         /// </summary>
-        public static string ResolveIndexFilePath(string dataDirectory, IndexFixtureHeader header)
+        public static string ResolveIndexFilePath(string homeRoot, IndexFixtureHeader header)
         {
             var prefix = header.StorageType == TeensyStorageType.SD
                 ? StorageHelper.Sd_Cache_File_Name
                 : StorageHelper.Usb_Cache_File_Name;
 
             return Path.Combine(
-                dataDirectory,
+                homeRoot,
+                TeensyRomHome.ApiFolderName,
                 StorageHelper.Cache_File_Relative_Path,
                 $"{prefix}{header.DeviceId}{StorageHelper.Cache_File_Extension}");
         }
@@ -89,7 +94,7 @@ namespace TeensyRom.Core.Storage.Tests.Integration
             if (string.IsNullOrWhiteSpace(dataDirectory))
             {
                 return (null, $"No real index file: {Data_Dir_Environment_Variable} is not set, so there is " +
-                              $"nowhere to look for '{StorageHelper.Cache_File_Relative_Path}'. " +
+                              $"nowhere to look for '{TeensyRomHome.ApiFolderName}/{StorageHelper.Cache_File_Relative_Path}'. " +
                               $"Fixtures found in '{fixtureDirectory}': {string.Join(", ", fixturePaths.Select(Path.GetFileName))}.");
             }
 

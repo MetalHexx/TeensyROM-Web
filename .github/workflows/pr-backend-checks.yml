@@ -101,7 +101,7 @@ jobs:
 
       # TeensyRom.Api.Tests.Integration also contains pre-existing [Collection("Endpoint")] tests that
       # require a physical TeensyROM device (real serial-port/subnet discovery via EndpointFixture).
-      # This filter runs only the new hardware-free FILE-TRANSFER-1 tests, which live under the
-      # TeensyRom.Api.Tests.Integration.Transfers namespace and use TransferFixture's fake device port.
+      # This filter runs only the hardware-free tests, which live under the Transfers, Home, Logs and
+      # Engine namespaces and use TransferFixture's fake device port (or boot the engine without a device).
       - name: Run .NET Transfer Integration Tests
-        run: dotnet test apps/api/src/TeensyRom.Api.Tests.Integration/TeensyRom.Api.Tests.Integration.csproj --no-build --filter "FullyQualifiedName~TeensyRom.Api.Tests.Integration.Transfers"
+        run: dotnet test apps/api/src/TeensyRom.Api.Tests.Integration/TeensyRom.Api.Tests.Integration.csproj --no-build --filter "FullyQualifiedName~TeensyRom.Api.Tests.Integration.Transfers|FullyQualifiedName~TeensyRom.Api.Tests.Integration.Home|FullyQualifiedName~TeensyRom.Api.Tests.Integration.Logs|FullyQualifiedName~TeensyRom.Api.Tests.Integration.Engine"

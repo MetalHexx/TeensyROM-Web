@@ -201,7 +201,7 @@ namespace TeensyRom.Core.Music
     /// <param name="song">The song item to enrich with composer image.</param>
     private void EnrichWithDeepSidComposerImage(SongItem song)
         {
-            var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
+            var currentDirectory = Assembly.GetExecutingAssembly().GetDataPath();
             
             // Guard against empty directory path
             if (string.IsNullOrEmpty(currentDirectory))
