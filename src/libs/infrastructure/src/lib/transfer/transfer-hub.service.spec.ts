@@ -58,9 +58,9 @@ const getMocks = async () => {
 };
 
 const mockApiConfig: IApiConfig = {
-  basePath: 'http://localhost:213',
-  signalRBasePath: 'http://localhost:213',
-  getBaseUrl: () => 'http://localhost:213',
+  basePath: 'http://localhost:10213',
+  signalRBasePath: 'http://localhost:10213',
+  getBaseUrl: () => 'http://localhost:10213',
 };
 
 const jobDto = {

@@ -66,9 +66,9 @@ The published application:
 5. **Handles SPA routing** - Unknown routes serve `index.html` for Angular routing
 
 **Runtime URL Structure**:
-- API routes: `http://localhost:213/api/devices`, `http://localhost:213/api/files`, etc.
-- SignalR hubs: `http://localhost:213/logHub`, `http://localhost:213/deviceEventHub`
-- SPA routes: `http://localhost:213/` (index.html), `http://localhost:213/player/music` (Angular routing)
+- API routes: `http://localhost:10213/api/devices`, `http://localhost:10213/api/files`, etc.
+- SignalR hubs: `http://localhost:10213/logHub`, `http://localhost:10213/deviceEventHub`
+- SPA routes: `http://localhost:10213/` (index.html), `http://localhost:10213/player/music` (Angular routing)
 
 ---
 
@@ -104,7 +104,7 @@ pnpm start
 - **End users need nothing** (self-contained executable)
 
 **Single executable**:
-- Serves both API and frontend from port 213
+- Serves both API and frontend from port 10213
 - No external dependencies
 - Self-contained .NET runtime
 
@@ -372,12 +372,12 @@ teensyrom-web --version
 # Should output: 1.2.0 (or current version)
 
 teensyrom-web
-# Application should start, console shows: "Now listening on: http://localhost:5000"
+# Application should start, console shows: "Now listening on: http://localhost:10213"
 ```
 
 **Open in browser**:
 ```bash
-open http://localhost:5000
+open http://localhost:10213
 ```
 
 **macOS Security Note**: First launch may require:
@@ -489,7 +489,7 @@ https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-We
 - Linux: User must be in `dialout` group (`sudo usermod -a -G dialout $USER`)
 
 **Firewall**:
-- Application listens on `http://localhost:5000` (local only, no external network access)
+- Application listens on `http://localhost:10213` (local only, no external network access)
 - No firewall prompt should appear (loopback only)
 
 ### Dependency Vulnerabilities
@@ -588,7 +588,7 @@ Checksums must match exactly.
 
 ### What ports does the application use?
 
-**Default**: `http://localhost:5000`
+**Default**: `http://localhost:10213`
 
 **Customizing**:
 ```bash

@@ -9,7 +9,10 @@ using TeensyRom.Core.ValueObjects;
 namespace TeensyRom.Core.Storage
 {
     /// <summary>
-    /// Base class for storage cache implementations that contains common functionality
+    /// Base class for storage cache implementations that contains common functionality. The cache mirrors
+    /// what is on the device; bans are a view applied when the cache is read (see <see cref="Search"/> and
+    /// <see cref="GetRandomFile"/>, and the directory listing in the storage service), so removing a ban
+    /// brings its items back without re-indexing.
     /// </summary>
     public abstract class BaseStorageCache : Dictionary<string, IStorageCacheItem>, IStorageCache
     {
@@ -18,8 +21,9 @@ namespace TeensyRom.Core.Storage
 
         protected Dictionary<string, List<FileItem>>? _fileIdCache;
         protected abstract string CacheFilePath { get; }
-        protected abstract List<string> BannedFiles { get; }
-        protected abstract List<string> BannedDirectories { get; }
+
+        /// <summary>The ban lists in effect right now; read once per filtering operation.</summary>
+        protected abstract BanLists Bans { get; }
 
         // Shared lock for thread-safety
         private readonly ReaderWriterLockSlim _ioLock = new(LockRecursionPolicy.SupportsRecursion);
@@ -28,8 +32,6 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertDirectory(DirectoryPath path, IStorageCacheItem directory)
         {
-            if (IsBannedFolder(path)) return;
-
             DeleteDirectory(path);
             Insert(path, directory);
             InvalidateIdCache();
@@ -37,8 +39,6 @@ namespace TeensyRom.Core.Storage
 
         public void UpsertFile(FileItem fileItem)
         {
-            if (IsBannedFile(fileItem.Path.Value)) return;
-
             IStorageCacheItem parentStorageItem = null!;
 
             if (fileItem.Path.Directory.IsRoot)
@@ -81,9 +81,6 @@ namespace TeensyRom.Core.Storage
 
         protected void Insert(DirectoryPath path, IStorageCacheItem cacheItem)
         {
-            if (IsBannedFolder(path)) return;
-
-            cacheItem = CleanBadFilesAndFolders(cacheItem);
             TryAdd(path.Value, cacheItem);
         }
 
@@ -125,8 +122,6 @@ namespace TeensyRom.Core.Storage
 
         public virtual IStorageCacheItem? GetByDirPath(DirectoryPath path)
         {
-            if (IsBannedFolder(path)) return null;
-
             if (!TryGetValue(path.Value, out var item)) return null;
 
             return item;
@@ -167,9 +162,13 @@ namespace TeensyRom.Core.Storage
 
         public IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes)
         {
+            var bans = Bans;
+
             return this
                 .Where(FileExcludeFilter(excludePaths))
+                .Where(c => !BanMatcher.IsBannedDirectory(c.Key, bans.Directories))
                 .SelectMany(c => c.Value.Files)
+                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
                 .OfType<LaunchableItem>()
                 .Where(f => fileTypes.Contains(f.FileType) &&
                             (f.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
@@ -185,9 +184,12 @@ namespace TeensyRom.Core.Storage
             {
                 fileTypes = TeensyFileTypeExtensions.GetLaunchFileTypes();
             }
+            var bans = Bans;
             var selection = this
                 .Where(FileExcludeFilter(excludePaths))
+                .Where(c => !BanMatcher.IsBannedDirectory(c.Key, bans.Directories))
                 .SelectMany(c => c.Value.Files)
+                .Where(f => !BanMatcher.IsBannedFile(f.Name, bans.Files))
                 .Where(f => fileTypes.Contains(f.FileType))
                 .Where(f => scope switch
                 {
@@ -432,33 +434,5 @@ namespace TeensyRom.Core.Storage
         }
 
         public int GetCacheSize() => this.Aggregate(0, (acc, item) => acc + item.Value.Files.Count);
-
-        protected bool IsBannedFolder(DirectoryPath folder)
-        {
-            if (folder.Equals(StorageHelper.Remote_Path_Root)) return false;
-
-            return BannedDirectories.Any(banned => folder.Equals(banned));
-        }
-
-        protected virtual bool IsBannedFile(string fileName)
-        {
-            return BannedFiles.Any(banned => 
-                banned.RemoveLeadingAndTrailingSlash().Equals(
-                    fileName.RemoveLeadingAndTrailingSlash(), 
-                    StringComparison.OrdinalIgnoreCase));
-        }
-
-        protected IStorageCacheItem CleanBadFilesAndFolders(IStorageCacheItem cacheItem)
-        {
-            cacheItem.Directories = cacheItem.Directories
-                .Where(d => !IsBannedFolder(d.Path))
-                .ToList();
-
-            cacheItem.Files = cacheItem.Files
-                .Where(f => !IsBannedFile(f.Name))
-                .ToList();
-
-            return cacheItem;
-        }
     }
 }

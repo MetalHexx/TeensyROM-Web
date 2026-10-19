@@ -3,13 +3,13 @@
 // boot wait rather than racing it. A round passes only when both calls return 200 - the launch answers
 // 200 only once the firmware's GoodSIDToken has been seen, so a 200 here is the boot-complete wait
 // actually holding.
-//   node reset-launch.mjs --device 19277260 [--rounds 10] [--api http://localhost:213]
+//   node reset-launch.mjs --device 19277260 [--rounds 10] [--api http://localhost:10213]
 //        [--sid "/music/DEMOS/M-R/Melody.sid"] [--out file]
 import fs from 'node:fs';
 
 const argv = process.argv.slice(2);
 const option = (name, fallback) => { const i = argv.indexOf(name); return i < 0 ? fallback : argv[i + 1]; };
-const api = option('--api', 'http://localhost:213');
+const api = option('--api', 'http://localhost:10213');
 const deviceId = option('--device', null);
 const rounds = Number(option('--rounds', 10));
 const sidFile = option('--sid', '/music/DEMOS/M-R/Melody.sid');

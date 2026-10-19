@@ -5,9 +5,9 @@ import { DeviceLogsService } from './device-logs.service';
 import { ALERT_SERVICE, IAlertService, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 
 const mockApiConfig: IApiConfig = {
-  basePath: 'http://localhost:213',
-  signalRBasePath: 'http://localhost:213',
-  getBaseUrl: () => 'http://localhost:213',
+  basePath: 'http://localhost:10213',
+  signalRBasePath: 'http://localhost:10213',
+  getBaseUrl: () => 'http://localhost:10213',
 };
 
 describe('DeviceLogsService - Alert Integration', () => {

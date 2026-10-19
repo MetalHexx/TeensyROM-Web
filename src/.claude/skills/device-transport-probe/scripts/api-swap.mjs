@@ -2,7 +2,7 @@
 // a SID, which makes the API bring the device back to full before it can launch. Prints which transport
 // the API is actually using first - Connection:PreferredTransport decides which transport wins when
 // the device answers on both.
-//   node api-swap.mjs --device 19277260 [--api http://localhost:213] [--rounds 10] [--wait 5000]
+//   node api-swap.mjs --device 19277260 [--api http://localhost:10213] [--rounds 10] [--wait 5000]
 //        [--large "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt"]
 //        [--sid "/music/DEMOS/M-R/Melody.sid"] [--out file]
 // A failed round waits 30 s, resets, and carries on, so one failure does not hide the rest.
@@ -10,7 +10,7 @@ import fs from 'node:fs';
 
 const argv = process.argv.slice(2);
 const option = (name, fallback) => { const i = argv.indexOf(name); return i < 0 ? fallback : argv[i + 1]; };
-const api = option('--api', 'http://localhost:213');
+const api = option('--api', 'http://localhost:10213');
 const deviceId = option('--device', null);
 const rounds = Number(option('--rounds', 10));
 const waitMs = Number(option('--wait', 5000));

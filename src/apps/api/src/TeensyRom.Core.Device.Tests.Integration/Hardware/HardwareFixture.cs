@@ -94,7 +94,8 @@ public sealed class HardwareFixture : IAsyncLifetime
             Substitute.For<IMediator>(),
             Substitute.For<IGameMetadataService>(),
             Substitute.For<ISidMetadataService>(),
-            Log);
+            Log,
+            Substitute.For<ISearchSettingsProvider>());
 
         _finder = new CartFinder(Log, storageFactory, Interrogator, alert, Recovery, discoveryStrategies, Substitute.For<IDeviceSettingsProvider>(), Options);
 
