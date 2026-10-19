@@ -1,19 +1,19 @@
 # TeensyROM Web Distribution Guide
 
-**Last Updated**: 2025-12-06  
+**Last Updated**: 2026-10-19  
 **Status**: Production Ready ✅
 
 ---
 
 ## 📋 Overview
 
-This guide documents the complete distribution process for TeensyROM Web, a self-contained desktop application that bundles the .NET Web API and Angular frontend into a single executable for Windows, macOS, and Linux.
+This guide documents the complete distribution process for TeensyROM Web, a self-contained desktop application that bundles the .NET Web API (the engine) and Angular frontend into a single executable for Windows, macOS, and Linux. Every download also carries the TeensyROM command-line tool (the CLI) in a `cli/` subfolder beside the engine.
 
 **Distribution Goals**:
 - Zero dependencies for end users (bundled .NET runtime)
-- Single executable per platform
+- One download per platform: the single-file engine plus the CLI in `cli/`
 - Automated GitHub Releases via CI/CD
-- macOS distribution via Homebrew
+- macOS distribution via Homebrew (one formula installs both commands)
 - Cross-platform support (Windows, macOS Intel/ARM, Linux)
 
 ---
@@ -24,7 +24,7 @@ This guide documents the complete distribution process for TeensyROM Web, a self
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Source Code (Angular + .NET API)                  │
+│  Source Code (Angular + .NET API + CLI)             │
 └─────────────────┬───────────────────────────────────┘
                   │
                   ▼
@@ -41,8 +41,14 @@ This guide documents the complete distribution process for TeensyROM Web, a self
                   │
                   ▼
 ┌─────────────────────────────────────────────────────┐
-│  dotnet publish (self-contained, single-file)       │
-│  → Single executable per platform                   │
+│  dotnet publish engine (self-contained, one file)   │
+│  → publish/<rid>/TeensyRom.Api[.exe]                │
+└─────────────────┬───────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────┐
+│  dotnet publish CLI (self-contained, folder)        │
+│  → publish/<rid>/cli/TeensyRom.Cli[.exe]            │
 └─────────────────┬───────────────────────────────────┘
                   │
                   ▼
@@ -62,13 +68,30 @@ The published application:
 1. **Bundles .NET 9 runtime** - No .NET SDK required on target machine
 2. **Serves Angular SPA** - All frontend files embedded in wwwroot
 3. **Provides API endpoints** - RadEndpoints at `/api/*` paths
-4. **Enables SignalR hubs** - Real-time communication at `/logHub`, `/deviceEventHub`
+4. **Enables SignalR hubs** - Real-time communication at `/api/logHub`, `/api/audioHub`, `/api/transferHub`
 5. **Handles SPA routing** - Unknown routes serve `index.html` for Angular routing
 
 **Runtime URL Structure**:
 - API routes: `http://localhost:10213/api/devices`, `http://localhost:10213/api/files`, etc.
-- SignalR hubs: `http://localhost:10213/logHub`, `http://localhost:10213/deviceEventHub`
+- SignalR hubs: `http://localhost:10213/api/logHub`, `http://localhost:10213/api/audioHub`, `http://localhost:10213/api/transferHub`
 - SPA routes: `http://localhost:10213/` (index.html), `http://localhost:10213/player/music` (Angular routing)
+
+### Package Layout and Home
+
+Every platform's archive has the engine at its root and the CLI in `cli/`:
+
+```
+TeensyRom.Api[.exe]      ← Engine (self-contained, single-file)
+appsettings.json         ← Runtime configuration
+wwwroot/                 ← Angular frontend
+Assets/                  ← Seed assets (unpacked)
+cli/
+  TeensyRom.Cli[.exe]    ← CLI, with its own runtime, Fonts/ and dependencies
+```
+
+- **Self-contained, not single-file**: the CLI resolves its fonts from its assembly location, which is empty in a single-file bundle. Keeping it in its own subfolder also stops the two self-contained apps' runtimes from overwriting each other.
+- **The seam**: the packaged CLI finds the engine at `../TeensyRom.Api[.exe]` relative to its own folder, and starts it itself when it is not running. The archive and the Homebrew formula must both keep `cli/` directly inside the engine's folder.
+- **The home**: both apps keep their state under one per-user home, `~/.teensyrom`. The engine uses `~/.teensyrom/api` (its `Assets/` working copy and logs, plus the `engine.lock` single-instance lock) and the CLI uses `~/.teensyrom/cli` (its own settings and logs). `TEENSYROM_DATA_DIR` moves the whole home. The engine copies the package's seed `Assets/` into `~/.teensyrom/api/Assets` when its version changes (it records the version in `Assets/.package-version`). Nothing is written beside the program, so a read-only install folder such as Homebrew's `libexec` works.
 
 ---
 
@@ -112,7 +135,7 @@ pnpm start
 
 ## 🚀 Local Testing (Before Release)
 
-See the `release-local` skill for the current step-by-step local build/test process.
+See the `release-local` skill for the current step-by-step local build/test process. It also publishes the CLI into `cli/` and smoke-tests it from the package.
 
 ---
 
@@ -124,8 +147,8 @@ GitHub Actions automates the entire release process:
 
 1. **Trigger**: Push git tag starting with `v` (e.g., `v1.0.0`)
 2. **Validate**: Extract version, detect pre-release
-3. **Build**: Build frontend, publish for 4 platforms in parallel
-4. **Update Formula**: Calculate SHA256, update Homebrew formula (stable only)
+3. **Build**: Check out and build the sibling SIDablist repo (the frontend depends on it), build the frontend, publish the engine and the CLI for 4 platforms in parallel
+4. **Update Formula**: Calculate SHA256, update Homebrew formula (every tag, pre-releases included)
 5. **Release**: Create GitHub Release with all artifacts attached
 
 ### Workflow File
@@ -134,8 +157,8 @@ GitHub Actions automates the entire release process:
 
 **Jobs**:
 1. `validate` - Extract version from tag, detect pre-release
-2. `build` - Matrix build for 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64)
-3. `update-formula` - Update Homebrew formula (stable releases only)
+2. `build` - Matrix build for 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64); publishes the engine, then the CLI into `cli/`
+3. `update-formula` - Update Homebrew formula (no condition: runs for every tag, pre-releases included)
 4. `release` - Create GitHub Release with artifacts
 
 ### Version Requirements
@@ -146,12 +169,14 @@ v{major}.{minor}.{patch}[-{prerelease}]
 ```
 
 **Examples**:
-- `v1.0.0` - Stable release (formula updated)
-- `v1.0.0-alpha.1` - Pre-release (formula NOT updated)
-- `v2.1.3-beta.2` - Pre-release (formula NOT updated)
-- `v1.5.0-rc.1` - Pre-release (formula NOT updated)
+- `v1.0.0` - Stable release
+- `v1.0.0-alpha.1` - Pre-release (marked as a pre-release on GitHub)
+- `v2.1.3-beta.2` - Pre-release
+- `v1.5.0-rc.1` - Pre-release
 
-**Critical**: The version in `apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` MUST match the git tag:
+The formula is updated for **every** tag: the `update-formula` job has no `if:`, so pre-releases rewrite `version` and the checksums on `main` just like stable releases.
+
+**Critical**: The version in `src/apps/Version.props` MUST match the git tag. It is imported by both `TeensyRom.Api.csproj` and `TeensyRom.Cli.csproj`, so one bump stamps the engine and the CLI:
 
 ```xml
 <PropertyGroup>
@@ -159,7 +184,7 @@ v{major}.{minor}.{patch}[-{prerelease}]
 </PropertyGroup>
 ```
 
-**Why no version override?**: The workflow does NOT use `-p:Version=` to override the .csproj version. This ensures:
+**Why no version override?**: The workflow does NOT use `-p:Version=` to override the version in `Version.props`. This ensures:
 - Version displayed in UI matches release tag
 - `/api/version` endpoint returns correct version
 - No version mismatch confusion
@@ -168,7 +193,7 @@ v{major}.{minor}.{patch}[-{prerelease}]
 
 #### Step 1: Update Version in Code
 
-**Backend version** (`apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj`):
+**Version** (`src/apps/Version.props`, stamps the engine and the CLI):
 ```xml
 <PropertyGroup>
   <Version>1.2.0</Version>
@@ -182,7 +207,7 @@ v{major}.{minor}.{patch}[-{prerelease}]
 #### Step 2: Commit and Push
 
 ```bash
-git add apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj
+git add src/apps/Version.props
 git commit -m "chore: bump version to 1.2.0"
 git push origin main
 ```
@@ -195,7 +220,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-**Pre-release** (formula NOT updated):
+**Pre-release**:
 ```bash
 git tag v1.2.0-alpha.1
 git push origin v1.2.0-alpha.1
@@ -212,7 +237,7 @@ git push origin v1.2.0-alpha.1
 **Job timeline**:
 - `validate`: 10 seconds
 - `build` (4 parallel jobs): 8-12 minutes
-- `update-formula`: 30 seconds (stable only)
+- `update-formula`: 30 seconds
 - `release`: 1-2 minutes
 
 #### Step 5: Verify Release
@@ -220,14 +245,14 @@ git push origin v1.2.0-alpha.1
 **GitHub Release**:
 1. Go to **Releases** page
 2. Find release tagged `v1.2.0`
-3. Verify 4 artifacts attached:
+3. Verify 4 artifacts attached (each holds the engine at its root and the CLI in `cli/`):
    - `TeensyROM-Web-1.2.0-win-x64.zip`
    - `TeensyROM-Web-1.2.0-osx-x64.tar.gz`
    - `TeensyROM-Web-1.2.0-osx-arm64.tar.gz`
    - `TeensyROM-Web-1.2.0-linux-x64.tar.gz`
 4. Check pre-release checkbox (should be unchecked for stable)
 
-**Homebrew Formula** (stable releases only):
+**Homebrew Formula** (every release, pre-releases included):
 1. Check `Formula/teensyrom-web.rb` in repository
 2. Verify version updated: `version "1.2.0"`
 3. Verify SHA256 checksums updated (not PLACEHOLDER)
@@ -258,10 +283,16 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
   -p:OpenApiGenerateDocuments=false \
   -p:OpenApiGenerateDocumentsOnBuild=false \
   -o ./publish/win-x64
+
+# Locally test the CLI publish (self-contained, not single-file)
+dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+  -c Release -r win-x64 --self-contained true \
+  -o ./publish/win-x64/cli
 ```
 
 **Common issues**:
 - Missing dependencies: Check `pnpm-lock.yaml` committed
+- `pnpm install --frozen-lockfile` cannot resolve `file:../../SIDablist/...`: the SIDablist checkout/build steps ahead of it in the build job failed or were removed (a tag has no matching SIDablist branch, so the job uses its `main`)
 - Build configuration errors: Verify `nx.json` and `project.json` valid
 - TypeScript errors: Run `pnpm nx lint` locally
 
@@ -281,13 +312,13 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
 
 **sed errors**:
 - Formula must have correct structure (`on_arm do ... end`, `on_intel do ... end`)
-- Placeholder values must match exactly: `PLACEHOLDER_SHA256_ARM64`, `PLACEHOLDER_SHA256_X64`
+- The job rewrites any line containing `version "` and edits `sha256` from `on_arm do`/`on_intel do` to the next `end`: keep new formula lines free of `version "` and outside those two blocks
 
 #### Release Job Fails
 
 **Dependency failures**:
 - Check `build` job succeeded
-- Pre-releases: Formula update can be skipped (expected)
+- The job runs even when `update-formula` fails (`if: always() && needs.build.result == 'success'`), so a formula failure does not block the GitHub Release
 
 **GitHub Release creation errors**:
 - Tag must exist (pushed before workflow)
@@ -327,12 +358,26 @@ class TeensyromWeb < Formula
     sha256 "def456..."  # Calculated by workflow
   end
   
+  conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install a TeensyRom.Cli command"
+
   def install
     libexec.install Dir["*"]
-    (bin/"teensyrom-web").write <<~EOS
-      #!/bin/zsh
-      exec "#{libexec}/TeensyRom.Api" "$@"
-    EOS
+    if (libexec/"cli/TeensyRom.Cli").exist?
+      # Combined package: engine and CLI share the default home, ~/.teensyrom
+      (bin/"teensyrom-web").write <<~EOS
+        #!/bin/zsh
+        cd "#{libexec}"
+        exec "./TeensyRom.Api" "$@"
+      EOS
+      (bin/"TeensyRom.Cli").write <<~EOS
+        #!/bin/zsh
+        exec "#{libexec}/cli/TeensyRom.Cli" "$@"
+      EOS
+      chmod 0755, bin/"TeensyRom.Cli"
+    else
+      # Older package (no cli/, engine predates ~/.teensyrom): the previous wrapper
+      # (sets TEENSYROM_DATA_DIR to ~/Library/Application Support/TeensyROM-Web)
+    end
     chmod 0755, bin/"teensyrom-web"
   end
   
@@ -344,11 +389,13 @@ end
 
 **Install behavior**:
 1. Downloads correct tar.gz for user's architecture (ARM64 or Intel)
-2. Extracts all files to `libexec` (private location)
-3. Creates wrapper script at `/usr/local/bin/teensyrom-web`
-4. Sets executable permissions
+2. Extracts all files to `libexec` (private location): the engine at its root, the CLI in `libexec/cli`
+3. If `libexec/cli/TeensyRom.Cli` exists (the combined package), creates two wrapper scripts in `bin`: `teensyrom-web` (changes to `libexec`, runs the engine) and `TeensyRom.Cli` (runs `libexec/cli/TeensyRom.Cli`). Neither sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
+4. Otherwise (an older package with no `cli/`, such as `1.0.0-alpha.8`, whose engine still writes beside itself), keeps the previous `teensyrom-web` wrapper unchanged, which sets `TEENSYROM_DATA_DIR` to `~/Library/Application Support/TeensyROM-Web`. That `else` branch can be deleted after the first release that contains `cli/`
+5. Sets executable permissions
+6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` also installs a `TeensyRom.Cli` command, so Homebrew refuses to install both
 
-**Result**: User can run `teensyrom-web` from anywhere
+**Result**: User can run `teensyrom-web` (and, with the combined package, `TeensyRom.Cli`) from anywhere
 
 ### Testing Homebrew Install
 
@@ -374,6 +421,8 @@ teensyrom-web --version
 teensyrom-web
 # Application should start, console shows: "Now listening on: http://localhost:10213"
 ```
+
+With the combined package, `TeensyRom.Cli` starts the engine itself when it is not running, and `TeensyRom.Cli stop` stops it.
 
 **Open in browser**:
 ```bash
@@ -429,24 +478,28 @@ Approximate sizes for self-contained builds:
 - Application assemblies (~10 MB)
 - Embedded assets (SID database, images, etc.) (~15 MB)
 
+**The CLI adds to every archive**: it is self-contained but not single-file, so `cli/` carries its own runtime and dependencies (about 80 MB uncompressed in a local win-x64 publish). The sizes above predate it.
+
 **Compression**:
-- Single-file publish uses compression (`EnableCompressionInSingleFile`)
+- Single-file publish of the engine uses compression (`EnableCompressionInSingleFile`); the CLI folder is not single-file
 - Archive formats use standard compression (gzip for tar.gz, deflate for zip)
 
 ### Archive Contents
 
 **Windows** (`TeensyROM-Web-1.2.0-win-x64.zip`):
 ```
-TeensyRom.Api.exe       (Single executable)
-TeensyRom.Api.pdb       (Debug symbols - optional)
+TeensyRom.Api.exe       (Engine, single-file executable)
+appsettings.json        (Runtime configuration)
+wwwroot/                (Angular frontend)
+Assets/                 (Seed assets, unpacked)
+api-spec/               (OpenAPI schema)
 web.config              (IIS config - not needed for standalone)
+*.pdb, *.xml            (Debug symbols and XML docs - optional)
+cli/
+  TeensyRom.Cli.exe     (CLI, with its own runtime, Fonts/ and dependencies)
 ```
 
-**macOS/Linux** (`TeensyROM-Web-1.2.0-osx-arm64.tar.gz`):
-```
-TeensyRom.Api           (Single executable, no .exe extension)
-TeensyRom.Api.pdb       (Debug symbols - optional)
-```
+**macOS/Linux** (`TeensyROM-Web-1.2.0-osx-arm64.tar.gz`): the same layout, with `TeensyRom.Api` and `cli/TeensyRom.Cli` (no `.exe`; both marked executable by the workflow).
 
 **Note**: `.pdb` files can be removed to reduce size, but they're helpful for debugging crash dumps.
 
@@ -524,13 +577,7 @@ Follow the **Local Testing** section above. Build frontend, run API, test publis
 
 ### Can I create a release without updating the Homebrew formula?
 
-Yes, create a **pre-release** by adding a suffix to the version:
-```bash
-git tag v1.2.0-alpha.1
-git push origin v1.2.0-alpha.1
-```
-
-Pre-releases skip formula updates but still create GitHub Releases with artifacts.
+Not with the current workflow. The `update-formula` job has no `if:`, so every tag, pre-releases included, rewrites `version` and the checksums on `main`, and Homebrew users pick the release up as soon as that commit lands. To test a build without touching the formula, use the `release-local` skill.
 
 ### What if the workflow fails?
 
@@ -556,12 +603,12 @@ Then fix issues and recreate tag.
 
 ### Can I override the version during publish?
 
-**Not recommended**. The workflow does NOT use `-p:Version=` to override `.csproj` version. This ensures:
+**Not recommended**. The workflow does NOT use `-p:Version=` to override the version in `src/apps/Version.props`. This ensures:
 - Version consistency between git tag and application
 - `/api/version` endpoint returns correct version
 - UI header displays correct version
 
-Always update `TeensyRom.Api.csproj` to match git tag.
+Always update `src/apps/Version.props` to match git tag.
 
 ### Why does the executable need security approval on macOS?
 
@@ -600,6 +647,10 @@ $env:ASPNETCORE_URLS="http://localhost:8080"
 export ASPNETCORE_URLS="http://localhost:8080"
 ./TeensyRom.Api
 ```
+
+### Where does the app keep its data?
+
+In one per-user home, `~/.teensyrom`: `api/` for the engine and `cli/` for the CLI. Set `TEENSYROM_DATA_DIR` to move the whole home (a relative value is made absolute). The engine copies the package's seed `Assets/` into `~/.teensyrom/api/Assets` when its version changes, and nothing is written beside the program. An older Homebrew package (no `cli/`) still keeps its data in `~/Library/Application Support/TeensyROM-Web` through the wrapper's `TEENSYROM_DATA_DIR`.
 
 ### How do I enable verbose logging?
 

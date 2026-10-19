@@ -81,6 +81,39 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
+      # `src/package.json` depends on @sidablist/core and @sidablist/asid via relative file:/link:
+      # paths (../../SIDablist/libs/{core,asid}), so a standalone checkout of this repo alone cannot
+      # resolve them. A tag is not a branch, so a release falls back to SIDablist's main.
+      - name: Determine SIDablist ref to check out
+        id: sidablist-ref
+        working-directory: ${{ github.workspace }}
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if git ls-remote --exit-code --heads https://github.com/MetalHexx/SIDablist.git "$BRANCH" > /dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      # actions/checkout refuses a `path` outside $GITHUB_WORKSPACE, but package.json's relative
+      # dependency needs a true sibling of this checkout, not a nested directory — hence the move.
+      - name: Checkout SIDablist (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: MetalHexx/SIDablist
+          ref: ${{ steps.sidablist-ref.outputs.ref }}
+          path: SIDablist
+
+      - name: Move SIDablist beside this checkout
+        working-directory: ${{ github.workspace }}
+        run: mv SIDablist ../SIDablist
+
+      - name: Build SIDablist packages
+        working-directory: ${{ github.workspace }}/../SIDablist
+        run: |
+          npx --yes pnpm@10.11.0 install --frozen-lockfile
+          npx --yes pnpm@10.11.0 run build
+
       - name: Install frontend dependencies
         run: |
           cd src
@@ -115,6 +148,16 @@ jobs:
             -p:OpenApiGenerateDocumentsOnBuild=false \
             -o ./publish/${{ matrix.rid }}
 
+      # Self-contained but not single-file: the CLI resolves its fonts from its assembly location,
+      # which is empty in a single-file bundle. The subfolder keeps the two apps' runtimes apart.
+      - name: Publish CLI for ${{ matrix.rid }}
+        run: |
+          dotnet publish src/apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -o ./publish/${{ matrix.rid }}/cli
+
       - name: Unpack Assets (avoid runtime extraction in read-only directories)
         run: |
           cd publish/${{ matrix.rid }}/Assets
@@ -136,7 +179,7 @@ jobs:
         if: matrix.extension == 'tar.gz'
         run: |
           cd publish/${{ matrix.rid }}
-          chmod +x TeensyRom.Api
+          chmod +x TeensyRom.Api cli/TeensyRom.Cli
           tar -czvf ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.tar.gz .
       
       - name: Upload artifact
