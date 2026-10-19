@@ -705,48 +705,6 @@
         }
       }
     },
-    "/api/logs": {
-      "post": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Start Logging Hub",
-        "description": "Starts the logging service and returns a success message.",
-        "operationId": "StartLogs",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StartLogsResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Stop Logging Channel",
-        "description": "Stops the logging service and returns a success message.",
-        "operationId": "StopLogs",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StopLogsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/devices/{deviceId}": {
       "delete": {
         "tags": [
@@ -1548,6 +1506,38 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engine/stop": {
+      "post": {
+        "tags": [
+          "Engine"
+        ],
+        "summary": "Stop the Engine",
+        "description": "Gracefully shuts the TeensyROM engine down, ending its process and releasing its instance lock.\n\n- Only callers on the machine the engine runs on are accepted; any other caller receives a 403 and the engine keeps running.\n- The response is sent before the engine begins stopping.",
+        "operationId": "StopEngine",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopEngineResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2686,15 +2676,10 @@
           }
         }
       },
-      "StartLogsResponse": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string"
-          }
-        }
-      },
-      "StopLogsResponse": {
+      "StopEngineResponse": {
+        "required": [
+          "message"
+        ],
         "type": "object",
         "properties": {
           "message": {
@@ -3137,6 +3122,9 @@
     },
     {
       "name": "Files"
+    },
+    {
+      "name": "Engine"
     },
     {
       "name": "Audio"

@@ -58,10 +58,16 @@ namespace TeensyRom.Api.Services
                 TaskScheduler.Default);
         }
 
+        /// <summary>
+        /// Starts pumping queued lines to the log stream. Does nothing when a stream is already running,
+        /// so a second listener never clears the queue or starts a second pump.
+        /// </summary>
         public void StartLogStream()
         {
+            if (_clientLoggingCancellationSource is not null) return;
+
             _channelQueue.Clear();
-            _clientLoggingCancellationSource ??= new CancellationTokenSource();
+            _clientLoggingCancellationSource = new CancellationTokenSource();
             _logStreamTask = StartLogStreaming(_clientLoggingCancellationSource.Token);
 
             _logStreamTask.ContinueWith(task =>

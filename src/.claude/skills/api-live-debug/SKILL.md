@@ -93,15 +93,15 @@ hub.
 node .claude/skills/api-live-debug/scripts/logtap.mjs <out.log>
 ```
 
-Connects to `/api/logHub`, POSTs `/api/logs` to enable streaming, appends every
+Connects to `/api/logHub`, invokes the hub's `Subscribe` method to start receiving, appends every
 `LogProduced` line with a **UTC** timestamp — and it's an *arrival* time, not the moment the API logged
 it: the API batches at most 20 lines onto the hub, then waits 100 ms
 (`TeensyRom.Api/Services/LoggingService.cs`) before the next batch, so "the tap gives millisecond stamps"
 overstates its precision. For real timing, use a firmware-side probe (`device-transport-probe`) or a run
 with the debugger detached and read the tap's own stamps knowing the ~100 ms batching granularity.
 
-**Nothing reaches the tap before `POST /api/logs`** — that call is what starts the log stream and also
-clears whatever was queued before it, so startup discovery's own lines never appear there; they're only
+**Nothing reaches the tap before its `Subscribe`** — the first listener to subscribe is what starts the log
+stream, and starting it clears whatever was queued before, so startup discovery's own lines never appear there; they're only
 in the file log (`~/.teensyrom/api/Assets/System/Logs/Logs-<start>.txt`, one per run). That file log has no
 per-line timestamps of its own (a raw log line, nothing prepended) and flushes to disk every 100 lines or
 5 s, whichever comes first — its *file name* is in local time, not UTC.
@@ -157,7 +157,6 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 | `POST /api/devices/{deviceId}/reconnect` | saved addresses, preferred transport first, then one search for missing units if that misses |
 | `DELETE /api/devices/{deviceId}` | offline units only - an available device answers 409 |
 | `POST /api/devices/{deviceId}/toggle-music` | |
-| `POST /api/logs` / `DELETE /api/logs` | starts/stops the log stream; the hub itself is `/api/logHub` |
 | `GET /api/devices/{deviceId}/storage/{SD\|USB}/files/content?Path=` | |
 
 ## Gotchas
@@ -233,9 +232,9 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 
 ## Proven round-trip (2026-09-20)
 
-Breakpoint on `StartLogsEndpoint.cs:22` → started the log tap (its `POST /api/logs`
+Breakpoint on `LogsHub.Subscribe` → started the log tap (its `Subscribe` invoke
 tripped it) → `GET /status` showed HELD with the stack → `GET /locals?depth=2` and
-`POST /eval` read state → `POST /continue` → the tap's POST returned 200 → `DELETE /bp`.
+`POST /eval` read state → `POST /continue` → the tap's `Subscribe` returned → `DELETE /bp`.
 
 ## Worked example — the large-launch investigation (2026-09-20)
 

@@ -34,6 +34,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ILoggingService>(sp => sp.GetRequiredService<LoggingService>());
             services.AddSingleton<IQueuedChannelLogger>(sp => sp.GetRequiredService<LoggingService>());
             services.AddSingleton<ILogStream, LogStream>();
+            services.AddSingleton<ILogSubscriptions, LogSubscriptions>();
+            services.AddSingleton<IEngineShutdown, EngineShutdown>();
             services.AddSingleton<IAlertService, AlertService>();
             services.AddSingleton<SettingsService>();
             services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());

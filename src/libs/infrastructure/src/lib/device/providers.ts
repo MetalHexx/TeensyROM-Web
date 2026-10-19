@@ -30,7 +30,7 @@ export const DEVICE_SERVICE_PROVIDER = {
 export const DEVICE_LOGS_SERVICE_PROVIDER = {
   provide: DEVICE_LOGS_SERVICE,
   useClass: DeviceLogsService,
-  deps: [DevicesApiService, ALERT_SERVICE, API_CONFIG],
+  deps: [ALERT_SERVICE, API_CONFIG],
 };
 
 export const DEVICE_STORAGE_SERVICE_PROVIDER = {

@@ -1,6 +1,7 @@
 .openapi-generator-ignore
 apis/AudioApi.ts
 apis/DevicesApi.ts
+apis/EngineApi.ts
 apis/FilesApi.ts
 apis/PlayerApi.ts
 apis/SettingsApi.ts
@@ -59,8 +60,7 @@ models/SealJobResponse.ts
 models/SearchResponse.ts
 models/SearchSettingsDto.ts
 models/SearchWeightsDto.ts
-models/StartLogsResponse.ts
-models/StopLogsResponse.ts
+models/StopEngineResponse.ts
 models/StorageCacheDto.ts
 models/TeensyFilterType.ts
 models/TeensyStorageType.ts

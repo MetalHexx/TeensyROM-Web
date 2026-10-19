@@ -23,8 +23,6 @@ import type {
   RenameDeviceBody,
   RenameDeviceResponse,
   ResetDeviceResponse,
-  StartLogsResponse,
-  StopLogsResponse,
 } from '../models/index';
 import {
     FindDevicesResponseFromJSON,
@@ -43,10 +41,6 @@ import {
     RenameDeviceResponseToJSON,
     ResetDeviceResponseFromJSON,
     ResetDeviceResponseToJSON,
-    StartLogsResponseFromJSON,
-    StartLogsResponseToJSON,
-    StopLogsResponseFromJSON,
-    StopLogsResponseToJSON,
 } from '../models/index';
 
 export interface FindDevicesRequest {
@@ -300,62 +294,6 @@ export class DevicesApiService extends runtime.BaseAPI {
      */
     async resetDevice(requestParameters: ResetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ResetDeviceResponse> {
         const response = await this.resetDeviceRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Starts the logging service and returns a success message.
-     * Start Logging Hub
-     */
-    async startLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StartLogsResponse>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        const response = await this.request({
-            path: `/api/logs`,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => StartLogsResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * Starts the logging service and returns a success message.
-     * Start Logging Hub
-     */
-    async startLogs(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<StartLogsResponse> {
-        const response = await this.startLogsRaw(initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Stops the logging service and returns a success message.
-     * Stop Logging Channel
-     */
-    async stopLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StopLogsResponse>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        const response = await this.request({
-            path: `/api/logs`,
-            method: 'DELETE',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => StopLogsResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * Stops the logging service and returns a success message.
-     * Stop Logging Channel
-     */
-    async stopLogs(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<StopLogsResponse> {
-        const response = await this.stopLogsRaw(initOverrides);
         return await response.value();
     }
 

@@ -18,11 +18,15 @@ conn.on('LogProduced', (msg) => {
   const text = typeof msg === 'string' ? msg : JSON.stringify(msg);
   appendFileSync(out, `${ts()} ${text.replace(/\r?\n$/, '')}\n`);
 });
-conn.onreconnected(() => appendFileSync(out, `${ts()} [tap] reconnected\n`));
+conn.onreconnected(async () => {
+  // A reconnect is a new connection id: it lost its group membership.
+  const resubscribed = await conn.invoke('Subscribe').then(() => 'resubscribed', (e) => `resubscribe failed ${e}`);
+  appendFileSync(out, `${ts()} [tap] reconnected, ${resubscribed}\n`);
+});
 conn.onclose((e) => appendFileSync(out, `${ts()} [tap] closed ${e ?? ''}\n`));
 
 await conn.start();
 appendFileSync(out, `${ts()} [tap] connected to ${base}/api/logHub\n`);
-const r = await fetch(`${base}/api/logs`, { method: 'POST' });
-appendFileSync(out, `${ts()} [tap] StartLogs -> ${r.status}\n`);
+await conn.invoke('Subscribe');
+appendFileSync(out, `${ts()} [tap] subscribed\n`);
 setInterval(() => {}, 1 << 30); // keep alive

@@ -108,7 +108,7 @@ graph TB
 |-----------|---------|-----------|
 | **Program.cs** | Application entry point, DI container setup, middleware pipeline | #file:apps/api/src/TeensyRom.Api/Program.cs |
 | **RadEndpoints** | Thin HTTP handlers that delegate to MediatR or services | #file:apps/api/src/TeensyRom.Api/Endpoints/Files/GetDirectory/GetDirectoryEndpoint.cs<br/>#file:apps/api/src/TeensyRom.Api/Endpoints/Serial/FindDevices/FindDevicesEndpoint.cs<br/>#file:apps/api/src/TeensyRom.Api/Endpoints/Player/LaunchFile/LaunchFileEndpoint.cs |
-| **SignalR Hubs** | Real-time log stream for the frontend | #file:apps/api/src/TeensyRom.Api/Endpoints/Serial/Logs/LogsHub.cs |
+| **SignalR Hubs** | Real-time log stream for the frontend; each listener subscribes its own connection (`Subscribe`/`Unsubscribe`) | #file:apps/api/src/TeensyRom.Api/Endpoints/Serial/Logs/LogsHub.cs |
 | **Startup Extensions** | Service registration and configuration | #file:apps/api/src/TeensyRom.Api/Startup/ServiceStartupExtensions.cs<br/>#file:apps/api/src/TeensyRom.Api/Startup/MediatorStartupExtensions.cs<br/>#file:apps/api/src/TeensyRom.Api/Startup/ApiDocStartupExtensions.cs |
 
 **Endpoint Pattern**: Each endpoint lives in `Endpoints/[Domain]/[Action]/[Action]Endpoint.cs` with explicit RadEndpoints configuration (routes, tags, descriptions) and delegates complex operations to MediatR.
@@ -836,7 +836,7 @@ TeensyRom.Api
 
 **Logging Architecture**:
 - **LoggingService**: Queued channel-based logger buffering messages
-- **LogStream**: Pushes logs to SignalR `LogsHub` for real-time frontend display
+- **LogStream**: Pushes logs to the SignalR `LogsHub` group of subscribed listeners for real-time frontend display; the stream runs while at least one connection is subscribed (`LogSubscriptions`)
 - **Console Logging**: ASP.NET Core default logger for server-side debugging
 
 **Log Levels**:
