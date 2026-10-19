@@ -85,6 +85,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Boolean / Phrase Search**: Group phrases in quotes or add a plus for required terms/phrases E.g., `Iron +Maiden +"Aces High"`
 - **Search Results View**: Dedicated view for browsing and launching search results
 - **File Type Filters**: Filter by All, Games, Music, Images, or Demos
+- **Banned Files & Directories**: Hide files and directories from browsing, search, and shuffle. Manage the list in **Settings → Search**; it starts with entries such as `System Volume Information`, `FOUND.000`, `Docs`, and `Dumps`, and removing an entry shows its items again
 
 ### Play History & Favorites
 - **Play History Tracking**: Complete history of all launched files with timestamps
@@ -178,7 +179,7 @@ This application can be deployed in two ways:
 TeensyRom.Api.exe
 ```
 
-4. Open your browser to `http://localhost:213`
+4. Open your browser to `http://localhost:10213`
 
 > **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
 
@@ -198,7 +199,7 @@ brew install teensyrom-web
 teensyrom-web
 ```
 
-4. Open your browser to `http://localhost:213`
+4. Open your browser to `http://localhost:10213`
 
 > **Note**: macOS may block the app on first run. Go to System Settings > Privacy & Security and click "Open Anyway".
 
@@ -214,7 +215,7 @@ chmod +x TeensyRom.Api
 ./TeensyRom.Api
 ```
 
-3. Open your browser to `http://localhost:213`
+3. Open your browser to `http://localhost:10213`
 
 ## 🔌 Device Discovery & Connectivity
 
@@ -273,12 +274,12 @@ Once running, open your browser to access:
 
 **Web UI:**
 ```
-http://localhost:213
+http://localhost:10213
 ```
 
 **API Documentation (Scalar):**
 ```
-http://localhost:213/scalar/v1
+http://localhost:10213/scalar/v1
 ```
 
 ## 🤝 Contributing

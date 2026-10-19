@@ -799,7 +799,7 @@ TeensyRom.Api
 
 **Environment Variables**:
 - `ASPNETCORE_ENVIRONMENT`: Development/Production (affects logging verbosity)
-- `ASPNETCORE_URLS`: Bind address (default: `http://localhost:5000`)
+- `ASPNETCORE_URLS`: Bind address (the API binds the Kestrel endpoint in `appsettings.json`, `http://0.0.0.0:10213`)
 
 **Settings Service** (#file:apps/api/src/TeensyRom.Core/Settings/SettingsService.cs):
 - Manages user preferences (search weights, banned directories, last connected device)

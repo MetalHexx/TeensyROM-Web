@@ -51,7 +51,7 @@ TeensyROM-UI is a hybrid .NET/Angular application that provides a modern desktop
 ```bash
 # From: Source/Windows/TeensyRom.Ui/
 dotnet build                                    # Build entire solution
-dotnet run --project src/TeensyRom.Api        # Start API server (port 5000/5001)
+dotnet run --project src/TeensyRom.Api        # Start API server (port 10213)
 dotnet test                                    # Run all .NET tests
 ```
 

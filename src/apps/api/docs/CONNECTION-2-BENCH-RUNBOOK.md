@@ -29,7 +29,7 @@ Live state lives under the Debug build's `bin/.../Assets/System`: `Config/Settin
 ```
 Remove-Item -Recurse -Force apps/api/src/TeensyRom.Api/bin
 dotnet build apps/api/src/TeensyRom.Api
-dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 213
+dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 10213
 ```
 
 Start the log tap before triggering anything you want timed:

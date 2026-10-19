@@ -119,15 +119,15 @@ cd publish/win-x64
 ```
 
 **Verify functionality:**
-1. Open browser: `http://localhost:5000`
+1. Open browser: `http://localhost:10213`
 2. Check Angular app loads (not Scalar docs redirect)
 3. Test device detection (if TeensyROM connected)
-4. Check API endpoints: `http://localhost:5000/api/devices`
-5. Verify Scalar docs: `http://localhost:5000/scalar/v1`
+4. Check API endpoints: `http://localhost:10213/api/devices`
+5. Verify Scalar docs: `http://localhost:10213/scalar/v1`
 6. Check SignalR hubs connect (browser DevTools console)
 
 **Common Issues:**
-- ❌ **Port 5000 already in use**: Kill existing process or change port in appsettings.json
+- ❌ **Port 10213 already in use**: Kill existing process or change port in appsettings.json
 - ❌ **404 on root**: Frontend not copied to wwwroot (run Step 1)
 - ❌ **CORS errors**: Check allowed origins in appsettings.json
 - ❌ **Assets not found**: AppContext.BaseDirectory issue (Phase 03 concern)
