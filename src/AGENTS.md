@@ -6,6 +6,7 @@ Hybrid **.NET 9 Web API + Angular 19 (Nx monorepo)** application for TeensyROM d
 
 - Frontend app: `apps/teensyrom-ui` (source in `src/`, assets in `public/`). Cypress e2e: `apps/teensyrom-ui-e2e`.
 - Backend solution: `apps/api/TeensyRom.Ui.sln`. API project: `apps/api/src/TeensyRom.Api` (RadEndpoints, MediatR, SignalR), Scalar docs at `/scalar/v1`.
+- CLI: `apps/cli` (own solution `TeensyRom.Cli.sln`; .NET 9 terminal client of the API, shipped with it) — see the `cli` skill.
 
 ## Architecture
 
@@ -83,7 +84,8 @@ export class DeviceStore {
 - Unit tests (Vitest): `pnpm nx test <project>`
 - Lint/format: `pnpm nx lint`; `pnpm run format`
 - Backend: `dotnet build` / `dotnet run` / `dotnet test` from `apps/api/src/TeensyRom.Api` (or the solution `apps/api/TeensyRom.Ui.sln`)
-- Regenerate OpenAPI spec: `dotnet build apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` (generated in `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`), then regenerate the TypeScript client and update Angular services/state
+- CLI (from `src/`): build `dotnet build apps/cli/TeensyRom.Cli.sln`; unit tests `dotnet test apps/cli/src/TeensyRom.Cli.Tests`; real-engine suite `dotnet test apps/cli/src/TeensyRom.Cli.Tests.Integration --filter "Category!=Hardware"` (the `Hardware` category needs a bench)
+- Regenerate OpenAPI spec: `dotnet build apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` (generated in `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`), then regenerate both clients (`pnpm run generate:api-client` for web, `pnpm run generate:cli-api-client` for the CLI) and update Angular services/state
 - Dev fixture page: `/dev/transfer-states` — renders every file-transfer modal/dropzone state (including hard-to-trigger ones like `device-busy`, `draining`, `aborted`) with no backend or device needed. Not linked from nav; source in `libs/features/file-transfer/src/lib/dev-transfer-fixtures/`.
 
 ### Sibling-repo dependency: SIDablist
@@ -150,7 +152,7 @@ Mock only at infrastructure boundaries — application and features tests should
 1. Modify endpoint or models in `Endpoints/` or `Models/`.
 2. Update the Core layer if business logic changes.
 3. Run the API to regenerate the OpenAPI spec.
-4. Regenerate the TypeScript client.
+4. Regenerate both clients: `pnpm run generate:api-client` (web) and `pnpm run generate:cli-api-client` (CLI).
 5. Update Angular services and state as needed.
 
 ### Frontend changes
@@ -170,7 +172,7 @@ Mock only at infrastructure boundaries — application and features tests should
 
 ## Real-Time Communication (SignalR)
 
-- Device logs: `/logHub`; device events: `/deviceEventHub`.
+- Device logs: `/api/logHub` — each listener calls `Subscribe`/`Unsubscribe`; lines arrive as `LogProduced`.
 - Infrastructure services own hub lifecycle and reconnection logic.
 
 ## Backend Notes
@@ -182,6 +184,7 @@ Mock only at infrastructure boundaries — application and features tests should
   fork branch `boot-complete-flag`, pending upstream).
 - `Connection:PreferredTransport` (default `Tcp`) orders the start and reconnect occasions' own cached-endpoint attempts, and picks the survivor when a scan finds a unit reachable on both.
 - After any reset the API stays silent until the C64 menu's SID token.
+- Engine data: everything the engine writes lives in `~/.teensyrom/api` (`TEENSYROM_DATA_DIR` moves the home). Tests use a throwaway home, and a build never touches the home (the OpenAPI generator's run is guarded). On Windows, stop a running engine (`TeensyRom.Cli stop`, or `dotnet run --project apps/cli/src/TeensyRom.Cli -- stop` from `src/`) before rebuilding it.
 
 ## UI & Styling Resources
 

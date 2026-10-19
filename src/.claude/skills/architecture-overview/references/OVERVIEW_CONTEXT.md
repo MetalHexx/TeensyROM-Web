@@ -201,6 +201,7 @@ apps/                                           # [group] Applications
 │       ├── app.component.ts                    # [file] Root component with routing
 │       ├── app.routes.ts                       # [file] Route configuration (devices, player)
 │       └── app.config.ts                       # [file] App providers and DI configuration
+├── cli/                                        # [app] Terminal client of the engine's API (see the cli skill)
 └── teensyrom-ui-e2e/                          # [e2e] Cypress end-to-end tests
 
 libs/
