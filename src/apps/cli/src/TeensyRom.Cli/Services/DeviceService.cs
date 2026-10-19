@@ -1,39 +1,11 @@
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
-using AssemblyExtensions = TeensyRom.Cli.Common.AssemblyExtensions;
 
 namespace TeensyRom.Cli.Services;
 
 internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
 {
-    private static readonly TimeSpan VersionTimeout = TimeSpan.FromSeconds(5);
-
-    /// <summary>This CLI's own version, which the engine it talks to must match.</summary>
-    internal static readonly string CliVersion = AssemblyExtensions.GetVersion(typeof(DeviceService).Assembly);
-
     public DeviceSummary? SelectedDevice { get; private set; }
-
-    public async Task<VersionCheck> CheckVersionAsync(CancellationToken ct = default)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(VersionTimeout);
-
-        try
-        {
-            var response = await api.GetVersionAsync(timeout.Token);
-            var running = response.Version;
-            var plus = running.IndexOf('+');
-            var comparable = plus < 0 ? running : running[..plus];
-
-            return new VersionCheck(
-                string.Equals(comparable, CliVersion, StringComparison.Ordinal) ? VersionOutcome.Match : VersionOutcome.Mismatch,
-                running);
-        }
-        catch (Exception)
-        {
-            return new VersionCheck(VersionOutcome.Unreachable, null);
-        }
-    }
 
     public async Task<IReadOnlyList<DeviceSummary>> GetDevicesAsync(CancellationToken ct = default)
     {

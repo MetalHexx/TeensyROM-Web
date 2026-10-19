@@ -1,7 +1,6 @@
 ﻿using Spectre.Console;
 using Spectre.Console.Cli;
 using System.Diagnostics;
-using System.Reflection;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Fonts;
@@ -16,8 +15,10 @@ public class Program
 
         var host = CliHost.Create();
         var app = CliHost.CreateApp(new TypeRegistrar(host.Services));
+        var session = new CliSession(app, host.Gate);
+        var interactive = AnsiConsole.Profile.Capabilities.Interactive;
 
-        if (!IsHelpOrVersion(args) && !await host.Startup.RunAsync())
+        if (!await session.EnsureReadyForAsync(args))
         {
             return 1;
         }
@@ -28,7 +29,7 @@ public class Program
         {
             try
             {
-                if (IsHelpOrVersion(args))
+                if (CommandRouting.IsHelpOrVersion(args))
                 {
                     app.Run(args);
                     return -99;
@@ -41,11 +42,18 @@ public class Program
                     AnsiConsole.WriteLine();
 
                     resultCode = app.Run(help.ToArray());
-                    resultCode = app.Run(args);
+                    resultCode = await session.RunCommandAsync(args);
                     args = [];
+
+                    if (!interactive) return resultCode;
+                }
+                else if (!interactive)
+                {
+                    app.Run(["-h"]);
+                    return 0;
                 }
 
-                var menuChoice = PromptHelper.ChoicePrompt("Choose wisely", ["Launch", "Settings", "Index Files", "List Ports", "Generate ASID Patches", "Credits", "Leave"]);
+                var menuChoice = PromptHelper.ChoicePrompt("Choose wisely", ["Launch", "Settings", "Index Files", "List Ports", "Generate ASID Patches", "Credits", "Stop Engine", "Leave"]);
 
                 AnsiConsole.WriteLine();
 
@@ -59,9 +67,15 @@ public class Program
                     "List Ports" => ["ports"],
                     "Generate ASID Patches" => ["chipsynth"],
                     "Credits" => ["credits"],
+                    "Stop Engine" => ["stop"],
                     _ => []
                 };
-                app.Run(args);
+
+                if (!await session.EnsureReadyForAsync(args))
+                {
+                    return 1;
+                }
+                await session.RunCommandAsync(args);
 
                 args = [];
             }
@@ -75,26 +89,27 @@ public class Program
             {
                 RadHelper.WriteError(ex.Message);
                 args = [];
+
+                if (!interactive) return 1;
                 continue;
             }
             catch (Exception ex)
             {
                 AnsiConsole.WriteException(ex, ExceptionFormats.Default);
                 LogExceptionToFile(ex);
+
+                if (!interactive) return 1;
                 continue;
             }
             if (resultCode == -1) return resultCode;
         }
     }
 
-    private static bool IsHelpOrVersion(string[] args) =>
-        args.Contains("-h") || args.Contains("--help") || args.Contains("-v") || args.Contains("--version");
-
     private static readonly object _logFileLock = new object();
 
     private static void LogExceptionToFile(Exception ex)
     {
-        string filePath = Path.Combine(Assembly.GetExecutingAssembly().GetPath(), @"Assets\System\Logs\UnhandledErrorLogs.txt");
+        string filePath = Path.Combine(TeensyRomHome.CliLogsPath, "UnhandledErrorLogs.txt");
 
         if (!Directory.Exists(Path.GetDirectoryName(filePath)))
         {

@@ -1,8 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reflection;
-using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Logging;
 using Formatting = Newtonsoft.Json.Formatting;
 
@@ -15,7 +13,7 @@ namespace TeensyRom.Cli.Settings
         private BehaviorSubject<TeensySettings> _settings;
         private readonly ILoggingService _logger;
 
-        private string _settingsFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), SettingsConstants.SettingsPath).GetOsFriendlyPath();
+        private string _settingsFilePath => SettingsConstants.SettingsPath;
 
         public SettingsService(ILoggingService logger)
         {

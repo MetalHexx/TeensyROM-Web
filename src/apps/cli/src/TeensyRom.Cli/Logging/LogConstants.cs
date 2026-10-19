@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TeensyRom.Cli.Common;
 
 namespace TeensyRom.Cli.Logging
 {
     public static class LogConstants
     {
-        public const string LogPath = @"Assets\System\Logs\Logs.txt";
+        public static string LogPath => Path.Combine(TeensyRomHome.CliLogsPath, "Logs.txt");
         public const string InternalColor = "#b39ddb"; //lavendar
         public const string InternalSuccessColor = "#86c691"; //green
         public const string InternalErrorColor = "#cc666c"; //soft red

@@ -27,8 +27,8 @@ internal sealed class CliHarness : IDisposable
         Host = CliHost.Create();
     }
 
-    /// <summary>Runs what the CLI runs before its menu: the version check and the device prompt.</summary>
-    public Task<bool> StartAsync() => Host.Startup.RunAsync();
+    /// <summary>Runs what the CLI runs before a command that needs the engine: readying the engine and the device prompt.</summary>
+    public Task<bool> StartAsync() => Host.Gate.EnsureReadyAsync();
 
     /// <summary>Runs a command line; one app serves every call on this harness.</summary>
     public int Run(params string[] args) =>

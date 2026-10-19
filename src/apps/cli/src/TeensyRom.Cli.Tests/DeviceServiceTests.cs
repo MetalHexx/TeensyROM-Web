@@ -13,9 +13,6 @@ public class DeviceServiceTests
 
     public DeviceServiceTests() => _sut = new DeviceService(_api);
 
-    private void ApiReportsVersion(string version) =>
-        _api.GetVersionAsync(Arg.Any<CancellationToken>()).Returns(new GetVersionResponse { Version = version });
-
     private void ApiKnowsDevices(params CartDto[] carts) =>
         _api.FindDevicesAsync(false, Arg.Any<CancellationToken>()).Returns(new FindDevicesResponse { Devices = carts });
 
@@ -31,48 +28,6 @@ public class DeviceServiceTests
         ComPort = "COM3",
         IpAddress = "10.0.0.7"
     };
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("+abc123")]
-    public async Task CheckVersion_WithTheCliVersion_Matches(string buildMetadata)
-    {
-        ApiReportsVersion(DeviceService.CliVersion + buildMetadata);
-
-        var check = await _sut.CheckVersionAsync();
-
-        check.Outcome.Should().Be(VersionOutcome.Match);
-    }
-
-    [Fact]
-    public async Task CheckVersion_WithAnotherVersion_ReportsWhatIsRunning()
-    {
-        ApiReportsVersion("0.0.1-other+abc123");
-
-        var check = await _sut.CheckVersionAsync();
-
-        check.Outcome.Should().Be(VersionOutcome.Mismatch);
-        check.RunningVersion.Should().StartWith("0.0.1-other");
-    }
-
-    public static IEnumerable<object[]> VersionFailures() =>
-    [
-        [new HttpRequestException("refused")],
-        [new TaskCanceledException("timed out")],
-        [ApiFailure(500, "")]
-    ];
-
-    [Theory]
-    [MemberData(nameof(VersionFailures))]
-    public async Task CheckVersion_WithoutAReply_IsUnreachable(Exception failure)
-    {
-        _api.GetVersionAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException<GetVersionResponse>(failure));
-
-        var check = await _sut.CheckVersionAsync();
-
-        check.Outcome.Should().Be(VersionOutcome.Unreachable);
-        check.RunningVersion.Should().BeNull();
-    }
 
     [Fact]
     public async Task GetDevices_ListsOnlineAndOfflineUnitsWithTheirConnection()

@@ -10,6 +10,7 @@ using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Common;
+using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
@@ -19,9 +20,9 @@ using AssemblyExtensions = TeensyRom.Cli.Common.AssemblyExtensions;
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// The CLI's service registrations and the startup that runs before its first command.
+/// The CLI's service registrations and the gate that readies the engine and a device before a command that needs them.
 /// </summary>
-internal sealed record CliComposition(ServiceCollection Services, ConnectionStartup Startup);
+internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate);
 
 /// <summary>
 /// Composition root shared by <c>Program</c> and the end-to-end tests.
@@ -29,7 +30,7 @@ internal sealed record CliComposition(ServiceCollection Services, ConnectionStar
 internal static class CliHost
 {
     /// <summary>
-    /// Builds what startup needs as instances, so the device chosen at startup is the one every command sees.
+    /// Builds what the gate needs as instances, so the device it selects is the one every command sees.
     /// The returned services are not built into a provider: Spectre registers command and settings types
     /// through the <see cref="ITypeRegistrar"/> during <c>Run</c>, and <see cref="TypeRegistrar"/> ignores
     /// registrations once its provider exists.
@@ -51,11 +52,21 @@ internal static class CliHost
         };
         var apiClient = new TeensyRomApiClient(httpClient);
         var deviceService = new DeviceService(apiClient);
-        var startup = new ConnectionStartup(deviceService);
+        var engine = new EngineControl(
+            new EngineProbe(),
+            new EngineLock(),
+            new EngineLocator(AppContext.BaseDirectory),
+            new EngineLauncher(),
+            new SourceFingerprint(),
+            new SystemEngineClock(),
+            AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly()),
+            notice => RadHelper.WriteLine(notice.EscapeBrackets()));
+        var gate = new StartupGate(engine, deviceService);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
-        services.AddSingleton(startup);
+        services.AddSingleton<IEngineControl>(engine);
+        services.AddSingleton(gate);
 
         services.AddSingleton<ILoggingService>(logService);
         services.AddSingleton<ICliLoggingService>(logService);
@@ -69,7 +80,7 @@ internal static class CliHost
         services.AddSingleton<IProgressTimer, ProgressTimer>();
         services.AddSingleton<ILaunchHistory, LaunchHistory>();
 
-        return new CliComposition(services, startup);
+        return new CliComposition(services, gate);
     }
 
     public static CommandApp CreateApp(ITypeRegistrar registrar)
@@ -147,6 +158,11 @@ internal static class CliHost
                   .WithAlias("c")
                   .WithDescription(CreditsSettings.Description)
                   .WithExample(CreditsSettings.Example);
+
+            config.AddExample(StopSettings.Example);
+            config.AddCommand<StopCommand>("stop")
+                  .WithDescription(StopSettings.Description)
+                  .WithExample(StopSettings.Example);
 
             var help = config.Settings.HelpProviderStyles;
             help!.Arguments!.Header = new Style(foreground: RadHelper.Theme.Secondary.Color);

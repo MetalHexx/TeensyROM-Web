@@ -7,9 +7,6 @@ internal interface IDeviceService
 {
     DeviceSummary? SelectedDevice { get; }
 
-    /// <summary>Asks tr-web which version it runs and compares it with the pinned one.</summary>
-    Task<VersionCheck> CheckVersionAsync(CancellationToken ct = default);
-
     /// <summary>Lists the devices tr-web already knows, online first, without scanning for new ones.</summary>
     /// <exception cref="TeensyApiException">tr-web could not list its devices.</exception>
     Task<IReadOnlyList<DeviceSummary>> GetDevicesAsync(CancellationToken ct = default);
@@ -30,7 +27,3 @@ internal interface IDeviceService
 }
 
 internal sealed record DeviceSummary(string Id, string Name, bool IsOnline, string Connection, string State);
-
-internal enum VersionOutcome { Match, Mismatch, Unreachable }
-
-internal sealed record VersionCheck(VersionOutcome Outcome, string? RunningVersion);

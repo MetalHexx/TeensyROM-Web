@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\TeensyRom.Cli.Tests\TestHome.cs" Link="TestHome.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="FluentAssertions" />
     <Using Include="Xunit" />
   </ItemGroup>

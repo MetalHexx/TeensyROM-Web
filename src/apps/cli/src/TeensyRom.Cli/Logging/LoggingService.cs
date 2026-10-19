@@ -1,7 +1,5 @@
 ﻿using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reflection;
-using TeensyRom.Cli.Common;
 
 namespace TeensyRom.Cli.Logging
 {
@@ -9,7 +7,7 @@ namespace TeensyRom.Cli.Logging
     {
         public IObservable<string> Logs => _logs.AsObservable();
         protected Subject<string> _logs = new();
-        private string _logPath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), LogConstants.LogPath).GetOsFriendlyPath();
+        private string _logPath => LogConstants.LogPath;
 
         protected LoggingService()
         {
