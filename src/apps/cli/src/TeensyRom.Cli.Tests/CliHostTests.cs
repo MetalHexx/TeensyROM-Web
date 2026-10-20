@@ -54,7 +54,7 @@ public sealed class CliHostTests : IDisposable
         var exitCode = await _host.RunAsync("--help");
 
         exitCode.Should().Be(0);
-        StdOut.Should().Contain("trom engine").And.Contain("trom device").And.Contain("EXIT CODES").And.Contain("--json");
+        StdOut.Should().Contain("COMMANDS").And.Contain("engine").And.Contain("device").And.Contain("EXIT CODES").And.Contain("--json");
         StdErr.Should().BeEmpty();
         await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
         await _host.Devices.DidNotReceiveWithAnyArgs().GetDevicesAsync(default);

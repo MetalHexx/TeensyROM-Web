@@ -64,7 +64,7 @@ internal static class CliHost
     /// The public command tree: <c>trom &lt;noun&gt; &lt;verb&gt;</c>. It is the one description that both registers the
     /// branches and feeds bare-noun detection, so a task that adds a noun adds it here and nowhere else.
     /// </summary>
-    private static readonly PublicNoun[] PublicTree =
+    internal static readonly PublicNoun[] PublicTree =
     [
         new("engine", "Check on or stop the TeensyROM engine.",
         [
@@ -256,6 +256,10 @@ internal static class CliHost
 
             StyleHelp(config);
             config.SetHelpProvider(new TromHelpProvider(config.Settings));
+
+            config.AddExample("device", "list");
+            config.AddExample("file", "ls", "/music");
+            config.AddExample("file", "search", "commando", "--json", "|", "jq", "-r", "'.[0].path'", "|", "trom", "file", "launch", "-");
 
             foreach (var noun in PublicTree)
             {

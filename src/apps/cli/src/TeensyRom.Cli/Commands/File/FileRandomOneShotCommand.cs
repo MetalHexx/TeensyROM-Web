@@ -28,7 +28,7 @@ internal sealed class FileRandomOneShotSettings : FileLaunchingSettings
     public string? Directory { get; set; }
 
     [CommandOption("-t|--timer <TIMER>")]
-    [Description("With --player: how long each file plays: none, 5s, 15s, 30s, 1m, 3m, 5m, 15m, 30m or 1h.")]
+    [Description("With --player: how long each file plays: none, 5s, 15s, 30s, 1m, 3m, 5m, 15m, 30m or 1h. Defaults to none.")]
     public string? Timer { get; set; }
 
     [CommandOption("--override")]
