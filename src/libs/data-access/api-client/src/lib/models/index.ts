@@ -3,6 +3,7 @@
 export * from './AppSettingsDto';
 export * from './AudioDeviceDto';
 export * from './AudioSettingsDto';
+export * from './BanFileResponse';
 export * from './CancelJobResponse';
 export * from './CartDto';
 export * from './CartStorageDto';

@@ -12,6 +12,7 @@ index.ts
 models/AppSettingsDto.ts
 models/AudioDeviceDto.ts
 models/AudioSettingsDto.ts
+models/BanFileResponse.ts
 models/CancelJobResponse.ts
 models/CartDto.ts
 models/CartStorageDto.ts
