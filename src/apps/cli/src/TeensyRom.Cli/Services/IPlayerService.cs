@@ -24,6 +24,9 @@ namespace TeensyRom.Cli.Services
         void SetDirectoryMode(string path);
         void SetRandomMode(string path);
         Task TogglePlay();
+        /// <summary>Saves the storage as the CLI's default-storage preference. For the menu; a command line uses <see cref="UseStorage"/>.</summary>
         void SetStorage(TeensyStorageType storageType);
+        /// <summary>Plays from another storage for this session only; the saved default-storage preference is left alone.</summary>
+        void UseStorage(TeensyStorageType storageType);
     }
 }

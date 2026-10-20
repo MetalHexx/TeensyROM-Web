@@ -326,6 +326,21 @@ namespace TeensyRom.Cli.Tests
             playerService.GetState().StorageType.Should().Be(storageType);
         }
 
+        [Theory]
+        [InlineData(TeensyStorageType.SD)]
+        [InlineData(TeensyStorageType.USB)]
+        public void When_StorageUsed_Then_StateFollows_And_TheSavedDefaultIsLeftAlone(TeensyStorageType storageType)
+        {
+            //Act
+            var playerService = _fixture.Create<PlayerService>();
+            playerService.UseStorage(storageType);
+
+            //Assert
+            _storageService.Received(1).UseStorage(storageType);
+            _storageService.DidNotReceive().SwitchStorage(Any<TeensyStorageType>());
+            playerService.GetState().StorageType.Should().Be(storageType);
+        }
+
         [Fact]
         public async Task When_SetSidTimerOverride_PlayTimerReset()
         {

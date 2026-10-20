@@ -118,6 +118,58 @@ public class StorageServiceTests
         failure.StatusCode.Should().Be(404);
     }
 
+    private void ListDirectory(string path, params FileItemDto[] files) =>
+        _api.GetDirectoryAsync(DeviceId, ApiStorageType.SD, path, Arg.Any<CancellationToken>())
+            .Returns(new GetDirectoryResponse { StorageItem = new StorageCacheDto { Path = path, Directories = [], Files = [.. files] } });
+
+    [Fact]
+    public async Task GetFile_MatchesThePathExactly_NotAFileWhosePathMerelyContainsIt()
+    {
+        ListDirectory("/music/", File("/music/11.sid"), File("/music/1.sid"), File("/music/1.sid.bak", FileItemType.Unknown));
+
+        var file = await _sut.GetFile("/music/1.sid");
+
+        file.Should().NotBeNull();
+        file!.Path.Should().Be("/music/1.sid");
+    }
+
+    [Fact]
+    public async Task GetFile_WhenOnlyALongerPathContainsIt_FindsNothing()
+    {
+        ListDirectory("/music/", File("/music/11.sid"));
+
+        (await _sut.GetFile("/music/1.sid")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetFile_IgnoresCase_AsTheStorageDoes()
+    {
+        ListDirectory("/music/", File("/music/Commando.SID"));
+
+        var file = await _sut.GetFile("/music/commando.sid");
+
+        file.Should().NotBeNull();
+        file!.Path.Should().Be("/music/Commando.SID");
+    }
+
+    [Fact]
+    public async Task GetFile_OfAFileThatCantBeLaunched_FindsNothing()
+    {
+        ListDirectory("/docs/", File("/docs/notes.txt", FileItemType.Unknown));
+
+        (await _sut.GetFile("/docs/notes.txt")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetFile_ListsTheFilesParentDirectory()
+    {
+        ListDirectory("/");
+
+        await _sut.GetFile("/top.sid");
+
+        await _api.Received(1).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/", Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Search_KeepsOnlyTheChosenStorage_AndOnlyLaunchableFiles()
     {

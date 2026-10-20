@@ -1,6 +1,7 @@
 using System.Text.Json;
-using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Storage.Entities;
+using CartDto = TeensyRom.Cli.Api.Generated.CartDto;
 
 namespace TeensyRom.Cli.Tests.Integration;
 
@@ -16,21 +17,86 @@ public sealed class HardwareScenarios(SharedApiFixture api)
     /// on the first online device. The bench run extends this pattern.
     /// </summary>
     [SkippableFact]
-    public async Task LaunchFile_RunsTheBenchFile_AndTheApiReportsItLaunched()
+    public async Task FileLaunch_RunsTheBenchFile_AndReportsItLaunched()
+    {
+        var path = BenchFileOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("file", "launch", path, "--device", device.DeviceId, "--storage", storage, "--json");
+
+        exitCode.Should().Be(0, cli.Error);
+        var result = JsonDocument.Parse(cli.Output).RootElement;
+        result.GetProperty("status").GetString().Should().Be("launched");
+        result.GetProperty("file").GetProperty("path").GetString().Should().BeEquivalentTo(path);
+    }
+
+    [SkippableFact]
+    public async Task FileLs_ListsTheRootOfTheBenchStorage()
+    {
+        var (device, storage) = BenchDeviceOrSkip();
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("file", "ls", "/", "--device", device.DeviceId, "--storage", storage, "--json");
+
+        exitCode.Should().Be(0, cli.Error);
+        var listing = JsonDocument.Parse(cli.Output).RootElement;
+        listing.GetProperty("path").GetString().Should().Be("/");
+        listing.GetProperty("storage").GetString().Should().Be(storage);
+        listing.GetProperty("directories").EnumerateArray().Concat(listing.GetProperty("files").EnumerateArray())
+            .Should().OnlyContain(entry => entry.GetProperty("storage").GetString() == storage && entry.GetProperty("path").GetString()!.StartsWith('/'));
+    }
+
+    /// <summary>
+    /// Searches for CLI_BENCH_SEARCH, or the name of CLI_BENCH_FILE without its extension. The storage must be indexed
+    /// for the search to find anything; an empty result is still a successful search.
+    /// </summary>
+    [SkippableFact]
+    public async Task FileSearch_AnswersWithItemsThatCarryTheirPathAndStorage()
+    {
+        var text = Environment.GetEnvironmentVariable("CLI_BENCH_SEARCH");
+        if (string.IsNullOrWhiteSpace(text)) text = Path.GetFileNameWithoutExtension(Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty);
+        Skip.If(string.IsNullOrWhiteSpace(text), "neither CLI_BENCH_SEARCH nor CLI_BENCH_FILE is set");
+        var (device, storage) = BenchDeviceOrSkip();
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("file", "search", text!, "--take", "5", "--device", device.DeviceId, "--storage", storage, "--json");
+
+        exitCode.Should().Be(0, cli.Error);
+        JsonDocument.Parse(cli.Output).RootElement.EnumerateArray()
+            .Should().OnlyContain(item => item.GetProperty("storage").GetString() == storage && item.GetProperty("path").GetString()!.StartsWith('/'));
+    }
+
+    /// <summary>Has tr-web pick a music file on the bench storage; the scenario is skipped when the storage has none.</summary>
+    [SkippableFact]
+    public async Task FileRandom_LaunchesAMusicFileFromTheBenchStorage()
+    {
+        var (device, storage) = BenchDeviceOrSkip();
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("file", "random", "--filter", "music", "--device", device.DeviceId, "--storage", storage, "--json");
+
+        Skip.If(exitCode == (int)CliExitCode.NotFound, "the bench storage has no music files");
+        exitCode.Should().Be(0, cli.Error);
+        var result = JsonDocument.Parse(cli.Output).RootElement;
+        result.GetProperty("status").GetString().Should().Be("launched");
+        result.GetProperty("file").GetProperty("fileType").GetString().Should().Be("sid");
+    }
+
+    private static string BenchFileOrSkip()
     {
         var path = Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty;
         Skip.If(string.IsNullOrWhiteSpace(path), "CLI_BENCH_FILE is not set");
+        return path;
+    }
+
+    /// <summary>The first online device and the storage to use on it, as <c>--storage</c> writes it.</summary>
+    private (CartDto Device, string Storage) BenchDeviceOrSkip()
+    {
         Skip.If(api.OnlineDevices.Count == 0, "no TeensyROM is online in the test API");
         var device = api.OnlineDevices[0];
-        var storageType = CliServices.AvailableStorageOrSkip(device);
 
-        using var cli = new CliServices();
-        cli.SelectDevice(device);
-        var item = FileItem.Create(path).Should().BeAssignableTo<ILaunchableItem>().Subject;
-
-        var outcome = await cli.Get<ILaunchService>().LaunchFile(storageType, item);
-
-        outcome.Status.Should().Be(LaunchStatus.Launched, outcome.Message);
+        return (device, CliServices.AvailableStorageOrSkip(device) == TeensyStorageType.SD ? "sd" : "usb");
     }
 
     [SkippableFact]

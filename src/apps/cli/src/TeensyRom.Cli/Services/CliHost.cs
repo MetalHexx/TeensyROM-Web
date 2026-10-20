@@ -9,6 +9,7 @@ using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Commands.Device;
 using TeensyRom.Cli.Commands.Engine;
+using TeensyRom.Cli.Commands.File;
 using TeensyRom.Cli.Commands.Index;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Asid;
@@ -77,6 +78,13 @@ internal static class CliHost
             PublicVerb.Of<DeviceForgetCommand, DeviceSettings>("forget", "Make tr-web forget a TeensyROM, even one that is offline.", ["device", "forget", "--device", "Bench"]),
             PublicVerb.Of<DevicePingCommand, DeviceSettings>("ping", "Check that an online TeensyROM answers.", ["device", "ping"]),
             PublicVerb.Of<DeviceResetCommand, DeviceSettings>("reset", "Reset an online TeensyROM, which stops whatever it is running.", ["device", "reset"])
+        ]),
+        new("file", "Browse, search and launch the files on a TeensyROM's storage.",
+        [
+            PublicVerb.Of<FileLsCommand, FileLsSettings>("ls", "List a directory: its subdirectories, then its files.", ["file", "ls", "/music"]),
+            PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the indexed files of a storage.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
+            PublicVerb.Of<FileLaunchOneShotCommand, FileLaunchOneShotSettings>("launch", "Launch one file; --player then opens the player on it.", ["file", "launch", "/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid"]),
+            PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it.", ["file", "random", "--filter", "music", "--directory", "/music"])
         ]),
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [

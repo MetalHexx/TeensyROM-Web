@@ -63,6 +63,29 @@ public sealed class DeviceFreeScenarios
     }
 
     [Fact]
+    public async Task FilePlayer_OutsideATerminal_IsAUsageError_AndStartsNoEngine()
+    {
+        using var bound = TestEngine.Bounded();
+        await TestEngine.StopAsync(bound.Token);
+
+        try
+        {
+            using var cli = new CliHarness();
+
+            (await cli.RunAsync("file", "launch", "/music/Artillery.sid", "--player")).Should().Be(2);
+            (await cli.RunAsync("file", "random", "--player")).Should().Be(2);
+
+            cli.Output.Should().BeEmpty();
+            cli.Error.Should().Contain("--player needs an interactive terminal.").And.NotContain("Starting the TeensyROM engine");
+            (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
+        }
+        finally
+        {
+            await TestEngine.EnsureAsync(bound.Token);
+        }
+    }
+
+    [Fact]
     public async Task ChipsynthGenerate_AndSettingsShow_RunWithoutAnEngine_AndStartNone()
     {
         using var bound = TestEngine.Bounded();

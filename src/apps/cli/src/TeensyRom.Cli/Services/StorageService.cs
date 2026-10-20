@@ -1,5 +1,6 @@
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Entities;
@@ -34,6 +35,15 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
 
         var response = await ApiErrors.Call(() => api.GetDirectoryAsync(deviceId, storage, path));
         return ApiMapper.ToListing(response.StorageItem);
+    }
+
+    public async Task<ILaunchableItem?> GetFile(string path)
+    {
+        var directory = await GetDirectory(path.GetUnixParentPath());
+
+        return directory.Files
+            .OfType<ILaunchableItem>()
+            .FirstOrDefault(file => file.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<IReadOnlyList<ILaunchableItem>> Search(string query, TeensyFilterType filter)

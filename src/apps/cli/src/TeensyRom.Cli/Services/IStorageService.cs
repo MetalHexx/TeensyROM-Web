@@ -21,6 +21,12 @@ internal interface IStorageService
     /// <summary>Lists one directory of the current storage.</summary>
     Task<DirectoryListing> GetDirectory(string path);
 
+    /// <summary>
+    /// The launchable file at exactly <paramref name="path"/> in the current storage, or null when its directory holds
+    /// none by that path. Case is ignored, as FAT storage does.
+    /// </summary>
+    Task<ILaunchableItem?> GetFile(string path);
+
     /// <summary>Searches the current storage only; results that are not launchable are dropped.</summary>
     Task<IReadOnlyList<ILaunchableItem>> Search(string query, TeensyFilterType filter);
 
