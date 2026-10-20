@@ -32,7 +32,8 @@ namespace TeensyRom.Cli.Storage.Services
             if (index == -1) return;            
             
             _history.RemoveAt(index);
-            
+            Renumber();
+
             if (index <= _currentIndex)
             {
                 _currentIndex--;
@@ -75,6 +76,15 @@ namespace TeensyRom.Cli.Storage.Services
             _currentIndex = filteredList[currentFilteredIndex].Item1;
             CurrentIsNew = false;
             return filteredList[currentFilteredIndex].Item2;
+        }
+
+        /// <summary>Numbers the entries 0..n-1 again, so a removal leaves no gap and the next <see cref="Add"/> can't reuse an index.</summary>
+        private void Renumber()
+        {
+            for (var i = 0; i < _history.Count; i++)
+            {
+                _history[i] = new(i, _history[i].Item2);
+            }
         }
 
         private List<Tuple<int, ILaunchableItem>> FilterByTypes(TeensyFileType[] types) => _history
