@@ -21,11 +21,12 @@ Routing reference for the TeensyROM CLI, the terminal client of the engine's API
 
 - **One tool, one version**: the CLI ships with the engine and the web app as one package, and the engine and the CLI share `<Version>` in `src/apps/Version.props`.
 - **Client of the API only**: the CLI calls the engine's HTTP API and its log hub. It never references an engine project.
-- **Engine lifecycle**: a packaged CLI starts the engine from beside itself; from source, the CLI builds the engine and starts it. A running engine whose version or build differs from the CLI's is restarted. `stop` shuts the engine down. Only one engine runs per home (the lock is `<home>/api/engine.lock`), and the engine keeps running after the CLI exits until it is stopped.
-- **Device-free commands**: `chipsynth`, `credits` and `stop` run without starting an engine, and so do the help and version flags (`-h`/`--help`, `-v`/`--version`).
+- **Grammar**: `trom <noun> <verb>`, with the nouns `device`, `file`, `index`, `settings`, `engine`, `chipsynth` and `path`. `trom` alone opens the TUI. Every command takes `--json`; results go to stdout and diagnostics to stderr; exit codes are 0–5; no command prompts outside a terminal; `-` reads paths from stdin.
+- **Engine lifecycle**: a packaged CLI starts the engine from beside itself; from source, the CLI builds the engine and starts it. A running engine whose version or build differs from the CLI's is restarted. `trom engine stop` shuts the engine down. Only one engine runs per home (the lock is `<home>/api/engine.lock`), and the engine keeps running after the CLI exits until it is stopped.
+- **Device-free commands**: `chipsynth`, `settings`, `path`, `engine status`, `engine stop`, and the help and version flags (`-h`/`--help`, `-v`/`--version`) run without starting an engine.
 - **Home**: the CLI keeps its state in `~/.teensyrom/cli` and the engine keeps its in `~/.teensyrom/api`. `TEENSYROM_DATA_DIR` moves the whole home; set it to a temp folder whenever you run the CLI by hand during development.
 - **Source runs**: from source, the CLI rebuilds and restarts the engine when the engine's sources have changed, recording the sources it built from in `<home>/cli/source-engine.json`.
-- **Windows file locks**: on Windows a running engine locks the DLLs in its `bin/Debug` folder. Stop it with `TeensyRom.Cli stop` (from source, run `dotnet run --project apps/cli/src/TeensyRom.Cli -- stop` in `src/`) before you build the engine yourself, for example for engine tests or `generate-api-client.ps1`.
+- **Windows file locks**: on Windows a running engine locks the DLLs in its `bin/Debug` folder. Stop it with `trom engine stop` (from source, run `dotnet run --project apps/cli/src/TeensyRom.Cli -- engine stop` in `src/`) before you build the engine yourself, for example for engine tests or `generate-api-client.ps1`.
 - **Non-interactive shells**: without a terminal, a direct command runs and exits instead of showing the menu.
 - **Log following**: a listener calls the log hub's `Subscribe` and `Unsubscribe` on `/api/logHub`, and lines arrive as `LogProduced`.
 
