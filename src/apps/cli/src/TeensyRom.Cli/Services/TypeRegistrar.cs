@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System;
@@ -30,6 +31,14 @@ public sealed class TypeResolver : ITypeResolver
     }
 }
 
+/// <summary>
+/// Spectre's registrar over a service collection, shared by every app of the process so they share one provider.
+/// </summary>
+/// <remarks>
+/// Registrations are ignored once the provider is built, and a service type already registered keeps its first
+/// registration: Spectre registers settings types as singletons, which would carry option values from one run into the
+/// next, so the CLI registers its own (transient) instances first and Spectre's later ones change nothing.
+/// </remarks>
 public sealed class TypeRegistrar : ITypeRegistrar
 {
     private readonly IServiceCollection _builder;
@@ -55,14 +64,14 @@ public sealed class TypeRegistrar : ITypeRegistrar
     {
         if (_provider is not null) return;
 
-        _builder.AddSingleton(service, implementation);
+        _builder.TryAddSingleton(service, implementation);
     }
 
     public void RegisterInstance(Type service, object implementation)
     {
         if (_provider is not null) return;
 
-        _builder.AddSingleton(service, implementation);
+        _builder.TryAdd(ServiceDescriptor.Singleton(service, implementation));
     }
 
     public void RegisterLazy(Type service, Func<object> func)
@@ -73,6 +82,6 @@ public sealed class TypeRegistrar : ITypeRegistrar
         {
             throw new ArgumentNullException(nameof(func));
         }
-        _builder.AddSingleton(service, (provider) => func());
+        _builder.TryAddSingleton(service, (provider) => func());
     }
 }

@@ -5,7 +5,9 @@ using TeensyRom.Cli.Helpers;
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// What a command that needs the engine does first: gets an engine running, then picks the TeensyROM to work with.
+/// What a menu entry that needs the engine does first: gets an engine running, then lets the user pick the
+/// TeensyROM to work with. One-shot commands do not use it; their base classes ready the engine and the device
+/// without ever prompting unless several devices qualify.
 /// </summary>
 internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
 {
@@ -13,7 +15,7 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
 
     /// <summary>
     /// Returns true once an engine is running and a device is selected; false after telling the user what to fix.
-    /// Once ready, later calls return true without checking again until <see cref="Reset"/>.
+    /// Once ready, later calls return true without checking again.
     /// </summary>
     public async Task<bool> EnsureReadyAsync(CancellationToken ct = default)
     {
@@ -30,9 +32,6 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
         _ready = await SelectDeviceAsync(ct);
         return _ready;
     }
-
-    /// <summary>Forgets the engine and device check, so the next engine command makes it again; call after the engine was stopped.</summary>
-    public void Reset() => _ready = false;
 
     private async Task<bool> SelectDeviceAsync(CancellationToken ct)
     {

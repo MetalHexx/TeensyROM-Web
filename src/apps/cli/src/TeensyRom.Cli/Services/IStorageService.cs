@@ -15,6 +15,9 @@ internal interface IStorageService
     /// <summary>Works against another storage from now on and saves it as the CLI's default-storage preference.</summary>
     void SwitchStorage(TeensyStorageType storageType);
 
+    /// <summary>Works against another storage for this session only; the saved default-storage preference is left alone.</summary>
+    void UseStorage(TeensyStorageType storageType);
+
     /// <summary>Lists one directory of the current storage.</summary>
     Task<DirectoryListing> GetDirectory(string path);
 

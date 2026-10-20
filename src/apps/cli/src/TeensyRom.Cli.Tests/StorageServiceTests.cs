@@ -71,6 +71,18 @@ public class StorageServiceTests
     }
 
     [Fact]
+    public async Task UseStorage_ChangesTheStorageForThisSession_WithoutSavingThePreference()
+    {
+        _sut.UseStorage(TeensyStorageType.USB);
+
+        _sut.StorageType.Should().Be(TeensyStorageType.USB);
+        _settings.DidNotReceiveWithAnyArgs().SaveSettings(default!);
+
+        await _sut.Index("/");
+        await _api.Received(1).IndexAsync(DeviceId, ApiStorageType.USB, null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task GetDirectory_ListsTheChosenStorage_AsTheCliModels()
     {
         _sut.SwitchStorage(TeensyStorageType.USB);

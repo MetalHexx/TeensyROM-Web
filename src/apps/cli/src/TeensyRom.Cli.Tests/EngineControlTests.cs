@@ -422,6 +422,79 @@ public class EngineControlTests
 
         _world.Calls.Should().NotContain("launch").And.NotContain("build");
     }
+
+    // ---- status ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Status_OfAnEngineOfThisVersion_IsRunningAndMatching()
+    {
+        _world.Answer = OwnEngine;
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Should().Be(new EngineStatus(true, FakeEngineWorld.OwnVersion, FakeEngineWorld.OwnVersion, true, "localhost:10213", null));
+    }
+
+    [Theory]
+    [InlineData("1.0.0-alpha.8+abc123", true)]
+    [InlineData("1.0.0-alpha.8", true)]
+    [InlineData("1.0.0-alpha.7+abc123", false)]
+    public async Task Status_ComparesVersionsIgnoringBuildMetadata(string engineVersion, bool matches)
+    {
+        _world.Answer = new EngineProbeResult.Engine(engineVersion);
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Running.Should().BeTrue();
+        status.Version.Should().Be(engineVersion);
+        status.Matches.Should().Be(matches);
+        status.Problem.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Status_WhenNothingListens_IsNotRunning_AndSaysHowToStartOne()
+    {
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Running.Should().BeFalse();
+        status.Version.Should().BeNull();
+        status.Matches.Should().BeFalse();
+        status.CliVersion.Should().Be(FakeEngineWorld.OwnVersion);
+        status.Problem.Should().Contain("No TeensyROM engine is running").And.Contain("trom device list");
+    }
+
+    [Fact]
+    public async Task Status_WhenSomethingListensButHasNotAnswered_IsNotRunning()
+    {
+        _world.Answer = new EngineProbeResult.NotReady();
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Running.Should().BeFalse();
+        status.Problem.Should().Contain("isn't answering yet");
+    }
+
+    [Fact]
+    public async Task Status_WhenAnotherProgramHoldsThePort_IsNotRunning_AndNamesThePort()
+    {
+        _world.Answer = new EngineProbeResult.Foreign("it answered HTTP 404");
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Running.Should().BeFalse();
+        status.Problem.Should().Contain("10213").And.Contain("it answered HTTP 404");
+    }
+
+    [Fact]
+    public async Task Status_NeverStartsOrStopsAnything()
+    {
+        await _sut.GetStatusAsync(default);
+        _world.Answer = OwnEngine;
+        await _sut.GetStatusAsync(default);
+
+        _world.Calls.Should().BeEmpty();
+        _world.Notices.Should().BeEmpty();
+    }
 }
 
 /// <summary>

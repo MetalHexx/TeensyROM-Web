@@ -11,6 +11,13 @@ internal interface IDeviceService
     /// <exception cref="TeensyApiException">tr-web could not list its devices.</exception>
     Task<IReadOnlyList<DeviceSummary>> GetDevicesAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Lists the devices tr-web knows; with <paramref name="fullScan"/> it first scans for ones it doesn't know yet.
+    /// <c>GetDevicesAsync</c> is <c>FindAsync(fullScan: false)</c>. tr-web answers one lookup per 5 seconds.
+    /// </summary>
+    /// <exception cref="TeensyApiException">tr-web could not list its devices.</exception>
+    Task<IReadOnlyList<DeviceSummary>> FindAsync(bool fullScan, CancellationToken ct = default);
+
     void Select(DeviceSummary device);
 
     /// <summary>The selected device's id.</summary>
@@ -26,4 +33,4 @@ internal interface IDeviceService
     Task ResetAsync();
 }
 
-internal sealed record DeviceSummary(string Id, string Name, bool IsOnline, string Connection, string State);
+internal sealed record DeviceSummary(string Id, string Name, bool IsOnline, string Connection, string State, bool SdAvailable = false, bool UsbAvailable = false);

@@ -4,6 +4,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AssemblyName>trom</AssemblyName>
+    <RootNamespace>TeensyRom.Cli</RootNamespace>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

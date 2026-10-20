@@ -1,32 +1,55 @@
+using Spectre.Console;
 using Spectre.Console.Cli;
+using TeensyRom.Cli.Errors;
+using TeensyRom.Cli.Output;
 
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// Runs commands for one CLI session, getting the engine ready first for those that need it. <c>Program</c> and the
-/// integration harness both drive commands through it.
+/// Runs one <c>trom</c> command line and turns its outcome into an exit code. <c>Program</c> and the integration
+/// harness both drive commands through it, so both get the same pre-parse steps.
 /// </summary>
-internal sealed class CliSession(CommandApp app, StartupGate gate)
+/// <param name="app">The public app.</param>
+/// <param name="errHelpApp">An app over the same tree whose help goes to stderr, for the nearest help of a usage error.</param>
+/// <param name="nouns">The nouns of the public tree.</param>
+internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutput output, CliConsoles consoles, IReadOnlyCollection<string> nouns)
 {
     /// <summary>
-    /// True when <paramref name="args"/> needs no engine, or the engine and device are ready; false after the
-    /// gate told the user what to fix.
+    /// Runs <paramref name="args"/> once and returns the exit code. In order: reads <c>--json</c> from the raw
+    /// arguments (a parse error throws before settings bind and still owes a JSON error), swaps a bare <c>-</c> for
+    /// the stdin marker, rejects a bare noun, points the static console at stderr so every incidental write lands
+    /// there, then runs the app.
     /// </summary>
-    public async Task<bool> EnsureReadyForAsync(string[] args) =>
-        !CommandRouting.NeedsEngine(args) || await gate.EnsureReadyAsync();
-
-    /// <summary>
-    /// Runs one command and returns its exit code, or 1 without running it when the engine isn't ready.
-    /// After <c>stop</c> the next engine command checks the engine again.
-    /// </summary>
-    public async Task<int> RunCommandAsync(string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
-        if (!await EnsureReadyForAsync(args)) return 1;
+        output.UseJson(CommandRouting.WantsJson(args));
 
-        var exitCode = await app.RunAsync(args);
+        var parseable = CommandRouting.ReplaceStdinMarker(args);
+        AnsiConsole.Console = consoles.Err;
 
-        if (CommandRouting.IsStop(args)) gate.Reset();
+        try
+        {
+            if (CommandRouting.FindBareNoun(parseable, nouns) is { } noun)
+            {
+                throw new CliException(CliExitCode.Usage, $"`trom {noun}` needs a command — see `trom {noun} --help`.");
+            }
+            return await app.RunAsync(parseable);
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, args);
+        }
+    }
 
-        return exitCode;
+    private int Report(Exception ex, string[] args)
+    {
+        var prefix = CommandRouting.HelpPrefix(args, nouns);
+        var error = ExitCodeMapper.Map(ex, $"trom {string.Join(' ', prefix.Append("--help"))}");
+
+        if (error.Code == CliExitCode.Usage) errHelpApp.Run([.. prefix, "--help"]);
+
+        output.Error(error);
+
+        return (int)error.Code;
     }
 }

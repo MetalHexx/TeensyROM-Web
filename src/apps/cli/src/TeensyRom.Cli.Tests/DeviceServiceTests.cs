@@ -92,6 +92,43 @@ public class DeviceServiceTests
     }
 
     [Fact]
+    public async Task Find_WithAFullScan_AsksTheApiToScan_WhileGetDevicesNeverDoes()
+    {
+        _api.FindDevicesAsync(true, Arg.Any<CancellationToken>()).Returns(new FindDevicesResponse { Devices = [Cart("a", "Alpha", DeviceState.Connected)] });
+
+        var found = await _sut.FindAsync(fullScan: true);
+
+        found.Should().ContainSingle().Which.Name.Should().Be("Alpha");
+        await _api.Received(1).FindDevicesAsync(true, Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().FindDevicesAsync(false, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Find_WhenTrWebKnowsNone_IsEmptyEvenAfterAScan(bool fullScan)
+    {
+        _api.FindDevicesAsync(fullScan, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<FindDevicesResponse>(ApiFailure(404, "\"No TeensyRom devices found.\"")));
+
+        var found = await _sut.FindAsync(fullScan);
+
+        found.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Find_ReportsWhichStoragesAreAvailable()
+    {
+        var cart = Cart("a", "Alpha", DeviceState.Connected);
+        cart.SdStorage = new CartStorageDto { Available = true };
+        cart.UsbStorage = new CartStorageDto { Available = false };
+        ApiKnowsDevices(cart);
+
+        var found = await _sut.FindAsync(fullScan: false);
+
+        found.Should().ContainSingle().Which.Should().Match<DeviceSummary>(d => d.SdAvailable && !d.UsbAvailable);
+    }
+    [Fact]
     public void RequireDeviceId_WithoutASelection_Throws()
     {
         var act = () => _sut.RequireDeviceId();

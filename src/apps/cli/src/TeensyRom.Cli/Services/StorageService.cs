@@ -25,6 +25,8 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
         settingsService.SaveSettings(settings);
     }
 
+    public void UseStorage(TeensyStorageType storageType) => StorageType = storageType;
+
     public async Task<DirectoryListing> GetDirectory(string path)
     {
         var deviceId = devices.RequireDeviceId();

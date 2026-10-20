@@ -137,22 +137,6 @@ public sealed class StartupGateTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureReady_AfterReset_ChecksTheEngineAndAsksForTheDeviceAgain()
-    {
-        TrWebKnows(Online("a", "Alpha"));
-        _console.Input.PushKey(ConsoleKey.Enter);
-        await _sut.EnsureReadyAsync();
-        _sut.Reset();
-        _console.Input.PushKey(ConsoleKey.Enter);
-
-        var ready = await _sut.EnsureReadyAsync();
-
-        ready.Should().BeTrue();
-        await _engine.Received(2).EnsureRunningAsync(Arg.Any<CancellationToken>());
-        _devices.Received(2).Select(Arg.Any<DeviceSummary>());
-    }
-
-    [Fact]
     public async Task EnsureReady_WhenAFailedAttemptIsRetried_ChecksAgain()
     {
         TrWebKnows(Offline("c", "Charlie"));

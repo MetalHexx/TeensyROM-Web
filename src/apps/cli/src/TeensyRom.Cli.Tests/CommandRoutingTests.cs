@@ -1,70 +1,61 @@
+using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Services;
 
 namespace TeensyRom.Cli.Tests;
 
 public class CommandRoutingTests
 {
+    private static readonly string[] Nouns = ["engine", "device"];
+
     [Theory]
-    [InlineData("chipsynth")]
-    [InlineData("cs")]
-    [InlineData("credits")]
-    [InlineData("c")]
-    [InlineData("stop")]
-    [InlineData("CREDITS")]
-    [InlineData("Stop")]
-    public void NeedsEngine_ForTheDeviceFreeCommands_IsFalse(string command)
+    [InlineData(new[] { "--json" }, true)]
+    [InlineData(new[] { "engine", "status", "--json" }, true)]
+    [InlineData(new[] { "engine", "--json", "status" }, true)]
+    [InlineData(new[] { "engine", "status" }, false)]
+    [InlineData(new[] { "engine", "status", "--", "--json" }, false)]
+    [InlineData(new[] { "launch", "--bogus", "--json" }, true)]
+    public void WantsJson_LooksAtTheRawArguments_EvenWhenTheyWillNotParse(string[] args, bool expected)
     {
-        CommandRouting.NeedsEngine([command]).Should().BeFalse();
+        CommandRouting.WantsJson(args).Should().Be(expected);
     }
 
     [Fact]
-    public void NeedsEngine_ForAnEngineFreeCommandWithItsOwnArguments_IsFalse()
+    public void ReplaceStdinMarker_SwapsOnlyAStandaloneDash()
     {
-        CommandRouting.NeedsEngine(["chipsynth", "--presets", "all"]).Should().BeFalse();
-    }
+        var replaced = CommandRouting.ReplaceStdinMarker(["file", "-", "--name", "-x", "a-b", "-"]);
 
-    [Fact]
-    public void NeedsEngine_WithNoArguments_IsFalseBecauseTheMenuAloneNeedsNothing()
-    {
-        CommandRouting.NeedsEngine([]).Should().BeFalse();
+        replaced.Should().Equal("file", StdinPaths.Marker, "--name", "-x", "a-b", StdinPaths.Marker);
     }
 
     [Theory]
-    [InlineData("-h")]
-    [InlineData("--help")]
-    [InlineData("-v")]
-    [InlineData("--version")]
-    public void NeedsEngine_ForHelpOrVersionAnywhere_IsFalse(string flag)
+    [InlineData(new[] { "engine" }, "engine")]
+    [InlineData(new[] { "device", "--json" }, "device")]
+    [InlineData(new[] { "device", "--json", "-d" }, "device")]
+    public void FindBareNoun_FindsAKnownNounWithNoVerb(string[] args, string expected)
     {
-        CommandRouting.NeedsEngine([flag]).Should().BeFalse();
-        CommandRouting.NeedsEngine(["launch", flag]).Should().BeFalse();
-        CommandRouting.NeedsEngine(["launch", "random", flag]).Should().BeFalse();
+        CommandRouting.FindBareNoun(args, Nouns).Should().Be(expected);
     }
 
     [Theory]
+    [InlineData]
+    [InlineData("engine", "status")]
+    [InlineData("engine", "--help")]
+    [InlineData("engine", "--json", "-h")]
     [InlineData("launch")]
-    [InlineData("index")]
-    [InlineData("i")]
-    [InlineData("settings")]
-    [InlineData("ports")]
-    [InlineData("p")]
-    public void NeedsEngine_ForTheCommandsThatTalkToTheEngine_IsTrue(string command)
+    [InlineData("--help")]
+    [InlineData("Engine")]
+    public void FindBareNoun_LeavesEverythingElseToSpectre(params string[] args)
     {
-        CommandRouting.NeedsEngine([command]).Should().BeTrue();
-    }
-
-    [Fact]
-    public void NeedsEngine_OnlyLooksAtTheFirstTokenForTheCommand()
-    {
-        CommandRouting.NeedsEngine(["launch", "credits"]).Should().BeTrue();
+        CommandRouting.FindBareNoun(args, Nouns).Should().BeNull();
     }
 
     [Theory]
-    [InlineData("stop", true)]
-    [InlineData("STOP", true)]
-    [InlineData("ports", false)]
-    public void IsStop_RecognizesTheStopCommand(string command, bool expected)
+    [InlineData(new[] { "engine", "status", "--bogus" }, new[] { "engine" })]
+    [InlineData(new[] { "device" }, new[] { "device" })]
+    [InlineData(new[] { "launch", "random" }, new string[0])]
+    [InlineData(new string[0], new string[0])]
+    public void HelpPrefix_IsTheLeadingNounOtherwiseTheRoot(string[] args, string[] expected)
     {
-        CommandRouting.IsStop([command]).Should().Be(expected);
+        CommandRouting.HelpPrefix(args, Nouns).Should().Equal(expected);
     }
 }

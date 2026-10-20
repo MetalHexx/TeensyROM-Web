@@ -179,7 +179,7 @@ jobs:
         if: matrix.extension == 'tar.gz'
         run: |
           cd publish/${{ matrix.rid }}
-          chmod +x TeensyRom.Api cli/TeensyRom.Cli
+          chmod +x TeensyRom.Api cli/trom
           tar -czvf ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.tar.gz .
       
       - name: Upload artifact

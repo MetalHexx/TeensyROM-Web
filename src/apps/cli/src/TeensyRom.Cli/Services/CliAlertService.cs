@@ -1,11 +1,15 @@
 ﻿using Spectre.Console;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Logging;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using TeensyRom.Cli.Output;
 
 namespace TeensyRom.Cli.Services
 {
-    internal class CliAlertService : IAlertService
+    /// <summary>
+    /// Shows the messages services publish: on stderr for a one-shot command, on the menu's screen for the menu and
+    /// the player, which also blank the line the alert may have drawn over.
+    /// </summary>
+    internal class CliAlertService(ICliOutput output) : IAlertService
     {
         public IObservable<string> CommandErrors => throw new NotImplementedException();
 
@@ -13,16 +17,22 @@ namespace TeensyRom.Cli.Services
         {
             if(!string.IsNullOrWhiteSpace(error))
             {
-                RadHelper.WriteLine(error.EscapeBrackets());                
-                
+                output.Notice(error);
             }
-            AnsiConsole.WriteLine(RadHelper.ClearHack);
+            ClearLine();
         }
 
         public void PublishError(string message)
         {
-            RadHelper.WriteError(message.EscapeBrackets());
-            AnsiConsole.WriteLine(RadHelper.ClearHack);
+            if (output.RunMode == CliRunMode.Tui) RadHelper.WriteError(message.EscapeBrackets());
+            else output.Notice(message);
+
+            ClearLine();
+        }
+
+        private void ClearLine()
+        {
+            if (output.RunMode == CliRunMode.Tui) AnsiConsole.WriteLine(RadHelper.ClearHack);
         }
     }
 }

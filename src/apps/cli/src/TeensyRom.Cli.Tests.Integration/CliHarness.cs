@@ -1,57 +1,66 @@
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
-using Spectre.Console.Cli;
 using Spectre.Console.Testing;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
 using TeensyStorageType = TeensyRom.Cli.Storage.Entities.TeensyStorageType;
 
 namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
-/// The real CLI - composition root, startup and commands - on Spectre's test console.
-/// Push keys on <see cref="Console"/>.Input before the prompt that reads them.
+/// The real CLI - composition root, session and commands - on a pair of Spectre test consoles, one for stdout and one
+/// for stderr. Commands run through <see cref="CliSession"/>, so they get the same pre-parse steps as the real thing.
 /// </summary>
+/// <remarks>
+/// By default every stream is redirected, as in a script: no prompts, plain output. Pass <c>interactive: true</c> for
+/// a terminal, and push keys on <see cref="Err"/>.Input (one-shot prompts) or <see cref="Out"/>.Input (the menu's
+/// startup gate) before the prompt that reads them.
+/// </remarks>
 internal sealed class CliHarness : IDisposable
 {
     private readonly IAnsiConsole _original = AnsiConsole.Console;
-    private CommandApp? _app;
-    private CliSession? _session;
+    private readonly CliSession _session;
 
-    public TestConsole Console { get; } = NewConsole();
+    public TestConsole Out { get; }
+
+    public TestConsole Err { get; }
 
     public CliComposition Host { get; }
 
-    public CliHarness()
+    public CliHarness(bool interactive = false)
     {
-        AnsiConsole.Console = Console;
-        Host = CliHost.Create();
+        Out = NewConsole(interactive);
+        Err = NewConsole(interactive);
+        Host = CliHost.Create(new CliConsoles(Out, Err, interactive, interactive, interactive));
+        _session = CliHost.CreateSession(Host);
     }
 
-    /// <summary>Runs what the CLI runs before a command that needs the engine: readying the engine and the device prompt.</summary>
-    public Task<bool> StartAsync() => Host.Gate.EnsureReadyAsync();
-
-    private CommandApp App => _app ??= CliHost.CreateApp(new TypeRegistrar(Host.Services));
-
     /// <summary>
-    /// Runs a command line straight on the app, skipping the engine and device checks; one app serves every call on this harness.
+    /// Runs the menu's startup gate, which readies the engine and prompts for a device on the menu's own screen
+    /// (<see cref="Out"/>).
     /// </summary>
-    public int Run(params string[] args) => App.Run(args);
+    public Task<bool> StartAsync()
+    {
+        AnsiConsole.Console = Out;
+        return Host.Gate.EnsureReadyAsync();
+    }
 
-    /// <summary>
-    /// Runs a command line the way the CLI does: routing decides whether the engine is started or replaced first and
-    /// the device prompt follows. Returns 1 without running the command when the gate says it isn't ready.
-    /// </summary>
-    public Task<int> RunThroughSessionAsync(params string[] args) =>
-        (_session ??= new CliSession(App, Host.Gate)).RunCommandAsync(args);
+    /// <summary>Runs a command line the way <c>trom</c> does and returns its exit code.</summary>
+    public Task<int> RunAsync(params string[] args) => _session.RunAsync(args);
 
-    public string Output => Console.Output;
+    /// <summary>Everything written to stdout.</summary>
+    public string Output => Out.Output;
+
+    /// <summary>Everything written to stderr.</summary>
+    public string Error => Err.Output;
 
     public void Dispose() => AnsiConsole.Console = _original;
 
-    public static TestConsole NewConsole()
+    public static TestConsole NewConsole(bool interactive = true)
     {
-        var console = new TestConsole().Interactive();
+        var console = new TestConsole();
+        if (interactive) console.Interactive();
         console.Profile.Width = 300;
         return console;
     }
@@ -67,8 +76,9 @@ internal sealed class CliServices : IDisposable
 
     public CliServices()
     {
-        AnsiConsole.Console = CliHarness.NewConsole();
-        _provider = CliHost.Create().Services.BuildServiceProvider();
+        var console = CliHarness.NewConsole();
+        AnsiConsole.Console = console;
+        _provider = CliHost.Create(new CliConsoles(console, console, false, false, false)).Services.BuildServiceProvider();
     }
 
     public T Get<T>() where T : notnull => _provider.GetRequiredService<T>();

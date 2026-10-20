@@ -1,14 +1,17 @@
 namespace TeensyRom.Cli.Tests.Integration;
 
+/// <summary>
+/// The menu's startup gate: it readies the engine and offers exactly the devices that are online.
+/// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class StartupScenarios(SharedApiFixture api)
 {
     [Fact]
     public async Task Startup_OffersExactlyTheOnlineDevicesTheApiReports()
     {
-        using var cli = new CliHarness();
+        using var cli = new CliHarness(interactive: true);
         var online = api.OnlineDevices;
-        if (online.Count > 0) cli.Console.Input.PushKey(ConsoleKey.Enter);
+        if (online.Count > 0) cli.Out.Input.PushKey(ConsoleKey.Enter);
 
         var ready = await cli.StartAsync();
 
