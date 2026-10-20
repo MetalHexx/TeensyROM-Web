@@ -24,6 +24,7 @@ public sealed class IndexBuildTests : IDisposable
     private readonly TestHost _host;
     private Action<string> _onLine = _ => { };
     private bool _followStopped;
+    private string _stdin = "/from/stdin\n";
 
     public IndexBuildTests()
     {
@@ -32,7 +33,7 @@ public sealed class IndexBuildTests : IDisposable
             services.AddSingleton<IDeviceChooser, DeviceChooser>();
             services.Replace(ServiceDescriptor.Singleton(_storage));
             services.AddSingleton(_deviceLog);
-            services.AddSingleton<IStdinPaths>(new StdinPaths(new StringReader("/from/stdin\n"), inputIsTerminal: false));
+            services.AddSingleton<IStdinPaths>(_ => new StdinPaths(new StringReader(_stdin), inputIsTerminal: false));
         });
         _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
         UseDevice(Both);
@@ -139,6 +140,19 @@ public sealed class IndexBuildTests : IDisposable
 
         exitCode.Should().Be((int)CliExitCode.Usage);
         _indexed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ABadPathFromStdin_IsAUsageError_AndIndexesNothing()
+    {
+        _stdin = "/bad<path\n";
+
+        var exitCode = await _host.RunAsync("index", "build", "-", "-s", "sd");
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        StdErr.Should().Contain("'/bad<path' is not a valid unix path");
+        _indexed.Should().BeEmpty();
+        await _deviceLog.DidNotReceive().FollowAsync(Arg.Any<Action<string>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -28,18 +28,25 @@ internal static class CommandRouting
     /// The noun when the command line is a known noun with no verb: nothing after it, or only options other than help.
     /// Spectre would answer such a line with help and exit code 0; it is a usage error.
     /// </summary>
-    public static string? FindBareNoun(string[] args, IReadOnlyCollection<string> nouns)
+    public static string? FindBareNoun(string[] args, IReadOnlyDictionary<string, string[]> nouns)
     {
-        if (args.Length == 0 || !nouns.Contains(args[0], StringComparer.Ordinal)) return null;
+        if (args.Length == 0 || !nouns.ContainsKey(args[0])) return null;
 
         var rest = args.Skip(1).ToArray();
 
         return !AsksForHelp(rest) && rest.All(arg => arg.StartsWith('-')) ? args[0] : null;
     }
 
-    /// <summary>The words that name the nearest help for a usage error: the noun when the line starts with one, else none (the root).</summary>
-    public static string[] HelpPrefix(string[] args, IReadOnlyCollection<string> nouns) =>
-        args.Length > 0 && nouns.Contains(args[0], StringComparer.Ordinal) ? [args[0]] : [];
+    /// <summary>
+    /// The words that name the nearest help for a usage error: the noun and verb when the line starts with a known pair,
+    /// else the noun when it starts with one, else none (the root).
+    /// </summary>
+    public static string[] HelpPrefix(string[] args, IReadOnlyDictionary<string, string[]> nouns)
+    {
+        if (args.Length == 0 || !nouns.TryGetValue(args[0], out var verbs)) return [];
+
+        return args.Length > 1 && verbs.Contains(args[1], StringComparer.Ordinal) ? [args[0], args[1]] : [args[0]];
+    }
 
     private static bool IsHelpFlag(string arg) => arg is "-h" or "--help";
 }

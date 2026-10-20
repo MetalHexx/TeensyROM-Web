@@ -51,6 +51,15 @@ public class ExitCodeMapperTests
         mapped.Code.Should().Be(CliExitCode.EngineUnavailable);
     }
 
+    [Fact]
+    public void TrWebRejectingTheRequestAsInvalid_IsAUsageError()
+    {
+        var mapped = ExitCodeMapper.Map(new TeensyApiException("Path must be a valid Unix path.", 400));
+
+        mapped.Code.Should().Be(CliExitCode.Usage);
+        mapped.Message.Should().Be("Path must be a valid Unix path.");
+    }
+
     [Theory]
     [InlineData(503)]
     [InlineData(500)]

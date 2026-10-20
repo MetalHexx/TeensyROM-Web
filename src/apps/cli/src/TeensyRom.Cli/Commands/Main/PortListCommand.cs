@@ -6,8 +6,6 @@ namespace TeensyRom.Cli.Commands.Main
 {
     internal class PortListSettings : CommandSettings
     {
-        public static string Example => "ports";
-        public static string Description => "List the TeensyROM devices tr-web knows.";
     }
 
     internal class PortListCommand(IDeviceService devices, IPlayerService player) : AsyncCommand<PortListSettings>

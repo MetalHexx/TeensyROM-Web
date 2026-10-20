@@ -3,9 +3,11 @@ using Spectre.Console.Cli;
 using System.ComponentModel;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Commands.Common;
+using TeensyRom.Cli.Commands.File;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
+using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
@@ -13,14 +15,23 @@ using TeensyRom.Cli.Storage.Entities;
 
 namespace TeensyRom.Cli.Commands.Index;
 
-internal sealed class IndexBuildSettings : StorageSettings
+internal sealed class IndexBuildSettings : DeviceSettings
 {
+    [Description("The storage to index: sd or usb. Defaults to every storage the device has available.")]
+    [CommandOption("-s|--storage <STORAGE>")]
+    public string? Storage { get; set; }
+
     [CommandArgument(0, "[PATH]")]
     [Description("The directory to index, with everything below it. Use - to read it from stdin.")]
     public string Path { get; set; } = "/";
 
-    public override ValidationResult Validate() =>
-        Path != StdinPaths.Marker && !Path.IsValidUnixPath() ? ValidationResult.Error("The path must be a valid unix path, such as /music.") : base.Validate();
+    public override ValidationResult Validate()
+    {
+        var path = FileCommandOptions.ValidatePath(Path);
+        if (!path.Successful) return path;
+
+        return Storage is null ? base.Validate() : Storage.ValidateStorageDevice();
+    }
 }
 
 /// <summary>The JSON result of <c>trom index build</c>.</summary>
@@ -43,7 +54,7 @@ internal sealed class IndexBuildCommand(
 {
     protected override async Task<int> RunAsync(CommandContext context, IndexBuildSettings settings, CancellationToken ct)
     {
-        var path = stdin.ExpandOne(settings.Path);
+        var path = FileCommandOptions.ReadPath(stdin, settings.Path);
         var storages = StoragesToIndex(settings, devices.SelectedDevice);
 
         await using var progress = await FollowIndexingAsync(ct);

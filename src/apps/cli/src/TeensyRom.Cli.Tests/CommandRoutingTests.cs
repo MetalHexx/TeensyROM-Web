@@ -5,7 +5,11 @@ namespace TeensyRom.Cli.Tests;
 
 public class CommandRoutingTests
 {
-    private static readonly string[] Nouns = ["engine", "device"];
+    private static readonly Dictionary<string, string[]> Nouns = new()
+    {
+        ["engine"] = ["status", "stop"],
+        ["device"] = ["list"]
+    };
 
     [Theory]
     [InlineData(new[] { "--json" }, true)]
@@ -50,11 +54,13 @@ public class CommandRoutingTests
     }
 
     [Theory]
-    [InlineData(new[] { "engine", "status", "--bogus" }, new[] { "engine" })]
+    [InlineData(new[] { "engine", "status", "--bogus" }, new[] { "engine", "status" })]
+    [InlineData(new[] { "engine", "bogus" }, new[] { "engine" })]
+    [InlineData(new[] { "engine", "--bogus" }, new[] { "engine" })]
     [InlineData(new[] { "device" }, new[] { "device" })]
     [InlineData(new[] { "launch", "random" }, new string[0])]
     [InlineData(new string[0], new string[0])]
-    public void HelpPrefix_IsTheLeadingNounOtherwiseTheRoot(string[] args, string[] expected)
+    public void HelpPrefix_IsTheLeadingNounAndVerbWhenKnown_ThenTheNoun_OtherwiseTheRoot(string[] args, string[] expected)
     {
         CommandRouting.HelpPrefix(args, Nouns).Should().Equal(expected);
     }

@@ -8,9 +8,6 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
     internal class LaunchSettings : CommandSettings, IClearableSettings
     {
         public void ClearSettings() { }
-
-        public static string Description => "Launch files from your storage device.";
-        public static string Example => "launch";
     }
     internal class LaunchCommand : AsyncCommand<LaunchSettings>
     {

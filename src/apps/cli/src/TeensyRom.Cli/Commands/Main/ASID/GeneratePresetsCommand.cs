@@ -30,7 +30,6 @@ namespace TeensyRom.Cli.Commands.Main.Asid
         public bool RunWizard { get; set; } = false;
 
         public static string Description => "Generate ASID friendly Chipsynth ASID presets.";
-        public static string Example => "chipsynth --clock ntsc --target ASID --source c:\\your\\preset\\directory";
 
         public override ValidationResult Validate()
         {

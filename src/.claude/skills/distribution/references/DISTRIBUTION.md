@@ -393,7 +393,7 @@ end
 3. If `libexec/cli/trom` exists (the combined package), creates two wrapper scripts in `bin`: `teensyrom-web` (changes to `libexec`, runs the engine) and `trom` (runs `libexec/cli/trom`). Neither sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
 4. Otherwise (an older package with no `cli/`, such as `1.0.0-alpha.8`, whose engine still writes beside itself), keeps the previous `teensyrom-web` wrapper unchanged, which sets `TEENSYROM_DATA_DIR` to `~/Library/Application Support/TeensyROM-Web`. That `else` branch can be deleted after the first release that contains `cli/`
 5. Sets executable permissions
-6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` also installs a `trom` command, so Homebrew refuses to install both
+6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` installs a `TeensyRom.Cli` command; the line is kept so the two CLIs are not installed together
 
 **Result**: User can run `teensyrom-web` (and, with the combined package, `trom`) from anywhere
 

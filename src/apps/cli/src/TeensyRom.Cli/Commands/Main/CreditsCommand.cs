@@ -6,8 +6,6 @@ namespace TeensyRom.Cli.Commands.Main
 {
     internal class CreditsSettings : CommandSettings
     {
-        public static string Example => "credits";
-        public static string Description => "Credits to all the folks who helped with ideas and testing.";
     }
     internal class CreditsCommand() : Command<CreditsSettings>
     {

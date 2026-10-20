@@ -29,9 +29,6 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
         [CommandOption("--override")]        
         public bool? SidOverride { get; set; }
 
-        public new static string Example = "launch random -s sd -f all -t 3m -d /demos --override";
-        public new static string Description = "Randomly streams files from the specified directory and it's subdirectories.";
-
         public new void ClearSettings()
         {
             StorageDevice = string.Empty;

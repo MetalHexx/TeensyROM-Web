@@ -112,8 +112,9 @@ internal static class CliHost
         ])
     ];
 
-    /// <summary>The nouns of the public command tree.</summary>
-    public static IReadOnlyCollection<string> PublicNouns { get; } = PublicTree.Select(noun => noun.Name).ToArray();
+    /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>
+    public static IReadOnlyDictionary<string, string[]> PublicNouns { get; } =
+        PublicTree.ToDictionary(noun => noun.Name, noun => noun.Verbs.Select(verb => verb.Name).ToArray());
 
     /// <summary>
     /// Every command and settings type of the menu's private app that the public tree does not also run, with the
@@ -174,7 +175,8 @@ internal static class CliHost
             new SystemEngineClock(),
             AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly()),
             output.Notice);
-        var gate = new StartupGate(engine, deviceService);
+        var chooser = new DeviceChooser(deviceService, output);
+        var gate = new StartupGate(engine, deviceService, chooser);
         var pathRegistrar = PathRegistrar.CreateDefault(settingsService);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
@@ -185,7 +187,7 @@ internal static class CliHost
         services.AddSingleton<ICliOutput>(output);
         services.AddSingleton(pathRegistrar);
         services.AddSingleton<IStdinPaths>(new StdinPaths(Console.In, !Console.IsInputRedirected));
-        services.AddSingleton<IDeviceChooser, DeviceChooser>();
+        services.AddSingleton<IDeviceChooser>(chooser);
 
         services.AddSingleton<ILoggingService>(logService);
         services.AddSingleton<ICliLoggingService>(logService);
@@ -293,64 +295,18 @@ internal static class CliHost
             config.AddBranch<LaunchSettings>("launch", launch =>
             {
                 launch.SetDefaultCommand<LaunchCommand>();
-                config.AddExample(LaunchSettings.Example);
-                launch.SetDescription(LaunchSettings.Description);
-                launch.AddExample(LaunchSettings.Example);
-
-                config.AddExample(RandomSettings.Example);
-                launch.AddCommand<RandomCommand>("random")
-                      .WithAlias("r")
-                      .WithDescription(RandomSettings.Description)
-                      .WithExample(RandomSettings.Example);
-
-                config.AddExample(NavigateSettings.Example);
-                launch.AddCommand<NavigateCommand>("nav")
-                      .WithAlias("n")
-                      .WithDescription(NavigateSettings.Description)
-                      .WithExample(NavigateSettings.Example);
-
-                config.AddExample(SearchSettings.Example);
-                launch.AddCommand<SearchCommand>("search")
-                      .WithAlias("s")
-                      .WithDescription(SearchSettings.Description)
-                      .WithExample(SearchSettings.Example);
-
-                config.AddExample(FileLaunchSettings.Example);
-                launch.AddCommand<FileLaunchCommand>("file")
-                      .WithAlias("s")
-                      .WithDescription(FileLaunchSettings.Description)
-                      .WithExample(FileLaunchSettings.Example);
-
-                launch.AddCommand<PlayerCommand>("player")
-                      .IsHidden();
+                launch.AddCommand<RandomCommand>("random");
+                launch.AddCommand<NavigateCommand>("nav");
+                launch.AddCommand<SearchCommand>("search");
+                launch.AddCommand<FileLaunchCommand>("file");
+                launch.AddCommand<PlayerCommand>("player").IsHidden();
             });
 
-            config.AddExample(IndexSettings.Example);
-            config.AddCommand<IndexCommand>("index")
-                  .WithAlias("i")
-                  .WithDescription(IndexSettings.Description)
-                  .WithExample(IndexSettings.Example);
-
-            config.AddExample(PortListSettings.Example);
-            config.AddCommand<PortListCommand>("ports")
-                  .WithAlias("p")
-                  .WithDescription(PortListSettings.Description)
-                  .WithExample(PortListSettings.Example);
-
-            config.AddExample(GeneratePresetsSettings.Example);
-            config.AddCommand<GeneratePresetsCommand>("chipsynth")
-                  .WithAlias("cs")
-                  .WithDescription(GeneratePresetsSettings.Description)
-                  .WithExample(GeneratePresetsSettings.Example);
-
-            config.AddCommand<SettingsCommand>("settings")
-                  .IsHidden();
-
-            config.AddExample(CreditsSettings.Example);
-            config.AddCommand<CreditsCommand>("credits")
-                  .WithAlias("c")
-                  .WithDescription(CreditsSettings.Description)
-                  .WithExample(CreditsSettings.Example);
+            config.AddCommand<IndexCommand>("index");
+            config.AddCommand<PortListCommand>("ports");
+            config.AddCommand<GeneratePresetsCommand>("chipsynth");
+            config.AddCommand<SettingsCommand>("settings").IsHidden();
+            config.AddCommand<CreditsCommand>("credits");
         });
 
         return app;

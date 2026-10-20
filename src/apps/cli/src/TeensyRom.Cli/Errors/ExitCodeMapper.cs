@@ -32,6 +32,9 @@ internal static class ExitCodeMapper
             case CommandParseException or CommandRuntimeException:
                 return new CliException(CliExitCode.Usage, $"{error.Message.TrimEnd('.', ' ')} — see `{helpCommand}`.");
 
+            case TeensyApiException { StatusCode: 400 } api:
+                return new CliException(CliExitCode.Usage, api.Message);
+
             case TeensyApiException { StatusCode: 404 } api:
                 return new CliException(CliExitCode.NotFound, api.Message);
 

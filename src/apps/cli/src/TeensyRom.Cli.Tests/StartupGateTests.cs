@@ -2,7 +2,9 @@ using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Testing;
 using TeensyRom.Cli.Api;
+using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
+using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
 
 namespace TeensyRom.Cli.Tests;
@@ -20,6 +22,7 @@ public sealed class StartupGateTests : IDisposable
     private readonly TestConsole _console = new TestConsole().Interactive();
     private readonly IEngineControl _engine = Substitute.For<IEngineControl>();
     private readonly IDeviceService _devices = Substitute.For<IDeviceService>();
+    private readonly ICliOutput _output = Substitute.For<ICliOutput>();
     private readonly StartupGate _sut;
 
     public StartupGateTests()
@@ -27,7 +30,8 @@ public sealed class StartupGateTests : IDisposable
         _console.Profile.Width = 200;
         AnsiConsole.Console = _console;
         _engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
-        _sut = new StartupGate(_engine, _devices);
+        _output.CanPrompt.Returns(true);
+        _sut = new StartupGate(_engine, _devices, new DeviceChooser(_devices, _output));
     }
 
     public void Dispose() => AnsiConsole.Console = _originalConsole;
@@ -58,24 +62,25 @@ public sealed class StartupGateTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureReady_WithOneOnlineDevice_StillPrompts()
+    public async Task EnsureReady_WithOneOnlineDevice_SelectsItWithoutPrompting()
     {
         var alpha = Online("a", "Alpha");
-        TrWebKnows(alpha);
+        TrWebKnows(alpha, Offline("c", "Charlie"));
         _console.Input.PushKey(ConsoleKey.Enter);
 
         var ready = await _sut.EnsureReadyAsync();
 
         ready.Should().BeTrue();
         _devices.Received(1).Select(alpha);
-        _console.Input.IsKeyAvailable().Should().BeFalse("the prompt consumed the key press");
+        _console.Input.IsKeyAvailable().Should().BeTrue("no prompt was shown to consume the key press");
+        _console.Output.Should().NotContain("Alpha");
     }
 
     [Fact]
     public async Task EnsureReady_WithADeviceNameThatLooksLikeMarkup_ShowsItAsTyped()
     {
         var odd = Online("a", "[red]Rig[/] #1");
-        TrWebKnows(odd);
+        TrWebKnows(odd, Online("b", "Bravo"));
         _console.Input.PushKey(ConsoleKey.Enter);
 
         var ready = await _sut.EnsureReadyAsync();
@@ -93,7 +98,7 @@ public sealed class StartupGateTests : IDisposable
         var ready = await _sut.EnsureReadyAsync();
 
         ready.Should().BeFalse();
-        _console.Output.Should().Contain("No TeensyROM is online in tr-web — connect one in tr-web and try again.");
+        _console.Output.Should().Contain("No TeensyROM is online. Connect one, then run `trom device discover`.");
         _devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
     }
 
@@ -126,7 +131,6 @@ public sealed class StartupGateTests : IDisposable
     public async Task EnsureReady_OnceReady_DoesNotCheckAgain()
     {
         TrWebKnows(Online("a", "Alpha"));
-        _console.Input.PushKey(ConsoleKey.Enter);
         await _sut.EnsureReadyAsync();
 
         var again = await _sut.EnsureReadyAsync();
@@ -148,17 +152,17 @@ public sealed class StartupGateTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureReady_WithoutAnInteractiveTerminal_SaysSoInsteadOfPrompting()
+    public async Task EnsureReady_WithSeveralDevicesAndNoInteractiveTerminal_AsksForADeviceNameInsteadOfPrompting()
     {
         var plain = new TestConsole();
         plain.Profile.Width = 200;
         AnsiConsole.Console = plain;
-        TrWebKnows(Online("a", "Alpha"));
+        TrWebKnows(Online("a", "Alpha"), Online("b", "Bravo"));
 
         var ready = await _sut.EnsureReadyAsync();
 
         ready.Should().BeFalse();
-        plain.Output.Should().Contain("Choosing a TeensyROM needs an interactive terminal.");
+        plain.Output.Should().Contain("Several TeensyROMs are available").And.Contain("--device");
         _devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
     }
 }

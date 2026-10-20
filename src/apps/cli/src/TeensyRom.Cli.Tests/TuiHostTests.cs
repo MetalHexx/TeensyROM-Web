@@ -82,12 +82,11 @@ public sealed class TuiHostTests : IDisposable
     }
 
     [Fact]
-    public async Task AFlowThatNeedsTheEngine_ReadiesItAndAsksForTheDeviceFirst()
+    public async Task AFlowThatNeedsTheEngine_ReadiesIt_AndSelectsTheOnlyOnlineDeviceWithoutAsking()
     {
         var alpha = new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected");
         _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { alpha });
         Pick(Devices);
-        _host.Consoles.Out.Input.PushKey(ConsoleKey.Enter);
         Pick(Leave);
 
         var exitCode = await RunMenu();
@@ -106,7 +105,7 @@ public sealed class TuiHostTests : IDisposable
         var exitCode = await RunMenu();
 
         exitCode.Should().Be(1);
-        Screen.Should().Contain("No TeensyROM is online in tr-web");
+        Screen.Should().Contain("No TeensyROM is online. Connect one, then run `trom device discover`.");
     }
 
     [Fact]
@@ -117,7 +116,6 @@ public sealed class TuiHostTests : IDisposable
             Task.FromResult<IReadOnlyList<DeviceSummary>>([alpha]),
             Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("tr-web stopped answering.")));
         Pick(Devices);
-        _host.Consoles.Out.Input.PushKey(ConsoleKey.Enter);
         Pick(Leave);
 
         var exitCode = await RunMenu();

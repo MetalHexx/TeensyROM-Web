@@ -3,6 +3,7 @@ using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Testing;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Output;
@@ -88,7 +89,7 @@ internal sealed class TestHost : IDisposable
         configure?.Invoke(Services);
         CliHost.RegisterCommands(Services);
 
-        Composition = new CliComposition(Services, new StartupGate(Engine, Devices), Consoles.Consoles, output, new TypeRegistrar(Services));
+        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services));
         Session = CliHost.CreateSession(Composition);
     }
 

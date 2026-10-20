@@ -11,8 +11,8 @@ namespace TeensyRom.Cli.Services;
 /// </summary>
 /// <param name="app">The public app.</param>
 /// <param name="errHelpApp">An app over the same tree whose help goes to stderr, for the nearest help of a usage error.</param>
-/// <param name="nouns">The nouns of the public tree.</param>
-internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutput output, CliConsoles consoles, IReadOnlyCollection<string> nouns)
+/// <param name="nouns">The nouns of the public tree, each with the names of its verbs.</param>
+internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutput output, CliConsoles consoles, IReadOnlyDictionary<string, string[]> nouns)
 {
     /// <summary>
     /// Runs <paramref name="args"/> once and returns the exit code. In order: reads <c>--json</c> from the raw

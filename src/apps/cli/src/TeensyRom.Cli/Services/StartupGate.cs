@@ -1,15 +1,17 @@
 using TeensyRom.Cli.Api;
+using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
+using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Helpers;
 
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// What a menu entry that needs the engine does first: gets an engine running, then lets the user pick the
-/// TeensyROM to work with. One-shot commands do not use it; their base classes ready the engine and the device
-/// without ever prompting unless several devices qualify.
+/// What a menu entry that needs the engine does first: gets an engine running, then selects the TeensyROM to work
+/// with. The device is chosen by the same <see cref="IDeviceChooser"/> the one-shot commands use: the only online
+/// device is taken without asking, and the user is prompted only when several are online.
 /// </summary>
-internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
+internal sealed class StartupGate(IEngineControl engine, IDeviceService devices, IDeviceChooser chooser)
 {
     private bool _ready;
 
@@ -35,40 +37,15 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
 
     private async Task<bool> SelectDeviceAsync(CancellationToken ct)
     {
-        List<DeviceSummary> online;
-
         try
         {
-            online = (await devices.GetDevicesAsync(ct)).Where(d => d.IsOnline).ToList();
+            devices.Select(await chooser.ChooseAsync(null, DeviceScope.Online, ct));
+            return true;
         }
-        catch (TeensyApiException ex)
+        catch (Exception ex) when (ex is CliException or TeensyApiException)
         {
             RadHelper.WriteError(ex.Message);
             return false;
         }
-
-        if (online.Count == 0)
-        {
-            RadHelper.WriteError("No TeensyROM is online in tr-web — connect one in tr-web and try again.");
-            return false;
-        }
-
-        var labels = online.Select(Label).ToList();
-        string choice;
-
-        try
-        {
-            choice = PromptHelper.FilePrompt("TeensyROM", labels);
-        }
-        catch (NotSupportedException)
-        {
-            RadHelper.WriteError("Choosing a TeensyROM needs an interactive terminal.");
-            return false;
-        }
-
-        devices.Select(online[labels.IndexOf(choice)]);
-        return true;
     }
-
-    private static string Label(DeviceSummary device) => $"{device.Name} ({device.Connection})";
 }

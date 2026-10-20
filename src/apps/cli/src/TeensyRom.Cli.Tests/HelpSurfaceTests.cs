@@ -90,6 +90,17 @@ public sealed class HelpSurfaceTests
         await AssertNoEngineOrDeviceTouched(host);
     }
 
+    [Fact]
+    public async Task ABadOption_PointsAtTheVerbsHelp()
+    {
+        using var host = new TestHost();
+
+        var exitCode = await host.RunAsync("device", "list", "--bogus");
+
+        exitCode.Should().Be(2);
+        host.Consoles.StdErr.Should().Contain("trom device list --help");
+    }
+
     private static async Task AssertNoEngineOrDeviceTouched(TestHost host)
     {
         await host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);

@@ -17,7 +17,7 @@ namespace TeensyRom.Cli.Tests;
 [Collection(ConsoleCollection.Name)]
 public sealed class CliSessionTests : IDisposable
 {
-    private static readonly string[] Nouns = ["x"];
+    private static readonly Dictionary<string, string[]> Nouns = new() { ["x"] = ["who", "paths"] };
 
     private readonly IAnsiConsole _originalConsole = AnsiConsole.Console;
     private readonly TestConsoles _consoles = new();
@@ -132,14 +132,14 @@ public sealed class CliSessionTests : IDisposable
     // ---- usage errors ---------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task AnUnknownOption_IsAUsageError_WithTheNounsHelpOnStderrAndNothingOnStdout()
+    public async Task AnUnknownOption_IsAUsageError_WithTheVerbsHelpOnStderrAndNothingOnStdout()
     {
         var sut = SessionOver();
 
         var exitCode = await sut.RunAsync(["x", "who", "--bogus"]);
 
         exitCode.Should().Be((int)CliExitCode.Usage);
-        _consoles.StdErr.Should().Contain("Unknown option 'bogus'").And.Contain("trom x --help").And.Contain("COMMANDS").And.Contain("paths");
+        _consoles.StdErr.Should().Contain("Unknown option 'bogus'").And.Contain("trom x who --help").And.Contain("USAGE");
         _consoles.StdOut.Should().BeEmpty();
     }
 

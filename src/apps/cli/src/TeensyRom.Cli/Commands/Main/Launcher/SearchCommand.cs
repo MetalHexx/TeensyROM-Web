@@ -32,9 +32,6 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
         [CommandOption("--override")]
         public bool? SidOverride { get; set; }
 
-        public new static string Example => "launch search -s sd -q \"iron maiden aces high\"";
-        public new static string Description => "Search for a file.";
-
         public new void ClearSettings()
         {
             StorageDevice = string.Empty;

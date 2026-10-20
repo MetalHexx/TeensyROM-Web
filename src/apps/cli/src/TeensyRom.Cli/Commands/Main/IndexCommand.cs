@@ -20,9 +20,6 @@ namespace TeensyRom.Cli.Commands.Main
         [CommandOption("-p|--path")]
         public string Path { get; set; } = string.Empty;
 
-        public static string Example => "index -s sd -p /music/ ";
-        public static string Description => "Indexes all the files on your storage device to enhance search and streaming features.";
-
         public void ClearSettings()
         {
             StorageDevice = string.Empty;

@@ -47,6 +47,38 @@ public sealed class SettingsAndBanScenarios(SharedApiFixture api)
     }
 
     [SkippableFact]
+    public async Task FileBan_ThroughTheCommandLine_ReportsASecondBanAsAlreadyBanned_WithCleanStdout()
+    {
+        var (services, _, storageType, found) = await ArrangeAsync();
+        using var servicesScope = services;
+        var original = await api.Api.GetSettingsAsync();
+        var storageName = storageType == TeensyStorageType.USB ? "usb" : "sd";
+        var args = new[] { "file", "ban", found.File.Path, "--device", api.OnlineDevices[0].DeviceId, "--storage", storageName, "--json" };
+
+        try
+        {
+            using var first = new CliHarness();
+            (await first.RunAsync(args)).Should().Be(0);
+            using var second = new CliHarness();
+            (await second.RunAsync(args)).Should().Be(0);
+
+            Ban(first).GetProperty("alreadyBanned").GetBoolean().Should().BeFalse();
+            Ban(second).GetProperty("alreadyBanned").GetBoolean().Should().BeTrue();
+            Ban(second).GetProperty("path").GetString().Should().Be(found.File.Path);
+        }
+        finally
+        {
+            await RestoreAsync(original);
+        }
+    }
+
+    private static JsonElement Ban(CliHarness cli)
+    {
+        using var document = JsonDocument.Parse(cli.Output);
+        return document.RootElement.EnumerateArray().Single().Clone();
+    }
+
+    [SkippableFact]
     public async Task BanFile_HidesTheFileFromItsDirectoryListing()
     {
         var (cli, storage, storageType, found) = await ArrangeAsync();
