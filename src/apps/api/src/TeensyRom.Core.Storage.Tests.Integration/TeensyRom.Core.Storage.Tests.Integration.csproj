@@ -7,6 +7,9 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+
+    <!-- Its local-only suites read captured data from the home TEENSYROM_DATA_DIR names, so TestHome keeps that home. -->
+    <DefineConstants>$(DefineConstants);KEEP_INHERITED_HOME</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

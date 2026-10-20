@@ -10,9 +10,15 @@ namespace TeensyRom.Cli.Tests;
 /// One home per process: two processes on one home would share one engine lock.
 /// </summary>
 /// <remarks>
+/// <para>
+/// A <c>TEENSYROM_DATA_DIR</c> inherited from the shell is replaced, so a stray value can't point the settings tests
+/// at a real home they would overwrite and delete.
+/// </para>
+/// <para>
 /// A test may start an engine that outlives the test process and holds <c>engine.lock</c> in its home, so the home is
 /// deleted only when nothing holds that lock. Each home's folder name carries its owner's PID, so the next test
 /// process sweeps away every home whose owner is gone and whose lock is free.
+/// </para>
 /// </remarks>
 internal static class TestHome
 {
@@ -21,9 +27,6 @@ internal static class TestHome
     [ModuleInitializer]
     internal static void Initialize()
     {
-        // Left alone when already set: a run may be pointed at a real home on purpose.
-        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(TeensyRomHome.DataDirVariable))) return;
-
         var project = typeof(TestHome).Assembly.GetName().Name;
         var home = Path.Combine(TestHomesRoot, $"{project}-{Environment.ProcessId}-{Guid.NewGuid():N}");
 

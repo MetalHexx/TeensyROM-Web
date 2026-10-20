@@ -11,10 +11,17 @@ namespace TeensyRom.TestSupport;
 /// test processes on one home would trip the engine instance lock.
 /// </summary>
 /// <remarks>
+/// <para>
+/// A <c>TEENSYROM_DATA_DIR</c> inherited from the shell is replaced, so a stray value can't point the settings tests
+/// at a real home they would overwrite and delete. A project that reads captured data from a home on purpose defines
+/// <c>KEEP_INHERITED_HOME</c> to keep the inherited one.
+/// </para>
+/// <para>
 /// A process that booted the engine holds <c>engine.lock</c> open until it dies, and the test host may be killed
 /// before an exit-time delete of a large home finishes, so exit cleanup is only best-effort. What guarantees
 /// cleanup: each home folder name carries its owner's PID, so the next test process sweeps away every home whose
 /// owner is gone. At most the latest run's home outlives its process.
+/// </para>
 /// </remarks>
 internal static class TestHome
 {
@@ -23,8 +30,10 @@ internal static class TestHome
     [ModuleInitializer]
     internal static void Initialize()
     {
-        // Left alone when already set: local-only suites may be pointed at real captured data on purpose.
+#if KEEP_INHERITED_HOME
+        // Left alone when already set: this project's local-only suites read captured data from the home the variable names.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(TeensyRomHome.DataDirVariable))) return;
+#endif
 
         var project = typeof(TestHome).Assembly.GetName().Name;
         var home = Path.Combine(TestHomesRoot, $"{project}-{Environment.ProcessId}-{Guid.NewGuid():N}");
