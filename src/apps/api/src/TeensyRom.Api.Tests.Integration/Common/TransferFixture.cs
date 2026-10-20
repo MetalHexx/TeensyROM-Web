@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Abstractions;
@@ -58,6 +59,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
         }
 
         public IServiceProvider Services => _factory.Services;
+
+        /// <summary>The in-memory server, for clients that build their own transport (e.g. a SignalR connection).</summary>
+        public TestServer Server => _factory.Server;
 
         public FakeDeviceConnectionManager DeviceManager { get; }
 

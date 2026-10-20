@@ -57,7 +57,7 @@ public class DeepSidDatabase : IDeepSidDatabase
 
     private static string GetDeepSidFilePath()
     {
-        var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
+        var currentDirectory = Assembly.GetExecutingAssembly().GetDataPath();
 
         if (string.IsNullOrEmpty(currentDirectory)) return string.Empty;
 

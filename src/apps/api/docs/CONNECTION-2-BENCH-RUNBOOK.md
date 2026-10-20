@@ -22,12 +22,14 @@ comes from the log tap's millisecond timestamps against a pristine, undebugged A
 
 ## Pristine restart
 
-Live state lives under the Debug build's `bin/.../Assets/System`: `Config/Settings.json`,
+Live state lives under the engine's home, `~/.teensyrom/api/Assets/System` (or
+`$TEENSYROM_DATA_DIR/api/Assets/System` when that variable is set): `Config/Settings.json`,
 `Config/ConnectionRecords.json` (the discovery cache), `Cache/Sd-<chipId>.json` (storage indexes), and
-`Logs/`. Deleting the whole `bin` folder gives a truly pristine API — it self-heals settings on first run.
+`Logs/`. The build output folder is only read. Deleting the home's `api` folder gives a truly pristine
+API — it self-heals settings on first run.
 
 ```
-Remove-Item -Recurse -Force apps/api/src/TeensyRom.Api/bin
+Remove-Item -Recurse -Force ~/.teensyrom/api
 dotnet build apps/api/src/TeensyRom.Api
 dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 10213
 ```
@@ -129,7 +131,7 @@ Read: two `DeviceRecovery: Recovery LeaveMinimal ...` pairs (one per chip id), a
 
 ### 4. Serial-only cold start with two dead cached TCP rows
 
-Edit `Assets/System/Config/ConnectionRecords.json` by hand so both units' rows carry a `TcpEndpoint` that
+Edit `~/.teensyrom/api/Assets/System/Config/ConnectionRecords.json` (under `$TEENSYROM_DATA_DIR/api` when set) by hand so both units' rows carry a `TcpEndpoint` that
 is no longer live (an IP neither unit currently holds) and no usable `SerialPortName`, or a serial port
 name that is stale too — the point is both cached rows must fail to confirm. Restart the API (pristine
 restart, but only after re-seeding the doctored cache file) with the listener off or the units off the

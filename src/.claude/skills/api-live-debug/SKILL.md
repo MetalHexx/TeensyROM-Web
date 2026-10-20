@@ -51,33 +51,34 @@ takes one debugger at a time. Once unzipped, the debugger's full path (from the 
 
 ## Pristine restart
 
-The Debug build's `apps/api/src/TeensyRom.Api/bin/Debug/net9.0/win-x64/Assets/System/` folder (relative
-to the repo's `src/`) holds live state. What it has today:
+The engine's home, `~/.teensyrom/api/Assets/System/` (or `$TEENSYROM_DATA_DIR/api/Assets/System/`), holds
+live state; the build output folder is only read. What it has today:
 
 - `Config/Settings.json` and `Config/ConnectionRecords.json` (the discovery cache). `DeviceIps.json` and
   `SerialPorts.json` no longer exist.
 - `Cache/Sd-<chipId>.json` and `Cache/Usb-<chipId>.json` (storage indexes), and `Cache/GameImageMetadata.json`.
 - `Logs/Logs-<start>.txt` and `Logs/GlobalExceptions-<date>.log`.
 
-Deleting the whole `bin` folder gives a truly pristine API — it self-heals settings on first run and
+Deleting the home's `api` folder gives a truly pristine API — it self-heals settings on first run and
 indexes directories on demand (`GetDirectory`), so no full index is needed. **`TEENSYROM_DATA_DIR`**
-(`TeensyRom.Core/Common/AssemblyExtensions.cs`) moves all of the above out of `bin` entirely when it's
-set — check for it before assuming this is where a given run actually wrote.
+(`TeensyRom.Core/Common/TeensyRomHome.cs`) names a different home root when it's set — check for it
+before assuming this is where a given run actually wrote. Only one engine can run per home; a second one
+exits with "Another TeensyROM engine is already running".
 
 ```bash
-rm -rf apps/api/src/TeensyRom.Api/bin
+rm -rf ~/.teensyrom/api
 dotnet build apps/api/src/TeensyRom.Api
 dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 10213
 ```
 
-(PowerShell's `Remove-Item -Recurse -Force apps/api/src/TeensyRom.Api/bin` works the same if that's the
+(PowerShell's `Remove-Item -Recurse -Force ~/.teensyrom/api` works the same if that's the
 shell in hand.) To find the running API's pid from a Bash shell — `dbg.mjs`'s second argument —
 `ps -W | grep TeensyRom.Api` (Git Bash on Windows) or `pgrep -f TeensyRom.Api` (a real POSIX shell).
 
 **Startup runs discovery by itself** (`ApplicationBootstrap: Scanning for devices...`,
 right after "Now listening") — the start occasion confirms cached endpoints by chip id and
 only falls back to a full discovery sweep on a miss. A *pristine* start has no cache at all
-(the whole `bin` folder, and `ConnectionRecords.json` with it, is gone), so it always takes
+(the whole `api` home folder, and `ConnectionRecords.json` with it, is gone), so it always takes
 the miss path: opens every COM port and sweeps the /24, ~18 s with two units on serial, then
 writes a fresh `ConnectionRecords.json`. The only other occasion that contacts a device is the
 device toolbar's Discover Devices action — `GET /api/devices/?FullScan=true` (that call *is*
@@ -92,16 +93,16 @@ hub.
 node .claude/skills/api-live-debug/scripts/logtap.mjs <out.log>
 ```
 
-Connects to `/api/logHub`, POSTs `/api/logs` to enable streaming, appends every
+Connects to `/api/logHub`, invokes the hub's `Subscribe` method to start receiving, appends every
 `LogProduced` line with a **UTC** timestamp — and it's an *arrival* time, not the moment the API logged
 it: the API batches at most 20 lines onto the hub, then waits 100 ms
 (`TeensyRom.Api/Services/LoggingService.cs`) before the next batch, so "the tap gives millisecond stamps"
 overstates its precision. For real timing, use a firmware-side probe (`device-transport-probe`) or a run
 with the debugger detached and read the tap's own stamps knowing the ~100 ms batching granularity.
 
-**Nothing reaches the tap before `POST /api/logs`** — that call is what starts the log stream and also
-clears whatever was queued before it, so startup discovery's own lines never appear there; they're only
-in the file log (`bin/.../Assets/System/Logs/Logs-<start>.txt`, one per run). That file log has no
+**Nothing reaches the tap before its `Subscribe`** — the first listener to subscribe is what starts the log
+stream, and starting it clears whatever was queued before, so startup discovery's own lines never appear there; they're only
+in the file log (`~/.teensyrom/api/Assets/System/Logs/Logs-<start>.txt`, one per run). That file log has no
 per-line timestamps of its own (a raw log line, nothing prepended) and flushes to disk every 100 lines or
 5 s, whichever comes first — its *file name* is in local time, not UTC.
 
@@ -156,7 +157,6 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 | `POST /api/devices/{deviceId}/reconnect` | saved addresses, preferred transport first, then one search for missing units if that misses |
 | `DELETE /api/devices/{deviceId}` | offline units only - an available device answers 409 |
 | `POST /api/devices/{deviceId}/toggle-music` | |
-| `POST /api/logs` / `DELETE /api/logs` | starts/stops the log stream; the hub itself is `/api/logHub` |
 | `GET /api/devices/{deviceId}/storage/{SD\|USB}/files/content?Path=` | |
 
 ## Gotchas
@@ -232,9 +232,9 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 
 ## Proven round-trip (2026-09-20)
 
-Breakpoint on `StartLogsEndpoint.cs:22` → started the log tap (its `POST /api/logs`
+Breakpoint on `LogsHub.Subscribe` → started the log tap (its `Subscribe` invoke
 tripped it) → `GET /status` showed HELD with the stack → `GET /locals?depth=2` and
-`POST /eval` read state → `POST /continue` → the tap's POST returned 200 → `DELETE /bp`.
+`POST /eval` read state → `POST /continue` → the tap's `Subscribe` returned → `DELETE /bp`.
 
 ## Worked example — the large-launch investigation (2026-09-20)
 

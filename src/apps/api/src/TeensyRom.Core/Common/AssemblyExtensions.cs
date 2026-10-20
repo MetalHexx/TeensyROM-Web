@@ -7,6 +7,8 @@ namespace TeensyRom.Core.Common
         /// <summary>
         /// Get the full path of the assembly.
         /// For single-file executables, returns AppContext.BaseDirectory instead of Assembly.Location.
+        /// Read-only: it locates the packaged assets that <see cref="PackageAssetSync"/> copies into the home.
+        /// Anything the engine writes belongs under <see cref="GetDataPath"/>.
         /// </summary>
         public static string GetPath(this Assembly assembly) 
         {
@@ -25,22 +27,8 @@ namespace TeensyRom.Core.Common
         }
 
         /// <summary>
-        /// Get the writable data directory path.
-        /// Checks TEENSYROM_DATA_DIR environment variable first, then falls back to assembly path.
-        /// This allows package managers (like Homebrew) to specify a writable location
-        /// while maintaining backward compatibility for manual installations.
+        /// Get the writable data directory path: the engine's per-user home, <see cref="TeensyRomHome.ApiPath"/>.
         /// </summary>
-        public static string GetDataPath(this Assembly assembly)
-        {
-            var envDataDir = Environment.GetEnvironmentVariable("TEENSYROM_DATA_DIR");
-            
-            if (!string.IsNullOrWhiteSpace(envDataDir))
-            {
-                return envDataDir;
-            }
-            
-            // Fallback to assembly path for backward compatibility
-            return assembly.GetPath();
-        }
+        public static string GetDataPath(this Assembly assembly) => TeensyRomHome.ApiPath;
     }
 }

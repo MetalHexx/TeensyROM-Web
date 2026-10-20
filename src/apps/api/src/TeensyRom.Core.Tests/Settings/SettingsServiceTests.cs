@@ -1,6 +1,5 @@
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
-using System.Reflection;
 using AutoFixture;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
@@ -11,7 +10,7 @@ namespace TeensyRom.Core.Tests.Settings;
 /// <summary>
 /// Comprehensive behavioral tests for SettingsService functionality.
 /// Tests focus on service behavior, file I/O, observable patterns, and provider interfaces.
-/// File operations write to the test assembly's output directory for isolation.
+/// File operations write to the throwaway test home for isolation.
 /// </summary>
 public class SettingsServiceTests : IDisposable
 {
@@ -26,8 +25,7 @@ public class SettingsServiceTests : IDisposable
         _mockLogger = Substitute.For<ILoggingService>();
         
         // Get the actual path where the service will write
-        var assemblyPath = Assembly.GetExecutingAssembly().GetPath();
-        _settingsFilePath = Path.Combine(assemblyPath, SettingsConstants.SettingsPath);
+        _settingsFilePath = Path.Combine(TeensyRomHome.ApiPath, SettingsConstants.SettingsPath);
         
         // Create a test watch directory that will exist for validation tests
         _testWatchDirectory = Path.Combine(Path.GetTempPath(), "TeensyRomTests", "WatchDir");

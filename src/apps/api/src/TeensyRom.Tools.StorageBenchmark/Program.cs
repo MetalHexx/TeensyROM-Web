@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Storage;
 using TeensyRom.Core.Storage.Index;
@@ -26,8 +27,9 @@ public static class Program
         }
 
         // Must be set before constructing anything that resolves a cache file path - it is the only
-        // seam SimpleStorageCache exposes for pointing at a different index file.
-        Environment.SetEnvironmentVariable("TEENSYROM_DATA_DIR", options.DataDir);
+        // seam SimpleStorageCache exposes for pointing at a different index file. --data-dir names a
+        // TeensyROM home root; the engine's data, including the caches, lives under its api/ folder.
+        Environment.SetEnvironmentVariable(TeensyRomHome.DataDirVariable, options.DataDir);
 
         var runner = new BenchmarkRunner(options.Iterations);
         string report;
@@ -84,7 +86,7 @@ public static class Program
             BannedFiles = []
         };
 
-        return LegacyCacheScenarios.Run(runner, cartStorage, settings, options.DataDir);
+        return LegacyCacheScenarios.Run(runner, cartStorage, settings, TeensyRomHome.ApiPath);
     }
 
     private static async Task<string> BuildStoreReportAsync(BenchmarkRunner runner, BenchmarkOptions options)
@@ -407,9 +409,10 @@ public sealed record BenchmarkOptions(
     bool Explain = false)
 {
     public const string Usage =
-        "Usage: StorageBenchmark --data-dir <dir> --device <deviceId> [--storage sd|usb] " +
+        "Usage: StorageBenchmark --data-dir <home> --device <deviceId> [--storage sd|usb] " +
         "[--iterations 5] [--out <path.md>] [--scenarios legacy|store|both] [--fixture <path>] " +
-        "[--db <path>] [--keep-db] [--prior <path.tsv>] [--explain]";
+        "[--db <path>] [--keep-db] [--prior <path.tsv>] [--explain]\n" +
+        "  <home> is a TeensyROM home root: index caches are read from <home>/api/Assets/System/Cache.";
 
     public static BenchmarkOptions Parse(string[] args)
     {

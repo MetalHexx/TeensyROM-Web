@@ -12,8 +12,8 @@ namespace TeensyRom.Core.Storage.Index
         public const string Index_Db_File_Name = "index.db";
 
         /// <summary>
-        /// Resolves to <c>&lt;data dir&gt;/Data/index.db</c>. The <c>Data</c> directory is deliberately outside
-        /// <c>Assets/</c>: startup unpacks asset zips over that tree with overwrite enabled on every run.
+        /// Resolves to <c>&lt;home&gt;/api/Data/index.db</c>. The <c>Data</c> directory is deliberately outside
+        /// <c>Assets/</c>: a package asset refresh deletes everything in that tree except <c>Assets/System</c>.
         /// </summary>
         public static string ResolveDatabasePath() => Path.Combine(
             Assembly.GetExecutingAssembly().GetDataPath(),

@@ -7,6 +7,7 @@
     "prestart": "rimraf .angular/cache .nx/cache",
     "start": "nx run teensyrom-ui:serve",
     "generate:api-client": "nx run api-client:generate",
+    "generate:cli-api-client": "pwsh apps/cli/scripts/generate-api-client.ps1",
     "generate:asm-64-client": "nx run asm-64-client:generate",
     "build:frontend": "pwsh scripts/copy-frontend.ps1",
     "vite": "vite",

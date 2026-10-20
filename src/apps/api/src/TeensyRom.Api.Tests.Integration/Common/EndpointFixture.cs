@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Reflection;
 using TeensyRom.Api.Endpoints.Files.Index;
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Api.Endpoints.ResetDevice;
@@ -121,7 +120,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public void DeleteAllCache() 
         {
             var cacheDirectory = Path.Combine(
-                Assembly.GetExecutingAssembly().GetPath(),
+                TeensyRomHome.ApiPath,
                 StorageHelper.Cache_File_Relative_Path);
 
             if (Directory.Exists(cacheDirectory))
@@ -155,14 +154,14 @@ namespace TeensyRom.Api.Tests.Integration.Common
             if (storageType == TeensyStorageType.SD)
             {
                 path = Path.Combine(
-                    Assembly.GetExecutingAssembly().GetPath(),
+                    TeensyRomHome.ApiPath,
                     StorageHelper.Cache_File_Relative_Path,
                     $"{StorageHelper.Sd_Cache_File_Name}{deviceId}{StorageHelper.Cache_File_Extension}");
             }
             else
             {
                 path = Path.Combine(
-                    Assembly.GetExecutingAssembly().GetPath(),
+                    TeensyRomHome.ApiPath,
                     StorageHelper.Cache_File_Relative_Path,
                     $"{StorageHelper.Usb_Cache_File_Name}{deviceId}{StorageHelper.Cache_File_Extension}");
             }

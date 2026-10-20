@@ -15,6 +15,7 @@ This skill creates a **local test release** of TeensyROM Web without version bum
 - ✅ Validating build process changes
 - ✅ Creating test executables for manual QA
 - ✅ Verifying frontend/backend integration in production mode
+- ✅ Verifying the package layout: the engine at the root and the CLI in `cli/`
 - ❌ NOT for official releases (use the `release` skill instead)
 
 ## Prerequisites
@@ -107,10 +108,38 @@ publish/win-x64/
 ├── Assets/                        ← System config & database files
 ├── api-spec/                      ← OpenAPI schema
 ├── appsettings.json               ← Runtime configuration
+├── cli/                           ← The CLI (added in Step 3)
 └── ... (other support files)
 ```
 
-### Step 3: Test the Build
+### Step 3: Publish the CLI (Windows x64)
+
+The CLI ships inside the same package, in a `cli/` subfolder beside the engine. Publish it with the same RID into `./publish/<rid>/cli`, run from `src/`:
+
+**Command:**
+```bash
+dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+  -c Release \
+  -r win-x64 \
+  --self-contained true \
+  -o ./publish/win-x64/cli
+```
+
+**Self-contained, not single-file**: the CLI resolves its fonts from its assembly location, which is empty in a single-file bundle. The separate `cli/` subfolder also keeps the two self-contained apps' runtimes from overwriting each other.
+
+**Output structure:**
+```
+publish/win-x64/
+├── TeensyRom.Api.exe              ← The engine
+├── ...
+└── cli/
+    ├── TeensyRom.Cli.exe          ← The CLI (plus its runtime, fonts and dependencies)
+    └── ...
+```
+
+The packaged CLI finds the engine at `../TeensyRom.Api[.exe]` relative to its own folder, so keep `cli/` directly inside the engine's folder.
+
+### Step 4: Test the Build
 
 **Run the executable:**
 ```bash
@@ -126,19 +155,31 @@ cd publish/win-x64
 5. Verify Scalar docs: `http://localhost:10213/scalar/v1`
 6. Check SignalR hubs connect (browser DevTools console)
 
+**Smoke-test the CLI from the package** (stop the engine from the step above first, so nothing is on port 10213; point `TEENSYROM_DATA_DIR` at a temp folder so the test does not touch your real `~/.teensyrom`):
+```powershell
+$env:TEENSYROM_DATA_DIR = Join-Path $env:TEMP 'teensyrom-pkg-test'
+cd publish/win-x64/cli
+.\TeensyRom.Cli.exe ports      # starts the packaged engine from ../TeensyRom.Api.exe
+curl http://localhost:10213/api/version
+.\TeensyRom.Cli.exe stop       # stops the engine it started
+```
+The `ports` device prompt may fail in a non-interactive shell; what matters is that the engine answers `/api/version` and that `stop` brings it down. Always finish with `stop` so no engine is left running.
+
 **Common Issues:**
 - ❌ **Port 10213 already in use**: Kill existing process or change port in appsettings.json
 - ❌ **404 on root**: Frontend not copied to wwwroot (run Step 1)
 - ❌ **CORS errors**: Check allowed origins in appsettings.json
 - ❌ **Assets not found**: AppContext.BaseDirectory issue (Phase 03 concern)
+- ❌ **CLI cannot find the engine**: `cli/` must sit directly inside the engine's folder (`../TeensyRom.Api[.exe]`)
 
-### Step 4: Report Output Location
+### Step 5: Report Output Location
 
 **Always provide the user with:**
 
 📍 **Full path to executable:**
 ```
 c:\dev\src\TeensyROM-Web\src\publish\win-x64\TeensyRom.Api.exe
+c:\dev\src\TeensyROM-Web\src\publish\win-x64\cli\TeensyRom.Cli.exe
 ```
 
 **Include:**
@@ -160,8 +201,13 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
   -p:OpenApiGenerateDocumentsOnBuild=false \
   -o ./publish/osx-x64
 
+# Publish the CLI beside it
+dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+  -c Release -r osx-x64 --self-contained true \
+  -o ./publish/osx-x64/cli
+
 # Make executable
-chmod +x ./publish/osx-x64/TeensyRom.Api
+chmod +x ./publish/osx-x64/TeensyRom.Api ./publish/osx-x64/cli/TeensyRom.Cli
 ```
 
 ### macOS ARM64 (Apple Silicon)
@@ -176,7 +222,11 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
   -p:OpenApiGenerateDocumentsOnBuild=false \
   -o ./publish/osx-arm64
 
-chmod +x ./publish/osx-arm64/TeensyRom.Api
+dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+  -c Release -r osx-arm64 --self-contained true \
+  -o ./publish/osx-arm64/cli
+
+chmod +x ./publish/osx-arm64/TeensyRom.Api ./publish/osx-arm64/cli/TeensyRom.Cli
 ```
 
 ### Linux x64
@@ -191,7 +241,11 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
   -p:OpenApiGenerateDocumentsOnBuild=false \
   -o ./publish/linux-x64
 
-chmod +x ./publish/linux-x64/TeensyRom.Api
+dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
+  -c Release -r linux-x64 --self-contained true \
+  -o ./publish/linux-x64/cli
+
+chmod +x ./publish/linux-x64/TeensyRom.Api ./publish/linux-x64/cli/TeensyRom.Cli
 ```
 
 **Note**: Cross-platform builds work from any OS, but testing requires the target OS.
@@ -269,6 +323,8 @@ dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
 **Not a problem unless exceeding 150+ MB**
 
 ## Packaging for Distribution
+
+Packaging zips/tars the whole `publish/<rid>/` folder, so `cli/` rides along with the engine. Run the CLI publish (and the `chmod +x` for macOS/Linux) before packaging.
 
 **Windows (.zip):**
 ```powershell

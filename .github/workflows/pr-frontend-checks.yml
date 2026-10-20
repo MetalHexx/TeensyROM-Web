@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - '!src/apps/api/**'
+      - '!src/apps/cli/**'
   workflow_dispatch:
 
 concurrency:

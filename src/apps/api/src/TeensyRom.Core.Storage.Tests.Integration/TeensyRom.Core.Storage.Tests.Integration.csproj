@@ -7,6 +7,9 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+
+    <!-- Its local-only suites read captured data from the home TEENSYROM_DATA_DIR names, so TestHome keeps that home. -->
+    <DefineConstants>$(DefineConstants);KEEP_INHERITED_HOME</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +30,10 @@
   <ItemGroup>
     <ProjectReference Include="..\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj" />
     <ProjectReference Include="..\TeensyRom.Core\TeensyRom.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\TestHome.cs" Link="TestHome.cs" />
   </ItemGroup>
 
 </Project>

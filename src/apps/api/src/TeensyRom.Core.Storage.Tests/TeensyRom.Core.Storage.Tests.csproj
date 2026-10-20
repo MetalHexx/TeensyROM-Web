@@ -31,4 +31,8 @@
     <ProjectReference Include="..\TeensyRom.Tools.StorageBenchmark\TeensyRom.Tools.StorageBenchmark.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\TestHome.cs" Link="TestHome.cs" />
+  </ItemGroup>
+
 </Project>

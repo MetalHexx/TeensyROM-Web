@@ -146,7 +146,8 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 
         /// <summary>
         /// Builds the current cache against the real index file. <see cref="SimpleStorageCache"/> resolves
-        /// that file in its constructor through <c>TEENSYROM_DATA_DIR</c>, so the variable is set before the
+        /// that file in its constructor through <c>TEENSYROM_DATA_DIR</c> (the home root; the cache reads
+        /// <c>api/Assets/System/Cache</c> beneath it), so the variable is set before the
         /// call and restored after it rather than left pointing at the test's choice.
         /// </summary>
         private static SimpleStorageCache CreateCache(FixtureInputs inputs)
