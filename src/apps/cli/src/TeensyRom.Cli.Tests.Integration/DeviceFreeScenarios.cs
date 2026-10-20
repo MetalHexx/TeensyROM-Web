@@ -44,7 +44,7 @@ public sealed class DeviceFreeScenarios
 
         try
         {
-            foreach (var oldName in new[] { "launch", "index", "ports", "credits", "stop" })
+            foreach (var oldName in new[] { "launch", "ports", "credits", "stop" })
             {
                 using var cli = new CliHarness();
 

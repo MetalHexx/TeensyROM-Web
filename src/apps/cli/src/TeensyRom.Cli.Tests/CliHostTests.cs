@@ -75,7 +75,6 @@ public sealed class CliHostTests : IDisposable
 
     [Theory]
     [InlineData("launch")]
-    [InlineData("index")]
     [InlineData("i")]
     [InlineData("ports")]
     [InlineData("p")]

@@ -31,6 +31,26 @@ internal interface IDeviceService
     /// <summary>Resets the selected device, which stops whatever it is running.</summary>
     /// <exception cref="TeensyApiException">No device is selected, or tr-web couldn't reset it.</exception>
     Task ResetAsync();
+
+    /// <summary>Reconnects the device, whether or not it is online now, and returns it as it is afterwards.</summary>
+    /// <exception cref="TeensyApiException">tr-web doesn't know the device or couldn't reconnect it.</exception>
+    Task<DeviceSummary> ReconnectDeviceAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>Renames the device and returns it under its new name.</summary>
+    /// <exception cref="TeensyApiException">tr-web doesn't know the device or refused the name.</exception>
+    Task<DeviceSummary> RenameDeviceAsync(string deviceId, string name, CancellationToken ct = default);
+
+    /// <summary>Makes tr-web forget the device, whether or not it is online now, and returns tr-web's message.</summary>
+    /// <exception cref="TeensyApiException">tr-web doesn't know the device or couldn't forget it.</exception>
+    Task<string> ForgetDeviceAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>Pings the device and returns tr-web's message.</summary>
+    /// <exception cref="TeensyApiException">tr-web doesn't know the device or the device didn't answer.</exception>
+    Task<string> PingDeviceAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>Resets the device, which stops whatever it is running, and returns tr-web's message.</summary>
+    /// <exception cref="TeensyApiException">tr-web doesn't know the device or couldn't reset it.</exception>
+    Task<string> ResetDeviceAsync(string deviceId, CancellationToken ct = default);
 }
 
 internal sealed record DeviceSummary(string Id, string Name, bool IsOnline, string Connection, string State, bool SdAvailable = false, bool UsbAvailable = false);

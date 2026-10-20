@@ -33,4 +33,27 @@ public sealed class DeviceScenarios(SharedApiFixture api)
         devices.Select(device => device.GetProperty("id").GetString()).Should().BeEquivalentTo(api.Devices.Select(device => device.DeviceId));
         devices.Select(device => device.GetProperty("isOnline").GetBoolean()).Should().BeEquivalentTo(api.Devices.Select(device => device.DeviceState != Api.Generated.DeviceState.ConnectionLost));
     }
+
+    [SkippableFact]
+    public async Task DevicePing_WithNoDeviceOnline_ExitsNoDevice()
+    {
+        Skip.If(api.OnlineDevices.Count > 0, "a TeensyROM is online in the test API");
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("device", "ping");
+
+        exitCode.Should().Be(4);
+        cli.Output.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeviceForget_OfADeviceTheApiDoesNotKnow_ExitsNotFound()
+    {
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("device", "forget", "--device", "nope");
+
+        exitCode.Should().Be(5);
+        cli.Output.Should().BeEmpty();
+    }
 }

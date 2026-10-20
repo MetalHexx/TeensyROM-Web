@@ -43,6 +43,21 @@ internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
         await ApiErrors.Call(() => api.ResetDeviceAsync(deviceId));
     }
 
+    public async Task<DeviceSummary> ReconnectDeviceAsync(string deviceId, CancellationToken ct = default) =>
+        ToSummary((await ApiErrors.Call(() => api.ReconnectDeviceAsync(deviceId, ct))).Device);
+
+    public async Task<DeviceSummary> RenameDeviceAsync(string deviceId, string name, CancellationToken ct = default) =>
+        ToSummary((await ApiErrors.Call(() => api.RenameDeviceAsync(deviceId, new RenameDeviceBody { Name = name }, ct))).Device);
+
+    public async Task<string> ForgetDeviceAsync(string deviceId, CancellationToken ct = default) =>
+        (await ApiErrors.Call(() => api.ForgetDeviceAsync(deviceId, ct))).Message;
+
+    public async Task<string> PingDeviceAsync(string deviceId, CancellationToken ct = default) =>
+        (await ApiErrors.Call(() => api.PingDeviceAsync(deviceId, ct))).Message;
+
+    public async Task<string> ResetDeviceAsync(string deviceId, CancellationToken ct = default) =>
+        (await ApiErrors.Call(() => api.ResetDeviceAsync(deviceId, ct))).Message;
+
     private static DeviceSummary ToSummary(CartDto cart) => new(
         cart.DeviceId,
         cart.Name,

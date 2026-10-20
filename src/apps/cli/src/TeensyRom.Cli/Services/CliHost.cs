@@ -9,6 +9,7 @@ using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Commands.Device;
 using TeensyRom.Cli.Commands.Engine;
+using TeensyRom.Cli.Commands.Index;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
@@ -67,10 +68,19 @@ internal static class CliHost
             PublicVerb.Of<EngineStatusCommand, EngineStatusSettings>("status", "Show whether the TeensyROM engine is running and which version.", ["engine", "status"]),
             PublicVerb.Of<EngineStopCommand, EngineStopSettings>("stop", "Stop the TeensyROM engine and the web app it serves.", ["engine", "stop"])
         ]),
-        new("device", "List the TeensyROM devices tr-web knows.",
+        new("device", "List, reconnect, rename, forget, ping or reset TeensyROM devices.",
         [
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices tr-web already knows.", ["device", "list"]),
-            PublicVerb.Of<DeviceListCommand, DeviceListSettings>(DeviceListCommand.DiscoverVerb, "Scan for TeensyROM devices, then list them.", ["device", DeviceListCommand.DiscoverVerb])
+            PublicVerb.Of<DeviceListCommand, DeviceListSettings>(DeviceListCommand.DiscoverVerb, "Scan for TeensyROM devices, then list them.", ["device", DeviceListCommand.DiscoverVerb]),
+            PublicVerb.Of<DeviceReconnectCommand, DeviceSettings>("reconnect", "Reconnect a TeensyROM, even one that is offline.", ["device", "reconnect", "--device", "Bench"]),
+            PublicVerb.Of<DeviceRenameCommand, DeviceRenameSettings>("rename", "Give a TeensyROM a new name, even one that is offline.", ["device", "rename", "Bench", "--device", "TeensyROM"]),
+            PublicVerb.Of<DeviceForgetCommand, DeviceSettings>("forget", "Make tr-web forget a TeensyROM, even one that is offline.", ["device", "forget", "--device", "Bench"]),
+            PublicVerb.Of<DevicePingCommand, DeviceSettings>("ping", "Check that an online TeensyROM answers.", ["device", "ping"]),
+            PublicVerb.Of<DeviceResetCommand, DeviceSettings>("reset", "Reset an online TeensyROM, which stops whatever it is running.", ["device", "reset"])
+        ]),
+        new("index", "Index a TeensyROM's storage for search and random launches.",
+        [
+            PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one.", ["index", "build", "/music", "--storage", "sd"])
         ]),
         new("settings", "Show or change the CLI's own settings.",
         [
