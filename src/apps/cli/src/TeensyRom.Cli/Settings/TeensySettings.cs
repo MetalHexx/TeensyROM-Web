@@ -24,6 +24,12 @@ namespace TeensyRom.Cli.Settings
         public bool EnableDebugLogs { get; set; } = false;
         public bool HasIndexed { get; set; } = false;
 
+        /// <summary>The PATH offer has been answered, yes or no, and is never made again.</summary>
+        public bool PathOfferAnswered { get; set; } = false;
+
+        /// <summary>The folders <c>trom path add</c> put on the Windows user PATH, which <c>remove</c> takes off again.</summary>
+        public List<string> PathEntriesAdded { get; set; } = [];
+
         public void InitializeDefaults()
         {
             FileTargets.AddRange(new List<TeensyTarget>
@@ -123,6 +129,7 @@ namespace TeensyRom.Cli.Settings
 
         public TeensySettings GetClone() => this with
         {
+            PathEntriesAdded = [.. PathEntriesAdded],
             FileTargets = FileTargets.Select(t => new TeensyTarget
             {
                 DisplayName = t.DisplayName,

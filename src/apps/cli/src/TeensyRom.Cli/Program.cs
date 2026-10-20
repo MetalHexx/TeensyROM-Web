@@ -11,13 +11,10 @@ public class Program
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
         var host = CliHost.Create();
 
-        await OfferPathSetupAsync(host);
+        if (host.PathOffer is { } pathOffer) await pathOffer.MaybeOfferAsync(args);
 
         if (args.Length == 0 && interactive) return await CliHost.CreateTui(host).RunAsync();
 
         return await CliHost.CreateSession(host).RunAsync(args.Length == 0 ? ["--help"] : args);
     }
-
-    /// <summary>The one place that offers to put <c>trom</c> on the user's PATH; it does nothing yet.</summary>
-    private static Task OfferPathSetupAsync(CliComposition host) => Task.CompletedTask;
 }

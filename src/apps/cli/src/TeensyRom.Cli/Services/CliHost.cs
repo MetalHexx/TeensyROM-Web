@@ -14,6 +14,7 @@ using TeensyRom.Cli.Commands.Index;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
+using TeensyRom.Cli.Commands.PathCommands;
 using TeensyRom.Cli.Commands.Settings;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Common;
@@ -21,6 +22,7 @@ using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Help;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Output;
+using TeensyRom.Cli.PathSetup;
 using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Services;
@@ -33,7 +35,7 @@ namespace TeensyRom.Cli.Services;
 /// The CLI's service registrations, the registrar both command apps share, and the gate that readies the engine and
 /// a device before a menu flow that needs them.
 /// </summary>
-internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate, CliConsoles Consoles, ICliOutput Output, TypeRegistrar Registrar);
+internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate, CliConsoles Consoles, ICliOutput Output, TypeRegistrar Registrar, PathOffer? PathOffer = null);
 
 /// <summary>
 /// One verb of the public command tree. <see cref="Command"/> and <see cref="Settings"/> are what the verb needs
@@ -92,6 +94,12 @@ internal static class CliHost
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [
             PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one.", ["index", "build", "/music", "--storage", "sd"])
+        ]),
+        new("path", "Put trom on your PATH, or take it off again.",
+        [
+            PublicVerb.Of<PathAddCommand, TromSettings>("add", "Add the folder holding trom to your PATH; new terminals will see it.", ["path", "add"]),
+            PublicVerb.Of<PathRemoveCommand, TromSettings>("remove", "Take off your PATH exactly what `trom path add` put there.", ["path", "remove"]),
+            PublicVerb.Of<PathStatusCommand, TromSettings>("status", "Show whether trom is on your PATH and which entries it manages.", ["path", "status"])
         ]),
         new("settings", "Show or change the CLI's own settings.",
         [
@@ -167,6 +175,7 @@ internal static class CliHost
             AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly()),
             output.Notice);
         var gate = new StartupGate(engine, deviceService);
+        var pathRegistrar = PathRegistrar.CreateDefault(settingsService);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
@@ -174,6 +183,7 @@ internal static class CliHost
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
         services.AddSingleton<ICliOutput>(output);
+        services.AddSingleton(pathRegistrar);
         services.AddSingleton<IStdinPaths>(new StdinPaths(Console.In, !Console.IsInputRedirected));
         services.AddSingleton<IDeviceChooser, DeviceChooser>();
 
@@ -191,7 +201,8 @@ internal static class CliHost
 
         RegisterCommands(services);
 
-        return new CliComposition(services, gate, consoles, output, new TypeRegistrar(services));
+        return new CliComposition(services, gate, consoles, output, new TypeRegistrar(services),
+            new PathOffer(output, settingsService, new EngineLocator(AppContext.BaseDirectory), pathRegistrar));
     }
 
     /// <summary>
@@ -200,6 +211,8 @@ internal static class CliHost
     /// </summary>
     internal static void RegisterCommands(IServiceCollection services)
     {
+        services.TryAddSingleton(provider => PathRegistrar.CreateDefault(provider.GetRequiredService<ISettingsService>()));
+
         foreach (var verb in PublicTree.SelectMany(noun => noun.Verbs))
         {
             services.TryAddTransient(verb.Command);
