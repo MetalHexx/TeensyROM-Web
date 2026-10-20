@@ -3,26 +3,29 @@ using System.Xml.Linq;
 using Newtonsoft.Json;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using TeensyRom.Cli.Commands.Common;
+using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Helpers;
+using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
 
 namespace TeensyRom.Cli.Commands.Main.Asid
 {
-    internal class GeneratePresetsSettings : CommandSettings, IClearableSettings
+    internal class GeneratePresetsSettings : TromSettings, IClearableSettings
     {
         [JsonIgnore]
-        [Description("SID Clock that matches your machine.")]
-        [CommandOption("-c|--clock")]
+        [Description("SID Clock that matches your machine: PAL or NTSC.")]
+        [CommandOption("--clock <CLOCK>")]
         public string Clock { get; set; } = string.Empty;
 
         [JsonIgnore]
         [Description("Source path of the Chipsynth C64 presets. (Absolute Path)")]
-        [CommandOption("-s|--source")]
+        [CommandOption("--source <SOURCE>")]
         public string SourcePath { get; set; } = string.Empty;
 
         [JsonIgnore]
         [Description("Target path of the Chipsynth C64 presets. (Relative Path)")]
-        [CommandOption("-t|--target")]
+        [CommandOption("--target <TARGET>")]
         public string TargetPath { get; set; } = string.Empty;
         public bool RunWizard { get; set; } = false;
 
@@ -60,12 +63,26 @@ namespace TeensyRom.Cli.Commands.Main.Asid
             RunWizard = true;
         }
     }
-    internal class GeneratePresetsCommand(IPlayerService player) : Command<GeneratePresetsSettings>
+
+    /// <summary>The result of a one-shot run: what was generated and where.</summary>
+    internal sealed record GeneratePresetsResult(string Clock, string Source, string Target, int PresetsWritten, string OutputFolder);
+
+    /// <summary>
+    /// Generates the ASID presets. One-shot it runs from its options alone; in the menu it runs the guided wizard.
+    /// </summary>
+    internal class GeneratePresetsCommand(ICliOutput output, IPlayerService player) : TromCommand<GeneratePresetsSettings>(output)
     {
-        public override int Execute(CommandContext context, GeneratePresetsSettings s)
+        protected override Task<int> RunAsync(CommandContext context, GeneratePresetsSettings s, CancellationToken ct)
         {
             player.StopStream();
 
+            var exitCode = Output.RunMode == CliRunMode.OneShot ? GenerateOneShot(s) : GenerateInMenu(s);
+
+            return Task.FromResult(exitCode);
+        }
+
+        private int GenerateInMenu(GeneratePresetsSettings s)
+        {
             RadHelper.WriteTitle("Chipsynth ASID Preset Generator");
             AnsiConsole.WriteLine();
 
@@ -84,6 +101,68 @@ namespace TeensyRom.Cli.Commands.Main.Asid
             AnsiConsole.WriteLine();
 
             return 0;
+        }
+
+        private int GenerateOneShot(GeneratePresetsSettings s)
+        {
+            CompleteOptions(s);
+
+            var validation = s.Validate();
+
+            if (!validation.Successful)
+            {
+                throw new CliException(CliExitCode.Usage, validation.Message ?? "The preset options are invalid.");
+            }
+            var outputFolder = Path.Combine(s.SourcePath, s.TargetPath);
+
+            if (!EnsureTargetPath(s))
+            {
+                throw new CliException(CliExitCode.Failed, $"The target folder '{outputFolder}' couldn't be created.");
+            }
+            var files = GetExistingPresets(s);
+
+            if (files.Count == 0)
+            {
+                throw new CliException(CliExitCode.Failed, $"No .fermatax files found in '{s.SourcePath}'.");
+            }
+            foreach (var file in files)
+            {
+                WritePreset(file, s);
+            }
+            var result = new GeneratePresetsResult(s.Clock.ToUpper(), s.SourcePath, s.TargetPath, files.Count, outputFolder);
+
+            if (Output.Mode == OutputMode.Json) Output.Json(result);
+            else Output.Lines([$"Generated {files.Count} presets in {outputFolder}."]);
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Fills each option the command line left out. A script can't be asked, so a missing option is a usage error
+        /// unless the terminal can answer the prompt.
+        /// </summary>
+        private void CompleteOptions(GeneratePresetsSettings s)
+        {
+            if (string.IsNullOrWhiteSpace(s.Clock))
+            {
+                RequireInteractive("--clock");
+                s.Clock = PromptHelper.ChoicePrompt("SID Clock", ["PAL", "NTSC"]);
+            }
+            if (string.IsNullOrWhiteSpace(s.SourcePath))
+            {
+                RequireInteractive("--source");
+                s.SourcePath = PromptHelper.DefaultValueTextPrompt("Source Path", 4, Directory.GetCurrentDirectory());
+            }
+            if (string.IsNullOrWhiteSpace(s.TargetPath))
+            {
+                RequireInteractive("--target");
+                s.TargetPath = PromptHelper.DefaultValueTextPrompt("Target Path", 1, "ASID");
+            }
+        }
+
+        private void RequireInteractive(string option)
+        {
+            if (!Output.CanPrompt) throw new CliException(CliExitCode.Usage, $"Missing {option}, which is required when no terminal can answer a prompt.");
         }
 
         public bool RunWizard(GeneratePresetsSettings s)

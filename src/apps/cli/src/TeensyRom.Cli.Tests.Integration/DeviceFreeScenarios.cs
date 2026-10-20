@@ -44,7 +44,7 @@ public sealed class DeviceFreeScenarios
 
         try
         {
-            foreach (var oldName in new[] { "launch", "index", "ports", "chipsynth", "settings", "credits", "stop" })
+            foreach (var oldName in new[] { "launch", "index", "ports", "credits", "stop" })
             {
                 using var cli = new CliHarness();
 
@@ -58,6 +58,36 @@ public sealed class DeviceFreeScenarios
         }
         finally
         {
+            await TestEngine.EnsureAsync(bound.Token);
+        }
+    }
+
+    [Fact]
+    public async Task ChipsynthGenerate_AndSettingsShow_RunWithoutAnEngine_AndStartNone()
+    {
+        using var bound = TestEngine.Bounded();
+        await TestEngine.StopAsync(bound.Token);
+
+        var source = Path.Combine(Path.GetTempPath(), $"chipsynth-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(source);
+            await File.WriteAllTextAsync(Path.Combine(source, "lead.fermatax"), "<Preset><Settings sc=\"0\" /><Slot id=\"0\" version=\"1\" /></Preset>", bound.Token);
+
+            using var cli = new CliHarness();
+
+            (await cli.RunAsync("chipsynth", "generate", "--clock", "ntsc", "--source", source, "--target", "ASID")).Should().Be(0);
+            (await cli.RunAsync("settings", "show")).Should().Be(0);
+
+            File.Exists(Path.Combine(source, "ASID", "lead.fermatax")).Should().BeTrue();
+            cli.Output.Should().Contain("storage: ");
+            cli.Error.Should().NotContain("Starting the TeensyROM engine");
+            (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
+        }
+        finally
+        {
+            if (Directory.Exists(source)) Directory.Delete(source, recursive: true);
             await TestEngine.EnsureAsync(bound.Token);
         }
     }

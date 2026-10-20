@@ -64,6 +64,8 @@ internal sealed class TestHost : IDisposable
 
     public ServiceCollection Services { get; } = new();
 
+    public CliLoggingService Logging { get; } = new();
+
     public CliComposition Composition { get; }
 
     public CliSession Session { get; }
@@ -73,11 +75,12 @@ internal sealed class TestHost : IDisposable
         Consoles = new TestConsoles(terminal);
 
         var output = new CliOutput(Consoles.Consoles);
-        var settings = new SettingsService(new CliLoggingService());
+        var settings = new SettingsService(Logging);
 
         Services.AddSingleton<ICliOutput>(output);
         Services.AddSingleton(Engine);
         Services.AddSingleton(Devices);
+        Services.AddSingleton<ICliLoggingService>(Logging);
         Services.AddSingleton<ISettingsService>(settings);
         Services.AddSingleton<IAlertService>(Substitute.For<IAlertService>());
         Services.AddSingleton(Substitute.For<ITeensyRomApiClient>());

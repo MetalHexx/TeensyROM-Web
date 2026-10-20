@@ -12,6 +12,7 @@ using TeensyRom.Cli.Commands.Engine;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
+using TeensyRom.Cli.Commands.Settings;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
@@ -70,6 +71,15 @@ internal static class CliHost
         [
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices tr-web already knows.", ["device", "list"]),
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>(DeviceListCommand.DiscoverVerb, "Scan for TeensyROM devices, then list them.", ["device", DeviceListCommand.DiscoverVerb])
+        ]),
+        new("settings", "Show or change the CLI's own settings.",
+        [
+            PublicVerb.Of<SettingsShowCommand, SettingsShowSettings>("show", "Show the CLI's saved settings.", ["settings", "show"]),
+            PublicVerb.Of<SettingsSetCommand, SettingsSetSettings>("set", "Change one of the CLI's saved settings.", ["settings", "set", "storage", "usb"])
+        ]),
+        new("chipsynth", "Generate ASID presets from Chipsynth C64 presets.",
+        [
+            PublicVerb.Of<GeneratePresetsCommand, GeneratePresetsSettings>("generate", GeneratePresetsSettings.Description, ["chipsynth", "generate", "--clock", "ntsc", "--target", "ASID", "--source", "c:\\your\\preset\\directory"])
         ])
     ];
 
@@ -77,8 +87,9 @@ internal static class CliHost
     public static IReadOnlyCollection<string> PublicNouns { get; } = PublicTree.Select(noun => noun.Name).ToArray();
 
     /// <summary>
-    /// Every command and settings type of the menu's private app, with the settings type each command binds.
-    /// The menu's flow types are singletons: they rely on <see cref="IClearableSettings"/> and <see cref="CommandInterceptor"/>.
+    /// Every command and settings type of the menu's private app that the public tree does not also run, with the
+    /// settings type each command binds. The menu's flow types are singletons: they rely on <see cref="IClearableSettings"/>
+    /// and <see cref="CommandInterceptor"/>. A type the public tree runs (<c>chipsynth generate</c>) is registered there, transient.
     /// </summary>
     private static readonly (Type Command, Type Settings)[] TuiFlows =
     [
@@ -90,7 +101,6 @@ internal static class CliHost
         (typeof(PlayerCommand), typeof(PlayerSettings)),
         (typeof(IndexCommand), typeof(IndexSettings)),
         (typeof(PortListCommand), typeof(PortListSettings)),
-        (typeof(GeneratePresetsCommand), typeof(GeneratePresetsSettings)),
         (typeof(SettingsCommand), typeof(SettingsCommandSettings)),
         (typeof(CreditsCommand), typeof(CreditsSettings))
     ];
