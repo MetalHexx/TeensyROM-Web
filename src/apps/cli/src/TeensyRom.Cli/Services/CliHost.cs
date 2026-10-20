@@ -84,7 +84,10 @@ internal static class CliHost
             PublicVerb.Of<FileLsCommand, FileLsSettings>("ls", "List a directory: its subdirectories, then its files.", ["file", "ls", "/music"]),
             PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the indexed files of a storage.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
             PublicVerb.Of<FileLaunchOneShotCommand, FileLaunchOneShotSettings>("launch", "Launch one file; --player then opens the player on it.", ["file", "launch", "/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid"]),
-            PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it.", ["file", "random", "--filter", "music", "--directory", "/music"])
+            PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it.", ["file", "random", "--filter", "music", "--directory", "/music"]),
+            PublicVerb.Of<FileFavoriteCommand, FilePathsSettings>("favorite", "Tag files as favorites; give paths, or - to read them from stdin.", ["file", "favorite", "/music/Commando.sid", "/music/Delta.sid"]),
+            PublicVerb.Of<FileUnfavoriteCommand, FilePathsSettings>("unfavorite", "Untag favorites; give paths, or - to read them from stdin.", ["file", "unfavorite", "/favorites/music/Commando.sid"]),
+            PublicVerb.Of<FileBanCommand, FilePathsSettings>("ban", "Ban files so they no longer show up; give paths, or - to read them from stdin.", ["file", "ban", "/music/Commando.sid"])
         ]),
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [

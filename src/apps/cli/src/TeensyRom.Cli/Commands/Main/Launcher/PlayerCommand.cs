@@ -248,7 +248,7 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
             {
                 try
                 {
-                    _storage.BanFile(playerState.CurrentItem).GetAwaiter().GetResult();
+                    _storage.BanFile(playerState.CurrentItem.Path, playerState.StorageType).GetAwaiter().GetResult();
                 }
                 catch (TeensyApiException ex)
                 {

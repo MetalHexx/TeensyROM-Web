@@ -44,15 +44,6 @@ public class StorageServiceTests
         Path = path
     };
 
-    private static GetSettingsResponse ServerSettings(params string[] bannedFiles) => new()
-    {
-        KnownDevices = [new DeviceSettingsDto()],
-        PlayerSettings = new PlayerSettingsDto(),
-        FileTransferSettings = new FileTransferSettingsDto(),
-        SearchSettings = new SearchSettingsDto { BannedFiles = [.. bannedFiles], BannedDirectories = ["Docs"], SearchStopWords = ["the"] },
-        AppSettings = new AppSettingsDto()
-    };
-
     [Fact]
     public void StorageType_StartsAsTheSavedPreference()
     {
@@ -271,54 +262,50 @@ public class StorageServiceTests
     }
 
     [Fact]
-    public async Task BanFile_SavesEverySettingsSectionBackAsRead_WithTheNameAdded()
+    public async Task BanFile_AsksTrWebToBanThePathOnTheGivenStorage_AndReturnsItsAnswer()
     {
-        var current = ServerSettings("Old.sid");
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(current);
-        SaveSettingsRequest? saved = null;
-        _api.SaveSettingsAsync(Arg.Do<SaveSettingsRequest>(request => saved = request), Arg.Any<CancellationToken>())
-            .Returns(new SaveSettingsResponse());
+        _api.BanFileAsync(DeviceId, ApiStorageType.USB, "/music/Commando.sid", Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Commando.sid is now banned.", BannedFileName = "Commando.sid", AlreadyBanned = false });
 
-        await _sut.BanFile(Song("/music/Commando.sid"));
+        var result = await _sut.BanFile("/music/Commando.sid", TeensyStorageType.USB);
 
-        saved.Should().NotBeNull();
-        saved!.KnownDevices.Should().BeSameAs(current.KnownDevices);
-        saved.PlayerSettings.Should().BeSameAs(current.PlayerSettings);
-        saved.FileTransferSettings.Should().BeSameAs(current.FileTransferSettings);
-        saved.AppSettings.Should().BeSameAs(current.AppSettings);
-        saved.SearchSettings.Should().BeSameAs(current.SearchSettings);
-        saved.SearchSettings.BannedFiles.Should().Equal("Old.sid", "Commando.sid");
-        saved.SearchSettings.BannedDirectories.Should().Equal("Docs");
-        saved.SearchSettings.SearchStopWords.Should().Equal("the");
-        _alert.Received(1).Publish("Commando.sid has been banned and will no longer show up in the application.");
+        result.Should().Be(new BanResult("Commando.sid", false, "Commando.sid is now banned."));
+        _alert.Received(1).Publish("Commando.sid is now banned.");
     }
 
     [Fact]
-    public async Task BanFile_OfAnAlreadyBannedName_AddsItOnlyOnce()
+    public async Task BanFile_OfAnAlreadyBannedFile_ReportsItWasAlreadyBanned()
     {
-        var current = ServerSettings();
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(current);
-        var song = Song();
+        _api.BanFileAsync(DeviceId, ApiStorageType.SD, "/music/Commando.sid", Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Already banned.", BannedFileName = "Commando.sid", AlreadyBanned = true });
 
-        await _sut.BanFile(song);
-        await _sut.BanFile(song);
+        var result = await _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
 
-        current.SearchSettings.BannedFiles.Should().Equal("Commando.sid");
-        await _api.Received(1).SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
+        result.AlreadyBanned.Should().BeTrue();
     }
 
     [Fact]
-    public async Task BanFile_NeedsNoSelectedDevice()
+    public async Task BanFile_NeverReadsOrWritesTheSettingsDocument_NorListsADirectory()
+    {
+        _api.BanFileAsync(Arg.Any<string>(), Arg.Any<ApiStorageType>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Banned.", BannedFileName = "Commando.sid" });
+
+        await _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
+
+        await _api.DidNotReceive().GetSettingsAsync(Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().GetDirectoryAsync(Arg.Any<string>(), Arg.Any<ApiStorageType>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BanFile_WithNoSelectedDevice_Throws()
     {
         _devices.RequireDeviceId().Returns(_ => throw new TeensyApiException("No TeensyROM is selected."));
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(ServerSettings());
 
-        await _sut.BanFile(Song());
+        var act = () => _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
 
-        await _api.Received(1).SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
-        _devices.DidNotReceive().RequireDeviceId();
+        await act.Should().ThrowAsync<TeensyApiException>().WithMessage("No TeensyROM is selected.");
     }
-
     [Fact]
     public async Task GetDirectory_WithNoSelectedDevice_Throws()
     {

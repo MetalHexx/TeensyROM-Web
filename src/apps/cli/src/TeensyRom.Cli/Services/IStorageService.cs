@@ -39,9 +39,17 @@ internal interface IStorageService
     /// <summary>Untags the favorite and clears <see cref="IStorageItem.IsFavorite"/> on success.</summary>
     Task RemoveFavorite(ILaunchableItem item);
 
-    /// <summary>Adds the file's name to tr-web's banned files. Needs no selected device.</summary>
-    Task BanFile(ILaunchableItem item);
+    /// <summary>
+    /// Bans the file at <paramref name="path"/> through tr-web, which adds its name to the banned files. The file is
+    /// never looked up here: banned files are invisible to listings, so a lookup would report an already-banned file
+    /// as missing.
+    /// </summary>
+    /// <param name="storage">The storage the file is on, which is not necessarily <see cref="StorageType"/>.</param>
+    Task<BanResult> BanFile(string path, TeensyStorageType storage);
 }
+
+/// <summary>What tr-web answered to a ban: the name now banned and whether it already was.</summary>
+internal sealed record BanResult(string BannedFileName, bool AlreadyBanned, string Message);
 
 /// <summary>
 /// The directories and files directly inside one storage directory.

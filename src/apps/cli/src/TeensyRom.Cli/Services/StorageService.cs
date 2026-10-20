@@ -105,23 +105,14 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
         alert.Publish($"{item.Path} was untagged as a favorite.");
     }
 
-    public async Task BanFile(ILaunchableItem item)
+    public async Task<BanResult> BanFile(string path, TeensyStorageType storage)
     {
-        var current = await ApiErrors.Call(() => api.GetSettingsAsync());
+        var deviceId = devices.RequireDeviceId();
+        var apiStorage = storage.ToApi();
 
-        if (!current.SearchSettings.BannedFiles.Contains(item.Name))
-        {
-            current.SearchSettings.BannedFiles.Add(item.Name);
+        var response = await ApiErrors.Call(() => api.BanFileAsync(deviceId, apiStorage, path));
 
-            await ApiErrors.Call(() => api.SaveSettingsAsync(new SaveSettingsRequest
-            {
-                KnownDevices = current.KnownDevices,
-                PlayerSettings = current.PlayerSettings,
-                FileTransferSettings = current.FileTransferSettings,
-                SearchSettings = current.SearchSettings,
-                AppSettings = current.AppSettings
-            }));
-        }
-        alert.Publish($"{item.Name} has been banned and will no longer show up in the application.");
+        alert.Publish(response.Message);
+        return new BanResult(response.BannedFileName, response.AlreadyBanned, response.Message);
     }
 }

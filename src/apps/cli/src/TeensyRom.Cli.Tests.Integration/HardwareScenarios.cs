@@ -83,6 +83,28 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         result.GetProperty("file").GetProperty("fileType").GetString().Should().Be("sid");
     }
 
+    /// <summary>Tags the bench file as a favorite, then untags it, leaving the storage as it was found.</summary>
+    [SkippableFact]
+    public async Task FileFavoriteThenUnfavorite_TagsAndUntagsTheBenchFile()
+    {
+        var path = BenchFileOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+
+        using (var favorite = new CliHarness())
+        {
+            var exitCode = await favorite.RunAsync("file", "favorite", path, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            exitCode.Should().Be(0, favorite.Error);
+            JsonDocument.Parse(favorite.Output).RootElement[0].GetProperty("ok").GetBoolean().Should().BeTrue();
+        }
+        using var unfavorite = new CliHarness();
+
+        var unfavoriteExit = await unfavorite.RunAsync("file", "unfavorite", path, "--device", device.DeviceId, "--storage", storage, "--json");
+
+        unfavoriteExit.Should().Be(0, unfavorite.Error);
+        JsonDocument.Parse(unfavorite.Output).RootElement[0].GetProperty("ok").GetBoolean().Should().BeTrue();
+    }
+
     private static string BenchFileOrSkip()
     {
         var path = Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty;
