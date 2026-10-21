@@ -5,7 +5,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands.GetFile
 {
-    public class GetFileCommand : ITeensyCommand<GetFileResult>
+    public class GetFileCommand : ITeensyCommand<GetFileResult>, IReadCommand
     {
         public required TeensyStorageType StorageType { get; init; }
         public required FilePath FilePath { get; init; }

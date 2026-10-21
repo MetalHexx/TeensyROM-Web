@@ -5,7 +5,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands
 {
-    public class GetDirectoryRecursiveCommand : ITeensyCommand<GetDirectoryRecursiveResult>
+    public class GetDirectoryRecursiveCommand : ITeensyCommand<GetDirectoryRecursiveResult>, IReadCommand
 	{
         public required TeensyStorageType StorageType { get; init; }
         public required DirectoryPath Path { get; init; }

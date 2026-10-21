@@ -88,9 +88,30 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
+			if (r.LaunchItem.FileType == TeensyFileType.Crt)
+			{
+				// Only a CRT larger than CertainFitCrtBytes can reboot into minimal.
+				var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
 
-			return BuildRecoveryResult(outcome);
+				return BuildRecoveryResult(outcome);
+			}
+
+			var transport = device.Connection.TransportInUse ?? r.CommunicationPort.GetConnectionType();
+			var settled = await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
+
+			return settled.Reachable
+				? new()
+				{
+					IsSuccess = false,
+					Error = LinkMessages.OutcomeUnknown(transport),
+					LaunchResult = LaunchFileResultType.Error
+				}
+				: new()
+				{
+					IsSuccess = false,
+					Error = LinkMessages.LinkLost(transport),
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
 		}
 
 		/// <summary>

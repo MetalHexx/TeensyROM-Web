@@ -7,9 +7,9 @@ namespace TeensyRom.Core.Serial.Recovery
     /// <see cref="DeviceMode.Unreachable"/>), how long it took against how long it was allowed, and -
     /// when the device answered but never reached the expected mode, or came back full without the C64
     /// menu announcing itself - why the caller should treat this as a failure even though the device is
-    /// reachable.
+    /// reachable. <see cref="LinkReplaced"/> says whether the link was closed and reopened to get there.
     /// </summary>
-    public sealed record RecoveryOutcome(DeviceMode Mode, TimeSpan Elapsed, TimeSpan Ceiling, string? Failure)
+    public sealed record RecoveryOutcome(DeviceMode Mode, TimeSpan Elapsed, TimeSpan Ceiling, string? Failure, bool LinkReplaced = false)
     {
         public bool Reachable => Mode is not DeviceMode.Unreachable;
     }

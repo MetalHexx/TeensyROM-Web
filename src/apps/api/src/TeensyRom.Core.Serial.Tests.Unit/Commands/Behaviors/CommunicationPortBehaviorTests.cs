@@ -22,6 +22,12 @@ public class CommunicationPortBehaviorTests
         public required ICommunicationPort CommunicationPort { get; init; }
     }
 
+    private sealed class FakeReadCommand : ITeensyCommand<TeensyCommandResult>, IReadCommand
+    {
+        public string? DeviceId { get; set; }
+        public required ICommunicationPort CommunicationPort { get; init; }
+    }
+
     /// <summary>
     /// Records the gate's own port traffic (open/clear/reset) so tests can assert on it directly - no
     /// firmware check or busy ping to answer, since the gate no longer sends either.
@@ -34,6 +40,10 @@ public class CommunicationPortBehaviorTests
         public int BytesToRead => 0;
         public List<uint> SentTokens { get; } = [];
         public int ClosePortCallCount { get; private set; }
+        public long? BytesWritten { get; set; }
+
+        /// <summary>The connect timeout the gate's last bounded open asked for; null when it never opened with one.</summary>
+        public int? ConnectTimeoutMs { get; private set; }
 
         /// <summary>Runs inside <see cref="OpenPort"/> before it marks the port open; throw here to simulate a failed open.</summary>
         public Action? OpenPortAction { get; set; }
@@ -56,6 +66,12 @@ public class CommunicationPortBehaviorTests
             OpenPortAction?.Invoke();
             IsOpen = true;
             return "TEST";
+        }
+
+        public string? OpenPort(int connectTimeoutMs)
+        {
+            ConnectTimeoutMs = connectTimeoutMs;
+            return OpenPort(useRetryLoop: false);
         }
 
         public System.Reactive.Unit ClosePort()
@@ -818,7 +834,7 @@ public class CommunicationPortBehaviorTests
     }
 
     [Fact]
-    public async Task Handle_PortReportingClosedAndOpenPortThrows_RecoversWithDropAndPropagates()
+    public async Task Handle_PortReportingClosedAndOpenPortThrows_RecoveryUnreachable_ThrowsLinkLostWithoutRunningCommand()
     {
         var deviceId = Guid.NewGuid().ToString("N");
         var port = new StubCommunicationPort
@@ -843,9 +859,379 @@ public class CommunicationPortBehaviorTests
             return Task.FromResult(new TeensyCommandResult());
         }, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await act.Should().ThrowAsync<TeensyLinkException>())
+            .WithMessage(LinkMessages.LinkLost(ConnectionType.Tcp));
         await recovery.Received(1).RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
         invocations.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_PortReportingClosedAndOpenPortThrows_RecoveryReachable_RunsTheCommand()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort
+        {
+            IsOpen = false,
+            OpenPortAction = () => throw new InvalidOperationException("The port is closed.")
+        };
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        var response = await gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        await gate.Recovery.Received(1).RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_PortReportingClosed_ReopensWithTheBoundedConnect()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { IsOpen = false };
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+
+        await gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port },
+            () => Task.FromResult(new TeensyCommandResult()), CancellationToken.None);
+
+        port.ConnectTimeoutMs.Should().Be(new ConnectionOptions().ConnectTimeoutMs);
+    }
+
+    private sealed record Gate<TRequest>(
+        CommunicationPortBehavior<TRequest, TeensyCommandResult> Behavior,
+        TeensyRomDevice Device,
+        IDeviceRecovery Recovery,
+        StubCommunicationPort Port)
+        where TRequest : ITeensyCommand<TeensyCommandResult>
+    {
+        /// <summary>Scripts recovery for one reason; a reachable outcome leaves the port open again, as a real recovery would.</summary>
+        public void RecoveryReturns(RecoveryReason reason, RecoveryOutcome outcome) =>
+            Recovery.RecoverAsync(Device, reason, Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                Port.IsOpen = outcome.Reachable;
+                return outcome;
+            });
+    }
+
+    private static Gate<TRequest> BuildGate<TRequest>(StubCommunicationPort port, string deviceId)
+        where TRequest : ITeensyCommand<TeensyCommandResult>
+    {
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        var behavior = new CommunicationPortBehavior<TRequest, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        return new Gate<TRequest>(behavior, device, recovery, port);
+    }
+
+    private static RecoveryOutcome Reachable(DeviceMode mode = DeviceMode.FullIdle, bool linkReplaced = true) =>
+        new(mode, TimeSpan.Zero, TimeSpan.Zero, null, linkReplaced);
+
+    private static RecoveryOutcome Unreachable() =>
+        new(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "gone");
+
+    /// <summary>Drops the link mid-exchange: the port reads closed, the unit having been sent <paramref name="bytesAfter"/> bytes in total.</summary>
+    private static IOException DropMidExchange(StubCommunicationPort port, long bytesAfter)
+    {
+        port.BytesWritten = bytesAfter;
+        port.IsOpen = false;
+        return new IOException("The TeensyROM closed the connection.");
+    }
+
+    [Fact]
+    public async Task Handle_ReadDropsMidExchangeAndBytesMoved_RecoversAndResendsOnce()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        var response = await gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            if (++invocations == 1) throw DropMidExchange(port, 25);
+            return Task.FromResult(new TeensyCommandResult { Error = "second" });
+        }, CancellationToken.None);
+
+        response.Error.Should().Be("second");
+        invocations.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_NonReadDropsWithNothingSent_ResendsOnce()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        var response = await gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            if (++invocations == 1) throw DropMidExchange(port, 10);
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_NonReadDropsAfterBytesWentOut_FailsOutcomeUnknownWithoutResend()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw DropMidExchange(port, 25);
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Tcp));
+        invocations.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_NonReadDropsWithUnknownByteCount_FailsOutcomeUnknownWithoutResend()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            port.IsOpen = false;
+            throw new IOException("closed");
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Tcp));
+        invocations.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_DropAndRecoveryUnreachable_FailsLinkLostAndRecoversOnlyOnce()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.Drop, Unreachable());
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw DropMidExchange(port, 10);
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.LinkLost(ConnectionType.Tcp));
+        invocations.Should().Be(1);
+        await gate.Recovery.Received(1).RecoverAsync(gate.Device, Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TimeoutAnsweredOnTheExistingLink_RethrowsTheTimeoutWithoutResend()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.SuspectLink, Reachable(linkReplaced: false));
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<TimeoutException>();
+        invocations.Should().Be(1);
+        port.ClosePortCallCount.Should().Be(0);
+        await gate.Recovery.Received(1).RecoverAsync(gate.Device, RecoveryReason.SuspectLink, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TimeoutThenLinkReplaced_ReadIsResent()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.SuspectLink, Reachable(linkReplaced: true));
+        var invocations = 0;
+
+        var response = await gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            if (++invocations == 1) throw new TimeoutException();
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_TimeoutThenLinkReplacedAfterBytesWentOut_NonReadFailsOutcomeUnknown()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.SuspectLink, Reachable(linkReplaced: true));
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            port.BytesWritten = 30;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Tcp));
+        invocations.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_ResendDropsAgainAndRecoveryUnreachable_ReportsLinkLostAndNeverSendsAThirdTime()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.Recovery.RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>()).Returns(
+            _ => { port.IsOpen = true; return Reachable(); },
+            _ => { port.IsOpen = false; return Unreachable(); });
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw DropMidExchange(port, 10);
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.LinkLost(ConnectionType.Tcp));
+        invocations.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_ResendTimesOut_RecoversWithDropAndReportsOutcomeUnknownWhenReachable()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.RecoveryReturns(RecoveryReason.SuspectLink, Reachable(linkReplaced: true));
+        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Tcp));
+        invocations.Should().Be(2);
+        await gate.Recovery.Received(1).RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_BusyThenLinkDropOnTheBusyResend_StopsAtTwoSends()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = PortWithSuccessfulReset();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            port.IsOpen = true;
+            return Reachable();
+        });
+        var behavior = new CommunicationPortBehavior<FakeReadCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        var invocations = 0;
+
+        Func<Task> act = () => behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            if (++invocations == 1) throw new TeensyBusyException("busy");
+            port.IsOpen = false;
+            throw new IOException("closed");
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Serial));
+        invocations.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_RecoveryEndsFullBusy_ResetsTheDeviceBeforeTheResend()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = PortWithSuccessfulReset();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            port.IsOpen = true;
+            device.MarkBusy();
+            return Reachable(DeviceMode.FullBusy);
+        });
+        var behavior = new CommunicationPortBehavior<FakeReadCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        var invocations = 0;
+        var writtenAtResend = -1;
+
+        var response = await behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            if (++invocations == 1)
+            {
+                port.IsOpen = false;
+                throw new IOException("closed");
+            }
+            writtenAtResend = port.Written.Count;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(2);
+        writtenAtResend.Should().BeGreaterThan(0);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+    }
+
+    [Fact]
+    public async Task Handle_RecoveryEndsMinimal_ReturnsTheMinimalFailureWithoutResend()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.Recovery.RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            port.IsOpen = true;
+            gate.Device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+            return Reachable(DeviceMode.Minimal);
+        });
+        var invocations = 0;
+
+        var response = await gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw DropMidExchange(port, 10);
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Contain("Minimal");
+        invocations.Should().Be(1);
     }
 
     [Fact]

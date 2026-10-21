@@ -3,7 +3,7 @@ using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Core.Commands
 {
-    public class PingCommand : ITeensyCommand<PingResult>
+    public class PingCommand : ITeensyCommand<PingResult>, IReadCommand
     {
         public string? DeviceId { get; set; }
         public required ICommunicationPort CommunicationPort { get; init; }

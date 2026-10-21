@@ -31,6 +31,15 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
                     Error = ex.Message
                 };
             }
+            catch (TeensyLinkException ex)
+            {
+                alert.Publish(ex.Message);
+                return new TResponse
+                {
+                    IsSuccess = false,
+                    Error = ex.Message
+                };
+            }
             catch (Exception ex)
             {
                 var message = GetExceptionMessage(ex);
@@ -49,6 +58,8 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
         public string GetExceptionMessage(Exception ex) =>
             ex switch
             {
+                TimeoutException => "The TeensyROM did not answer in time.",
+                _ when ex.Message.All(c => c == '\0' || char.IsWhiteSpace(c)) => "Error communicating with TeensyROM.",
                 _ when ex.Message.Contains("port is closed", StringComparison.OrdinalIgnoreCase) => "Disconnected from TeensyROM",
                 _ when ex.Message.Contains("Cannot perform serial operations in", StringComparison.OrdinalIgnoreCase) => "Error communicating with TeensyROM.",
                 _ => $"Unexpected Error: {ex.Message}"

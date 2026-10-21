@@ -40,14 +40,39 @@ namespace TeensyRom.Core.Serial.Recovery
             VersionReply? lastCorrectReply = null;
             var fallbackLogged = false;
             var menuTokenSeen = false;
+            var linkReplaced = false;
+            var probeExistingLink = reason == RecoveryReason.SuspectLink && port.IsOpen;
 
             while (sw.Elapsed < ceiling)
             {
                 var needsReacquire = !port.IsOpen || !lastProbeAnswered;
                 VersionReply? reply = null;
 
+                if (probeExistingLink)
+                {
+                    // A unit still streaming the reply that timed out must finish before the version
+                    // request, or its bytes are misread as the version ack and a healthy link is closed.
+                    probeExistingLink = false;
+                    needsReacquire = false;
+                    TRDiscoveryRoutines.ReadTextUntilIdle(port, idleTimeoutMs: 200, maxTotalMs: 2000);
+                    port.ClearBuffers();
+                    reply = interrogator.ReadVersion(port);
+
+                    if (reply.IsTeensyRom && reply.ChipId == chipId)
+                    {
+                        log.Internal($"{_logClass} Recovery SuspectLink: {chipId} answered on the existing link in {(long)sw.Elapsed.TotalMilliseconds} ms; it was only slow");
+                        return new RecoveryOutcome(device.Connection.Mode, sw.Elapsed, ceiling, null, LinkReplaced: false);
+                    }
+
+                    reply = null;
+                    lastProbeAnswered = false;
+                    needsReacquire = true;
+                }
+
                 if (needsReacquire)
                 {
+                    linkReplaced = true;
+
                     if (transport == ConnectionType.Tcp)
                     {
                         ReacquireTcp(device, port);
@@ -72,7 +97,7 @@ namespace TeensyRom.Core.Serial.Recovery
                         // Argument evaluation order matters here: the boot wait inside MenuBootFailure has
                         // to run before sw.Elapsed is read, or the logged recovery time excludes it.
                         var menuBootFailure = MenuBootFailure(reason, port, reply);
-                        var outcome = Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, menuBootFailure);
+                        var outcome = Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, linkReplaced, menuBootFailure);
 
                         if (menuBootFailure is not null && outcome.Mode == DeviceMode.FullIdle)
                         {
@@ -108,13 +133,13 @@ namespace TeensyRom.Core.Serial.Recovery
                 // The device is reachable, just not in the mode this reason expected - the caller (e.g. a
                 // launch) decides what that means.
                 var failure = $"expected {DescribeExpectation(expected)}, device is in {unexpectedMode}";
-                return Succeed(device, port, transport, lastCorrectReply, unexpectedMode, reason, ceiling, sw.Elapsed, failure);
+                return Succeed(device, port, transport, lastCorrectReply, unexpectedMode, reason, ceiling, sw.Elapsed, linkReplaced, failure);
             }
 
             device.MarkUnreachable();
             Close(port);
             log.InternalError($"{_logClass} Recovery {reason} on {transport} for {chipId} failed after {sw.Elapsed.TotalMilliseconds} ms (ceiling {ceiling.TotalMilliseconds} ms)");
-            return new RecoveryOutcome(DeviceMode.Unreachable, sw.Elapsed, ceiling, $"no correct-chip reply from {chipId} within {ceiling.TotalMilliseconds} ms");
+            return new RecoveryOutcome(DeviceMode.Unreachable, sw.Elapsed, ceiling, $"no correct-chip reply from {chipId} within {ceiling.TotalMilliseconds} ms", linkReplaced);
         }
 
         /// <summary>
@@ -346,6 +371,7 @@ namespace TeensyRom.Core.Serial.Recovery
             RecoveryReason reason,
             TimeSpan ceiling,
             TimeSpan elapsed,
+            bool linkReplaced,
             string? failure = null)
         {
             device.Confirm(transport, port.GetEndpoint(), mode);
@@ -380,7 +406,7 @@ namespace TeensyRom.Core.Serial.Recovery
                 log.InternalWarning($"{_logClass} Recovery {reason} -> {device.Connection.Mode} in {elapsed.TotalMilliseconds} ms (ceiling {ceiling.TotalMilliseconds} ms): {failure}");
             }
 
-            return new RecoveryOutcome(device.Connection.Mode, elapsed, ceiling, failure);
+            return new RecoveryOutcome(device.Connection.Mode, elapsed, ceiling, failure, linkReplaced);
         }
 
         private TimeSpan GetCeiling(RecoveryReason reason, ConnectionType transport)
@@ -391,7 +417,7 @@ namespace TeensyRom.Core.Serial.Recovery
             {
                 RecoveryReason.LargeLaunch => TimeSpan.FromMilliseconds(ceilings.ToMinimalMs),
                 RecoveryReason.LeaveMinimal => TimeSpan.FromMilliseconds(LeaveMinimalCeilingMs(transport, ceilings)),
-                RecoveryReason.Drop => TimeSpan.FromMilliseconds(Math.Max(ceilings.ToMinimalMs, ceilings.ToFullMs)),
+                RecoveryReason.Drop or RecoveryReason.SuspectLink => TimeSpan.FromMilliseconds(Math.Max(ceilings.ToMinimalMs, ceilings.ToFullMs)),
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
             };
         }

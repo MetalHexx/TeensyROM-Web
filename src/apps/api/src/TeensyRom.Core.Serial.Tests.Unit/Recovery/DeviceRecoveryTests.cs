@@ -392,6 +392,43 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         }
 
         [Fact]
+        public async Task RecoverAsync_SuspectLink_AnsweredOnTheExistingLink_KeepsTheLinkAndTheRecordUntouched()
+        {
+            var (device, port) = BuildDevice();
+            port.ThenSucceed();
+            port.OpenPort(connectTimeoutMs: 0);
+            port.Calls.Clear();
+            var modeBefore = device.Connection.Mode;
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.SuspectLink, CancellationToken.None);
+
+            outcome.Reachable.Should().BeTrue();
+            outcome.LinkReplaced.Should().BeFalse();
+            port.Calls.Should().NotContain("Close").And.NotContain("Open");
+            device.Connection.Mode.Should().Be(modeBefore);
+            _interrogator.DidNotReceive().ProbeStorage(Arg.Any<ICommunicationPort>(), Arg.Any<TeensyStorageType>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_SuspectLink_ProbeFailsOnTheExistingLink_ReconnectsAndReportsTheLinkReplaced()
+        {
+            var (device, port) = BuildDevice();
+            port.ThenSucceed().ThenSucceed();
+            port.OpenPort(connectTimeoutMs: 0);
+            port.Calls.Clear();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss, CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.SuspectLink, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            outcome.LinkReplaced.Should().BeTrue();
+            port.Calls.Should().Contain("Close");
+        }
+
+        [Fact]
         public async Task RecoverAsync_FullThenStorageBusy_MarksFullBusyAndLeavesStorageAvailabilityUnchanged()
         {
             var (device, port) = BuildDevice();

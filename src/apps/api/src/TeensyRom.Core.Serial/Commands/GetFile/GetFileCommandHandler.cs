@@ -3,6 +3,7 @@ using TeensyRom.Core.Common;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Core.Commands.GetFile
 {
@@ -43,7 +44,7 @@ namespace TeensyRom.Core.Commands.GetFile
 				}
 
 			}
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is TimeoutException || TransportDrop.IsDrop(ex, _communicationPort)))
             {
                 GetFileErrorCode errorCode = ex.Message switch
                 {

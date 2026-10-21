@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Buffers;
 using TeensyRom.Core.ValueObjects;
 using TeensyRom.Core.Serial.Routines;
+using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Core.Commands
 {
@@ -58,7 +59,7 @@ namespace TeensyRom.Core.Commands
                             ErrorCode = GetDirectoryErrorCode.UnknownError
                         };
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!(ex is TimeoutException || TransportDrop.IsDrop(ex, _communicationPort)))
                     {
                         GetDirectoryErrorCode errorCode = ex.Message.GetDirectoryErrorCode();
 
@@ -69,12 +70,6 @@ namespace TeensyRom.Core.Commands
                             ErrorCode = errorCode
                         };
                     }
-                }
-                catch (TimeoutException)
-                {
-                    result.IsSuccess = false;
-                    result.Error = "There was a timeout when trying to fetch file data. This can be caused when the storage device is not installed on the TeensyROM device.";
-                    return result;
                 }
                 catch (OperationCanceledException)
                 {
@@ -258,6 +253,11 @@ namespace TeensyRom.Core.Commands
                     }
                     else
                     {
+                        if (!_communicationPort.IsOpen)
+                        {
+                            throw new IOException("The TeensyROM closed the connection.");
+                        }
+
                         Task.Delay(5, ct).Wait(ct);
                     }
                 }
