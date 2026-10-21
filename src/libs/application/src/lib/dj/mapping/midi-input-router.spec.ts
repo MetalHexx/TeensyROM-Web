@@ -119,6 +119,55 @@ describe('MidiInputRouter', () => {
     expect(handle).not.toHaveBeenCalled();
   });
 
+  describe('a key-up while learn is capturing', () => {
+    const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
+    const held = (): boolean => h.djStore.deck('A')().voices[0].held;
+    const holdMappings = () =>
+      h.mappingStore.mappings().filter((mapping) => mapping.control.control === 'voice-1-hold');
+
+    async function holdWithCcKey(): Promise<void> {
+      await start();
+      h.mappings.bind(ccSource(30), HOLD_1_A, { kind: 'hold', amount: null });
+      await h.controllers.setMappingMode(true);
+      h.midiInput.emit('port-1', 'cc', 30, 127);
+      expect(held()).toBe(true);
+    }
+
+    it('ends the hold it belongs to, though learn is waiting on that same control', async () => {
+      await holdWithCcKey();
+      h.learn.select(HOLD_1_A);
+
+      h.midiInput.emit('port-1', 'cc', 30, 0);
+
+      expect(held()).toBe(false);
+      expect(holdMappings()).toHaveLength(1);
+      expect(h.mappingStore.learn()?.phase).toBe('waiting');
+    });
+
+    it('ends the hold without taking the key for the control learn is waiting on', async () => {
+      await holdWithCcKey();
+      h.learn.select(PLAY_A);
+
+      h.midiInput.emit('port-1', 'cc', 30, 0);
+
+      expect(held()).toBe(false);
+      expect(holdMappings()).toHaveLength(1);
+      expect(h.mappingStore.learn()?.control).toEqual(PLAY_A);
+    });
+
+    it('is still captured by learn when no hold is in progress', async () => {
+      await start();
+      await h.controllers.setMappingMode(true);
+      h.learn.select(PLAY_A);
+
+      h.midiInput.emit('port-1', 'cc', 20, 0);
+
+      expect(
+        h.mappingStore.mappings().some((mapping) => mapping.control.control === 'play-pause')
+      ).toBe(true);
+    });
+  });
+
   it('stops delivering once the service is destroyed', async () => {
     await start();
 

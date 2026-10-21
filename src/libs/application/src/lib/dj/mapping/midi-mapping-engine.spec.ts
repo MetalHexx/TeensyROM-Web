@@ -360,6 +360,17 @@ describe('MidiMappingEngine', () => {
       expect(held(0)).toBe(false);
     });
 
+    it('reports a source as holding from its press until its release', () => {
+      expect(h.engine.isHolding(noteSource(60))).toBe(false);
+
+      h.engine.handle(note(60, 100));
+      expect(h.engine.isHolding(noteSource(60))).toBe(true);
+      expect(h.engine.isHolding(noteSource(61, 1, 'other-controller'))).toBe(false);
+
+      h.engine.handle(note(60, 0));
+      expect(h.engine.isHolding(noteSource(60))).toBe(false);
+    });
+
     it('lets go when its mapping is removed', () => {
       const id = h.mappingStore.mappingBySource(`${LAUNCH_CONTROL}|1|note|60`)()?.id as string;
       h.engine.handle(note(60, 100));

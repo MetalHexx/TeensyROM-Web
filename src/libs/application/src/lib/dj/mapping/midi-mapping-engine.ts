@@ -4,7 +4,13 @@ import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { relativeTicks, type RelativeStyleKind } from './mapping-styles';
-import { controlKey, sourceKey, type ControlMapping, type SourceEvent } from './mapping.models';
+import {
+  controlKey,
+  sourceKey,
+  type ControlMapping,
+  type MidiSource,
+  type SourceEvent,
+} from './mapping.models';
 import { MidiMappingStore } from './midi-mapping-store';
 
 type HoldControl = Extract<MappableControl, { nature: 'hold' }>;
@@ -150,6 +156,11 @@ export class MidiMappingEngine {
         this.down.delete(key);
       }
     }
+  }
+
+  /** Whether the source's key is down on a hold, so its release is what lets the hold go. */
+  isHolding(source: MidiSource): boolean {
+    return this.holds.has(sourceKey(source));
   }
 
   /** Lets go of the mapping's hold and drops its edge and accumulator state. Call it before the

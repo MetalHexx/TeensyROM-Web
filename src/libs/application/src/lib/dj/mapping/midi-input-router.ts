@@ -33,9 +33,12 @@ export class MidiInputRouter {
   }
 
   private route(message: MidiInputMessage): void {
-    const portName = this.midiInput.inputs().find((port) => port.id === message.portId)?.name ?? '';
-    if (this.learn.offer(message, portName)) {
-      return;
+    if (!this.endsHold(message)) {
+      const portName =
+        this.midiInput.inputs().find((port) => port.id === message.portId)?.name ?? '';
+      if (this.learn.offer(message, portName)) {
+        return;
+      }
     }
 
     const controllerId = this.controllers.controllerForPort(message.portId);
@@ -56,5 +59,24 @@ export class MidiInputRouter {
       value: message.value,
       pressed: message.pressed,
     });
+  }
+
+  /** Whether the message is the key-up of a hold in progress. It belongs to the engine even while
+   *  learn is capturing: learn would take it as the first message after a selection, and the hold
+   *  would stay down. */
+  private endsHold(message: MidiInputMessage): boolean {
+    if (message.pressed) {
+      return false;
+    }
+    const controllerId = this.controllers.controllerForPort(message.portId);
+    return (
+      controllerId !== null &&
+      this.engine.isHolding({
+        controllerId,
+        channel: message.channel,
+        kind: message.kind,
+        number: message.number,
+      })
+    );
   }
 }
