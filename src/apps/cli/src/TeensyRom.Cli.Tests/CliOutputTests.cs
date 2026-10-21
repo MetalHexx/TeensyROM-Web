@@ -1,5 +1,6 @@
 using Spectre.Console;
 using System.Text.Json;
+using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
 
@@ -145,6 +146,53 @@ public class CliOutputTests
         error.GetProperty("code").GetString().Should().Be("noDevice");
         error.GetProperty("exitCode").GetInt32().Should().Be(4);
         error.GetProperty("message").GetString().Should().Be("No TeensyROM is online.");
+    }
+
+    [Fact]
+    public void Error_UnderJson_CarriesDetailsWhenThereAreSome_AndOmitsThemOtherwise()
+    {
+        var output = Output();
+        output.UseJson(true);
+        var details = new ErrorDetails("/music/H", "TR-1", 3, ["It is missing.", "The device did not answer."]);
+
+        output.Error(new CliException(CliExitCode.NotFound, "Not found.", details));
+        output.Error(new CliException(CliExitCode.NotFound, "Not found."));
+
+        var lines = _consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(l => l.StartsWith('{')).ToList();
+        var withDetails = JsonDocument.Parse(lines[0]).RootElement.GetProperty("error").GetProperty("details");
+        withDetails.EnumerateObject().Select(p => p.Name).Should().Equal("path", "device", "attempts", "possibleCauses");
+        withDetails.GetProperty("path").GetString().Should().Be("/music/H");
+        withDetails.GetProperty("device").GetString().Should().Be("TR-1");
+        withDetails.GetProperty("attempts").GetInt32().Should().Be(3);
+        withDetails.GetProperty("possibleCauses").GetArrayLength().Should().Be(2);
+        JsonDocument.Parse(lines[1]).RootElement.GetProperty("error").TryGetProperty("details", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Notice_UnderJson_EndsStderrWithOneCompactJsonNoticeObject()
+    {
+        var output = Output();
+        output.UseJson(true);
+
+        output.Notice(new CliNotice("indexIncomplete", "TR-1 is not indexed.", "TR-1", "14470230", "sd", "trom index build --device TR-1 --storage sd"));
+
+        var lines = _consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        lines.Should().HaveCount(2);
+        lines[0].Should().Be("TR-1 is not indexed.");
+        var notice = JsonDocument.Parse(lines[1]).RootElement.GetProperty("notice");
+        notice.EnumerateObject().Select(p => p.Name).Should().Equal("code", "message", "device", "deviceId", "storage", "fix");
+        notice.GetProperty("code").GetString().Should().Be("indexIncomplete");
+        notice.GetProperty("fix").GetString().Should().Be("trom index build --device TR-1 --storage sd");
+        _consoles.StdOut.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Notice_WithoutJson_IsOnlyTheSentenceOnStderr()
+    {
+        Output().Notice(new CliNotice("indexIncomplete", "TR-1 is not indexed.", "TR-1", "1", "sd", "trom index build"));
+
+        _consoles.StdErr.Trim().Should().Be("TR-1 is not indexed.");
+        _consoles.StdOut.Should().BeEmpty();
     }
 
     [Theory]

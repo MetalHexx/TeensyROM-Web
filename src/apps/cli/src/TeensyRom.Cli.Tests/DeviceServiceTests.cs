@@ -117,6 +117,19 @@ public class DeviceServiceTests
     }
 
     [Fact]
+    public async Task Find_ReportsWhichStoragesAreIndexed()
+    {
+        var cart = Cart("a", "Alpha", DeviceState.Connected);
+        cart.SdStorage = new CartStorageDto { Available = true, IndexExists = false };
+        cart.UsbStorage = new CartStorageDto { Available = true, IndexExists = true };
+        ApiKnowsDevices(cart);
+
+        var found = await _sut.FindAsync(fullScan: false);
+
+        found.Should().ContainSingle().Which.Should().Match<DeviceSummary>(d => !d.SdIndexed && d.UsbIndexed);
+    }
+
+    [Fact]
     public async Task Find_ReportsWhichStoragesAreAvailable()
     {
         var cart = Cart("a", "Alpha", DeviceState.Connected);

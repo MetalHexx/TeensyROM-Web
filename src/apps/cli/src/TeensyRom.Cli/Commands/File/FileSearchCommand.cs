@@ -68,6 +68,8 @@ internal sealed class FileSearchCommand(
 
         if (results.Count == 0) Output.Notice("No files matched.");
 
+        NoticeWhenIndexIncomplete();
+
         return 0;
     }
 

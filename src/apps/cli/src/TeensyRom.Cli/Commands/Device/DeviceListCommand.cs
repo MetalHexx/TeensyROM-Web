@@ -45,7 +45,7 @@ internal sealed class DeviceListCommand(ICliOutput output, IEngineControl engine
     {
         var table = new Table().BorderColor(RadHelper.Theme.Secondary.Color).Border(TableBorder.Rounded);
 
-        foreach (var header in new[] { "Name", "Id", "State", "Connection", "Online" }) table.AddColumn(header);
+        foreach (var header in new[] { "Name", "Id", "State", "Connection", "Online", "SD indexed", "USB indexed" }) table.AddColumn(header);
 
         foreach (var device in found)
         {
@@ -54,7 +54,9 @@ internal sealed class DeviceListCommand(ICliOutput output, IEngineControl engine
                 new Text(device.Id),
                 new Text(device.State),
                 new Text(device.Connection),
-                new Text(device.IsOnline ? "yes" : "no"));
+                new Text(device.IsOnline ? "yes" : "no"),
+                new Text(device.SdIndexed ? "yes" : "no"),
+                new Text(device.UsbIndexed ? "yes" : "no"));
         }
         return table;
     }

@@ -86,6 +86,8 @@ internal sealed class FileRandomOneShotCommand(
         {
             var outcome = await Launches.LaunchRandom(storage.StorageType, FileCommandOptions.ParseScope(settings.Scope), directory, filter);
 
+            NoticeWhenIndexIncomplete();
+
             return Report(outcome, storage.StorageType, LaunchOutcome.NoFilesFoundMessage);
         }
 
@@ -96,6 +98,8 @@ internal sealed class FileRandomOneShotCommand(
         Player.SetSidTimer(settings.Override ? SidTimer.TimerOverride : SidTimer.SongLength);
 
         await Player.PlayRandom();
+
+        NoticeWhenIndexIncomplete();
 
         var state = Player.GetState();
 

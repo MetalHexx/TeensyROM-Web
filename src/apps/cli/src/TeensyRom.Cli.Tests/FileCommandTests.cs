@@ -28,7 +28,8 @@ public sealed class FileCommandTests : IDisposable
     private const string PlayerHeader = "Stream Player";
     private const int Back = 7;
 
-    private static readonly DeviceSummary Alpha = new("a-1", "Alpha", true, "USB COM3", "Connected", SdAvailable: true, UsbAvailable: true);
+    private static readonly DeviceSummary Alpha = new("a-1", "Alpha", true, "USB COM3", "Connected", SdAvailable: true, UsbAvailable: true, SdIndexed: true, UsbIndexed: true);
+    private static readonly DeviceSummary Unindexed = Alpha with { SdIndexed = false, UsbIndexed = false };
 
     private readonly IStorageService _storage = Substitute.For<IStorageService>();
     private readonly ILaunchService _launches = Substitute.For<ILaunchService>();
@@ -68,8 +69,9 @@ public sealed class FileCommandTests : IDisposable
         foreach (var host in _hosts) host.Dispose();
     }
 
-    private TestHost NewHost(bool terminal = false, string stdin = "", Action<ServiceCollection>? extra = null)
+    private TestHost NewHost(bool terminal = false, string stdin = "", Action<ServiceCollection>? extra = null, DeviceSummary? device = null)
     {
+        device ??= Alpha;
         var host = new TestHost(terminal, services =>
         {
             services.AddSingleton<IDeviceChooser, DeviceChooser>();
@@ -81,8 +83,8 @@ public sealed class FileCommandTests : IDisposable
             extra?.Invoke(services);
         });
         host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
-        host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { Alpha });
-        host.Devices.SelectedDevice.Returns(Alpha);
+        host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { device });
+        host.Devices.SelectedDevice.Returns(device);
         _hosts.Add(host);
         return host;
     }
@@ -255,6 +257,88 @@ public sealed class FileCommandTests : IDisposable
         Names(results[0]).Should().Equal(ItemShape);
         results[0].GetProperty("path").GetString().Should().Be("/music/a.sid");
         results[0].GetProperty("storage").GetString().Should().Be("sd");
+    }
+
+    private const string AlphaFix = "trom index build --device Alpha --storage sd";
+
+    [Fact]
+    public async Task Search_OnAnUnindexedStorage_NoticesOnStderr_NamingTheDeviceStorageAndTheIndexCommand_LeavingStdoutAlone()
+    {
+        Found(Song("/music/a.sid"));
+        var host = NewHost(device: Unindexed);
+
+        var exitCode = await host.RunAsync("file", "search", "commando");
+
+        exitCode.Should().Be(0);
+        host.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/a.sid\n");
+        var notice = host.Consoles.StdErr.Trim();
+        notice.Split('\n').Should().ContainSingle();
+        notice.Should().Contain("Alpha").And.Contain("SD").And.Contain($"`{AlphaFix}`");
+    }
+
+    [Fact]
+    public async Task Search_OnAnUnindexedStorage_NoticesEvenWhenNothingMatches()
+    {
+        var host = NewHost(device: Unindexed);
+
+        var exitCode = await host.RunAsync("file", "search", "zzz");
+
+        exitCode.Should().Be(0);
+        host.Consoles.StdOut.Should().BeEmpty();
+        host.Consoles.StdErr.Should().Contain("No files matched.").And.Contain(AlphaFix);
+    }
+
+    [Fact]
+    public async Task Search_OnAnIndexedStorage_HasNoNotice()
+    {
+        Found(Song("/music/a.sid"));
+        var host = NewHost();
+
+        await host.RunAsync("file", "search", "commando");
+
+        host.Consoles.StdErr.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Search_NoticesAboutTheStorageItSearched_NotTheOtherOne()
+    {
+        var onlyUsbIndexed = Alpha with { SdIndexed = false, UsbIndexed = true };
+        var usb = NewHost(device: onlyUsbIndexed);
+        await usb.RunAsync("file", "search", "zzz", "--storage", "usb");
+        usb.Consoles.StdErr.Should().NotContain("index build");
+
+        var sd = NewHost(device: onlyUsbIndexed);
+        await sd.RunAsync("file", "search", "zzz", "--storage", "sd");
+        sd.Consoles.StdErr.Should().Contain(AlphaFix);
+    }
+
+    [Fact]
+    public async Task Search_Json_OnAnUnindexedStorage_KeepsStdoutABareArray_AndEndsStderrWithTheNoticeObject()
+    {
+        Found(Song("/music/a.sid"));
+        var host = NewHost(device: Unindexed);
+
+        await host.RunAsync("file", "search", "commando", "--json");
+
+        Parse(host.Consoles.StdOut).GetArrayLength().Should().Be(1);
+        var lastLine = host.Consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[^1];
+        var notice = Parse(lastLine).GetProperty("notice");
+        Names(notice).Should().Equal("code", "message", "device", "deviceId", "storage", "fix");
+        notice.GetProperty("code").GetString().Should().Be("indexIncomplete");
+        notice.GetProperty("device").GetString().Should().Be("Alpha");
+        notice.GetProperty("deviceId").GetString().Should().Be("a-1");
+        notice.GetProperty("storage").GetString().Should().Be("sd");
+        notice.GetProperty("fix").GetString().Should().Be(AlphaFix);
+    }
+
+    [Fact]
+    public async Task Search_Json_OnAnIndexedStorage_WritesNothingToStderr()
+    {
+        var host = NewHost();
+
+        await host.RunAsync("file", "search", "zzz", "--json");
+
+        host.Consoles.StdErr.Should().NotContain("{");
     }
 
     [Theory]
@@ -534,6 +618,59 @@ public sealed class FileCommandTests : IDisposable
         var result = Parse(host.Consoles.StdOut);
         result.GetProperty("status").GetString().Should().Be("launched");
         result.GetProperty("file").GetProperty("path").GetString().Should().Be("/music/pick.sid");
+    }
+
+    [Fact]
+    public async Task Random_OnAnUnindexedStorage_NoticesOnStderr_AndKeepsStdoutAndTheExitCode()
+    {
+        Picked();
+        var host = NewHost(device: Unindexed);
+
+        var exitCode = await host.RunAsync("file", "random");
+
+        exitCode.Should().Be(0);
+        host.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/pick.sid\n");
+        host.Consoles.StdErr.Trim().Should().Contain(AlphaFix);
+    }
+
+    [Fact]
+    public async Task Random_Json_OnAnUnindexedStorage_EndsStderrWithTheNoticeObject()
+    {
+        Picked();
+        var host = NewHost(device: Unindexed);
+
+        await host.RunAsync("file", "random", "--json");
+
+        Parse(host.Consoles.StdOut).GetProperty("status").GetString().Should().Be("launched");
+        var lastLine = host.Consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[^1];
+        Parse(lastLine).GetProperty("notice").GetProperty("fix").GetString().Should().Be(AlphaFix);
+    }
+
+    [Fact]
+    public async Task Random_OnAnIndexedStorage_HasNoNotice()
+    {
+        Picked();
+        var host = NewHost();
+
+        await host.RunAsync("file", "random", "--json");
+
+        host.Consoles.StdErr.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Random_WithNoFilesToPick_OnAnUnindexedStorage_NoticesBeforeTheErrorObject()
+    {
+        _launches.LaunchRandom(Arg.Any<TeensyStorageType>(), Arg.Any<StorageScope>(), Arg.Any<string>(), Arg.Any<TeensyFilterType>())
+            .Returns(new LaunchOutcome(LaunchStatus.NotFound, null, LaunchOutcome.NoFilesFoundMessage));
+        var host = NewHost(device: Unindexed);
+
+        var exitCode = await host.RunAsync("file", "random", "--json");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        var lines = host.Consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(l => l.StartsWith('{')).ToList();
+        lines.Should().HaveCount(2);
+        Parse(lines[0]).TryGetProperty("notice", out _).Should().BeTrue();
+        Parse(lines[1]).TryGetProperty("error", out _).Should().BeTrue();
     }
 
     [Fact]

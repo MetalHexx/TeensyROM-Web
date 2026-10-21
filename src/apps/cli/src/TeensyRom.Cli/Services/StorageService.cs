@@ -15,6 +15,16 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
     // tr-web has no more and only then drops the other storage's files.
     private const int SearchPageSize = 1000;
 
+    // tr-web answers 404 for any directory read that fails, including a read over a stale link to the device, which the
+    // next attempt re-establishes. A path that is really missing fails every attempt.
+    private const int DirectoryAttempts = 3;
+
+    private static readonly string[] DirectoryFailureCauses =
+    [
+        "The directory does not exist on this storage.",
+        "The device did not answer: its connection may have gone stale, or it may be busy or powered off."
+    ];
+
     public TeensyStorageType StorageType { get; private set; } = settingsService.GetSettings().StorageType;
 
     public void SwitchStorage(TeensyStorageType storageType)
@@ -33,8 +43,29 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
         var deviceId = devices.RequireDeviceId();
         var storage = StorageType.ToApi();
 
-        var response = await ApiErrors.Call(() => api.GetDirectoryAsync(deviceId, storage, path));
-        return ApiMapper.ToListing(response.StorageItem);
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                var response = await ApiErrors.Call(() => api.GetDirectoryAsync(deviceId, storage, path));
+                return ApiMapper.ToListing(response.StorageItem);
+            }
+            catch (TeensyApiException ex) when (ex.StatusCode == 404)
+            {
+                if (attempt < DirectoryAttempts) continue;
+
+                // Only tr-web's directory 404 can be a failed read; "storage not available" and "device not found" are answers.
+                if (!ex.Message.StartsWith("The directory ", StringComparison.Ordinal)) throw;
+
+                var device = devices.SelectedDevice?.Name ?? deviceId;
+
+                throw new TeensyApiException(
+                    $"The directory {path} was not found, or {device} did not answer, after {attempt} attempts — check the path with `trom file ls`, or the device with `trom device ping`.",
+                    ex.StatusCode,
+                    ex,
+                    new ErrorDetails(path, device, attempt, DirectoryFailureCauses));
+            }
+        }
     }
 
     public async Task<ILaunchableItem?> GetFile(string path)

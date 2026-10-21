@@ -1,3 +1,5 @@
+using TeensyRom.Cli.Storage.Entities;
+
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
@@ -53,4 +55,21 @@ internal interface IDeviceService
     Task<string> ResetDeviceAsync(string deviceId, CancellationToken ct = default);
 }
 
-internal sealed record DeviceSummary(string Id, string Name, bool IsOnline, string Connection, string State, bool SdAvailable = false, bool UsbAvailable = false);
+/// <summary>
+/// A TeensyROM as tr-web reports it. <c>SdIndexed</c> and <c>UsbIndexed</c> say whether tr-web holds a full index of that
+/// storage; search and random only see the files it has cached until one exists.
+/// </summary>
+internal sealed record DeviceSummary(
+    string Id,
+    string Name,
+    bool IsOnline,
+    string Connection,
+    string State,
+    bool SdAvailable = false,
+    bool UsbAvailable = false,
+    bool SdIndexed = false,
+    bool UsbIndexed = false)
+{
+    /// <summary>Whether tr-web holds a full index of <paramref name="storage"/>.</summary>
+    public bool IsIndexed(TeensyStorageType storage) => storage == TeensyStorageType.USB ? UsbIndexed : SdIndexed;
+}

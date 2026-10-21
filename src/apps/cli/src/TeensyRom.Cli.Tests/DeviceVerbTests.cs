@@ -132,7 +132,7 @@ public sealed class DeviceVerbTests : IDisposable
 
         var device = JsonDocument.Parse(StdOut).RootElement;
         device.EnumerateObject().Select(p => p.Name).Should()
-            .Equal("id", "name", "isOnline", "connection", "state", "sdAvailable", "usbAvailable");
+            .Equal("id", "name", "isOnline", "connection", "state", "sdAvailable", "usbAvailable", "sdIndexed", "usbIndexed");
         device.GetProperty("name").GetString().Should().Be("Bench");
     }
 

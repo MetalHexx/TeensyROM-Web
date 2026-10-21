@@ -65,5 +65,7 @@ internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
         cart.ConnectionType == ConnectionType.Serial ? $"USB {cart.ComPort}" : $"Ethernet {cart.IpAddress}",
         cart.DeviceState.ToString(),
         cart.SdStorage.Available,
-        cart.UsbStorage.Available);
+        cart.UsbStorage.Available,
+        cart.SdStorage.IndexExists,
+        cart.UsbStorage.IndexExists);
 }

@@ -1,5 +1,6 @@
 using Spectre.Console;
 using System.Text.Json;
+using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Helpers;
 
@@ -65,6 +66,13 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
         else WriteRaw(console, message);
     }
 
+    public void Notice(CliNotice notice)
+    {
+        Notice(notice.Message);
+
+        if (_json) WriteRaw(consoles.Err, JsonSerializer.Serialize(new CliNoticeDocument(notice), CliJson.Compact));
+    }
+
     public void Error(CliException error)
     {
         var (console, isTerminal) = Messages;
@@ -84,7 +92,10 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
 /// <summary>The JSON error object written to stderr under <c>--json</c>: <c>{ "error": { "code", "exitCode", "message" } }</c>.</summary>
 internal sealed record CliErrorDocument(CliErrorBody Error)
 {
-    public CliErrorDocument(CliException error) : this(new CliErrorBody(error.Code, (int)error.Code, error.Message)) { }
+    public CliErrorDocument(CliException error) : this(new CliErrorBody(error.Code, (int)error.Code, error.Message, error.Details)) { }
 }
 
-internal sealed record CliErrorBody(CliExitCode Code, int ExitCode, string Message);
+internal sealed record CliErrorBody(CliExitCode Code, int ExitCode, string Message, ErrorDetails? Details = null);
+
+/// <summary>The JSON notice object written to stderr under <c>--json</c>: <c>{ "notice": { "code", "message", "device", "deviceId", "storage", "fix" } }</c>.</summary>
+internal sealed record CliNoticeDocument(CliNotice Notice);

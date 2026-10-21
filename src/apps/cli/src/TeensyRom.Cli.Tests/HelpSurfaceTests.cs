@@ -46,6 +46,30 @@ public sealed class HelpSurfaceTests
         await AssertNoEngineOrDeviceTouched(host);
     }
 
+    [Theory]
+    [InlineData("file", "search", "notice")]
+    [InlineData("file", "random", "notice")]
+    [InlineData("device", "list", "sdIndexed")]
+    public async Task VerbHelp_DescribesTheIndexNoticeAndTheIndexedFlags(string noun, string verb, string expected)
+    {
+        using var host = new TestHost();
+
+        await host.RunAsync(noun, verb, "--help");
+
+        host.Consoles.StdOut.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task RootHelp_SaysStderrCanEndWithAJsonErrorOrNoticeObject()
+    {
+        using var host = new TestHost();
+
+        await host.RunAsync("--help");
+
+        var help = string.Join(' ', host.Consoles.StdOut.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        help.Should().Contain("JSON error object").And.Contain("JSON notice object");
+    }
+
     [Fact]
     public async Task RootHelp_MentionsTheMenu_Json_TheExitCodes_AndThePipeExample()
     {

@@ -36,7 +36,7 @@ internal static class ExitCodeMapper
                 return new CliException(CliExitCode.Usage, api.Message);
 
             case TeensyApiException { StatusCode: 404 } api:
-                return new CliException(CliExitCode.NotFound, api.Message);
+                return new CliException(CliExitCode.NotFound, api.Message, api.Details);
 
             case TeensyApiException { StatusCode: null, InnerException: HttpRequestException } api:
                 return new CliException(CliExitCode.EngineUnavailable, api.Message);

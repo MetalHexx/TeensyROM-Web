@@ -44,6 +44,12 @@ internal interface ICliOutput
     void Notice(string message);
 
     /// <summary>
+    /// The notice's sentence on stderr, as <see cref="Notice(string)"/>. In JSON mode the JSON notice object follows,
+    /// compact on one line, as the last thing written to stderr.
+    /// </summary>
+    void Notice(CliNotice notice);
+
+    /// <summary>
     /// The error sentence on stderr. In JSON mode the JSON error object follows, compact on one line, as the last thing
     /// written to stderr.
     /// </summary>

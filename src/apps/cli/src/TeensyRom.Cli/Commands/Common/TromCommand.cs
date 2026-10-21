@@ -70,6 +70,27 @@ internal abstract class DeviceCommand<T>(
         if (settings is StorageSettings withStorage) storage.UseStorage(ChooseStorage(withStorage));
     }
 
+    /// <summary>
+    /// Warns, after the command's results, when tr-web holds no full index of the chosen storage: search and random only
+    /// see the files it has cached until one is built. Does nothing for an indexed storage.
+    /// </summary>
+    protected void NoticeWhenIndexIncomplete()
+    {
+        if (devices.SelectedDevice is not { } device || device.IsIndexed(storage.StorageType)) return;
+
+        var storageName = storage.StorageType == TeensyStorageType.USB ? "usb" : "sd";
+        var deviceArgument = device.Name.Any(char.IsWhiteSpace) ? $"\"{device.Name}\"" : device.Name;
+        var fix = $"trom index build --device {deviceArgument} --storage {storageName}";
+
+        Output.Notice(new CliNotice(
+            "indexIncomplete",
+            $"{device.Name}'s {storageName.ToUpperInvariant()} storage hasn't been fully indexed, so results may be incomplete — run `{fix}`.",
+            device.Name,
+            device.Id,
+            storageName,
+            fix));
+    }
+
     private TeensyStorageType ChooseStorage(StorageSettings settings) =>
         string.IsNullOrWhiteSpace(settings.Storage)
             ? settingsService.GetSettings().StorageType

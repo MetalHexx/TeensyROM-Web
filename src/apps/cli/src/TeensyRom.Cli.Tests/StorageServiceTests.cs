@@ -109,6 +109,63 @@ public class StorageServiceTests
         failure.StatusCode.Should().Be(404);
     }
 
+    private void DirectoryReads(params object[] outcomes)
+    {
+        var calls = 0;
+        _api.GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>()).Returns(_ =>
+            outcomes[Math.Min(calls++, outcomes.Length - 1)] switch
+            {
+                GetDirectoryResponse ok => Task.FromResult(ok),
+                var failure => Task.FromException<GetDirectoryResponse>((Exception)failure)
+            });
+    }
+
+    private static ApiException DirectoryNotFound() => ApiFailure(404, "\"The directory /music/H/ was not found.\"");
+
+    [Fact]
+    public async Task GetDirectory_RetriesA404_AndSucceedsOnTheThirdAttempt()
+    {
+        DirectoryReads(
+            DirectoryNotFound(),
+            DirectoryNotFound(),
+            new GetDirectoryResponse { StorageItem = new StorageCacheDto { Path = "/music/H/", Directories = [], Files = [File("/music/H/a.sid")] } });
+
+        var listing = await _sut.GetDirectory("/music/H/");
+
+        listing.Files.Should().ContainSingle();
+        await _api.Received(3).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetDirectory_WhenEveryAttemptIs404_FailsAfterThree_SayingMissingOrNotAnswering_WithDetails()
+    {
+        _devices.SelectedDevice.Returns(new DeviceSummary(DeviceId, "TR-1", true, "Ethernet 1.2.3.4", "Connected"));
+        DirectoryReads(DirectoryNotFound());
+
+        var act = () => _sut.GetDirectory("/music/H/");
+
+        var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
+        failure.StatusCode.Should().Be(404);
+        failure.Message.Should().Contain("/music/H/ was not found").And.Contain("TR-1 did not answer").And.Contain("3 attempts");
+        failure.Details.Should().NotBeNull();
+        failure.Details!.Path.Should().Be("/music/H/");
+        failure.Details.Device.Should().Be("TR-1");
+        failure.Details.Attempts.Should().Be(3);
+        failure.Details.PossibleCauses.Should().HaveCountGreaterThan(1);
+        await _api.Received(3).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetDirectory_DoesNotRetryAFailureThatIsNot404()
+    {
+        DirectoryReads(ApiFailure(500, "\"boom\""));
+
+        var act = () => _sut.GetDirectory("/music/H/");
+
+        await act.Should().ThrowAsync<TeensyApiException>();
+        await _api.Received(1).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
     private void ListDirectory(string path, params FileItemDto[] files) =>
         _api.GetDirectoryAsync(DeviceId, ApiStorageType.SD, path, Arg.Any<CancellationToken>())
             .Returns(new GetDirectoryResponse { StorageItem = new StorageCacheDto { Path = path, Directories = [], Files = [.. files] } });

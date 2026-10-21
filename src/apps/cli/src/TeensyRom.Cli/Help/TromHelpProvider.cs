@@ -32,7 +32,7 @@ internal sealed class TromHelpProvider(ICommandAppSettings settings) : HelpProvi
             new Text("trom: control your TeensyROM from the command line."),
             Text.NewLine,
             Text.NewLine,
-            new Text("Run trom with no arguments to open the interactive menu. Every command takes --json to write its result as JSON on stdout; messages and errors go to stderr."),
+            new Text("Run trom with no arguments to open the interactive menu. Every command takes --json to write its result as JSON on stdout; messages and errors go to stderr. With --json, the last line of stderr can be a JSON error object ({\"error\": ...}) or a JSON notice object ({\"notice\": ...})."),
             Text.NewLine,
             Text.NewLine
         ];

@@ -272,7 +272,7 @@ public sealed class CliHostTests : IDisposable
         var devices = JsonDocument.Parse(StdOut).RootElement.EnumerateArray().ToList();
         devices.Should().HaveCount(2);
         devices[0].EnumerateObject().Select(p => p.Name).Should()
-            .Equal("id", "name", "isOnline", "connection", "state", "sdAvailable", "usbAvailable");
+            .Equal("id", "name", "isOnline", "connection", "state", "sdAvailable", "usbAvailable", "sdIndexed", "usbIndexed");
         devices[0].GetProperty("name").GetString().Should().Be("Alpha");
         devices[0].GetProperty("sdAvailable").GetBoolean().Should().BeTrue();
         devices[1].GetProperty("isOnline").GetBoolean().Should().BeFalse();
@@ -312,7 +312,7 @@ public sealed class CliHostTests : IDisposable
         await terminal.RunAsync("device", "list");
 
         terminal.Consoles.StdOut.Should().Contain("Name").And.Contain("Id").And.Contain("State").And.Contain("Connection").And.Contain("Online")
-            .And.Contain("Alpha").And.Contain("a-1").And.Contain("USB COM3");
+            .And.Contain("SD indexed").And.Contain("USB indexed").And.Contain("Alpha").And.Contain("a-1").And.Contain("USB COM3");
     }
 
     [Fact]
