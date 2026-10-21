@@ -3,8 +3,23 @@ using TeensyRom.Cli.Commands.Main.Asid;
 
 namespace TeensyRom.Cli.Tests
 {
+    [Collection(ConsoleCollection.Name)]
     public class GeneratePresetsSettingsTests
     {
+        [Theory]
+        [InlineData("-s")]
+        [InlineData("-t")]
+        [InlineData("-c")]
+        public async Task ShortOptions_AreNotAcceptedOnChipsynth(string shortOption)
+        {
+            using var host = new TestHost();
+
+            var exitCode = await host.RunAsync("chipsynth", "generate", shortOption, "value");
+
+            exitCode.Should().Be(2);
+            host.Consoles.StdErr.Should().Contain("Unknown option");
+        }
+
         [Fact]
         public void When_SourcePath_Empty_ValidationSucceeds()
         {

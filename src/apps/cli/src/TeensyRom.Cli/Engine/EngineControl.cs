@@ -14,6 +14,9 @@ internal interface IEngineControl
 
     /// <summary>Stops the running engine and waits for it to release its port and lock. Never starts anything.</summary>
     Task<EngineStopOutcome> StopAsync(CancellationToken ct);
+
+    /// <summary>Looks at the engine port once and reports what answers. Never starts or stops anything.</summary>
+    Task<EngineStatus> GetStatusAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -95,6 +98,23 @@ internal sealed class EngineControl(
             await clock.DelayAsync(PollInterval, ct);
         }
     }
+
+    public async Task<EngineStatus> GetStatusAsync(CancellationToken ct)
+    {
+        var address = EngineAddress.DisplayAddress;
+
+        return await probe.ProbeAsync(ct) switch
+        {
+            EngineProbeResult.Engine running => new EngineStatus(true, running.Version, ownVersion, SameVersion(running.Version), address, null),
+            EngineProbeResult.NotReady => NotRunning(address,
+                $"An engine is listening on {address} but isn't answering yet — run `trom engine status` again in a moment."),
+            EngineProbeResult.Foreign foreign => NotRunning(address,
+                $"Something other than a TeensyROM engine is using port {EngineAddress.Port} ({foreign.Reason}) — free the port and try again."),
+            _ => NotRunning(address, $"No TeensyROM engine is running at {address} — run `trom device list` to start one.")
+        };
+    }
+
+    private EngineStatus NotRunning(string address, string problem) => new(false, null, ownVersion, false, address, problem);
 
     /// <summary>Reuses the running engine when it is this CLI's version and build; otherwise replaces it.</summary>
     private async Task<EngineReady> EnsureCurrentAsync(EngineProbeResult.Engine running, Attempt attempt, CancellationToken ct)

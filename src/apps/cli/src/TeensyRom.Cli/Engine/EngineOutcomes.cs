@@ -26,6 +26,17 @@ internal sealed record EngineReady(bool Ok, string? FailureMessage)
     public static EngineReady Failed(string message) => new(false, message);
 }
 
+/// <summary>
+/// What one look at the engine port found, for <c>trom engine status</c>.
+/// </summary>
+/// <param name="Running">A TeensyROM engine answered.</param>
+/// <param name="Version">The engine's version, when one answered.</param>
+/// <param name="CliVersion">This CLI's version.</param>
+/// <param name="Matches">The engine's version equals the CLI's, ignoring build metadata after <c>+</c>.</param>
+/// <param name="Address">Where the engine is looked for.</param>
+/// <param name="Problem">Why no engine is running, as a sentence for the user; null when one is.</param>
+internal sealed record EngineStatus(bool Running, string? Version, string CliVersion, bool Matches, string Address, string? Problem);
+
 internal enum EngineStopOutcome
 {
     Stopped,

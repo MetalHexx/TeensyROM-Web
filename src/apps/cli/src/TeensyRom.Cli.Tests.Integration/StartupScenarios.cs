@@ -1,14 +1,23 @@
+using Microsoft.Extensions.DependencyInjection;
+using TeensyRom.Cli.Services;
+
 namespace TeensyRom.Cli.Tests.Integration;
 
+/// <summary>
+/// The menu's startup gate: it readies the engine and takes the only online device without asking, or offers exactly
+/// the devices that are online when there are several.
+/// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class StartupScenarios(SharedApiFixture api)
 {
     [Fact]
     public async Task Startup_OffersExactlyTheOnlineDevicesTheApiReports()
     {
-        using var cli = new CliHarness();
+        using var cli = new CliHarness(interactive: true);
         var online = api.OnlineDevices;
-        if (online.Count > 0) cli.Console.Input.PushKey(ConsoleKey.Enter);
+
+        // The gate asks only when several devices are online; take the first one it offers.
+        if (online.Count > 1) cli.Out.Input.PushKey(ConsoleKey.Enter);
 
         var ready = await cli.StartAsync();
 
@@ -22,6 +31,15 @@ public sealed class StartupScenarios(SharedApiFixture api)
         }
 
         ready.Should().BeTrue();
+
+        if (online.Count == 1)
+        {
+            // Nothing to choose from, so nothing is asked and the only online device is the one selected.
+            cli.Output.Should().NotContain(online[0].Name);
+            SelectedDeviceId(cli).Should().Be(online[0].DeviceId);
+            return;
+        }
+
         foreach (var device in online)
         {
             cli.Output.Should().Contain(device.Name);
@@ -32,5 +50,12 @@ public sealed class StartupScenarios(SharedApiFixture api)
         {
             cli.Output.Should().NotContain(device.Name);
         }
+    }
+
+    private static string? SelectedDeviceId(CliHarness cli)
+    {
+        using var provider = cli.Host.Services.BuildServiceProvider();
+
+        return provider.GetRequiredService<IDeviceService>().SelectedDevice?.Id;
     }
 }

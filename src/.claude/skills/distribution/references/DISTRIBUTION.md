@@ -48,7 +48,7 @@ This guide documents the complete distribution process for TeensyROM Web, a self
                   ▼
 ┌─────────────────────────────────────────────────────┐
 │  dotnet publish CLI (self-contained, folder)        │
-│  → publish/<rid>/cli/TeensyRom.Cli[.exe]            │
+│  → publish/<rid>/cli/trom[.exe]                     │
 └─────────────────┬───────────────────────────────────┘
                   │
                   ▼
@@ -86,7 +86,7 @@ appsettings.json         ← Runtime configuration
 wwwroot/                 ← Angular frontend
 Assets/                  ← Seed assets (unpacked)
 cli/
-  TeensyRom.Cli[.exe]    ← CLI, with its own runtime, Fonts/ and dependencies
+  trom[.exe]             ← CLI, with its own runtime, Fonts/ and dependencies
 ```
 
 - **Self-contained, not single-file**: the CLI resolves its fonts from its assembly location, which is empty in a single-file bundle. Keeping it in its own subfolder also stops the two self-contained apps' runtimes from overwriting each other.
@@ -358,22 +358,22 @@ class TeensyromWeb < Formula
     sha256 "def456..."  # Calculated by workflow
   end
   
-  conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install a TeensyRom.Cli command"
+  conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install the TeensyROM CLI"
 
   def install
     libexec.install Dir["*"]
-    if (libexec/"cli/TeensyRom.Cli").exist?
+    if (libexec/"cli/trom").exist?
       # Combined package: engine and CLI share the default home, ~/.teensyrom
       (bin/"teensyrom-web").write <<~EOS
         #!/bin/zsh
         cd "#{libexec}"
         exec "./TeensyRom.Api" "$@"
       EOS
-      (bin/"TeensyRom.Cli").write <<~EOS
+      (bin/"trom").write <<~EOS
         #!/bin/zsh
-        exec "#{libexec}/cli/TeensyRom.Cli" "$@"
+        exec "#{libexec}/cli/trom" "$@"
       EOS
-      chmod 0755, bin/"TeensyRom.Cli"
+      chmod 0755, bin/"trom"
     else
       # Older package (no cli/, engine predates ~/.teensyrom): the previous wrapper
       # (sets TEENSYROM_DATA_DIR to ~/Library/Application Support/TeensyROM-Web)
@@ -390,12 +390,12 @@ end
 **Install behavior**:
 1. Downloads correct tar.gz for user's architecture (ARM64 or Intel)
 2. Extracts all files to `libexec` (private location): the engine at its root, the CLI in `libexec/cli`
-3. If `libexec/cli/TeensyRom.Cli` exists (the combined package), creates two wrapper scripts in `bin`: `teensyrom-web` (changes to `libexec`, runs the engine) and `TeensyRom.Cli` (runs `libexec/cli/TeensyRom.Cli`). Neither sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
+3. If `libexec/cli/trom` exists (the combined package), creates two wrapper scripts in `bin`: `teensyrom-web` (changes to `libexec`, runs the engine) and `trom` (runs `libexec/cli/trom`). Neither sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
 4. Otherwise (an older package with no `cli/`, such as `1.0.0-alpha.8`, whose engine still writes beside itself), keeps the previous `teensyrom-web` wrapper unchanged, which sets `TEENSYROM_DATA_DIR` to `~/Library/Application Support/TeensyROM-Web`. That `else` branch can be deleted after the first release that contains `cli/`
 5. Sets executable permissions
-6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` also installs a `TeensyRom.Cli` command, so Homebrew refuses to install both
+6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` installs a `TeensyRom.Cli` command; the line is kept so the two CLIs are not installed together
 
-**Result**: User can run `teensyrom-web` (and, with the combined package, `TeensyRom.Cli`) from anywhere
+**Result**: User can run `teensyrom-web` (and, with the combined package, `trom`) from anywhere
 
 ### Testing Homebrew Install
 
@@ -422,7 +422,7 @@ teensyrom-web
 # Application should start, console shows: "Now listening on: http://localhost:10213"
 ```
 
-With the combined package, `TeensyRom.Cli` starts the engine itself when it is not running, and `TeensyRom.Cli stop` stops it.
+With the combined package, `trom` starts the engine itself when it is not running, and `trom engine stop` stops it.
 
 **Open in browser**:
 ```bash
@@ -496,10 +496,10 @@ api-spec/               (OpenAPI schema)
 web.config              (IIS config - not needed for standalone)
 *.pdb, *.xml            (Debug symbols and XML docs - optional)
 cli/
-  TeensyRom.Cli.exe     (CLI, with its own runtime, Fonts/ and dependencies)
+  trom.exe              (CLI, with its own runtime, Fonts/ and dependencies)
 ```
 
-**macOS/Linux** (`TeensyROM-Web-1.2.0-osx-arm64.tar.gz`): the same layout, with `TeensyRom.Api` and `cli/TeensyRom.Cli` (no `.exe`; both marked executable by the workflow).
+**macOS/Linux** (`TeensyROM-Web-1.2.0-osx-arm64.tar.gz`): the same layout, with `TeensyRom.Api` and `cli/trom` (no `.exe`; both marked executable by the workflow).
 
 **Note**: `.pdb` files can be removed to reduce size, but they're helpful for debugging crash dumps.
 

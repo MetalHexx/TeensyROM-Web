@@ -184,7 +184,7 @@ Mock only at infrastructure boundaries — application and features tests should
   fork branch `boot-complete-flag`, pending upstream).
 - `Connection:PreferredTransport` (default `Tcp`) orders the start and reconnect occasions' own cached-endpoint attempts, and picks the survivor when a scan finds a unit reachable on both.
 - After any reset the API stays silent until the C64 menu's SID token.
-- Engine data: everything the engine writes lives in `~/.teensyrom/api` (`TEENSYROM_DATA_DIR` moves the home). Tests use a throwaway home, and a build never touches the home (the OpenAPI generator's run is guarded). On Windows, stop a running engine (`TeensyRom.Cli stop`, or `dotnet run --project apps/cli/src/TeensyRom.Cli -- stop` from `src/`) before rebuilding it.
+- Engine data: everything the engine writes lives in `~/.teensyrom/api` (`TEENSYROM_DATA_DIR` moves the home). Tests use a throwaway home, and a build never touches the home (the OpenAPI generator's run is guarded). On Windows, stop a running engine (`trom engine stop`, or `dotnet run --project apps/cli/src/TeensyRom.Cli -- engine stop` from `src/`) before rebuilding it.
 
 ## UI & Styling Resources
 

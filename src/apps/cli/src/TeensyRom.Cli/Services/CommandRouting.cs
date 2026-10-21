@@ -1,27 +1,52 @@
+using TeensyRom.Cli.Commands.Common;
+
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// Decides from a command line whether the command needs the engine, so those that don't (help, version, credits,
-/// the ASID patch generator, stopping the engine) run without starting one.
+/// Reads the raw command line before Spectre parses it: the decisions that must hold even when parsing fails.
+/// Whether a command needs the engine is not decided here; its base class declares it.
 /// </summary>
 internal static class CommandRouting
 {
-    private static readonly string[] EngineFreeCommands = ["chipsynth", "cs", "credits", "c", "stop"];
+    private const string EndOfOptions = "--";
 
-    /// <summary>True for a command line that asks for help or the version.</summary>
-    public static bool IsHelpOrVersion(string[] args) =>
-        args.Contains("-h") || args.Contains("--help") || args.Contains("-v") || args.Contains("--version");
+    /// <summary>True when <c>--json</c> appears anywhere before an end-of-options <c>--</c>, so a parse error still gets its JSON error.</summary>
+    public static bool WantsJson(string[] args) =>
+        args.TakeWhile(arg => arg != EndOfOptions).Contains("--json");
+
+    /// <summary>True when <c>-h</c> or <c>--help</c> appears anywhere.</summary>
+    public static bool AsksForHelp(string[] args) => args.Any(IsHelpFlag);
 
     /// <summary>
-    /// False for no arguments (the menu alone needs nothing), for help or version, and for the engine-free commands;
-    /// true for everything else.
+    /// Swaps each standalone <c>-</c> for <see cref="StdinPaths.Marker"/>: Spectre's tokenizer throws "Option does
+    /// not have a name." on a bare <c>-</c>, even after <c>--</c>.
     /// </summary>
-    public static bool NeedsEngine(string[] args) =>
-        args.Length > 0
-        && !IsHelpOrVersion(args)
-        && !EngineFreeCommands.Contains(args[0], StringComparer.OrdinalIgnoreCase);
+    public static string[] ReplaceStdinMarker(string[] args) =>
+        args.Select(arg => arg == "-" ? StdinPaths.Marker : arg).ToArray();
 
-    /// <summary>True when the command line runs <c>stop</c>.</summary>
-    public static bool IsStop(string[] args) =>
-        args.Length > 0 && string.Equals(args[0], "stop", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// The noun when the command line is a known noun with no verb: nothing after it, or only options other than help.
+    /// Spectre would answer such a line with help and exit code 0; it is a usage error.
+    /// </summary>
+    public static string? FindBareNoun(string[] args, IReadOnlyDictionary<string, string[]> nouns)
+    {
+        if (args.Length == 0 || !nouns.ContainsKey(args[0])) return null;
+
+        var rest = args.Skip(1).ToArray();
+
+        return !AsksForHelp(rest) && rest.All(arg => arg.StartsWith('-')) ? args[0] : null;
+    }
+
+    /// <summary>
+    /// The words that name the nearest help for a usage error: the noun and verb when the line starts with a known pair,
+    /// else the noun when it starts with one, else none (the root).
+    /// </summary>
+    public static string[] HelpPrefix(string[] args, IReadOnlyDictionary<string, string[]> nouns)
+    {
+        if (args.Length == 0 || !nouns.TryGetValue(args[0], out var verbs)) return [];
+
+        return args.Length > 1 && verbs.Contains(args[1], StringComparer.Ordinal) ? [args[0], args[1]] : [args[0]];
+    }
+
+    private static bool IsHelpFlag(string arg) => arg is "-h" or "--help";
 }

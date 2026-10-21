@@ -14,13 +14,13 @@ class TeensyromWeb < Formula
     sha256 "ac078715d9b457da2725e4893837c7baa7a5f58e722fa94d461e55abaa70732a"
   end
 
-  conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install a TeensyRom.Cli command"
+  conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install the TeensyROM CLI"
 
   def install
     # Install all files to libexec, create wrapper script in bin
     libexec.install Dir["*"]
 
-    if (libexec/"cli/TeensyRom.Cli").exist?
+    if (libexec/"cli/trom").exist?
       # Combined package: the engine and the CLI share the default home, ~/.teensyrom
       (bin/"teensyrom-web").write <<~EOS
         #!/bin/zsh
@@ -28,12 +28,12 @@ class TeensyromWeb < Formula
         exec "./TeensyRom.Api" "$@"
       EOS
 
-      (bin/"TeensyRom.Cli").write <<~EOS
+      (bin/"trom").write <<~EOS
         #!/bin/zsh
-        exec "#{libexec}/cli/TeensyRom.Cli" "$@"
+        exec "#{libexec}/cli/trom" "$@"
       EOS
 
-      chmod 0755, bin/"TeensyRom.Cli"
+      chmod 0755, bin/"trom"
     else
       # Older package (no cli/, engine predates ~/.teensyrom): today's wrapper, unchanged
       (bin/"teensyrom-web").write <<~EOS
@@ -59,7 +59,9 @@ class TeensyromWeb < Formula
         http://localhost:10213
 
       To use the command-line tool (it starts the engine itself):
-        TeensyRom.Cli
+        trom
+
+      Run `trom --help` to see every command.
 
       With the combined package, the engine and the CLI keep their
       data in ~/.teensyrom.
@@ -72,5 +74,8 @@ class TeensyromWeb < Formula
   test do
     # Basic test that binary shows version
     assert_match version.to_s, shell_output("#{bin}/teensyrom-web --version", 0)
+    if (libexec/"cli/trom").exist?
+      assert_match version.to_s, shell_output("#{bin}/trom --version", 0)
+    end
   end
 end

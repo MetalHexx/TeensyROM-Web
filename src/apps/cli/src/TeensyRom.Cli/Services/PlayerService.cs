@@ -538,6 +538,12 @@ namespace TeensyRom.Cli.Services
             _storage.SwitchStorage(storageType);
         }
 
+        public void UseStorage(TeensyStorageType storageType)
+        {
+            _state = _state with { StorageType = storageType };
+            _storage.UseStorage(storageType);
+        }
+
         private TeensyFileType[] GetFilterFileTypes()
         {
             var trSettings = _settingsService.GetSettings();

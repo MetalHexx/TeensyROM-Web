@@ -22,9 +22,6 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
         [DefaultValue("/")]
         public string StartingPath { get; set; } = "/";
 
-        public new static string Example => "launch nav -s SD -p /music/MUSICIANS/T/Tjelta_Geir/";
-        public new static string Description => "Navigate through the storage directories and pick a file to launch.";
-
         public new void ClearSettings()
         {
             StorageDevice = string.Empty;

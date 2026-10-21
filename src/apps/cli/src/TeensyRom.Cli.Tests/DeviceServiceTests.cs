@@ -92,6 +92,100 @@ public class DeviceServiceTests
     }
 
     [Fact]
+    public async Task Find_WithAFullScan_AsksTheApiToScan_WhileGetDevicesNeverDoes()
+    {
+        _api.FindDevicesAsync(true, Arg.Any<CancellationToken>()).Returns(new FindDevicesResponse { Devices = [Cart("a", "Alpha", DeviceState.Connected)] });
+
+        var found = await _sut.FindAsync(fullScan: true);
+
+        found.Should().ContainSingle().Which.Name.Should().Be("Alpha");
+        await _api.Received(1).FindDevicesAsync(true, Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().FindDevicesAsync(false, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Find_WhenTrWebKnowsNone_IsEmptyEvenAfterAScan(bool fullScan)
+    {
+        _api.FindDevicesAsync(fullScan, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<FindDevicesResponse>(ApiFailure(404, "\"No TeensyRom devices found.\"")));
+
+        var found = await _sut.FindAsync(fullScan);
+
+        found.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Find_ReportsWhichStoragesAreIndexed()
+    {
+        var cart = Cart("a", "Alpha", DeviceState.Connected);
+        cart.SdStorage = new CartStorageDto { Available = true, IndexExists = false };
+        cart.UsbStorage = new CartStorageDto { Available = true, IndexExists = true };
+        ApiKnowsDevices(cart);
+
+        var found = await _sut.FindAsync(fullScan: false);
+
+        found.Should().ContainSingle().Which.Should().Match<DeviceSummary>(d => !d.SdIndexed && d.UsbIndexed);
+    }
+
+    [Fact]
+    public async Task Find_ReportsWhichStoragesAreAvailable()
+    {
+        var cart = Cart("a", "Alpha", DeviceState.Connected);
+        cart.SdStorage = new CartStorageDto { Available = true };
+        cart.UsbStorage = new CartStorageDto { Available = false };
+        ApiKnowsDevices(cart);
+
+        var found = await _sut.FindAsync(fullScan: false);
+
+        found.Should().ContainSingle().Which.Should().Match<DeviceSummary>(d => d.SdAvailable && !d.UsbAvailable);
+    }
+    [Fact]
+    public async Task ReconnectDevice_ReturnsTheDeviceAfterwards()
+    {
+        _api.ReconnectDeviceAsync("a", Arg.Any<CancellationToken>())
+            .Returns(new ReconnectDeviceResponse { Device = Cart("a", "Alpha", DeviceState.Connected), Message = "Reconnected." });
+
+        var device = await _sut.ReconnectDeviceAsync("a");
+
+        device.Should().Be(new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected"));
+    }
+
+    [Fact]
+    public async Task RenameDevice_SendsTheNewName_AndReturnsTheRenamedDevice()
+    {
+        _api.RenameDeviceAsync("a", Arg.Is<RenameDeviceBody>(body => body.Name == "Bench"), Arg.Any<CancellationToken>())
+            .Returns(new RenameDeviceResponse { Device = Cart("a", "Bench", DeviceState.Connected), Message = "Renamed." });
+
+        var device = await _sut.RenameDeviceAsync("a", "Bench");
+
+        device.Name.Should().Be("Bench");
+    }
+
+    [Fact]
+    public async Task ForgetPingAndReset_ReturnTrWebsMessage()
+    {
+        _api.ForgetDeviceAsync("a", Arg.Any<CancellationToken>()).Returns(new ForgetDeviceResponse { Message = "Forgotten." });
+        _api.PingDeviceAsync("a", Arg.Any<CancellationToken>()).Returns(new PingDeviceResponse { Message = "Pong." });
+        _api.ResetDeviceAsync("a", Arg.Any<CancellationToken>()).Returns(new ResetDeviceResponse { Message = "Reset." });
+
+        (await _sut.ForgetDeviceAsync("a")).Should().Be("Forgotten.");
+        (await _sut.PingDeviceAsync("a")).Should().Be("Pong.");
+        (await _sut.ResetDeviceAsync("a")).Should().Be("Reset.");
+    }
+
+    [Fact]
+    public async Task ForgetDevice_WhenTrWebDoesNotKnowIt_ThrowsWithTheStatus()
+    {
+        _api.ForgetDeviceAsync("nope", Arg.Any<CancellationToken>()).Returns(Task.FromException<ForgetDeviceResponse>(ApiFailure(404, "\"Device not found.\"")));
+
+        var act = () => _sut.ForgetDeviceAsync("nope");
+
+        (await act.Should().ThrowAsync<TeensyApiException>()).Which.StatusCode.Should().Be(404);
+    }
+
+    [Fact]
     public void RequireDeviceId_WithoutASelection_Throws()
     {
         var act = () => _sut.RequireDeviceId();

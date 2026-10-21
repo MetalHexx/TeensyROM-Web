@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Services;
@@ -6,6 +7,8 @@ namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
 /// The CLI starting, replacing and stopping the real engine. Each scenario hands the shared engine back when it ends.
+/// An engine command here is <c>device list</c>; back-to-back runs can wait up to about 5 seconds on tr-web's
+/// <c>/api/devices</c> rate limit, which is expected.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class EngineLifecycleScenarios
@@ -25,11 +28,11 @@ public sealed class EngineLifecycleScenarios
         try
         {
             using var cli = new CliHarness();
-            cli.Console.Input.PushKey(ConsoleKey.Enter);
 
-            await cli.RunThroughSessionAsync("ports");
+            (await cli.RunAsync("device", "list")).Should().Be(0);
 
-            cli.Output.Should().Contain("Starting the TeensyROM engine");
+            cli.Error.Should().Contain("Starting the TeensyROM engine");
+            cli.Output.Should().NotContain("Starting the TeensyROM engine", "engine notices belong on stderr");
             (await RunningVersionAsync(bound.Token)).Should().Be(CliVersion);
             TestEngine.IsEngineLockHeld(home).Should().BeTrue();
             File.Exists(Path.Combine(home, "api", "Assets", ".package-version")).Should().BeTrue();
@@ -52,11 +55,10 @@ public sealed class EngineLifecycleScenarios
         try
         {
             using var cli = new CliHarness();
-            cli.Console.Input.PushKey(ConsoleKey.Enter);
 
-            await cli.RunThroughSessionAsync("ports");
+            (await cli.RunAsync("device", "list")).Should().Be(0);
 
-            cli.Output.Should().Contain("0.0.0-other").And.Contain("restarting");
+            cli.Error.Should().Contain("0.0.0-other").And.Contain("restarting");
             other.StopRequested.Should().BeTrue();
             (await RunningVersionAsync(bound.Token)).Should().Be(CliVersion);
         }
@@ -68,7 +70,38 @@ public sealed class EngineLifecycleScenarios
     }
 
     [Fact]
-    public async Task Stop_StopsTheEngine_AndSaysSoWhenNoneIsRunning()
+    public async Task EngineStatus_SaysNoEngineIsRunning_ThenSeesTheOneAnotherCommandStarted()
+    {
+        using var bound = TestEngine.Bounded();
+        await TestEngine.StopAsync(bound.Token);
+
+        try
+        {
+            using var cli = new CliHarness();
+
+            (await cli.RunAsync("engine", "status", "--json")).Should().Be(3);
+
+            JsonDocument.Parse(cli.Output).RootElement.GetProperty("running").GetBoolean().Should().BeFalse();
+            (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>("status never starts an engine");
+
+            await TestEngine.EnsureAsync(bound.Token);
+            using var after = new CliHarness();
+
+            (await after.RunAsync("engine", "status", "--json")).Should().Be(0);
+
+            var status = JsonDocument.Parse(after.Output).RootElement;
+            status.GetProperty("running").GetBoolean().Should().BeTrue();
+            status.GetProperty("matches").GetBoolean().Should().BeTrue();
+            status.GetProperty("version").GetString()!.Split('+')[0].Should().Be(CliVersion);
+        }
+        finally
+        {
+            await TestEngine.EnsureAsync(bound.Token);
+        }
+    }
+
+    [Fact]
+    public async Task EngineStop_StopsTheEngine_AndSaysSoWhenNoneIsRunning()
     {
         using var bound = TestEngine.Bounded();
         var home = await TestEngine.EnsureAsync(bound.Token);
@@ -77,15 +110,17 @@ public sealed class EngineLifecycleScenarios
         {
             using var cli = new CliHarness();
 
-            (await cli.RunThroughSessionAsync("stop")).Should().Be(0);
+            (await cli.RunAsync("engine", "stop")).Should().Be(0);
 
-            cli.Output.Should().Contain("engine stopped");
+            cli.Error.Should().Contain("engine stopped");
+            cli.Output.Should().BeEmpty();
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
             TestEngine.IsEngineLockHeld(home).Should().BeFalse();
 
-            (await cli.RunThroughSessionAsync("stop")).Should().Be(0);
+            (await cli.RunAsync("engine", "stop", "--json")).Should().Be(0);
 
-            cli.Output.Should().Contain("No TeensyROM engine is running.");
+            cli.Error.Should().Contain("No TeensyROM engine is running.");
+            JsonDocument.Parse(cli.Output).RootElement.GetProperty("outcome").GetString().Should().Be("notRunning");
         }
         finally
         {

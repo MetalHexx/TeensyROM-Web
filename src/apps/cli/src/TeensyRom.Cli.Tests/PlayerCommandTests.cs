@@ -85,7 +85,8 @@ public sealed class PlayerCommandTests : IDisposable
         _state.PlayState = PlayState.Playing;
         _player.TogglePlay().Returns(_ => SettlesAs(PlayState.Paused));
         _player.PlayNext().Returns(_ => SettlesAs(PlayState.Playing));
-        _storage.BanFile(Arg.Any<ILaunchableItem>()).Returns(Task.CompletedTask);
+        _state.StorageType = TeensyStorageType.USB;
+        _storage.BanFile(Arg.Any<string>(), Arg.Any<TeensyStorageType>()).Returns(new BanResult("Commando.sid", false, "Banned."));
         Choose(4);
         Choose(1);
         Choose(Back);
@@ -93,5 +94,6 @@ public sealed class PlayerCommandTests : IDisposable
         Run();
 
         _console.Output.Should().Contain("Stop/Pause").And.NotContain("Resume");
+        _storage.Received(1).BanFile("/music/Commando.sid", TeensyStorageType.USB);
     }
 }

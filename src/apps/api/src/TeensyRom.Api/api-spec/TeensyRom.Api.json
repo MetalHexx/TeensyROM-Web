@@ -1517,6 +1517,84 @@
         }
       }
     },
+    "/api/devices/{deviceId}/storage/{storageType}/ban": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Ban File",
+        "description": "Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.",
+        "operationId": "BanFile",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TeensyStorageType"
+            }
+          },
+          {
+            "name": "FilePath",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BanFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/engine/stop": {
       "post": {
         "tags": [
@@ -1658,6 +1736,25 @@
             }
           },
           "useOpusEncoding": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BanFileResponse": {
+        "required": [
+          "message",
+          "bannedFileName",
+          "alreadyBanned"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "bannedFileName": {
+            "type": "string"
+          },
+          "alreadyBanned": {
             "type": "boolean"
           }
         }

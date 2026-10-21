@@ -2,30 +2,40 @@ using System.Text.Json;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Storage.Entities;
+using TeensyStorageType = TeensyRom.Cli.Storage.Entities.TeensyStorageType;
 
 namespace TeensyRom.Cli.Tests.Integration;
 
+/// <summary>
+/// Banning goes through tr-web's ban endpoint, which needs an online device and a file that exists, so these scenarios
+/// skip without a device. On CI the ban itself is covered by the endpoint's own unit tests in tr-web.
+/// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class SettingsAndBanScenarios(SharedApiFixture api)
 {
-    private const string BanCheckFile = "cli-parity-ban-check.sid";
     private const int MaxDirectoriesWalked = 20;
 
-    [Fact]
-    public async Task BanFile_AddsTheNameOnce_AndLeavesEverythingElseAlone()
+    [SkippableFact]
+    public async Task BanFile_AddsTheNameOnce_ReportsASecondBanAsAlreadyBanned_AndLeavesEverythingElseAlone()
     {
+        var (cli, storage, storageType, found) = await ArrangeAsync();
+        using var _ = cli;
         var original = await api.Api.GetSettingsAsync();
 
         try
         {
-            using var cli = new CliServices();
-            await cli.Get<IStorageService>().BanFile(new SongItem { Name = BanCheckFile, Path = $"/music/{BanCheckFile}" });
+            var first = await storage.BanFile(found.File.Path, storageType);
+            var second = await storage.BanFile(found.File.Path, storageType);
+
+            first.AlreadyBanned.Should().BeFalse();
+            second.AlreadyBanned.Should().BeTrue();
+            second.BannedFileName.Should().Be(first.BannedFileName);
 
             var banned = await api.Api.GetSettingsAsync();
 
-            banned.SearchSettings.BannedFiles.Count(name => name == BanCheckFile).Should().Be(1);
-            banned.SearchSettings.BannedFiles.Where(name => name != BanCheckFile)
-                .Should().BeEquivalentTo(original.SearchSettings.BannedFiles.Where(name => name != BanCheckFile));
+            banned.SearchSettings.BannedFiles.Count(name => name == first.BannedFileName).Should().Be(1);
+            banned.SearchSettings.BannedFiles.Where(name => name != first.BannedFileName)
+                .Should().BeEquivalentTo(original.SearchSettings.BannedFiles.Where(name => name != first.BannedFileName));
             UnrelatedSections(banned).Should().Be(UnrelatedSections(original));
         }
         finally
@@ -37,26 +47,47 @@ public sealed class SettingsAndBanScenarios(SharedApiFixture api)
     }
 
     [SkippableFact]
+    public async Task FileBan_ThroughTheCommandLine_ReportsASecondBanAsAlreadyBanned_WithCleanStdout()
+    {
+        var (services, _, storageType, found) = await ArrangeAsync();
+        using var servicesScope = services;
+        var original = await api.Api.GetSettingsAsync();
+        var storageName = storageType == TeensyStorageType.USB ? "usb" : "sd";
+        var args = new[] { "file", "ban", found.File.Path, "--device", api.OnlineDevices[0].DeviceId, "--storage", storageName, "--json" };
+
+        try
+        {
+            using var first = new CliHarness();
+            (await first.RunAsync(args)).Should().Be(0);
+            using var second = new CliHarness();
+            (await second.RunAsync(args)).Should().Be(0);
+
+            Ban(first).GetProperty("alreadyBanned").GetBoolean().Should().BeFalse();
+            Ban(second).GetProperty("alreadyBanned").GetBoolean().Should().BeTrue();
+            Ban(second).GetProperty("path").GetString().Should().Be(found.File.Path);
+        }
+        finally
+        {
+            await RestoreAsync(original);
+        }
+    }
+
+    private static JsonElement Ban(CliHarness cli)
+    {
+        using var document = JsonDocument.Parse(cli.Output);
+        return document.RootElement.EnumerateArray().Single().Clone();
+    }
+
+    [SkippableFact]
     public async Task BanFile_HidesTheFileFromItsDirectoryListing()
     {
-        Skip.If(api.OnlineDevices.Count == 0, "no TeensyROM is online in the test API");
-        var device = api.OnlineDevices[0];
-        var storageType = CliServices.AvailableStorageOrSkip(device);
-
-        using var cli = new CliServices();
-        cli.SelectDevice(device);
-        var storage = cli.Get<IStorageService>();
-        storage.SwitchStorage(storageType);
-
-        if (await FindDirectoryHoldingAFile(storage) is not { } found)
-        {
-            throw new SkipException($"no file within the first {MaxDirectoriesWalked} directories of {device.Name}'s storage");
-        }
+        var (cli, storage, storageType, found) = await ArrangeAsync();
+        using var _ = cli;
         var original = await api.Api.GetSettingsAsync();
 
         try
         {
-            await storage.BanFile(found.File);
+            await storage.BanFile(found.File.Path, storageType);
 
             var after = await storage.GetDirectory(found.Listing.Path);
 
@@ -67,6 +98,26 @@ public sealed class SettingsAndBanScenarios(SharedApiFixture api)
         {
             await RestoreAsync(original);
         }
+    }
+
+    /// <summary>Selects the first online device and finds a file on it that can be banned; skips when there is none.</summary>
+    private async Task<(CliServices Cli, IStorageService Storage, TeensyStorageType StorageType, FoundFile Found)> ArrangeAsync()
+    {
+        Skip.If(api.OnlineDevices.Count == 0, "no TeensyROM is online in the test API");
+        var device = api.OnlineDevices[0];
+        var storageType = CliServices.AvailableStorageOrSkip(device);
+
+        var cli = new CliServices();
+        cli.SelectDevice(device);
+        var storage = cli.Get<IStorageService>();
+        storage.SwitchStorage(storageType);
+
+        if (await FindDirectoryHoldingAFile(storage) is not { } found)
+        {
+            cli.Dispose();
+            throw new SkipException($"no file within the first {MaxDirectoriesWalked} directories of {device.Name}'s storage");
+        }
+        return (cli, storage, storageType, found);
     }
 
     /// <summary>

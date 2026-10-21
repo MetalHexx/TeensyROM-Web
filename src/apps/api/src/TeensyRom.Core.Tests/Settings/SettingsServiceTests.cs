@@ -368,6 +368,76 @@ public class SettingsServiceTests : IDisposable
 
     #endregion
 
+    #region UpdateSettings Tests
+
+    private static TeensySettings WithBannedFile(TeensySettings settings, string name) => settings with
+    {
+        SearchSettings = settings.SearchSettings with
+        {
+            BannedFiles = [.. settings.SearchSettings.BannedFiles, name]
+        }
+    };
+
+    [Fact]
+    public async Task UpdateSettings_ShouldKeepEveryOverlappingUpdate()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var names = Enumerable.Range(0, 40).Select(i => $"update-file-{i}.sid").ToList();
+
+        // Act
+        var saved = await Task.WhenAll(names.Select(name => Task.Run(() => service.UpdateSettings(latest => WithBannedFile(latest, name)))));
+
+        // Assert
+        saved.Should().OnlyContain(ok => ok);
+        service.GetSettings().SearchSettings.BannedFiles.Should().Contain(names);
+        new SettingsService(_mockLogger).GetSettings().SearchSettings.BannedFiles.Should().Contain(names);
+    }
+
+    [Fact]
+    public void UpdateSettings_ShouldPassTheLatestSettings_AndPersistAndEmitTheResult()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        service.SaveSettings(WithBannedFile(service.GetSettings(), "first.sid"));
+        TeensySettings? received = null;
+        TeensySettings? emitted = null;
+        service.Settings.Skip(1).Take(1).Subscribe(s => emitted = s);
+
+        // Act
+        var saved = service.UpdateSettings(latest =>
+        {
+            received = latest;
+            return WithBannedFile(latest, "second.sid");
+        });
+
+        // Assert
+        saved.Should().BeTrue();
+        received!.SearchSettings.BannedFiles.Should().Contain("first.sid").And.NotContain("second.sid");
+        emitted!.SearchSettings.BannedFiles.Should().Contain(["first.sid", "second.sid"]);
+        new SettingsService(_mockLogger).GetSettings().SearchSettings.BannedFiles.Should().Contain(["first.sid", "second.sid"]);
+    }
+
+    [Fact]
+    public void UpdateSettings_ShouldSaveNothing_WhenTheUpdateReturnsItsInput()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var emissions = 0;
+        service.Settings.Skip(1).Subscribe(_ => emissions++);
+        var writtenBefore = File.GetLastWriteTimeUtc(_settingsFilePath);
+
+        // Act
+        var saved = service.UpdateSettings(latest => latest);
+
+        // Assert
+        saved.Should().BeTrue();
+        emissions.Should().Be(0);
+        File.GetLastWriteTimeUtc(_settingsFilePath).Should().Be(writtenBefore);
+    }
+
+    #endregion
+
     #region Observable Behavior Tests
 
     [Fact]

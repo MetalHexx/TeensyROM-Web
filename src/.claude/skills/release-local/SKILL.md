@@ -133,7 +133,7 @@ publish/win-x64/
 ├── TeensyRom.Api.exe              ← The engine
 ├── ...
 └── cli/
-    ├── TeensyRom.Cli.exe          ← The CLI (plus its runtime, fonts and dependencies)
+    ├── trom.exe                   ← The CLI (plus its runtime, fonts and dependencies)
     └── ...
 ```
 
@@ -159,11 +159,11 @@ cd publish/win-x64
 ```powershell
 $env:TEENSYROM_DATA_DIR = Join-Path $env:TEMP 'teensyrom-pkg-test'
 cd publish/win-x64/cli
-.\TeensyRom.Cli.exe ports      # starts the packaged engine from ../TeensyRom.Api.exe
+.\trom.exe device list          # starts the packaged engine from ../TeensyRom.Api.exe
 curl http://localhost:10213/api/version
-.\TeensyRom.Cli.exe stop       # stops the engine it started
+.\trom.exe engine stop          # stops the engine it started
 ```
-The `ports` device prompt may fail in a non-interactive shell; what matters is that the engine answers `/api/version` and that `stop` brings it down. Always finish with `stop` so no engine is left running.
+The `device list` device prompt may fail in a non-interactive shell; what matters is that the engine answers `/api/version` and that `engine stop` brings it down. Always finish with `engine stop` so no engine is left running.
 
 **Common Issues:**
 - ❌ **Port 10213 already in use**: Kill existing process or change port in appsettings.json
@@ -179,7 +179,7 @@ The `ports` device prompt may fail in a non-interactive shell; what matters is t
 📍 **Full path to executable:**
 ```
 c:\dev\src\TeensyROM-Web\src\publish\win-x64\TeensyRom.Api.exe
-c:\dev\src\TeensyROM-Web\src\publish\win-x64\cli\TeensyRom.Cli.exe
+c:\dev\src\TeensyROM-Web\src\publish\win-x64\cli\trom.exe
 ```
 
 **Include:**
@@ -207,7 +207,7 @@ dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
   -o ./publish/osx-x64/cli
 
 # Make executable
-chmod +x ./publish/osx-x64/TeensyRom.Api ./publish/osx-x64/cli/TeensyRom.Cli
+chmod +x ./publish/osx-x64/TeensyRom.Api ./publish/osx-x64/cli/trom
 ```
 
 ### macOS ARM64 (Apple Silicon)
@@ -226,7 +226,7 @@ dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
   -c Release -r osx-arm64 --self-contained true \
   -o ./publish/osx-arm64/cli
 
-chmod +x ./publish/osx-arm64/TeensyRom.Api ./publish/osx-arm64/cli/TeensyRom.Cli
+chmod +x ./publish/osx-arm64/TeensyRom.Api ./publish/osx-arm64/cli/trom
 ```
 
 ### Linux x64
@@ -245,7 +245,7 @@ dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
   -c Release -r linux-x64 --self-contained true \
   -o ./publish/linux-x64/cli
 
-chmod +x ./publish/linux-x64/TeensyRom.Api ./publish/linux-x64/cli/TeensyRom.Cli
+chmod +x ./publish/linux-x64/TeensyRom.Api ./publish/linux-x64/cli/trom
 ```
 
 **Note**: Cross-platform builds work from any OS, but testing requires the target OS.

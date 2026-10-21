@@ -6,7 +6,10 @@ namespace TeensyRom.Cli.Api;
 /// <param name="message">Plain text for the console.</param>
 /// <param name="statusCode">The HTTP status when tr-web answered; null when it didn't (gone, timed out).</param>
 /// <param name="inner">The underlying failure.</param>
-internal sealed class TeensyApiException(string message, int? statusCode = null, Exception? inner = null) : Exception(message, inner)
+/// <param name="details">What the failed request knew, when there is more to say than the message.</param>
+internal sealed class TeensyApiException(string message, int? statusCode = null, Exception? inner = null, ErrorDetails? details = null) : Exception(message, inner)
 {
     public int? StatusCode { get; } = statusCode;
+
+    public ErrorDetails? Details { get; } = details;
 }

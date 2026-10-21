@@ -212,6 +212,17 @@ namespace TeensyRom.Core.Settings
             }
         }
 
+        public bool UpdateSettings(Func<TeensySettings, TeensySettings> update)
+        {
+            lock (_lock)
+            {
+                var latest = GetSettings();
+                var updated = update(latest);
+
+                return ReferenceEquals(updated, latest) || SaveSettings(updated);
+            }
+        }
+
         public static string GetFileNameSafeHash(string stringToHash)
         {
             using (var md5 = MD5.Create())

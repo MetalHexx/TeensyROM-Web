@@ -13,7 +13,7 @@ Reference for how TeensyROM Web is built, packaged, and released as a self-conta
 - Understanding the package layout (engine at the root, CLI in `cli/`) and where the apps keep their data
 - Understanding the single-executable design (bundled runtime, SPA routing, SignalR hubs, API routes all on one process/port)
 - Questions about the automated release workflow (`.github/workflows/release.yml`): jobs, version/tag requirements, troubleshooting failures
-- Questions about the Homebrew formula (`Formula/teensyrom-web.rb`) structure, dual-architecture support, its two commands (`teensyrom-web`, `TeensyRom.Cli`) and the conflict with the older CLI formula, or manual formula updates
+- Questions about the Homebrew formula (`Formula/teensyrom-web.rb`) structure, dual-architecture support, its two commands (`teensyrom-web`, `trom`) and the conflict with the older CLI formula, or manual formula updates
 - Questions about artifact details: executable/archive sizes per platform, archive contents, download URLs
 - Security considerations: code signing status, OS permission prompts (SmartScreen/Gatekeeper), serial port permissions, dependency vulnerability monitoring
 - General distribution FAQ (pre-releases, deleting a failed release, overriding version, ports, verbose logging)
@@ -30,7 +30,7 @@ Reference for how TeensyROM Web is built, packaged, and released as a self-conta
 
 **Home**: both apps keep state under `~/.teensyrom` (`api/` for the engine, `cli/` for the CLI); `TEENSYROM_DATA_DIR` moves the whole home. The engine copies the package's seed assets into the home on version change and writes nothing beside the program.
 
-**Homebrew**: the formula installs `teensyrom-web` and, when the package has `cli/`, `TeensyRom.Cli` (it conflicts with the older `metalhexx/teensyrom-cli/teensyrom-cli` formula). A package without `cli/` keeps the previous single-wrapper install.
+**Homebrew**: the formula installs `teensyrom-web` and, when the package has `cli/`, `trom` (it conflicts with the older `metalhexx/teensyrom-cli/teensyrom-cli` formula). A package without `cli/` keeps the previous single-wrapper install.
 
 **Release trigger**: pushing a git tag matching `v{major}.{minor}.{patch}[-{prerelease}]`; the tag version must match `<Version>` in `src/apps/Version.props` (shared by the engine and the CLI). Pre-release tags (e.g. `-alpha.1`) are marked as pre-releases on GitHub and **do** update the Homebrew formula (the `update-formula` job has no `if:`); every release produces all 4 platform artifacts.
 

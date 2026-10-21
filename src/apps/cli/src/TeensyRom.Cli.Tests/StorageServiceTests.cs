@@ -44,15 +44,6 @@ public class StorageServiceTests
         Path = path
     };
 
-    private static GetSettingsResponse ServerSettings(params string[] bannedFiles) => new()
-    {
-        KnownDevices = [new DeviceSettingsDto()],
-        PlayerSettings = new PlayerSettingsDto(),
-        FileTransferSettings = new FileTransferSettingsDto(),
-        SearchSettings = new SearchSettingsDto { BannedFiles = [.. bannedFiles], BannedDirectories = ["Docs"], SearchStopWords = ["the"] },
-        AppSettings = new AppSettingsDto()
-    };
-
     [Fact]
     public void StorageType_StartsAsTheSavedPreference()
     {
@@ -68,6 +59,18 @@ public class StorageServiceTests
 
         _sut.StorageType.Should().Be(TeensyStorageType.USB);
         _settings.Received(1).SaveSettings(Arg.Is<TeensySettings>(s => s.StorageType == TeensyStorageType.USB));
+    }
+
+    [Fact]
+    public async Task UseStorage_ChangesTheStorageForThisSession_WithoutSavingThePreference()
+    {
+        _sut.UseStorage(TeensyStorageType.USB);
+
+        _sut.StorageType.Should().Be(TeensyStorageType.USB);
+        _settings.DidNotReceiveWithAnyArgs().SaveSettings(default!);
+
+        await _sut.Index("/");
+        await _api.Received(1).IndexAsync(DeviceId, ApiStorageType.USB, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -104,6 +107,115 @@ public class StorageServiceTests
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
         failure.Message.Should().Be("The storage USB is not available.");
         failure.StatusCode.Should().Be(404);
+    }
+
+    private void DirectoryReads(params object[] outcomes)
+    {
+        var calls = 0;
+        _api.GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>()).Returns(_ =>
+            outcomes[Math.Min(calls++, outcomes.Length - 1)] switch
+            {
+                GetDirectoryResponse ok => Task.FromResult(ok),
+                var failure => Task.FromException<GetDirectoryResponse>((Exception)failure)
+            });
+    }
+
+    private static ApiException DirectoryNotFound() => ApiFailure(404, "\"The directory /music/H/ was not found.\"");
+
+    [Fact]
+    public async Task GetDirectory_RetriesA404_AndSucceedsOnTheThirdAttempt()
+    {
+        DirectoryReads(
+            DirectoryNotFound(),
+            DirectoryNotFound(),
+            new GetDirectoryResponse { StorageItem = new StorageCacheDto { Path = "/music/H/", Directories = [], Files = [File("/music/H/a.sid")] } });
+
+        var listing = await _sut.GetDirectory("/music/H/");
+
+        listing.Files.Should().ContainSingle();
+        await _api.Received(3).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetDirectory_WhenEveryAttemptIs404_FailsAfterThree_SayingMissingOrNotAnswering_WithDetails()
+    {
+        _devices.SelectedDevice.Returns(new DeviceSummary(DeviceId, "TR-1", true, "Ethernet 1.2.3.4", "Connected"));
+        DirectoryReads(DirectoryNotFound());
+
+        var act = () => _sut.GetDirectory("/music/H/");
+
+        var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
+        failure.StatusCode.Should().Be(404);
+        failure.Message.Should().Contain("/music/H/ was not found").And.Contain("TR-1 did not answer").And.Contain("3 attempts");
+        failure.Details.Should().NotBeNull();
+        failure.Details!.Path.Should().Be("/music/H/");
+        failure.Details.Device.Should().Be("TR-1");
+        failure.Details.Attempts.Should().Be(3);
+        failure.Details.PossibleCauses.Should().HaveCountGreaterThan(1);
+        await _api.Received(3).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetDirectory_DoesNotRetryAFailureThatIsNot404()
+    {
+        DirectoryReads(ApiFailure(500, "\"boom\""));
+
+        var act = () => _sut.GetDirectory("/music/H/");
+
+        await act.Should().ThrowAsync<TeensyApiException>();
+        await _api.Received(1).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/music/H/", Arg.Any<CancellationToken>());
+    }
+
+    private void ListDirectory(string path, params FileItemDto[] files) =>
+        _api.GetDirectoryAsync(DeviceId, ApiStorageType.SD, path, Arg.Any<CancellationToken>())
+            .Returns(new GetDirectoryResponse { StorageItem = new StorageCacheDto { Path = path, Directories = [], Files = [.. files] } });
+
+    [Fact]
+    public async Task GetFile_MatchesThePathExactly_NotAFileWhosePathMerelyContainsIt()
+    {
+        ListDirectory("/music/", File("/music/11.sid"), File("/music/1.sid"), File("/music/1.sid.bak", FileItemType.Unknown));
+
+        var file = await _sut.GetFile("/music/1.sid");
+
+        file.Should().NotBeNull();
+        file!.Path.Should().Be("/music/1.sid");
+    }
+
+    [Fact]
+    public async Task GetFile_WhenOnlyALongerPathContainsIt_FindsNothing()
+    {
+        ListDirectory("/music/", File("/music/11.sid"));
+
+        (await _sut.GetFile("/music/1.sid")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetFile_IgnoresCase_AsTheStorageDoes()
+    {
+        ListDirectory("/music/", File("/music/Commando.SID"));
+
+        var file = await _sut.GetFile("/music/commando.sid");
+
+        file.Should().NotBeNull();
+        file!.Path.Should().Be("/music/Commando.SID");
+    }
+
+    [Fact]
+    public async Task GetFile_OfAFileThatCantBeLaunched_FindsNothing()
+    {
+        ListDirectory("/docs/", File("/docs/notes.txt", FileItemType.Unknown));
+
+        (await _sut.GetFile("/docs/notes.txt")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetFile_ListsTheFilesParentDirectory()
+    {
+        ListDirectory("/");
+
+        await _sut.GetFile("/top.sid");
+
+        await _api.Received(1).GetDirectoryAsync(DeviceId, ApiStorageType.SD, "/", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -207,54 +319,50 @@ public class StorageServiceTests
     }
 
     [Fact]
-    public async Task BanFile_SavesEverySettingsSectionBackAsRead_WithTheNameAdded()
+    public async Task BanFile_AsksTrWebToBanThePathOnTheGivenStorage_AndReturnsItsAnswer()
     {
-        var current = ServerSettings("Old.sid");
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(current);
-        SaveSettingsRequest? saved = null;
-        _api.SaveSettingsAsync(Arg.Do<SaveSettingsRequest>(request => saved = request), Arg.Any<CancellationToken>())
-            .Returns(new SaveSettingsResponse());
+        _api.BanFileAsync(DeviceId, ApiStorageType.USB, "/music/Commando.sid", Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Commando.sid is now banned.", BannedFileName = "Commando.sid", AlreadyBanned = false });
 
-        await _sut.BanFile(Song("/music/Commando.sid"));
+        var result = await _sut.BanFile("/music/Commando.sid", TeensyStorageType.USB);
 
-        saved.Should().NotBeNull();
-        saved!.KnownDevices.Should().BeSameAs(current.KnownDevices);
-        saved.PlayerSettings.Should().BeSameAs(current.PlayerSettings);
-        saved.FileTransferSettings.Should().BeSameAs(current.FileTransferSettings);
-        saved.AppSettings.Should().BeSameAs(current.AppSettings);
-        saved.SearchSettings.Should().BeSameAs(current.SearchSettings);
-        saved.SearchSettings.BannedFiles.Should().Equal("Old.sid", "Commando.sid");
-        saved.SearchSettings.BannedDirectories.Should().Equal("Docs");
-        saved.SearchSettings.SearchStopWords.Should().Equal("the");
-        _alert.Received(1).Publish("Commando.sid has been banned and will no longer show up in the application.");
+        result.Should().Be(new BanResult("Commando.sid", false, "Commando.sid is now banned."));
+        _alert.Received(1).Publish("Commando.sid is now banned.");
     }
 
     [Fact]
-    public async Task BanFile_OfAnAlreadyBannedName_AddsItOnlyOnce()
+    public async Task BanFile_OfAnAlreadyBannedFile_ReportsItWasAlreadyBanned()
     {
-        var current = ServerSettings();
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(current);
-        var song = Song();
+        _api.BanFileAsync(DeviceId, ApiStorageType.SD, "/music/Commando.sid", Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Already banned.", BannedFileName = "Commando.sid", AlreadyBanned = true });
 
-        await _sut.BanFile(song);
-        await _sut.BanFile(song);
+        var result = await _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
 
-        current.SearchSettings.BannedFiles.Should().Equal("Commando.sid");
-        await _api.Received(1).SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
+        result.AlreadyBanned.Should().BeTrue();
     }
 
     [Fact]
-    public async Task BanFile_NeedsNoSelectedDevice()
+    public async Task BanFile_NeverReadsOrWritesTheSettingsDocument_NorListsADirectory()
+    {
+        _api.BanFileAsync(Arg.Any<string>(), Arg.Any<ApiStorageType>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new BanFileResponse { Message = "Banned.", BannedFileName = "Commando.sid" });
+
+        await _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
+
+        await _api.DidNotReceive().GetSettingsAsync(Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
+        await _api.DidNotReceive().GetDirectoryAsync(Arg.Any<string>(), Arg.Any<ApiStorageType>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BanFile_WithNoSelectedDevice_Throws()
     {
         _devices.RequireDeviceId().Returns(_ => throw new TeensyApiException("No TeensyROM is selected."));
-        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(ServerSettings());
 
-        await _sut.BanFile(Song());
+        var act = () => _sut.BanFile("/music/Commando.sid", TeensyStorageType.SD);
 
-        await _api.Received(1).SaveSettingsAsync(Arg.Any<SaveSettingsRequest>(), Arg.Any<CancellationToken>());
-        _devices.DidNotReceive().RequireDeviceId();
+        await act.Should().ThrowAsync<TeensyApiException>().WithMessage("No TeensyROM is selected.");
     }
-
     [Fact]
     public async Task GetDirectory_WithNoSelectedDevice_Throws()
     {

@@ -40,6 +40,15 @@ public class ApiErrorsTests
     }
 
     [Fact]
+    public async Task BadRequest_WithValidationErrors_ShowsTheirMessagesInsteadOfTheTitle()
+    {
+        var failure = await Failure(HttpStatusCode.BadRequest,
+            """{"title":"Validation Error","status":400,"errors":{"StartingPath":["Path must be a valid Unix path."],"Name":["Name must be 1 to 24 characters."]}}""");
+
+        failure.Message.Should().Be("Path must be a valid Unix path. Name must be 1 to 24 characters.");
+    }
+
+    [Fact]
     public async Task BadGateway_WithProblemDetails_ShowsTheTitle()
     {
         var failure = await Failure(HttpStatusCode.BadGateway, """{"title":"The TeensyROM did not answer.","status":502}""");

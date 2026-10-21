@@ -15,6 +15,7 @@
 
 import * as runtime from '../runtime';
 import type {
+  BanFileResponse,
   GetDirectoryResponse,
   IndexAllResponse,
   IndexResponse,
@@ -26,6 +27,8 @@ import type {
   TeensyStorageType,
 } from '../models/index';
 import {
+    BanFileResponseFromJSON,
+    BanFileResponseToJSON,
     GetDirectoryResponseFromJSON,
     GetDirectoryResponseToJSON,
     IndexAllResponseFromJSON,
@@ -45,6 +48,12 @@ import {
     TeensyStorageTypeFromJSON,
     TeensyStorageTypeToJSON,
 } from '../models/index';
+
+export interface BanFileRequest {
+    deviceId: string;
+    storageType: TeensyStorageType;
+    filePath: string;
+}
 
 export interface GetDirectoryRequest {
     deviceId: string;
@@ -88,6 +97,59 @@ export interface SearchRequest {
  * 
  */
 export class FilesApiService extends runtime.BaseAPI {
+
+    /**
+     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+     * Ban File
+     */
+    async banFileRaw(requestParameters: BanFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BanFileResponse>> {
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling banFile().'
+            );
+        }
+
+        if (requestParameters['storageType'] == null) {
+            throw new runtime.RequiredError(
+                'storageType',
+                'Required parameter "storageType" was null or undefined when calling banFile().'
+            );
+        }
+
+        if (requestParameters['filePath'] == null) {
+            throw new runtime.RequiredError(
+                'filePath',
+                'Required parameter "filePath" was null or undefined when calling banFile().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['filePath'] != null) {
+            queryParameters['FilePath'] = requestParameters['filePath'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/storage/{storageType}/ban`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BanFileResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+     * Ban File
+     */
+    async banFile(requestParameters: BanFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BanFileResponse> {
+        const response = await this.banFileRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.

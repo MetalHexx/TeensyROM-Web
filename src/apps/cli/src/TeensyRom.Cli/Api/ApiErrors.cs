@@ -15,6 +15,7 @@ internal static class ApiErrors
     {
         TeensyApiException known => known.Message,
         HttpRequestException => $"tr-web stopped answering at {EngineAddress.DisplayAddress} — start it and try again.",
+        ApiException { StatusCode: 400 } api when ValidationText(api.Response) is { } text => text,
         ApiException<ProblemDetails> { Result: { } problem } when FirstText(problem.Title, problem.Detail) is { } text => text,
         ApiException api => FromBody(api.Response) ?? $"tr-web couldn't complete that request (HTTP {api.StatusCode}).",
         _ => "tr-web couldn't complete that request."
@@ -55,6 +56,35 @@ internal static class ApiErrors
 
     private static string? FirstText(params string?[] candidates) =>
         candidates.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c));
+
+    // A 400 ProblemDetails from request validation carries the useful sentences in "errors", not in its title.
+    private static string? ValidationText(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("errors", out var errors)
+                || errors.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var messages = errors.EnumerateObject()
+                .SelectMany(field => field.Value.ValueKind == JsonValueKind.Array ? field.Value.EnumerateArray() : [])
+                .Where(message => message.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(message.GetString()))
+                .Select(message => message.GetString()!.Trim());
+
+            return FirstText(string.Join(" ", messages));
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     // tr-web answers with either a bare JSON string or a ProblemDetails object.
     private static string? FromBody(string? body)

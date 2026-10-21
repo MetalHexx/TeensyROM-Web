@@ -1,19 +1,23 @@
 using TeensyRom.Cli.Api;
+using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
+using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Helpers;
 
 namespace TeensyRom.Cli.Services;
 
 /// <summary>
-/// What a command that needs the engine does first: gets an engine running, then picks the TeensyROM to work with.
+/// What a menu entry that needs the engine does first: gets an engine running, then selects the TeensyROM to work
+/// with. The device is chosen by the same <see cref="IDeviceChooser"/> the one-shot commands use: the only online
+/// device is taken without asking, and the user is prompted only when several are online.
 /// </summary>
-internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
+internal sealed class StartupGate(IEngineControl engine, IDeviceService devices, IDeviceChooser chooser)
 {
     private bool _ready;
 
     /// <summary>
     /// Returns true once an engine is running and a device is selected; false after telling the user what to fix.
-    /// Once ready, later calls return true without checking again until <see cref="Reset"/>.
+    /// Once ready, later calls return true without checking again.
     /// </summary>
     public async Task<bool> EnsureReadyAsync(CancellationToken ct = default)
     {
@@ -31,45 +35,17 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices)
         return _ready;
     }
 
-    /// <summary>Forgets the engine and device check, so the next engine command makes it again; call after the engine was stopped.</summary>
-    public void Reset() => _ready = false;
-
     private async Task<bool> SelectDeviceAsync(CancellationToken ct)
     {
-        List<DeviceSummary> online;
-
         try
         {
-            online = (await devices.GetDevicesAsync(ct)).Where(d => d.IsOnline).ToList();
+            devices.Select(await chooser.ChooseAsync(null, DeviceScope.Online, ct));
+            return true;
         }
-        catch (TeensyApiException ex)
+        catch (Exception ex) when (ex is CliException or TeensyApiException)
         {
             RadHelper.WriteError(ex.Message);
             return false;
         }
-
-        if (online.Count == 0)
-        {
-            RadHelper.WriteError("No TeensyROM is online in tr-web — connect one in tr-web and try again.");
-            return false;
-        }
-
-        var labels = online.Select(Label).ToList();
-        string choice;
-
-        try
-        {
-            choice = PromptHelper.FilePrompt("TeensyROM", labels);
-        }
-        catch (NotSupportedException)
-        {
-            RadHelper.WriteError("Choosing a TeensyROM needs an interactive terminal.");
-            return false;
-        }
-
-        devices.Select(online[labels.IndexOf(choice)]);
-        return true;
     }
-
-    private static string Label(DeviceSummary device) => $"{device.Name} ({device.Connection})";
 }
