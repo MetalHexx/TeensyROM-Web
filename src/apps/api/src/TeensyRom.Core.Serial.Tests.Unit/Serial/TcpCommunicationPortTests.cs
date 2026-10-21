@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Tests.Unit;
@@ -522,6 +523,237 @@ public class TcpCommunicationPortTests : IDisposable
         finished.Should().BeTrue();
         clearing.ElapsedMilliseconds.Should().BeLessThan(250);
         buffer.Take(bytesRead).Should().Equal(fresh, "the stale text was discarded, the next reply is intact");
+    }
+
+    #endregion
+
+    #region Closed-peer and dead-link behavior
+
+    [Fact]
+    public async Task IsOpen_ShouldBeFalse_WhenThePeerClosedTheConnection()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Port.IsOpen.Should().BeTrue();
+
+        link.Server.Close();
+
+        await WaitUntilClosed(link.Port);
+    }
+
+    [Fact]
+    public async Task IsOpen_ShouldBeFalse_WhenThePeerResetTheConnection()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Client.LingerState = new LingerOption(true, 0);
+
+        link.Server.Close();
+
+        await WaitUntilClosed(link.Port);
+    }
+
+    [Fact]
+    public async Task IsOpen_ShouldStayTrue_WhileThePeerHoldsTheConnectionOpenAndSilent()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+
+        await Task.Delay(100);
+
+        link.Port.IsOpen.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task IsOpen_ShouldStayTrueAndKeepUnreadBytes_WhenDataIsWaiting()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        var sent = Encoding.ASCII.GetBytes("Busy!\n");
+        await link.Server.GetStream().WriteAsync(sent);
+        await link.Server.GetStream().FlushAsync();
+        link.Port.WaitForSerialData(sent.Length, 5000);
+
+        link.Port.IsOpen.Should().BeTrue();
+        link.Port.IsOpen.Should().BeTrue();
+
+        var buffer = new byte[16];
+        var bytesRead = link.Port.Read(buffer, 0, buffer.Length);
+        buffer.Take(bytesRead).Should().Equal(sent);
+    }
+
+    [Fact]
+    public async Task IsOpen_ShouldStayTrue_WhenThePeerSentDataThenClosed_UntilTheDataIsRead()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        await link.Server.GetStream().WriteAsync(new byte[] { 0x41 });
+        await link.Server.GetStream().FlushAsync();
+        link.Server.Close();
+        var arrival = Stopwatch.StartNew();
+        while (link.Client.Available == 0 && arrival.ElapsedMilliseconds < 5000) await Task.Delay(5);
+
+        link.Port.IsOpen.Should().BeTrue("the unread byte has not been delivered yet");
+    }
+
+    [Fact]
+    public async Task WaitForSerialData_ShouldThrowAtOnceAsADrop_WhenThePeerClosed()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Close();
+        await WaitUntilClosed(link.Port);
+
+        var clock = Stopwatch.StartNew();
+        var act = () => link.Port.WaitForSerialData(1, 5000);
+
+        var thrown = act.Should().Throw<IOException>().Which;
+        clock.ElapsedMilliseconds.Should().BeLessThan(1000);
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task WaitForSerialDataAsync_ShouldThrowAsADrop_WhenThePeerClosed()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Close();
+
+        var act = () => link.Port.WaitForSerialDataAsync(1, 5000, CancellationToken.None);
+
+        var thrown = (await act.Should().ThrowAsync<IOException>()).Which;
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Read_ShouldThrowAsADrop_WhenThePeerClosed()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Close();
+        await WaitUntilClosed(link.Port);
+
+        var act = () => link.Port.Read(new byte[4], 0, 4);
+
+        var thrown = act.Should().Throw<TeensyException>().Which;
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadAsync_ShouldThrowAsADrop_WhenThePeerClosed()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Close();
+
+        var act = () => link.Port.ReadAsync(new byte[4], 0, 4, CancellationToken.None);
+
+        var thrown = (await act.Should().ThrowAsync<TeensyException>()).Which;
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadSerialAsString_ShouldThrowAsADrop_WhenThePeerClosed()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Server.Close();
+        await WaitUntilClosed(link.Port);
+
+        var act = () => link.Port.ReadSerialAsString();
+
+        var thrown = act.Should().Throw<IOException>().Which;
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Read_ShouldThrowTimeoutNotADrop_WhenALiveSilentPeerDoesNotAnswer()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+
+        var act = () => link.Port.Read(new byte[4], 0, 4);
+
+        var thrown = act.Should().Throw<TimeoutException>().Which;
+        TransportDrop.IsDrop(thrown, link.Port).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BytesWritten_ShouldMoveOnWriteAndSendIntBytes_ButNotOnAWriteRefusedOnAClosedPort()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        link.Port.BytesWritten.Should().Be(0);
+
+        link.Port.Write(new byte[] { 1, 2, 3 }, 0, 3);
+        link.Port.BytesWritten.Should().Be(3);
+
+        link.Port.SendIntBytes(0x1234, 2);
+        link.Port.BytesWritten.Should().Be(5);
+
+        link.Port.ClosePort();
+        var refused = () => link.Port.Write(new byte[] { 1 }, 0, 1);
+
+        refused.Should().Throw<TeensyException>();
+        link.Port.BytesWritten.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task KeepAlive_ShouldBeOnForAnAdoptedConnection()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+
+        link.Client.Client.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive).Should().NotBe(0);
+    }
+
+    [Fact]
+    public async Task KeepAlive_ShouldBeOnAfterOpenPort()
+    {
+        using var listener = new TcpListenerScope();
+        using var port = new TcpCommunicationPort(_mockLogger);
+        port.SetPort($"127.0.0.1:{listener.Port}");
+
+        port.OpenPort(2000);
+        using var accepted = await listener.Accepted;
+
+        var client = (TcpClient)typeof(TcpCommunicationPort)
+            .GetField("_tcpClient", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(port)!;
+        client.Client.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive).Should().NotBe(0);
+    }
+
+    private static async Task WaitUntilClosed(TcpCommunicationPort port)
+    {
+        var waited = Stopwatch.StartNew();
+        while (port.IsOpen && waited.ElapsedMilliseconds < 2000) await Task.Delay(5);
+
+        port.IsOpen.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// A real loopback connection: <see cref="Port"/> adopts the client side, <see cref="Server"/> is the
+    /// unit's side the test closes, resets or writes through.
+    /// </summary>
+    private sealed class LoopbackLink : IDisposable
+    {
+        private readonly TcpListenerScope _listener;
+
+        private LoopbackLink(TcpListenerScope listener, TcpClient client, TcpClient server, TcpCommunicationPort port)
+        {
+            _listener = listener;
+            Client = client;
+            Server = server;
+            Port = port;
+        }
+
+        public TcpClient Client { get; }
+        public TcpClient Server { get; }
+        public TcpCommunicationPort Port { get; }
+
+        public static async Task<LoopbackLink> Open(ILoggingService log)
+        {
+            var listener = new TcpListenerScope();
+            var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+            var server = await listener.Accepted;
+            return new LoopbackLink(listener, client, server, new TcpCommunicationPort(log, client));
+        }
+
+        public void Dispose()
+        {
+            Port.Dispose();
+            Client.Dispose();
+            Server.Dispose();
+            _listener.Dispose();
+        }
     }
 
     /// <summary>

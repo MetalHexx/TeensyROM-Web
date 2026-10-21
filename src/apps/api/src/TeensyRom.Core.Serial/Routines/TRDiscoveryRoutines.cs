@@ -4,6 +4,7 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Core.Serial.Routines
 {
@@ -147,6 +148,10 @@ namespace TeensyRom.Core.Serial.Routines
                     port.WaitForSerialData(numBytes: 1, timeoutMs: idleTimeoutMs);
                 }
                 catch (TimeoutException)
+                {
+                    break;
+                }
+                catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
                 {
                     break;
                 }

@@ -18,8 +18,24 @@ namespace TeensyRom.Core.Serial
     private const int _readTimeoutMs = 500;
     private const int _writeTimeoutMs = 500;
 
+    /// <remarks>
+    /// Keep-alive probes are empty ACKs answered by the unit's network stack; they never reach the
+    /// firmware's service loop, so they cannot take its single client slot. The idle time sits above the
+    /// longest silence a healthy link has in normal use (a reset waits up to 45 s for the menu to boot,
+    /// <c>HandleAck</c> up to 20 s), so a stack that stops answering ACKs for a moment during the menu's
+    /// network set-up does not get a healthy link killed mid-reset. A dead idle link is marked dead within
+    /// ~75 s (60 s idle + 3 probes at 5 s).
+    /// </remarks>
+    private const int _keepAliveIdleSeconds = 60;
+    private const int _keepAliveIntervalSeconds = 5;
+    private const int _keepAliveProbeCount = 3;
+
+    private const string _closedByPeerMessage = "The TeensyROM closed the connection.";
+
     private readonly Queue<byte> _receiveBuffer = new();
     private readonly object _lockObject = new();
+    private long _bytesWritten;
+    private bool _keepAliveTimingFailureLogged;
 
     /// <summary>
     /// Creates a TcpObservablePort from an already-connected TcpClient.
@@ -31,7 +47,8 @@ namespace TeensyRom.Core.Serial
       _networkStream = connectedClient.GetStream();
       _networkStream.ReadTimeout = _readTimeoutMs;
       _networkStream.WriteTimeout = _writeTimeoutMs;
-      
+      ConfigureKeepAlive(connectedClient.Client);
+
       if (connectedClient.Client.RemoteEndPoint is System.Net.IPEndPoint remoteEp)
       { 
         var address = remoteEp.Address.IsIPv4MappedToIPv6 
@@ -43,7 +60,63 @@ namespace TeensyRom.Core.Serial
 
     public int BytesToRead => _receiveBuffer.Count + (_networkStream?.DataAvailable == true ? 1 : 0);
 
-    public bool IsOpen => _tcpClient?.Connected == true && _networkStream != null;
+    /// <summary>
+    /// True while the connection is up. A connection the unit closed or reset reads as closed: .NET's own
+    /// <see cref="TcpClient.Connected"/> only learns of that on the next I/O, so the socket is also polled
+    /// (a local, non-blocking check that sends and consumes nothing).
+    /// </summary>
+    public bool IsOpen => _tcpClient?.Connected == true && _networkStream != null && !PeerHasClosed();
+
+    public long? BytesWritten => _bytesWritten;
+
+    /// <summary>
+    /// True when the peer has closed or reset the connection and no unread data remains. A readable
+    /// socket with nothing available is an orderly close or a reset. A socket closed locally or disposed
+    /// reads as closed.
+    /// </summary>
+    private bool PeerHasClosed()
+    {
+      try
+      {
+        var socket = _tcpClient?.Client;
+        return socket == null || (socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0);
+      }
+      catch (SocketException)
+      {
+        return true;
+      }
+      catch (ObjectDisposedException)
+      {
+        return true;
+      }
+    }
+
+    private void ConfigureKeepAlive(Socket socket)
+    {
+      try
+      {
+        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+      }
+      catch (SocketException ex)
+      {
+        log.Internal($"TcpObservablePort: could not enable TCP keep-alive: {ex.Message}");
+        return;
+      }
+
+      try
+      {
+        socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, _keepAliveIdleSeconds);
+        socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, _keepAliveIntervalSeconds);
+        socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, _keepAliveProbeCount);
+      }
+      catch (Exception ex) when (ex is SocketException or PlatformNotSupportedException)
+      {
+        if (_keepAliveTimingFailureLogged) return;
+
+        _keepAliveTimingFailureLogged = true;
+        log.Internal($"TcpObservablePort: keep-alive timings not applied, using the OS defaults: {ex.Message}");
+      }
+    }
 
     public Unit SetPort(string endpoint)
     {
@@ -99,6 +172,7 @@ namespace TeensyRom.Core.Serial
         _networkStream = _tcpClient.GetStream();
         _networkStream.ReadTimeout = _readTimeoutMs;
         _networkStream.WriteTimeout = _writeTimeoutMs;
+        ConfigureKeepAlive(_tcpClient.Client);
         log.InternalSuccess($"TcpObservablePort.OpenPort: Successfully connected to {_endpoint}");
       }
       catch (OperationCanceledException)
@@ -123,7 +197,8 @@ namespace TeensyRom.Core.Serial
 
       try
       {
-        if (_tcpClient != null && _tcpClient.Connected)
+        // Release the client even when .NET already marked it not connected, or it leaks with its stream.
+        if (_tcpClient != null)
         {
           _networkStream?.Close();
           _networkStream?.Dispose();
@@ -190,6 +265,7 @@ namespace TeensyRom.Core.Serial
         _networkStream = _tcpClient!.GetStream();
         _networkStream!.ReadTimeout = _readTimeoutMs;
         _networkStream.WriteTimeout = _writeTimeoutMs;
+        ConfigureKeepAlive(_tcpClient.Client);
 
         log.InternalSuccess($"TcpObservablePort.TryConnect: Successfully connected to {_endpoint}");
         return true;
@@ -216,6 +292,9 @@ namespace TeensyRom.Core.Serial
     {
       if (!IsOpen || _networkStream == null)
         throw new TeensyException("Cannot write: TCP connection is not open");
+
+      // Counted before the write: a write that throws may still have put bytes on the wire.
+      _bytesWritten += count;
 
       try
       {
@@ -261,6 +340,7 @@ namespace TeensyRom.Core.Serial
         if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = _networkStream.Read(buffer, offset + bytesRead, count - bytesRead);
+          if (streamRead == 0 && bytesRead == 0) throw EndOfStream();
           bytesRead += streamRead;
         }
 
@@ -268,15 +348,24 @@ namespace TeensyRom.Core.Serial
       }
       catch (IOException ex)
       {
-        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
-        throw new TeensyException(errorMessage, ex);
+        throw ReadFailure(ex);
       }
       catch (SocketException ex)
       {
-        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
-        throw new TeensyException(errorMessage, ex);
+        throw ReadFailure(ex);
       }
     }
+
+    private static TeensyException EndOfStream() =>
+      new("TCP connection lost during read", new IOException(_closedByPeerMessage));
+
+    /// <summary>
+    /// The stream's read timeout is a slow device, not a lost link; every other I/O failure is a lost link.
+    /// </summary>
+    private static Exception ReadFailure(Exception ex) =>
+      ex is IOException { InnerException: SocketException { SocketErrorCode: SocketError.TimedOut } }
+        ? new TimeoutException("The TeensyROM did not answer in time.", ex)
+        : new TeensyException("TCP connection lost during read", ex);
 
     /// <summary>
     /// Async counterpart of <see cref="Read"/>. Drains the receive buffer first and, exactly like
@@ -305,6 +394,7 @@ namespace TeensyRom.Core.Serial
         if (bytesRead < count && (bytesRead == 0 || _networkStream.DataAvailable))
         {
           int streamRead = await _networkStream.ReadAsync(buffer.AsMemory(offset + bytesRead, count - bytesRead), ct);
+          if (streamRead == 0 && bytesRead == 0) throw EndOfStream();
           bytesRead += streamRead;
         }
 
@@ -312,34 +402,11 @@ namespace TeensyRom.Core.Serial
       }
       catch (IOException ex)
       {
-        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
-        throw new TeensyException(errorMessage, ex);
+        throw ReadFailure(ex);
       }
       catch (SocketException ex)
       {
-        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
-        throw new TeensyException(errorMessage, ex);
-      }
-    }
-
-    private string GetBufferContentsAsString(byte[] buffer, int offset, int count)
-    {
-      try
-      {
-        if (buffer != null && count > 0)
-        {
-          var actualBytes = Math.Min(count, buffer.Length - offset);
-          var bufferSegment = new byte[actualBytes];
-          Array.Copy(buffer, offset, bufferSegment, 0, actualBytes);
-          
-          var bufferString = Encoding.UTF8.GetString(bufferSegment);
-          return bufferString;
-        }
-        return "TCP connection error";
-      }
-      catch
-      {
-        return "TCP connection error - failed to read buffer";
+        throw ReadFailure(ex);
       }
     }
 
@@ -362,8 +429,14 @@ namespace TeensyRom.Core.Serial
     {
       Thread.Sleep(msToWait);
 
-      if (_networkStream == null || !IsOpen)
+      if (_networkStream == null)
         return string.Empty;
+
+      // A link the unit closed is a drop, not an empty reply: a ping must not read it as success.
+      bool nothingBuffered;
+      lock (_lockObject) nothingBuffered = _receiveBuffer.Count == 0;
+      if (nothingBuffered && PeerHasClosed())
+        throw new IOException(_closedByPeerMessage);
 
       // Read() handles both _receiveBuffer and network stream automatically
       var buffer = new byte[4096];
@@ -491,6 +564,10 @@ namespace TeensyRom.Core.Serial
           }
         }
 
+        // The peer is gone and what it sent is not enough: no more will come, so do not spin out the timeout.
+        if (_networkStream != null && PeerHasClosed())
+          throw new IOException(_closedByPeerMessage);
+
         Thread.Sleep(10);
       }
 
@@ -504,6 +581,7 @@ namespace TeensyRom.Core.Serial
     /// <paramref name="ct"/> surfaces as an <see cref="OperationCanceledException"/>.
     /// </summary>
     /// <exception cref="TimeoutException">Thrown if the timeout is reached before the specified number of bytes are available</exception>
+    /// <exception cref="IOException">Thrown at once if the peer closes the connection</exception>
     public async Task WaitForSerialDataAsync(int numBytes, int timeoutMs, CancellationToken ct)
     {
       lock (_lockObject)
@@ -532,9 +610,8 @@ namespace TeensyRom.Core.Serial
         {
           int bytesRead = await stream.ReadAsync(tempBuffer.AsMemory(0, tempBuffer.Length), cts.Token);
 
-          // A zero-length read means the peer closed the connection. The synchronous loop would spin
-          // out its timeout and throw, so report it the same way.
-          if (bytesRead == 0) throw new TimeoutException("Timed out waiting for data to be received");
+          // A zero-length read means the peer closed the connection.
+          if (bytesRead == 0) throw new IOException(_closedByPeerMessage);
 
           lock (_lockObject)
           {

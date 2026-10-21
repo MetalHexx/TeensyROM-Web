@@ -170,7 +170,18 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				return;
 			}
 
-			var received = ReadResetLines(port, string.Empty, owed, options.LaunchSettleMs, Stopwatch.StartNew());
+			string received;
+
+			try
+			{
+				received = ReadResetLines(port, string.Empty, owed, options.LaunchSettleMs, Stopwatch.StartNew());
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
+			{
+				log.Internal("LaunchFileHandler: the link dropped after the launch was accepted");
+				return;
+			}
+
 			var seen = CountResetLines(received);
 
 			if (seen < owed)
