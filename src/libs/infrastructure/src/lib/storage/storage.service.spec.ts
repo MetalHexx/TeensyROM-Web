@@ -1175,7 +1175,7 @@ describe('StorageService', () => {
       const problemDetailsError = (body: unknown): ResponseError =>
         new ResponseError(
           new Response(JSON.stringify(body), {
-            status: 404,
+            status: 502,
             headers: { 'content-type': 'application/problem+json' },
           }),
           'Response returned an error code'
@@ -1196,6 +1196,21 @@ describe('StorageService', () => {
         await expect(getDirectory()).rejects.toBe(error);
 
         expect(mockAlertService.error).toHaveBeenCalledWith('Directory /games does not exist');
+      });
+
+      it('should alert the bare JSON string message of a 404 response', async () => {
+        const error = new ResponseError(
+          new Response('"The directory /games was not found."', {
+            status: 404,
+            headers: { 'content-type': 'application/json; charset=utf-8' },
+          }),
+          'Response returned an error code'
+        );
+        mockFilesApiService.getDirectory.mockRejectedValue(error);
+
+        await expect(getDirectory()).rejects.toBe(error);
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('The directory /games was not found.');
       });
 
       it('should alert the ProblemDetails detail when the title is absent', async () => {

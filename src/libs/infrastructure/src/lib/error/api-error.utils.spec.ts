@@ -43,6 +43,28 @@ describe('extractProblemMessage', () => {
     await expect(extractProblemMessage(error)).resolves.toBeUndefined();
   });
 
+  it('resolves the message of a bare JSON string body, as the API sends for a 404', async () => {
+    const response = new Response('"The directory /games was not found."', {
+      status: 404,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    });
+    const error = new ResponseError(response, 'Response returned an error code');
+
+    await expect(extractProblemMessage(error)).resolves.toBe('The directory /games was not found.');
+  });
+
+  it('resolves undefined for a blank bare JSON string body', async () => {
+    const error = responseErrorWithBody('  \u0000 ');
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves undefined for a null JSON body', async () => {
+    const error = responseErrorWithBody(null);
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
   it('resolves undefined for a non-JSON response body', async () => {
     const response = new Response('not json', { headers: { 'content-type': 'text/plain' } });
     const error = new ResponseError(response, 'Boom');

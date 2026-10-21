@@ -1,9 +1,10 @@
 import { ResponseError, ProblemDetails } from '@teensyrom-nx/data-access/api-client';
 
 /**
- * The API's own message from a ProblemDetails response body: its title, else its detail. Undefined when the
- * error is not a ResponseError with a JSON / problem+json body, or the message is blank once NUL characters
- * and whitespace are trimmed.
+ * The API's own message from a JSON response body. The API answers 502 with a ProblemDetails object (its
+ * title, else its detail is used) and 404 with a bare JSON string (used as is). Undefined when the error is
+ * not a ResponseError with a JSON / problem+json body, or the message is blank once NUL characters and
+ * whitespace are trimmed.
  *
  * @param error - The error thrown by the API client
  * @returns The API's message, or undefined when it has none
@@ -27,8 +28,11 @@ export async function extractProblemMessage(error: unknown): Promise<string | un
       return undefined;
     }
 
-    const problemDetails = JSON.parse(bodyText) as ProblemDetails;
-    return firstNonBlank(problemDetails.title, problemDetails.detail);
+    const body = JSON.parse(bodyText) as ProblemDetails | string | null;
+    if (typeof body === 'string') {
+      return isNonBlank(body) ? body : undefined;
+    }
+    return body ? firstNonBlank(body.title, body.detail) : undefined;
   } catch {
     return undefined;
   }

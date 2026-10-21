@@ -629,7 +629,7 @@ describe('PlayerService', () => {
       const problemDetailsError = (body: unknown): ResponseError =>
         new ResponseError(
           new Response(JSON.stringify(body), {
-            status: 404,
+            status: 502,
             headers: { 'content-type': 'application/problem+json' },
           }),
           'Response returned an error code'
