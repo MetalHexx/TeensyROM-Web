@@ -127,6 +127,49 @@ public sealed class FilePathsCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Ban_Json_AFailedPath_EndsStderrWithTheJsonErrorObject_AndKeepsStdoutToTheResults()
+    {
+        _storage.BanFile("/music/gone.sid", Arg.Any<TeensyStorageType>()).Returns<BanResult>(_ => throw new TeensyApiException("No such file.", 404));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "ban", "/music/gone.sid", "/music/a.sid", "--json");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        var error = JsonDocument.Parse(host.Consoles.StdErr.TrimEnd().Split('\n')[^1]).RootElement.GetProperty("error");
+        error.GetProperty("code").GetString().Should().Be("notFound");
+        error.GetProperty("exitCode").GetInt32().Should().Be((int)CliExitCode.NotFound);
+        error.GetProperty("message").GetString().Should().Be("1 of 2 paths failed.");
+        Parse(host.Consoles.StdOut).GetArrayLength().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Ban_Json_AFailureOtherThanNotFound_ReportsItsOwnCodeInTheErrorObject()
+    {
+        _storage.BanFile("/music/bad.sid", Arg.Any<TeensyStorageType>()).Returns<BanResult>(_ => throw new TeensyApiException("The device is busy.", 500));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "ban", "/music/bad.sid", "--json");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        var error = JsonDocument.Parse(host.Consoles.StdErr.TrimEnd().Split('\n')[^1]).RootElement.GetProperty("error");
+        error.GetProperty("code").GetString().Should().Be("failed");
+        error.GetProperty("exitCode").GetInt32().Should().Be((int)CliExitCode.Failed);
+        error.GetProperty("message").GetString().Should().Be("1 of 1 paths failed.");
+    }
+
+    [Fact]
+    public async Task Ban_AFailedPath_WithoutJson_WritesOnlySentencesToStderr()
+    {
+        _storage.BanFile("/music/gone.sid", Arg.Any<TeensyStorageType>()).Returns<BanResult>(_ => throw new TeensyApiException("No such file.", 404));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "ban", "/music/gone.sid");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        host.Consoles.StdErr.Should().Contain("/music/gone.sid: No such file.").And.Contain("1 of 1 paths failed.").And.NotContain("{");
+    }
+
+    [Fact]
     public async Task Ban_AnyOtherFailure_WinsOverNotFound()
     {
         _storage.BanFile("/music/gone.sid", Arg.Any<TeensyStorageType>()).Returns<BanResult>(_ => throw new TeensyApiException("No such file.", 404));

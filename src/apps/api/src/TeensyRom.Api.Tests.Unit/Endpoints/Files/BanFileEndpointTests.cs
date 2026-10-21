@@ -22,12 +22,26 @@ public class BanFileEndpointTests
     {
         SearchSettings = new SearchSettings { BannedFiles = ["existing.sid"] }
     };
+    private TeensySettings _latest;
+    private int _saves;
 
     public BanFileEndpointTests()
     {
-        _settingsService.GetSettings().Returns(_settings);
-        _settingsService.SaveSettings(Arg.Any<TeensySettings>()).Returns(true);
+        _latest = _settings;
+        _settingsService.GetSettings().Returns(_ => _latest);
+        _settingsService.UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>()).Returns(call =>
+        {
+            var updated = call.Arg<Func<TeensySettings, TeensySettings>>()(_latest);
+
+            if (ReferenceEquals(updated, _latest)) return true;
+
+            _latest = updated;
+            _saves++;
+            return true;
+        });
     }
+
+    private void Update(Func<TeensySettings, TeensySettings> change) => _latest = change(_latest);
 
     private TeensyRomDevice NewDevice(bool sdAvailable = true)
     {
@@ -66,8 +80,8 @@ public class BanFileEndpointTests
         response.BannedFileName.Should().Be("Tune.sid");
         response.Message.Should().NotBeEmpty();
 
-        _settingsService.Received(1).SaveSettings(Arg.Is<TeensySettings>(s =>
-            s.SearchSettings.BannedFiles.SequenceEqual(new[] { "existing.sid", "Tune.sid" })));
+        _saves.Should().Be(1);
+        _latest.SearchSettings.BannedFiles.Should().Equal("existing.sid", "Tune.sid");
         _settings.SearchSettings.BannedFiles.Should().Equal("existing.sid");
     }
 
@@ -77,14 +91,51 @@ public class BanFileEndpointTests
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
         _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Name = "Tune.sid" });
-        TeensySettings? saved = null;
-        _settingsService.SaveSettings(Arg.Do<TeensySettings>(s => saved = s)).Returns(true);
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
-        saved.Should().NotBeNull();
-        BanMatcher.IsBannedFile(endpoint.Response!.BannedFileName, saved!.SearchSettings.BannedFiles).Should().BeTrue();
+        BanMatcher.IsBannedFile(endpoint.Response!.BannedFileName, _latest.SearchSettings.BannedFiles).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_BannedByAnotherRequestDuringTheFileLookup_AnswersAlreadyBannedAndAddsNothing()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(_ =>
+        {
+            Update(s => s with { SearchSettings = s.SearchSettings with { BannedFiles = [.. s.SearchSettings.BannedFiles, "Tune.sid"] } });
+            return new FileItem { Name = "Tune.sid" };
+        });
+        var endpoint = NewEndpoint();
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
+        endpoint.Response!.AlreadyBanned.Should().BeTrue();
+        endpoint.Response!.BannedFileName.Should().Be("Tune.sid");
+        _saves.Should().Be(0);
+        _latest.SearchSettings.BannedFiles.Should().Equal("existing.sid", "Tune.sid");
+    }
+
+    [Fact]
+    public async Task Handle_SettingsSavedDuringTheFileLookup_AreNotRevertedByTheBan()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(_ =>
+        {
+            Update(s => s with { AppSettings = s.AppSettings with { FirstTimeSetup = false } });
+            return new FileItem { Name = "Tune.sid" };
+        });
+        var endpoint = NewEndpoint();
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.Response!.AlreadyBanned.Should().BeFalse();
+        _latest.SearchSettings.BannedFiles.Should().Equal("existing.sid", "Tune.sid");
+        _latest.AppSettings.FirstTimeSetup.Should().BeFalse();
     }
 
     [Theory]
@@ -103,7 +154,7 @@ public class BanFileEndpointTests
         endpoint.Response!.AlreadyBanned.Should().BeTrue();
         endpoint.Response!.BannedFileName.Should().NotBeEmpty();
         endpoint.Response!.Message.Should().NotBeEmpty();
-        _settingsService.DidNotReceive().SaveSettings(Arg.Any<TeensySettings>());
+        _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
     }
 
     [Fact]
@@ -115,7 +166,7 @@ public class BanFileEndpointTests
         await endpoint.Handle(Request(deviceId: "UNKNOWN1"), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
-        _settingsService.DidNotReceive().SaveSettings(Arg.Any<TeensySettings>());
+        _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
     }
 
     [Fact]
@@ -128,7 +179,7 @@ public class BanFileEndpointTests
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
-        _settingsService.DidNotReceive().SaveSettings(Arg.Any<TeensySettings>());
+        _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
     }
 
     [Fact]
@@ -143,7 +194,7 @@ public class BanFileEndpointTests
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
         endpoint.GetResult<NotFound<string>>().Value.Should().NotBeEmpty();
-        _settingsService.DidNotReceive().SaveSettings(Arg.Any<TeensySettings>());
+        _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
     }
 
     [Fact]
@@ -152,7 +203,7 @@ public class BanFileEndpointTests
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
         _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Name = "Tune.sid" });
-        _settingsService.SaveSettings(Arg.Any<TeensySettings>()).Returns(false);
+        _settingsService.UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>()).Returns(false);
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);

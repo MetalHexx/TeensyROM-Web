@@ -77,15 +77,24 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
                 return;
             }
 
-            var updated = settings with
+            // The lookup above awaited, so the settings read before it may be stale: check and add against the latest
+            // settings, in one step, so overlapping bans and settings saves are never lost.
+            var added = false;
+            var saved = settingsService.UpdateSettings(latest =>
             {
-                SearchSettings = settings.SearchSettings with
-                {
-                    BannedFiles = [.. settings.SearchSettings.BannedFiles, file.Name]
-                }
-            };
+                if (BanMatcher.IsBannedFile(file.Name, latest.SearchSettings.BannedFiles)) return latest;
 
-            if (!settingsService.SaveSettings(updated))
+                added = true;
+                return latest with
+                {
+                    SearchSettings = latest.SearchSettings with
+                    {
+                        BannedFiles = [.. latest.SearchSettings.BannedFiles, file.Name]
+                    }
+                };
+            });
+
+            if (!saved)
             {
                 SendExternalError("Failed to save settings to disk. Please check file permissions and try again.");
                 return;
@@ -93,9 +102,9 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
 
             Response = new()
             {
-                Message = $"The file {file.Name} was banned.",
+                Message = added ? $"The file {file.Name} was banned." : $"The file {file.Name} is already banned.",
                 BannedFileName = file.Name,
-                AlreadyBanned = false
+                AlreadyBanned = !added
             };
             Send();
         }

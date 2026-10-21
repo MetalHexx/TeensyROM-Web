@@ -85,9 +85,13 @@ internal abstract class FilePathsCommand<TResult>(
         Show(results);
 
         var failed = results.Count(result => !result.Ok);
-        if (failed > 0) Output.Notice($"{failed} of {results.Count} paths failed.");
+        if (failed == 0) return 0;
 
-        return failed == 0 ? 0 : failedForOtherReasons ? (int)CliExitCode.Failed : (int)CliExitCode.NotFound;
+        // Nothing is thrown, so CliSession never reports this run: report it here so --json still ends stderr with the error object.
+        var code = failedForOtherReasons ? CliExitCode.Failed : CliExitCode.NotFound;
+
+        Output.Error(new CliException(code, $"{failed} of {results.Count} paths failed."));
+        return (int)code;
     }
 
     private void Show(IReadOnlyList<TResult> results)
