@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Wraps the CI unit-test Nx invocation with a wall-clock budget.
 //
-// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 220] -- <nx args...>
+// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 310] -- <nx args...>
 //
 // Clears .test-timings/, runs `pnpm exec nx <nx args...>`, measures the
 // wall-clock time of that run only (not this script's setup/teardown),
@@ -16,9 +16,15 @@ import path from 'node:path';
 // Two consecutive fresh (--skip-nx-cache) full-suite runs on the same
 // commit measured 182.8s and 132.9s wall-clock, a ~38% spread wide enough
 // for ordinary system jitter to flip the bar's pass/fail outcome at a flat
-// 180s. Per the runtime-budget resolution, the bar is reset to the worse
+// 180s. Per the runtime-budget resolution, the bar was reset to the worse
 // measured value (182.8s) plus 20% headroom, rounded up: 220s.
-export const DEFAULT_BUDGET_SECONDS = 220;
+//
+// A full-suite CI run has since landed anywhere from 148s to 257s, so the
+// 220s bar has failed fully green suites (nine budget-only failures at
+// 222-239s across the ASID-DJ-3/4/5 and CONNECTION-2/4 branches, then three
+// on ASID-DJ-7 at 229s, 253s and 257s). Same rule, re-applied to the worst
+// measured value (256.7s): plus 20% headroom is 308s, rounded up: 310s.
+export const DEFAULT_BUDGET_SECONDS = 310;
 export const TIMINGS_DIR = '.test-timings';
 
 /**
