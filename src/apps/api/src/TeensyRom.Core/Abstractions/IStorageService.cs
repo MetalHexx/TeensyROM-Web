@@ -13,9 +13,15 @@ namespace TeensyRom.Core.Abstractions
         public void ClearCache(DirectoryPath path);
         public Task<FileItem?> GetFile(FilePath filePath);
 
+        /// <summary>Looks a file up, telling a missing file apart from a failed read of its parent directory.</summary>
+        Task<FileLookupResult> LookupFile(FilePath filePath);
+
         /// <summary>Reads a file's raw bytes from this storage over the serial link. Never cached.</summary>
         Task<FileBytesResult> ReadFileBytes(FilePath filePath, CancellationToken ct);
         Task<IStorageCacheItem?> GetDirectory(DirectoryPath directoryPath);
+
+        /// <summary>Reads a directory, telling a missing directory apart from a failed read.</summary>
+        Task<DirectoryReadResult> ReadDirectory(DirectoryPath directoryPath);
         LaunchableItem? GetRandomFile(StorageScope scope, DirectoryPath scopePath, TeensyFilterType filterType);
         IEnumerable<LaunchableItem> Search(string searchText, TeensyFilterType filterType = TeensyFilterType.All);
         Task<LaunchableItem?> SaveFavorite(LaunchableItem launchItem, TeensyStorageType storageType, CancellationToken ct);

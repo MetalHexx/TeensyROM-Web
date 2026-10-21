@@ -56,7 +56,7 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
             var filePath = new FilePath(r.FilePath);
             var settings = settingsService.GetSettings();
 
-            // Banned files are hidden from storage lookups, so the ban list must be checked before GetFile.
+            // Banned files are hidden from storage lookups, so the ban list must be checked before LookupFile.
             if (BanMatcher.IsBannedFile(filePath.FileName, settings.SearchSettings.BannedFiles))
             {
                 Response = new()
@@ -69,7 +69,15 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
                 return;
             }
 
-            var file = await storage.GetFile(filePath);
+            var lookup = await storage.LookupFile(filePath);
+
+            if (lookup.Failure is not null)
+            {
+                SendExternalError(lookup.Failure);
+                return;
+            }
+
+            var file = lookup.File;
 
             if (file is null)
             {

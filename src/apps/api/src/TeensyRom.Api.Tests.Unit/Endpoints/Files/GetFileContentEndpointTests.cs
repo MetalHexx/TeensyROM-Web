@@ -64,7 +64,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Failure(FileBytesError.NotFound));
         var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
@@ -80,7 +80,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Failure(FileBytesError.Failed));
         var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
@@ -97,7 +97,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Size = GetFileContentEndpoint.MaxFileBytes + 1 });
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Size = GetFileContentEndpoint.MaxFileBytes + 1 }));
         var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
 
         await endpoint.Handle(Request(), CancellationToken.None);
@@ -111,7 +111,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         var bytes = new byte[] { 1, 2, 3 };
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
@@ -131,7 +131,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         var bytes = new byte[GetFileContentEndpoint.MaxFileBytes + 1];
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
@@ -147,7 +147,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Size = 3 });
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Size = 3 }));
         var bytes = new byte[] { 9, 8, 7 };
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
@@ -159,5 +159,20 @@ public class GetFileContentEndpointTests
             ReferenceEquals(r.Bytes, bytes) &&
             r.ContentType == MediaTypeNames.Application.Octet &&
             r.FileDownloadName == "tune.sid"));
+    }
+
+    [Fact]
+    public async Task Handle_FileLookupFailed_SendsBadGatewayWithTheFailureWithoutReadingFile()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("The link dropped."));
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
+        endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("The link dropped.");
+        await _sdStorage.DidNotReceive().ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>());
     }
 }

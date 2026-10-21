@@ -93,6 +93,7 @@ namespace TeensyRom.Core.Commands
                 {
                     result.IsSuccess = false;
                     result.Error = "No data was returned from the TR.";
+                    result.ErrorCode = GetDirectoryErrorCode.EmptyDirectory;
                 }
                 return result;
             }, ct);
