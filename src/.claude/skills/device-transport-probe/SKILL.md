@@ -28,6 +28,8 @@ npm install --prefix .claude/skills/device-transport-probe/tools serialport@13.0
 ```
 
 Node 20+. Scripts run from `.claude/skills/device-transport-probe/scripts/` (paths below are relative to it).
+`serialport` is loaded only when a script opens a COM port, so the TCP probes (`version.mjs <ip>`, etc.)
+work in a fresh worktree without this install.
 
 ## Firmware prerequisite
 
@@ -231,7 +233,110 @@ Firmware source: `C:\dev\src\TeensyROM-Fork` (`Source/Teensy/SerUSBIO.ino` comma
 | `serialport is not installed` | Run the Setup line in this worktree |
 | `Access denied` / `open failed` on a COM port | The API or another tool holds it |
 | TCP `connect timeout` / `ECONNREFUSED` | Another TCP client, the TR mid-boot, listener off, or wrong IP |
+| TCP connects at once but the reply is `0 bytes` | The unit's network stack is up but the firmware is not serving this client - it serves one at a time (`Teensy.ino`, `if(!tcpClient)`) and frees the slot only once it sees the old client disconnect (`ServiceTCP.ino`). Confirm from the host: `Get-NetTCPConnection -RemoteAddress <ip>` (PowerShell) shows the closed probe stuck in `FinWait2` - the unit acknowledged our close but the firmware never closed its end. Seen 2026-10-21 on TR-2 with no other client on this PC (CONNECTION-8). Reproduce and verify it in [Dead-link scenarios](#dead-link-scenarios) |
 | `no full-firmware Teensy port found` | Device in minimal (`reset.mjs serial`) or not on USB |
 | Preflight FAIL "no Boot: line" | Firmware without the boot-complete flag - flash the fork's `boot-complete-flag` branch (see "Firmware prerequisite") |
 | Preflight FAIL "Access denied" on a COM port while `--api-expected` | The API legitimately holds Serial as its live connection - expected, not a defect (see "Exclusive access") |
 | All hardware tests skipped on a transport | No device confirmed there at all - check the unit is actually reachable on that transport; `TEENSYROM_BENCH_TRANSPORT` alone no longer needs the listener off |
+
+## Dead-link scenarios
+
+Bench checks for the dead-link recovery behavior (CONNECTION-8 P01). Run them one at a time against the unit under test.
+
+- The operator performs and approves every unit action (reboot, unplug, network or internet change). Each scenario needs one, so the agent asks before each one and runs one action per turn.
+- Run the log tap for the whole session, because the engine's file log has no timestamps: `node .claude/skills/api-live-debug/scripts/logtap.mjs <out.log>` from `src/` (see the Log tap section of `api-live-debug`, including its `pnpm install` prerequisite). The tap stamps arrival time and batches lines, so read the order of lines, not the gaps between them.
+- Never run `TeensyRom.Api.Tests.Integration` during the bench. It boots its own API in-process and takes the TCP session and every COM port.
+- Pass `--device <name>` to every `trom` command. Without it an interactive picker waits for arrow keys.
+
+Log lines below are quoted from the code. `<...>` is filled in by the run, and `Tcp` and `Serial` are the transport names.
+
+### Reboot under an open TCP link, read first
+
+- **Operator:** reboot the unit with its cable in, then wait for the C64 menu to show. Do not connect a probe to the unit meanwhile; the engine holds the TCP session.
+- **Commands:** `trom file ls <dir> --device <name>`, where `<dir>` is a directory the engine has never listed. A cached directory is answered without touching the device.
+- **Expected:** the listing succeeds on the first command.
+- **Log lines:** one of two shapes, recorded as seen:
+  - a reconnect before the command: `Disconnecting from <endpoint>.`, then `TcpObservablePort.OpenPort: Connecting to <endpoint> (bounded, <N>ms)`, then `TcpObservablePort.OpenPort: Successfully connected to <endpoint>`, all before the read;
+  - a recovery and re-send: `CommunicationPortBehavior: link <reason> on Tcp: recovered in <N> ms; re-sending GetDirectoryRecursiveCommand once`, then `CommunicationPortBehavior: re-send of GetDirectoryRecursiveCommand succeeded`.
+
+### Reboot under an open TCP link, launch after keep-alive
+
+- **Operator:** reboot the unit with its cable in, then wait at least 90 s from the reboot (the menu boot plus about 75 s of keep-alive) before the launch.
+- **Commands:** `trom file launch /music/DEMOS/M-R/Melody.sid --device <name>`.
+- **Expected:** the launch succeeds with no visible failure.
+- **Log lines:** before the launch's own lines, `Disconnecting from <endpoint>.`, then `TcpObservablePort.OpenPort: Connecting to <endpoint> (bounded, <N>ms)`, then `TcpObservablePort.OpenPort: Successfully connected to <endpoint>`: the closed link is caught and reconnected before the command. No `DeviceRecovery:` line appears before the launch.
+- A launch sent sooner after the reboot may honestly fail with `The network connection to the TeensyROM dropped while this command was being sent. The connection is back, but the command may or may not have run.` The host cannot know the link is dead until keep-alive or a reply says so. If that happens, record the delay from reboot to launch and the result returned.
+
+### Drop mid-command
+
+- **Operator:** unplug the unit's network cable as the command is sent, then re-plug it a few seconds later, before the recovery `ceiling <N> ms` in the log has run out. Do the read first, then the launch, each with its own unplug.
+- **Commands:** `trom file ls <dir> --device <name>` (a directory the engine has never listed), then `trom file launch /music/DEMOS/M-R/Melody.sid --device <name>`.
+- **Expected:** the read is re-sent and succeeds. The launch fails with `The network connection to the TeensyROM dropped while this command was being sent. The connection is back, but the command may or may not have run.` whether the drop came before or after its ack. The launch is never re-sent.
+- **Log lines, read:** `CommunicationPortBehavior: link <Drop|SuspectLink> on Tcp: recovered in <N> ms; re-sending GetDirectoryRecursiveCommand once`, then `CommunicationPortBehavior: re-send of GetDirectoryRecursiveCommand succeeded`.
+- **Log lines, launch:** `CommunicationPortBehavior: not re-sending LaunchFileCommand: bytes already went out`. If the drop came after the ack, `DeviceRecovery: Recovery Drop on Tcp for <id>: ceiling <N> ms` appears instead, with no re-send line.
+
+### A slow boot is not mistaken for a stuck session
+
+- **Operator:** cut the internet upstream of the bench switch so the menu's time sync stalls. Reboot the unit with its cable in and wait a few seconds into the boot, before the menu shows. Restore the internet afterward.
+- **Commands:** `trom device ping --device <name>`, sent a few seconds after the reboot.
+- **Expected:** either the ping waits and then succeeds, or it fails with `Lost the network connection to the TeensyROM and could not get it back. Check that it is powered on and connected.` because the boot outlasted the recovery ceiling.
+- **Log lines:** no `DeviceRecovery: Recovery <reason> on Tcp for <id>: stuck TCP session - the unit accepts connections but never answers` line and no `DeviceConnectionManager: fell back to serial on <COM> after a stuck TCP session` line. A failure shows `DeviceRecovery: Recovery <reason> on Tcp for <id> failed after <N> ms (ceiling <N> ms)`.
+
+### Healthy link survives a slow menu boot
+
+- **Operator:** make the menu's boot slow while the unit stays reachable over TCP: turn NFC on with no reader attached, or cut the internet upstream of the bench switch as above. Undo it afterward.
+- **Commands:** time `trom device reset --device <name>` from send to reply; the reset returns once the menu's boot wait ends (`Boot: complete`, or the menu-boot ceiling). Then run `trom device ping --device <name>` as the next command.
+- **Expected:** the reset completes and the ping succeeds on the same connection. Record the reset time.
+- **Log lines:** between the reset and the ping there is no `Disconnecting from <endpoint>.` line, no `TcpObservablePort.OpenPort: Connecting to` line, and no `DeviceRecovery:` line. The keep-alive does not kill the link.
+
+### Stuck TCP session with USB attached
+
+- **Operator:** keep the USB cable in. Reproduce the stuck session through ASID use, or confirm it with `node scripts/version.mjs <ip>` returning 0 bytes and `Get-NetTCPConnection -RemoteAddress <ip>` showing `FinWait2`.
+- **Commands:** `trom file ls <dir> --device <name>` on an uncached directory.
+- **Expected:** the command fails with `The TeensyROM's network session was stuck, so it is now connected over USB instead. Try the command again.` `trom device list` then shows the unit on its COM port.
+- **Log lines:** `DeviceRecovery: Recovery <reason> on Tcp for <id>: stuck TCP session - the unit accepts connections but never answers`, then `DeviceConnectionManager: fell back to serial on <COM> after a stuck TCP session`.
+
+### The same stuck session with USB unplugged
+
+- **Operator:** reproduce the stuck session as above, then unplug the USB cable. Keep the network cable in.
+- **Commands:** `trom file ls <dir> --device <name>` on an uncached directory.
+- **Expected:** the command fails with `The TeensyROM's network session is stuck: it accepts a connection but does not answer. Restart the TeensyROM to clear it.` The response mentions neither serial nor USB. The operator then restarts the unit.
+- **Log lines:** the stuck-session `DeviceRecovery:` line above, and no `fell back to serial` line. The engine also logs the failed fall-back attempt, and that line does name serial: one of `DeviceConnectionManager: no serial connection known for <id>; not falling back` (a unit never seen on USB), `DeviceConnectionManager: serial fall-back for <id> found no answering port in <N> ms`, or `DeviceConnectionManager: serial fall-back miss for <id>: <message>`.
+
+### Failed directory read vs not found
+
+- **Operator:** for the failed read, unplug the network cable and leave it out for the read, then re-plug it. For the not-found read, the cable stays in.
+- **Commands:** `trom file ls <dir> --device <name>` on an uncached directory with the cable out, then `trom file ls /no/such/dir --device <name>` with it in.
+- **Expected:** the failed read answers 502 with `Lost the network connection to the TeensyROM and could not get it back. Check that it is powered on and connected.` The missing path answers 404 with `The directory /no/such/dir was not found.`
+- **Log lines:** the failed read logs `The directory <dir> could not be read: <failure>` and `DeviceRecovery: Recovery <reason> on Tcp for <id> failed after <N> ms (ceiling <N> ms)`. The not-found read logs neither line.
+
+## Healthy-link timing check
+
+Debugger detached; the log tap is optional. No unit action is needed. Use a good TCP link.
+
+1. Time 20 pings:
+   ```
+   for i in $(seq 20); do curl -s -o /dev/null -w "%{time_total}\n" http://localhost:10213/api/devices/<id>/ping; done
+   ```
+2. Time 5 SID launches:
+   ```
+   for i in $(seq 5); do curl -s -o /dev/null -w "%{time_total}\n" -X POST "http://localhost:10213/api/devices/<id>/storage/SD/launch?FilePath=/music/DEMOS/M-R/Melody.sid"; done
+   ```
+3. Run `node scripts/reset-launch.mjs --device <id> --rounds 10 --out reset-launch.txt` and compare it with the Expected results table above.
+
+- **Before:** the 2026-10-21 baselines are ping 44 ms engine-side (about 0.25 s end to end through curl) and SID launches 276-308 ms. To re-measure them, build base commit `001c5a4b` in a scratch worktree (`git worktree add <scratch> 001c5a4b`) and run the same steps against it, one engine at a time, since only one engine runs per `~/.teensyrom` home.
+- **After:** must match "before" within normal run-to-run variation.
+
+## Dead-link results
+
+| Scenario | Unit | Date | Result | Notes |
+|---|---|---|---|---|
+| Reboot under an open TCP link, read first | | | | |
+| Reboot under an open TCP link, launch after keep-alive | | | | |
+| Drop mid-command | | | | |
+| A slow boot is not mistaken for a stuck session | | | | |
+| Healthy link survives a slow menu boot | | | | |
+| Stuck TCP session with USB attached | | | | |
+| The same stuck session with USB unplugged | | | | |
+| Failed directory read vs not found | | | | |
+| Healthy-link timing check | | | | |
