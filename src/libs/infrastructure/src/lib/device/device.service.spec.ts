@@ -368,6 +368,55 @@ describe('DeviceService - Alert Integration', () => {
     });
   });
 
+  describe('API ProblemDetails alert messages', () => {
+    const problemDetailsError = (body: unknown): ResponseError =>
+      new ResponseError(
+        new Response(JSON.stringify(body), {
+          status: 404,
+          headers: { 'content-type': 'application/problem+json' },
+        }),
+        'Response returned an error code'
+      );
+
+    const findDevices = () =>
+      new Promise((resolve, reject) => {
+        service.findDevices().subscribe({ next: resolve, error: reject });
+      });
+
+    it('alerts the ProblemDetails title and rethrows the original error', async () => {
+      const error = problemDetailsError({ title: 'No devices were found' });
+      mockApiService.findDevices.mockRejectedValue(error);
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(findDevices()).rejects.toBe(error);
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('No devices were found');
+      logSpy.mockRestore();
+    });
+
+    it('alerts the ProblemDetails detail when the title is absent', async () => {
+      mockApiService.findDevices.mockRejectedValue(
+        problemDetailsError({ detail: 'Scan timed out' })
+      );
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(findDevices()).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('Scan timed out');
+      logSpy.mockRestore();
+    });
+
+    it('alerts the fixed message when the title is NUL-only', async () => {
+      mockApiService.findDevices.mockRejectedValue(problemDetailsError({ title: '\u0000 \u0000' }));
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await expect(findDevices()).rejects.toThrow();
+
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to find devices');
+      logSpy.mockRestore();
+    });
+  });
+
   describe('index status alerts', () => {
     describe('Single Device Scenarios', () => {
       it('should alert when SD storage index missing', async () => {

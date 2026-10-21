@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@angular/core';
-import { from, map, catchError, throwError, Observable } from 'rxjs';
+import { from, map, catchError, switchMap, throwError, Observable } from 'rxjs';
 import { PlayerApiService } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from '../domain.mapper';
 import {
@@ -14,6 +14,7 @@ import {
   IApiConfig,
 } from '@teensyrom-nx/domain';
 import { logError } from '@teensyrom-nx/utils';
+import { extractProblemMessage } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerService implements IPlayerService {
@@ -115,7 +116,11 @@ export class PlayerService implements IPlayerService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`PlayerService.${methodName} failed:`, error);
-    this.alertService.error(friendlyMessage);
-    return throwError(() => error);
+    return from(extractProblemMessage(error)).pipe(
+      switchMap((apiMessage) => {
+        this.alertService.error(apiMessage ?? friendlyMessage);
+        return throwError(() => error);
+      })
+    );
   }
 }
