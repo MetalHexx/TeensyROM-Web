@@ -815,10 +815,9 @@ TeensyRom.Api
 3. **Endpoint Validation**: RadEndpoints validates request models, returns 400 on failures
 4. **Device Recovery**: The gate (`CommunicationPortBehavior`) hands any transport drop to `DeviceRecovery`, which reacquires the device in place and updates its `DeviceConnectionRecord` (see *Connectivity Ring*)
 
-**Alert System**:
-- `IAlertService` publishes error messages to frontend via SignalR
-- Displayed as toast notifications in UI
-- Critical errors logged to console + queued channel logger
+**Error Logging**:
+- `ExceptionBehavior` writes every caught exception to `ILoggingService`, tagged with the request's device id (the generic catch includes the exception type and stack trace)
+- The failed result's error reaches the UI in the API response; logs reach it through `/logHub`
 
 ### Retries & Timeouts
 

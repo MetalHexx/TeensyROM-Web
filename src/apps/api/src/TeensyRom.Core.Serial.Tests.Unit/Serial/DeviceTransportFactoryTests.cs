@@ -12,12 +12,11 @@ namespace TeensyRom.Core.Serial.Tests.Unit;
 public class DeviceTransportFactoryTests
 {
     private readonly ILoggingService _mockLog = Substitute.For<ILoggingService>();
-    private readonly IAlertService _mockAlert = Substitute.For<IAlertService>();
     private readonly DeviceTransportFactory _factory;
 
     public DeviceTransportFactoryTests()
     {
-        _factory = new DeviceTransportFactory(_mockLog, _mockAlert);
+        _factory = new DeviceTransportFactory(_mockLog);
     }
 
     #region CreateSerial Tests

@@ -17,7 +17,6 @@ public class CartFinderTests
     private readonly ILoggingService _log;
     private readonly IStorageFactory _mockStorageFactory;
     private readonly IDeviceInterrogator _mockInterrogator;
-    private readonly IAlertService _mockAlert;
     private readonly IDeviceRecovery _mockRecovery;
     private readonly IDeviceSettingsProvider _mockSettingsProvider;
     private readonly ConnectionOptions _options = new();
@@ -29,7 +28,6 @@ public class CartFinderTests
         _log = Substitute.For<ILoggingService>();
         _mockStorageFactory = Substitute.For<IStorageFactory>();
         _mockInterrogator = Substitute.For<IDeviceInterrogator>();
-        _mockAlert = Substitute.For<IAlertService>();
         _mockRecovery = Substitute.For<IDeviceRecovery>();
         _mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
         _mockDiscoveryStrategies = [];
@@ -41,7 +39,6 @@ public class CartFinderTests
             _log,
             _mockStorageFactory,
             _mockInterrogator,
-            _mockAlert,
             _mockRecovery,
             _mockDiscoveryStrategies,
             _mockSettingsProvider,
@@ -164,7 +161,7 @@ public class CartFinderTests
         cart.UsbStorage.Available.Should().BeFalse();
         _mockInterrogator.DidNotReceive().ProbeStorage(Arg.Any<ICommunicationPort>(), Arg.Any<TeensyStorageType>());
         _mockSettingsProvider.DidNotReceive().GetOrCreateDeviceSettings(Arg.Any<string>());
-        _mockAlert.Received(1).Publish(Arg.Any<string>());
+        _log.Received().InternalError(Arg.Is<string>(m => m.Contains("firmware check failed")), Arg.Any<string?>());
     }
 
     [Fact]

@@ -71,7 +71,7 @@ Three strategies: **lazy** (cache miss → fetch → cache), **full indexing** (
 
 ### SignalR Hubs
 
-`/logHub` for real-time device logs, `/deviceEventHub` for device state changes. Backend pushes via `IAlertService` and `DeviceEventStream`.
+`/logHub` for real-time device logs, `/deviceEventHub` for device state changes. Backend pushes via `ILoggingService` and `DeviceEventStream`.
 
 ### Testing
 
