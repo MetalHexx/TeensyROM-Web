@@ -944,6 +944,104 @@ public class CommunicationPortBehaviorTests
         return new IOException("The TeensyROM closed the connection.");
     }
 
+    private static RecoveryOutcome Stuck() =>
+        new(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "stuck TCP session", StuckTcpSession: true);
+
+    private static (CommunicationPortBehavior<FakeCommand, TeensyCommandResult> Behavior, IDeviceConnectionManager Devices, TeensyRomDevice Device) BuildStuckGate(
+        StubCommunicationPort port, string deviceId, RecoveryReason reason, TeensyRomDevice? fallback)
+    {
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        devices.FallBackToSerialAsync(deviceId, Arg.Any<CancellationToken>()).Returns(fallback);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, reason, Arg.Any<CancellationToken>()).Returns(Stuck());
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery, new ConnectionOptions());
+        return (behavior, devices, device);
+    }
+
+    [Fact]
+    public async Task Handle_SendTimesOutAndRecoveryFindsTheSessionStuck_NoSerialFallback_FailsWithTheRestartMessage()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var (behavior, devices, _) = BuildStuckGate(port, deviceId, RecoveryReason.SuspectLink, fallback: null);
+        var invocations = 0;
+
+        Func<Task> act = () => behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        var thrown = (await act.Should().ThrowAsync<TeensyLinkException>()).Which;
+        thrown.Message.Should().Be(LinkMessages.StuckSession);
+        thrown.Message.Should().NotContainEquivalentOf("serial").And.NotContainEquivalentOf("USB");
+        invocations.Should().Be(1, "the command is never re-sent on a stuck session");
+        await devices.Received(1).FallBackToSerialAsync(deviceId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SendTimesOutAndRecoveryFindsTheSessionStuck_SerialFallbackSucceeds_FailsWithTheFellBackMessage()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var rebuilt = BuildDevice(new StubCommunicationPort(), deviceId);
+        var (behavior, _, _) = BuildStuckGate(port, deviceId, RecoveryReason.SuspectLink, fallback: rebuilt);
+        var invocations = 0;
+
+        Func<Task> act = () => behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.FellBackToSerial);
+        invocations.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_OpenFailsAndRecoveryFindsTheSessionStuck_NoSerialFallback_FailsWithTheRestartMessageWithoutRunningTheCommand()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort
+        {
+            IsOpen = false,
+            OpenPortAction = () => throw new InvalidOperationException("The port is closed.")
+        };
+        var (behavior, devices, _) = BuildStuckGate(port, deviceId, RecoveryReason.Drop, fallback: null);
+        var invocations = 0;
+
+        Func<Task> act = () => behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.StuckSession);
+        invocations.Should().Be(0);
+        await devices.Received(1).FallBackToSerialAsync(deviceId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_OpenFailsAndRecoveryFindsTheSessionStuck_SerialFallbackSucceeds_FailsWithTheFellBackMessage()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort
+        {
+            IsOpen = false,
+            OpenPortAction = () => throw new InvalidOperationException("The port is closed.")
+        };
+        var rebuilt = BuildDevice(new StubCommunicationPort(), deviceId);
+        var (behavior, _, _) = BuildStuckGate(port, deviceId, RecoveryReason.Drop, fallback: rebuilt);
+
+        Func<Task> act = () => behavior.Handle(new FakeCommand { DeviceId = deviceId, CommunicationPort = port },
+            () => Task.FromResult(new TeensyCommandResult()), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.FellBackToSerial);
+    }
+
     [Fact]
     public async Task Handle_ReadDropsMidExchangeAndBytesMoved_RecoversAndResendsOnce()
     {

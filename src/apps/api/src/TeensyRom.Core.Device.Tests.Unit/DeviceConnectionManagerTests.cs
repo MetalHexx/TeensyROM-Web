@@ -950,6 +950,98 @@ public class DeviceConnectionManagerTests
         manager.GetOfflineDevices().Should().BeEmpty();
     }
 
+    // --- FallBackToSerial ---
+
+    /// <summary>A TCP unit the manager knows, marked unreachable the way recovery does when it finds the session stuck.</summary>
+    private async Task<(DeviceConnectionManager Manager, TeensyRomDevice Device)> StuckTcpUnit(string chipId, string? knownSerialPort)
+    {
+        var tcpPort = CreatePort(ConnectionType.Tcp);
+        var device = CreateDevice(chipId, ConnectionType.Tcp, "10.0.0.9:80", tcpPort);
+
+        if (knownSerialPort is not null)
+        {
+            device.Connection.RememberEndpoint(ConnectionType.Serial, knownSerialPort);
+        }
+
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        device.MarkUnreachable();
+        _finder.ClearReceivedCalls();
+        return (manager, device);
+    }
+
+    [Fact]
+    public async Task FallBackToSerialAsync_UnitWithNoSerialPortOnRecordAndNoDescriptorCandidates_ReturnsNullWithoutTouchingAnyPort()
+    {
+        var (manager, _) = await StuckTcpUnit("tcponly1", knownSerialPort: null);
+        _locator.FindByChipId("tcponly1").Returns(new PortLookup([], true, null));
+
+        var fallback = await manager.FallBackToSerialAsync("tcponly1", CancellationToken.None);
+
+        fallback.Should().BeNull();
+        _transports.DidNotReceiveWithAnyArgs().CreateSerial(default!, default);
+        await _finder.DidNotReceive().FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
+        _log.DidNotReceive().InternalError(Arg.Any<string>(), Arg.Any<string?>());
+        manager.GetAvailableDevice("tcponly1").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FallBackToSerialAsync_UnitWithAPortOnRecordThatConfirms_AdoptsASerialDeviceThatStillHoldsTheTcpEndpoint()
+    {
+        var (manager, _) = await StuckTcpUnit("stuckrec", knownSerialPort: "COM5");
+        var lastSave = CaptureLastSave();
+        var serialPort = CreatePort(ConnectionType.Serial);
+        var serialDevice = CreateDevice("stuckrec", ConnectionType.Serial, "COM5", serialPort);
+        AllowSerialLookup("stuckrec", "COM5");
+        _transports.CreateSerial("COM5", true).Returns(serialPort);
+        _interrogator.ReadVersion(serialPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "stuckrec" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(serialDevice);
+
+        var fallback = await manager.FallBackToSerialAsync("stuckrec", CancellationToken.None);
+
+        fallback.Should().BeSameAs(serialDevice);
+        manager.GetAvailableDevice("stuckrec").Should().BeSameAs(serialDevice);
+        serialDevice.Connection.TransportInUse.Should().Be(ConnectionType.Serial);
+        serialDevice.Connection.TcpEndpoint.Should().Be("10.0.0.9:80");
+        lastSave().Should().ContainSingle(r => r.ChipId == "stuckrec" && r.SerialPortName == "COM5" && r.TcpEndpoint == "10.0.0.9:80");
+        await _finder.DidNotReceive().FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FallBackToSerialAsync_UnitWithNoPortOnRecordButADescriptorCandidate_ConfirmsOnTheCandidate()
+    {
+        var (manager, _) = await StuckTcpUnit("stuckdsc", knownSerialPort: null);
+        var serialPort = CreatePort(ConnectionType.Serial);
+        var serialDevice = CreateDevice("stuckdsc", ConnectionType.Serial, "COM9", serialPort);
+        AllowSerialLookup("stuckdsc", "COM9");
+        _transports.CreateSerial("COM9", true).Returns(serialPort);
+        _interrogator.ReadVersion(serialPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "stuckdsc" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(serialDevice);
+
+        var fallback = await manager.FallBackToSerialAsync("stuckdsc", CancellationToken.None);
+
+        fallback.Should().BeSameAs(serialDevice);
+        serialDevice.Connection.TcpEndpoint.Should().Be("10.0.0.9:80");
+    }
+
+    [Fact]
+    public async Task FallBackToSerialAsync_SerialConfirmMisses_ReturnsNullAndTheUnitStaysUnreachable()
+    {
+        var (manager, _) = await StuckTcpUnit("stuckmis", knownSerialPort: "COM5");
+        var serialPort = CreatePort(ConnectionType.Serial);
+        AllowSerialLookup("stuckmis", "COM5");
+        _transports.CreateSerial("COM5", true).Returns(serialPort);
+        _interrogator.ReadVersion(serialPort).Returns(VersionReply.Empty);
+
+        var fallback = await manager.FallBackToSerialAsync("stuckmis", CancellationToken.None);
+
+        fallback.Should().BeNull();
+        manager.GetAvailableDevice("stuckmis").Should().BeNull();
+        await _finder.DidNotReceive().FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
     // --- GetOfflineDevices ---
 
     [Fact]

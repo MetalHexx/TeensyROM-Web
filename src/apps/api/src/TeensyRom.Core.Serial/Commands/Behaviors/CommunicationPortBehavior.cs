@@ -83,6 +83,11 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					var transport = TransportOf(device, port);
 					var reopened = await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
 
+					if (reopened.StuckTcpSession)
+					{
+						throw await StuckSessionFailureAsync(device, cancellationToken);
+					}
+
 					if (!reopened.Reachable)
 					{
 						throw new TeensyLinkException(LinkMessages.LinkLost(transport));
@@ -171,6 +176,11 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 				{
 					var settled = await recovery.RecoverAsync(device!, RecoveryReason.Drop, cancellationToken);
 
+					if (settled.StuckTcpSession)
+					{
+						return await StuckSessionFailureAsync(device!, cancellationToken);
+					}
+
 					return new TeensyLinkException(settled.Reachable
 						? LinkMessages.OutcomeUnknown(transport)
 						: LinkMessages.LinkLost(transport));
@@ -208,6 +218,11 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					}
 
 					var outcome = await recovery.RecoverAsync(device!, reason, cancellationToken);
+
+					if (outcome.StuckTcpSession)
+					{
+						throw await StuckSessionFailureAsync(device!, cancellationToken);
+					}
 
 					if (!outcome.Reachable)
 					{
@@ -315,6 +330,19 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 		{
 			log.Internal("CommunicationPortBehavior: the gate's reset was the reset command's reset; not resetting again");
 			return new();
+		}
+
+		/// <summary>
+		/// Recovery found the unit's TCP session stuck: tries to rebuild it on its USB port and says which
+		/// happened. The command is not re-sent on the new device - its port is bound to the old one. Awaits
+		/// the manager's occasion queue while this device's lock is held; that cannot deadlock because nothing
+		/// in <c>TeensyRom.Core.Device</c> sends MediatR commands, so keep it that way.
+		/// </summary>
+		private async Task<TeensyLinkException> StuckSessionFailureAsync(TeensyRomDevice device, CancellationToken cancellationToken)
+		{
+			var fallback = await devices.FallBackToSerialAsync(device.DeviceId, cancellationToken);
+
+			return new TeensyLinkException(fallback is not null ? LinkMessages.FellBackToSerial : LinkMessages.StuckSession);
 		}
 
 		private static ConnectionType TransportOf(TeensyRomDevice device, ICommunicationPort port) =>

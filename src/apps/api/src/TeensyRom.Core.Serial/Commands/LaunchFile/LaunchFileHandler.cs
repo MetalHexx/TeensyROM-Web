@@ -99,6 +99,20 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			var transport = device.Connection.TransportInUse ?? r.CommunicationPort.GetConnectionType();
 			var settled = await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
 
+			if (settled.StuckTcpSession)
+			{
+				// Nothing in TeensyRom.Core.Device sends MediatR commands, so awaiting the manager's occasion queue
+				// while the gate holds this device's lock cannot deadlock.
+				var fallback = await devices.FallBackToSerialAsync(device.DeviceId, cancellationToken);
+
+				return new()
+				{
+					IsSuccess = false,
+					Error = fallback is not null ? LinkMessages.FellBackToSerial : LinkMessages.StuckSession,
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
+			}
+
 			return settled.Reachable
 				? new()
 				{

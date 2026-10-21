@@ -24,6 +24,19 @@ namespace TeensyRom.Core.Serial.Recovery
     {
         private const string _logClass = $"{nameof(DeviceRecovery)}:";
 
+        /// <summary>
+        /// Consecutive fresh TCP connects that succeed but draw no reply before a Drop or SuspectLink
+        /// recovery calls the unit's session stuck. Over TCP the full image answers only once its menu has
+        /// booted (see <see cref="LeaveMinimalCeilingMs"/>; its first accepted connection already reports
+        /// "Boot: complete"), so a connect that succeeds means its network loop is running and silence after
+        /// that means its single client slot is held by an old dead client. Two probes cost about 2 x 3 s,
+        /// well inside the ceiling the loop would otherwise burn. Not applied to LargeLaunch or LeaveMinimal,
+        /// where the unit is legitimately mid-reboot. The SuspectLink probe over the existing link is not a
+        /// fresh connect, and neither is the first reconnect that closes a link recovery had just been using:
+        /// the firmware frees its slot only once it sees that close, which can trail the new connect.
+        /// </summary>
+        private const int StuckSessionSilentConnects = 2;
+
         public async Task<RecoveryOutcome> RecoverAsync(TeensyRomDevice device, RecoveryReason reason, CancellationToken ct)
         {
             var port = device.CommunicationPort;
@@ -42,10 +55,15 @@ namespace TeensyRom.Core.Serial.Recovery
             var menuTokenSeen = false;
             var linkReplaced = false;
             var probeExistingLink = reason == RecoveryReason.SuspectLink && port.IsOpen;
+            var detectsStuckSession = transport == ConnectionType.Tcp && reason is RecoveryReason.Drop or RecoveryReason.SuspectLink;
+            var reacquired = false;
+            var silentConnects = 0;
 
             while (sw.Elapsed < ceiling)
             {
                 var needsReacquire = !port.IsOpen || !lastProbeAnswered;
+                var closedLiveLink = false;
+                var connected = false;
                 VersionReply? reply = null;
 
                 if (probeExistingLink)
@@ -75,7 +93,10 @@ namespace TeensyRom.Core.Serial.Recovery
 
                     if (transport == ConnectionType.Tcp)
                     {
+                        closedLiveLink = !reacquired && port.IsOpen;
+                        reacquired = true;
                         ReacquireTcp(device, port);
+                        connected = port.IsOpen;
                     }
                     else
                     {
@@ -123,6 +144,26 @@ namespace TeensyRom.Core.Serial.Recovery
                 else
                 {
                     lastProbeAnswered = false;
+                }
+
+                if (detectsStuckSession && needsReacquire)
+                {
+                    if (!connected || reply.IsTeensyRom)
+                    {
+                        silentConnects = 0;
+                    }
+                    else if (!closedLiveLink)
+                    {
+                        silentConnects++;
+                    }
+
+                    if (silentConnects >= StuckSessionSilentConnects)
+                    {
+                        Close(port);
+                        device.MarkUnreachable();
+                        log.InternalWarning($"{_logClass} Recovery {reason} on {transport} for {chipId}: stuck TCP session - the unit accepts connections but never answers");
+                        return new RecoveryOutcome(DeviceMode.Unreachable, sw.Elapsed, ceiling, "stuck TCP session", StuckTcpSession: true);
+                    }
                 }
 
                 await Task.Delay(options.PollIntervalMs, ct);

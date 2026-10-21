@@ -8,8 +8,11 @@ namespace TeensyRom.Core.Serial.Recovery
     /// when the device answered but never reached the expected mode, or came back full without the C64
     /// menu announcing itself - why the caller should treat this as a failure even though the device is
     /// reachable. <see cref="LinkReplaced"/> says whether the link was closed and reopened to get there.
+    /// <see cref="StuckTcpSession"/> marks an unreachable unit whose TCP connects succeeded but never
+    /// drew a reply: its single client slot is held by a dead client, and only a restart (or its serial
+    /// port) gets past that.
     /// </summary>
-    public sealed record RecoveryOutcome(DeviceMode Mode, TimeSpan Elapsed, TimeSpan Ceiling, string? Failure, bool LinkReplaced = false)
+    public sealed record RecoveryOutcome(DeviceMode Mode, TimeSpan Elapsed, TimeSpan Ceiling, string? Failure, bool LinkReplaced = false, bool StuckTcpSession = false)
     {
         public bool Reachable => Mode is not DeviceMode.Unreachable;
     }

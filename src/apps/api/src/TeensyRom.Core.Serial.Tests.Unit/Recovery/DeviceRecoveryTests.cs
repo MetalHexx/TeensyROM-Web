@@ -73,14 +73,86 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
             _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss);
             var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 15, toFullMs: 15), _log);
 
-            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, CancellationToken.None);
 
             outcome.Mode.Should().Be(DeviceMode.Unreachable);
             outcome.Reachable.Should().BeFalse();
+            outcome.StuckTcpSession.Should().BeFalse("a unit mid-reboot is legitimately silent");
             device.Connection.Mode.Should().Be(DeviceMode.Unreachable);
             device.Connection.TcpEndpoint.Should().Be("10.0.0.5:6464");
             port.IsOpen.Should().BeFalse();
             port.Disposed.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Tcp_Drop_TwoConnectsThatNeverAnswer_ReportsAStuckSessionWellBeforeTheCeiling()
+        {
+            var (device, port) = BuildDevice();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 60000, toFullMs: 60000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.StuckTcpSession.Should().BeTrue();
+            outcome.Mode.Should().Be(DeviceMode.Unreachable);
+            outcome.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30));
+            device.Connection.Mode.Should().Be(DeviceMode.Unreachable);
+            port.IsOpen.Should().BeFalse();
+            _interrogator.Received(2).ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Tcp_Drop_AReplyBetweenTwoSilentConnects_ResetsTheCount()
+        {
+            var (device, _) = BuildDevice();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss, WrongChip, Miss, Miss);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 60000, toFullMs: 60000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.StuckTcpSession.Should().BeTrue();
+            _interrogator.Received(4).ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Tcp_Drop_AFailedConnectBetweenTwoSilentConnects_ResetsTheCount()
+        {
+            var (device, port) = BuildDevice();
+            port.ThenSucceed().ThenTimeOut();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 60000, toFullMs: 60000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.StuckTcpSession.Should().BeTrue();
+            _interrogator.Received(3).ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Tcp_SuspectLink_ExistingLinkProbeAndTheFirstReconnectThatClosesIt_DoNotCount()
+        {
+            var (device, port) = BuildDevice();
+            port.OpenPort(connectTimeoutMs: 0);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 60000, toFullMs: 60000), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.SuspectLink, CancellationToken.None);
+
+            outcome.StuckTcpSession.Should().BeTrue();
+            _interrogator.Received(4).ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Tcp_LeaveMinimal_SilentConnects_NeverReportAStuckSession()
+        {
+            var (device, _) = BuildDevice();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(Miss);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toFullMs: 30, menuBootTimeoutMs: 30), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.Unreachable);
+            outcome.StuckTcpSession.Should().BeFalse();
         }
 
         [Fact]
