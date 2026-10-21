@@ -1,0 +1,77 @@
+:host {
+  display: block;
+  width: 100%;
+  --segment-height: 32px;
+  --segment-font: 0.75rem;
+}
+
+// `medium` is the default and matches the block above exactly. Font stepping mirrors
+// `lib-filter-mode-selector`'s own.
+:host([data-size='small']) {
+  --segment-height: 24px;
+  --segment-font: 0.7rem;
+}
+
+:host([data-size='large']) {
+  --segment-height: 36px;
+  --segment-font: var(--font-size-sm);
+}
+
+:host([data-size='extra-large']) {
+  --segment-height: 40px;
+  --segment-font: var(--font-size-md);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.segmented-control {
+  display: flex;
+  width: 100%;
+  height: var(--segment-height);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+// Equal cells sharing the row's width, divided by 1px rules.
+.segment {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  border-right: 1px solid var(--color-dimmed);
+  background: transparent;
+  color: var(--color-dimmed);
+  font-family: inherit;
+  font-size: var(--segment-font);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  cursor: pointer;
+
+  &:last-child {
+    border-right: none;
+  }
+
+  // The ring sits inside the cell: the group's own `overflow: hidden` would clip an outer one.
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// The selected cell, filled and bold — fill and weight both, so selection never rests on colour.
+.segment--selected {
+  background: var(--color-primary);
+  color: var(--color-dimmed-light);
+  font-weight: var(--font-weight-bold);
+}

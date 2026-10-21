@@ -1,0 +1,48 @@
+// Fills the caller's `position: relative` container without catching its pointer events; only the
+// overlay buttons themselves take them. The z-index has to beat the 1000 that
+// `lib-scaling-compact-card` and `lib-scaling-container` hold while animating, or the overlays sit
+// under every card; the caller isolates its container so this value stays local to it.
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.mapping-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--color-highlight);
+  border-radius: var(--border-radius-md);
+  background: color-mix(in srgb, var(--color-highlight) 14%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-highlight) 30%, transparent);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+
+  // Thick, solid and ringed: the state a thin dashed line cannot be mistaken for.
+  &[data-state='selected'] {
+    border: 2px solid var(--color-highlight);
+    background: color-mix(in srgb, var(--color-highlight) 34%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-highlight) 45%, transparent),
+      0 0 28px color-mix(in srgb, var(--color-highlight) 75%, transparent);
+  }
+
+  &[data-state='bound'] {
+    border: 1px solid var(--color-primary-bright);
+    background: color-mix(in srgb, var(--color-primary-bright) 22%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary-bright) 45%, transparent);
+  }
+
+  &:focus-visible {
+    // Plain white to stay visible on both the cyan and magenta fills; no token is pure white.
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}

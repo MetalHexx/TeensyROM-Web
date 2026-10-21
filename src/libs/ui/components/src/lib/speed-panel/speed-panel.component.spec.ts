@@ -117,4 +117,10 @@ describe('SpeedPanelComponent', () => {
       expect(emitted).toEqual([]);
     });
   });
+
+  it('marks the fader as the speed anchor', () => {
+    const anchor = fixture.nativeElement.querySelector('[data-control="speed"]');
+
+    expect(anchor?.tagName).toBe('LIB-CHANNEL-FADER');
+  });
 });

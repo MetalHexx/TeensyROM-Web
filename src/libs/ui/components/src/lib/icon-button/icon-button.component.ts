@@ -56,6 +56,11 @@ export class IconButtonComponent {
   icon = input<string>();
   /** Accessible label announced to assistive technology for this button. Always required, even for icon-only buttons. */
   ariaLabel = input.required<string>();
+  /**
+   * Exposes whether the thing this button discloses is open, as `aria-expanded` on the underlying
+   * button. Leave unset for a button that is not a disclosure toggle, and no attribute is rendered.
+   */
+  ariaExpanded = input<boolean | undefined>(undefined);
   /** Optional tooltip configuration shown when hovering or focusing the button. */
   tooltip = input<TooltipConfig | undefined>();
   /**

@@ -1045,6 +1045,88 @@
         }
       }
     },
+    "/api/midi-settings": {
+      "post": {
+        "tags": [
+          "MidiSettings"
+        ],
+        "summary": "Save MIDI Settings",
+        "description": "Saves the whole MIDI settings set: known controllers, control mappings and deck-to-cartridge bindings.\n\nThe set replaces the stored one and is persisted to midi-settings.json beside Settings.json.\n\n**Validation:**\n- At most 64 controllers, 1024 mappings and 2 deck bindings\n- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique\n- Each mapping source names a controller in the same request, and no two mappings share a source\n- Mapping owner is A, B or mixer; the control must be a known deck control (A, B) or crossfader (mixer)\n- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, and null otherwise\n- Deck slots are A or B, each bound at most once, to different devices\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "operationId": "SaveMidiSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMidiSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveMidiSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "MidiSettings"
+        ],
+        "summary": "Get MIDI Settings",
+        "description": "Retrieves the MIDI settings set: known controllers, control mappings and deck-to-cartridge bindings.\n\nThe set lives in midi-settings.json beside Settings.json and is cached in memory. When no file exists yet, all three lists are empty and no file is created.",
+        "operationId": "GetMidiSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMidiSettingsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{deviceId}/search": {
       "get": {
         "tags": [
@@ -1949,6 +2031,25 @@
           }
         }
       },
+      "DeckDeviceBindingDto": {
+        "required": [
+          "slot",
+          "deviceId",
+          "lastSeenName"
+        ],
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "lastSeenName": {
+            "type": "string"
+          }
+        }
+      },
       "DeviceSettingsDto": {
         "required": [
           "deviceId",
@@ -2268,6 +2369,34 @@
           }
         }
       },
+      "GetMidiSettingsResponse": {
+        "required": [
+          "controllers",
+          "mappings",
+          "deckBindings"
+        ],
+        "type": "object",
+        "properties": {
+          "controllers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnownMidiControllerDto"
+            }
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MidiControlMappingDto"
+            }
+          },
+          "deckBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckDeviceBindingDto"
+            }
+          }
+        }
+      },
       "GetSettingsResponse": {
         "required": [
           "knownDevices",
@@ -2388,6 +2517,29 @@
           }
         }
       },
+      "KnownMidiControllerDto": {
+        "required": [
+          "id",
+          "name",
+          "listening"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lastPortId": {
+            "type": "string",
+            "nullable": true
+          },
+          "listening": {
+            "type": "boolean"
+          }
+        }
+      },
       "LaunchFileResponse": {
         "required": [
           "message",
@@ -2446,6 +2598,74 @@
           "C64",
           "C128"
         ]
+      },
+      "MidiControlMappingDto": {
+        "required": [
+          "id",
+          "source",
+          "owner",
+          "control",
+          "style"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/MidiSourceDto"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "control": {
+            "type": "string"
+          },
+          "style": {
+            "$ref": "#/components/schemas/MidiMappingStyleDto"
+          }
+        }
+      },
+      "MidiMappingStyleDto": {
+        "required": [
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        }
+      },
+      "MidiSourceDto": {
+        "required": [
+          "controllerId",
+          "channel",
+          "kind",
+          "number"
+        ],
+        "type": "object",
+        "properties": {
+          "controllerId": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "NullableOfTeensyFilterType": {
         "enum": [
@@ -2607,6 +2827,45 @@
             "$ref": "#/components/schemas/FileItemDto"
           },
           "favoritePath": {
+            "type": "string"
+          }
+        }
+      },
+      "SaveMidiSettingsRequest": {
+        "required": [
+          "controllers",
+          "mappings",
+          "deckBindings"
+        ],
+        "type": "object",
+        "properties": {
+          "controllers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnownMidiControllerDto"
+            }
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MidiControlMappingDto"
+            }
+          },
+          "deckBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckDeviceBindingDto"
+            }
+          }
+        }
+      },
+      "SaveMidiSettingsResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
             "type": "string"
           }
         }
@@ -3216,6 +3475,9 @@
     },
     {
       "name": "Player"
+    },
+    {
+      "name": "MidiSettings"
     },
     {
       "name": "Files"

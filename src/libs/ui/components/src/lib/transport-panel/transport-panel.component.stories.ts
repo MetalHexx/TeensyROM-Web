@@ -142,3 +142,37 @@ export const MultipleSubtunes: Story = {
     frameLabel: 'frame 3000',
   },
 };
+
+/** A deck column narrowed to 510px, as the bindings panel leaves it: the transport row gives up
+ *  its single line and wraps — buttons, then the stepper, then the state LED, each pinned right
+ *  once it drops — without clipping. */
+export const NarrowDeckColumn: Story = {
+  render: (args) => ({
+    props: {
+      ...args,
+      model: {
+        ...baseModel(),
+        tuneSources: [],
+        transport: { state: 'playing', label: 'Playing' },
+        playPause: { showing: 'pause', disabled: false },
+        subtune: {
+          text: 'Subtune 1 of 3',
+          disabled: false,
+          previousAccessibleName: 'Previous subtune deck A',
+          nextAccessibleName: 'Next subtune deck A',
+        },
+      },
+      positionPercent: 34,
+      frameLabel: 'frame 1,843',
+    },
+    template: `
+      <div style="width: 510px">
+        <lib-transport-panel
+          [model]="model"
+          [positionPercent]="positionPercent"
+          [frameLabel]="frameLabel"
+        />
+      </div>
+    `,
+  }),
+};

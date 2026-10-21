@@ -20,6 +20,11 @@
     height: auto;
   }
 
+  // Its own line above the strips, as in the column form.
+  .bindings-row {
+    flex-basis: 100%;
+  }
+
   // Content-sized again in the row direction — the column form's grow-to-fill-leftover-height
   // behaviour (below) is a vertical mechanism that doesn't apply once `.mixer-body` turns sideways.
   .strips {
@@ -53,6 +58,13 @@
   // The single gap inside this card, in both forms — a column gap here, a row gap once
   // `band-form` turns `.mixer-body` sideways.
   gap: var(--spacing-md);
+}
+
+// The Bindings button sits centred above the strips, as the wireframe draws it.
+.bindings-row {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
 }
 
 // Each strip's channel fader is cut to `faderLength` in the column form rather than growing with

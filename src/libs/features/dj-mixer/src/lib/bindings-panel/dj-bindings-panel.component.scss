@@ -1,0 +1,81 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.bindings-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+// The learn prompt reads as the selected overlay does: a thick highlight frame, so the waiting
+// state is unmistakable at the top of the panel.
+.learn-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid var(--color-highlight);
+  border-radius: var(--border-radius-md);
+  background: color-mix(in srgb, var(--color-highlight) 18%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-highlight) 40%, transparent);
+}
+
+.learn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.learn-name {
+  color: var(--color-highlight);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.learn-hint {
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+}
+
+.group {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+}
+
+.group-title {
+  margin: 0 0 2px;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  line-height: 24px;
+}
+
+.group-empty {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  color: var(--color-dimmed-light);
+  font-size: var(--font-size-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,9 +1,14 @@
 <div class="dj-mixer-view">
-  <div class="mixer-grid" [class.mixer-grid--two]="decks.length === 2">
+  <div #mixerGrid class="mixer-grid" [class.mixer-grid--two]="decks.length === 2">
     @for (deck of decks; track deck.index) {
     <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
     }
-    <lib-dj-mixer-card [decks]="decks" [showCrossfader]="showCrossfader()"></lib-dj-mixer-card>
+    <lib-dj-mixer-card
+      [decks]="decks"
+      [showCrossfader]="showCrossfader()"
+      [bindingsOpen]="panelOpen()"
+      (bindingsToggle)="togglePanel()"
+    ></lib-dj-mixer-card>
     <div class="bottom-band">
       @if (enabledDevices().length === 0) {
 
@@ -42,5 +47,30 @@
 
       }
     </div>
+    @if (mappingMode()) {
+    <lib-mapping-overlay-layer
+      [targets]="overlayTargets()"
+      [scope]="mixerGrid"
+      (targetSelect)="onTargetSelect($event)"
+      (dismiss)="onOverlayDismiss()"
+    ></lib-mapping-overlay-layer>
+    }
   </div>
+  @if (panelEverOpened()) {
+  <lib-sliding-container
+    #panelSlot
+    class="panel-slot"
+    [class.panel-slot--open]="panelOpen()"
+    animationDirection="from-right"
+    containerWidth="22.5rem"
+    containerHeight="100%"
+    [animationTrigger]="panelOpen()"
+    [animationDuration]="panelAnimationDuration()"
+  >
+    <lib-dj-bindings-panel
+      [animationDuration]="panelAnimationDuration()"
+      (closePanel)="closePanel()"
+    ></lib-dj-bindings-panel>
+  </lib-sliding-container>
+  }
 </div>

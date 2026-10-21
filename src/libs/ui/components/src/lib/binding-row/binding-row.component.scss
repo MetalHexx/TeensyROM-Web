@@ -1,0 +1,174 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.binding-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+// A divider above every row but the first in whatever list holds them.
+:host(:not(:first-child)) .binding-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+// Expanded in place: the whole row takes a highlight frame and tint.
+.binding-row--expanded,
+:host(:not(:first-child)) .binding-row--expanded {
+  gap: 6px;
+  margin: 4px 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--border-radius-md);
+  background: color-mix(in srgb, var(--color-highlight) 8%, transparent);
+}
+
+.binding-line {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 24px;
+}
+
+.binding-name {
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.binding-chip {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+  line-height: 18px;
+}
+
+.binding-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.binding-source,
+.binding-status {
+  font-size: 0.75rem;
+  color: var(--color-dimmed-light);
+}
+
+// A binding that is not live dims its identity, while the reason stays at full strength.
+.binding-row--dimmed {
+  .binding-name,
+  .binding-chip,
+  .binding-source {
+    opacity: 0.6;
+  }
+}
+
+.binding-status {
+  font-style: italic;
+}
+
+.binding-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-label {
+  flex: 0 0 3.25rem;
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+// The label sits above its control, which takes the row's whole width: a side label would leave a
+// four-option segmented control too narrow to read its cells.
+.edit-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+
+  .edit-label {
+    flex: 0 0 auto;
+  }
+}
+
+.edit-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.edit-input {
+  height: 32px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  color: inherit;
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 1px;
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--color-error);
+  }
+}
+
+.edit-suffix {
+  flex: 0 0 auto;
+  color: var(--color-dimmed-light);
+  font-size: var(--font-size-sm);
+}
+
+.edit-actions {
+  justify-content: space-between;
+}
+
+.pill-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+}
+
+.pill-button--danger {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
