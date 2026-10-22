@@ -184,6 +184,8 @@ The formula is updated for **every** tag: the `update-formula` job has no `if:`,
 </PropertyGroup>
 ```
 
+The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `Version.props` (a CLI test fails on drift), and `tr-plugin-marketplace` mirrors it in its copy of `plugin.json` and in the `trom-agent` entry of `.claude-plugin/marketplace.json`.
+
 **Why no version override?**: The workflow does NOT use `-p:Version=` to override the version in `Version.props`. This ensures:
 - Version displayed in UI matches release tag
 - `/api/version` endpoint returns correct version
@@ -200,6 +202,8 @@ The formula is updated for **every** tag: the `update-formula` job has no `if:`,
 </PropertyGroup>
 ```
 
+**Plugin version** (same value): `"version": "1.2.0"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`; then in `tr-plugin-marketplace` update `plugins/trom-agent/claude/.claude-plugin/plugin.json` and the `trom-agent` entry in `.claude-plugin/marketplace.json`.
+
 **Verify frontend displays version**:
 - Version shown in header (from `/api/version` endpoint)
 - Open Scalar docs to verify version (`/scalar/v1`)
@@ -207,7 +211,7 @@ The formula is updated for **every** tag: the `update-formula` job has no `if:`,
 #### Step 2: Commit and Push
 
 ```bash
-git add src/apps/Version.props
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json
 git commit -m "chore: bump version to 1.2.0"
 git push origin main
 ```

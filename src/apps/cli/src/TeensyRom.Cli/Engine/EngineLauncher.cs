@@ -7,7 +7,10 @@ namespace TeensyRom.Cli.Engine;
 /// <summary>The OS side of starting an engine: building it from source and launching it detached.</summary>
 internal interface IEngineLauncher
 {
-    /// <summary>Builds the engine from source; the failure names the build log.</summary>
+    /// <summary>The build configuration a source engine is built and run in.</summary>
+    string Configuration { get; }
+
+    /// <summary>Builds the engine from source in <see cref="Configuration"/>; the failure names the build log.</summary>
     Task<EngineStep> BuildAsync(EngineLocation location, CancellationToken ct);
 
     /// <summary>Starts the engine detached from this process and returns without waiting for it to listen.</summary>
@@ -29,11 +32,13 @@ internal sealed class EngineLauncher : IEngineLauncher
 {
     private const string BuildTarget = "net9.0";
 
+    public string Configuration => EngineConfiguration.Current;
+
     public async Task<EngineStep> BuildAsync(EngineLocation location, CancellationToken ct)
     {
         var project = location.ApiProject ?? throw new InvalidOperationException("Only a source engine is built.");
 
-        string[] command = ["dotnet", "build", project, "-c", "Debug", "--nologo", "-v:minimal", "-nodeReuse:false"];
+        var command = BuildCommand(project, Configuration);
 
         try
         {
@@ -58,9 +63,12 @@ internal sealed class EngineLauncher : IEngineLauncher
         }
     }
 
+    internal static string[] BuildCommand(string project, string configuration) =>
+        ["dotnet", "build", project, "-c", configuration, "--nologo", "-v:minimal", "-nodeReuse:false"];
+
     public EngineStep Launch(EngineLocation location)
     {
-        var launch = Resolve(location);
+        var launch = Resolve(location, Configuration);
 
         if (launch is null) return EngineStep.Fail("no built engine was found");
 
@@ -128,15 +136,15 @@ internal sealed class EngineLauncher : IEngineLauncher
         return start;
     }
 
-    internal static EngineLaunch? Resolve(EngineLocation location) => location.Mode == EngineMode.Packaged
+    internal static EngineLaunch? Resolve(EngineLocation location, string configuration) => location.Mode == EngineMode.Packaged
         ? new EngineLaunch(Path.Combine(location.Folder, EngineLocator.ExecutableName), null, location.Folder, [])
-        : ResolveBuilt(Path.GetDirectoryName(location.ApiProject!)!);
+        : ResolveBuilt(Path.GetDirectoryName(location.ApiProject!)!, configuration);
 
-    // The newest build wins; it may sit in a runtime-identifier subfolder such as win-x64. The engine runs from the
+    // The newest build of the configuration wins; it may sit in a runtime-identifier subfolder such as win-x64. The engine runs from the
     // build folder, which has no wwwroot, so it is pointed at the API project's wwwroot to serve the built front end.
-    private static EngineLaunch? ResolveBuilt(string apiProjectFolder)
+    private static EngineLaunch? ResolveBuilt(string apiProjectFolder, string configuration)
     {
-        var binFolder = Path.Combine(apiProjectFolder, "bin", "Debug", BuildTarget);
+        var binFolder = Path.Combine(apiProjectFolder, "bin", configuration, BuildTarget);
 
         if (!Directory.Exists(binFolder)) return null;
 

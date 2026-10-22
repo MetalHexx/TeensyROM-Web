@@ -233,7 +233,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeTrue();
-        _world.Calls.Should().Equal("build", "launch", "record:head:before");
+        _world.Calls.Should().Equal("build", "launch", "record:head:before|Release");
         _world.Notices.Should().Equal("Starting the TeensyROM engine…", "Building the TeensyROM engine from source…");
         _world.CliLogsExistedAtBuild.Should().BeTrue();
     }
@@ -257,7 +257,7 @@ public class EngineControlTests
         _world.Location = Source;
         _world.Answer = OwnEngine;
         _world.Fingerprint = "head:same";
-        _world.RecordedFingerprint = "head:same";
+        _world.RecordedFingerprint = "head:same|Release";
 
         var ready = await _sut.EnsureRunningAsync(default);
 
@@ -279,7 +279,49 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Notices.First().Should().Be("The running TeensyROM engine is out of date with this source tree — restarting it.");
-        _world.Calls.Should().Equal("stop", "build", "launch", "record:head:now");
+        _world.Calls.Should().Equal("stop", "build", "launch", "record:head:now|Release");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_FromSource_ReplacesAnEngineThatWasBuiltInAnotherConfiguration_AndRecordsTheNewOne()
+    {
+        _world.Location = Source;
+        _world.Answer = OwnEngine;
+        _world.Fingerprint = "head:same";
+        _world.RecordedFingerprint = "head:same|Debug";
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Notices.First().Should().Be("The running TeensyROM engine is out of date with this source tree — restarting it.");
+        _world.Calls.Should().Equal("stop", "build", "launch", "record:head:same|Release");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_FromSource_ReplacesAnEngineRecordedBeforeConfigurationsWereStamped()
+    {
+        _world.Location = Source;
+        _world.Answer = OwnEngine;
+        _world.Fingerprint = "head:same";
+        _world.RecordedFingerprint = "head:same";
+
+        await _sut.EnsureRunningAsync(default);
+
+        _world.Calls.Should().Equal("stop", "build", "launch", "record:head:same|Release");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_FromSource_KeepsADebugEngineWhileDebugIsTheConfiguration()
+    {
+        _world.Location = Source;
+        _world.Answer = OwnEngine;
+        _world.Fingerprint = "head:same";
+        _world.Configuration = "Debug";
+        _world.RecordedFingerprint = "head:same|Debug";
+
+        await _sut.EnsureRunningAsync(default);
+
+        _world.Calls.Should().BeEmpty();
     }
 
     [Fact]
@@ -531,6 +573,7 @@ internal sealed class FakeEngineWorld : IEngineProbe, IEngineLock, IEngineLocato
     // Locating, building, launching.
     public EngineLocation? Location { get; set; } = new(EngineMode.Packaged, @"C:\apps\teensyrom");
     public string Searched { get; set; } = @"C:\apps\teensyrom";
+    public string Configuration { get; set; } = "Release";
     public EngineStep BuildResult { get; set; } = EngineStep.Success;
     public EngineStep LaunchResult { get; set; } = EngineStep.Success;
     public Action? OnBuild { get; set; }

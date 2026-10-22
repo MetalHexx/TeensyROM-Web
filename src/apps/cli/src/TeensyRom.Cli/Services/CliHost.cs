@@ -188,10 +188,11 @@ internal static class CliHost
         var apiClient = new TeensyRomApiClient(httpClient);
         var deviceService = new DeviceService(apiClient);
         var clock = new SystemEngineClock();
+        var locator = new EngineLocator(AppContext.BaseDirectory);
         var engine = new EngineControl(
             new EngineProbe(),
             new EngineLock(),
-            new EngineLocator(AppContext.BaseDirectory),
+            locator,
             new EngineLauncher(),
             new SourceFingerprint(),
             clock,
@@ -205,6 +206,7 @@ internal static class CliHost
         services.AddSingleton<IDeviceService>(deviceService);
         services.AddSingleton<IEngineControl>(engine);
         services.AddSingleton<IEngineClock>(clock);
+        services.AddSingleton<IEngineLocator>(locator);
         services.AddSingleton<IWebUiProbe>(new WebUiProbe());
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
@@ -228,7 +230,7 @@ internal static class CliHost
         RegisterCommands(services);
 
         return new CliComposition(services, gate, consoles, output, new TypeRegistrar(services),
-            new PathOffer(output, settingsService, new EngineLocator(AppContext.BaseDirectory), pathRegistrar));
+            new PathOffer(output, settingsService, locator, pathRegistrar));
     }
 
     /// <summary>

@@ -19,6 +19,7 @@ public sealed class InitCommandTests
     private const string CliVersion = "1.2.3";
 
     private readonly IWebUiProbe _webUi = Substitute.For<IWebUiProbe>();
+    private readonly IEngineLocator _locator = Substitute.For<IEngineLocator>();
 
     private TestHost NewHost(
         bool engineReady = true,
@@ -29,7 +30,9 @@ public sealed class InitCommandTests
         bool terminal = false,
         params DeviceSummary[] devices)
     {
-        var host = new TestHost(terminal, configure: services => services.AddSingleton(_webUi));
+        var host = new TestHost(terminal, configure: services => services.AddSingleton(_webUi).AddSingleton(_locator));
+
+        _locator.Locate().Returns(new EngineLookup(new EngineLocation(EngineMode.Packaged, @"C:pps	eensyrom"), @"C:pps	eensyrom"));
 
         host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(new EngineReady(engineReady, failure));
         host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(new EngineStatus(
@@ -129,6 +132,74 @@ public sealed class InitCommandTests
 
         exitCode.Should().Be(0);
         Parse(host).GetProperty("webUi").GetProperty("available").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Init_WhenASourceEngineHasNoBuiltFrontEnd_NamesTheMissingIndexAndTheFix()
+    {
+        var root = Directory.CreateTempSubdirectory("teensyrom-init").FullName;
+
+        try
+        {
+            var api = Path.Combine(root, "src", "apps", "api", "src", "TeensyRom.Api");
+            Directory.CreateDirectory(api);
+            using var host = NewHost(webUiServing: false, devices: Device());
+            _locator.Locate().Returns(new EngineLookup(new EngineLocation(EngineMode.Source, root, Path.Combine(api, "TeensyRom.Api.csproj")), root));
+
+            await host.RunAsync("init", "--json");
+
+            var problem = Problems(Parse(host)).Should().ContainSingle().Subject;
+            problem.Should().Contain(Path.Combine(api, "wwwroot")).And.Contain("no index.html")
+                .And.Contain("pnpm run build:frontend").And.Contain(Path.Combine(root, "src"))
+                .And.Contain("trom engine stop").And.Contain("trom init");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Init_WhenASourceEngineHasABuiltFrontEndButDoesNotServeIt_SaysToRestartTheEngine()
+    {
+        var root = Directory.CreateTempSubdirectory("teensyrom-init").FullName;
+
+        try
+        {
+            var api = Path.Combine(root, "src", "apps", "api", "src", "TeensyRom.Api");
+            Directory.CreateDirectory(Path.Combine(api, "wwwroot"));
+            File.WriteAllText(Path.Combine(api, "wwwroot", "index.html"), "<html></html>");
+            using var host = NewHost(webUiServing: false, devices: Device());
+            _locator.Locate().Returns(new EngineLookup(new EngineLocation(EngineMode.Source, root, Path.Combine(api, "TeensyRom.Api.csproj")), root));
+
+            await host.RunAsync("init", "--json");
+
+            Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("trom engine stop").And.NotContain("build:frontend");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Init_WhenAPackagedEngineDoesNotServeTheWebUi_PointsAtTheEngineLogs()
+    {
+        using var host = NewHost(webUiServing: false, devices: Device());
+
+        await host.RunAsync("init", "--json");
+
+        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("isn't serving the web UI").And.Contain("logs");
+    }
+
+    [Fact]
+    public async Task Init_WhenTheWebUiIsNotServed_CarriesTheProblemInTheHumanOutputToo()
+    {
+        using var host = NewHost(webUiServing: false, devices: Device());
+
+        await host.RunAsync("init");
+
+        host.Consoles.StdOut.Should().Contain("isn't serving the web UI");
     }
 
     [Fact]

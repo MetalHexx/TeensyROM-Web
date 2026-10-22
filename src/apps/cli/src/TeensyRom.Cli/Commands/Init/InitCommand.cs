@@ -3,6 +3,7 @@ using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Commands.Device;
+using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
@@ -36,7 +37,7 @@ internal sealed record InitReport(
 /// raised first: the report is written and only then does the command exit 3. It never resets, reconnects, indexes
 /// or changes settings.
 /// </summary>
-internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi)
+internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi, IEngineLocator locator)
     : TromCommand<InitSettings>(output)
 {
     private const string WebUiAddress = EngineAddress.BaseUrl + "/";
@@ -66,6 +67,8 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         }
 
         var webUiAvailable = status.Running && await webUi.IsServingAsync(ct);
+
+        if (status.Running && !webUiAvailable) problems.Add(WebUiProblem());
         var report = new InitReport(
             new InitTrom(status.CliVersion),
             new InitEngine(status.Running, status.Version, status.Matches, EngineAddress.BaseUrl),
@@ -95,6 +98,23 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         .. CliHost.PublicTree.SelectMany(noun => noun.Verbs.Select(verb => $"{noun.Name} {verb.Name}")),
         .. CliHost.PublicCommands.Select(command => command.Name)
     ];
+
+    /// <summary>Why a running engine isn't serving the web UI, and what to do about it.</summary>
+    private string WebUiProblem()
+    {
+        const string RestartAndCheck = "run `trom engine stop`, then `trom init`";
+
+        if (locator.Locate().Location is not { Mode: EngineMode.Source, ApiProject: { } apiProject } source)
+        {
+            return $"The engine is running but isn't serving the web UI at {WebUiAddress} — check its logs in {TeensyRomHome.EngineLogsPath}.";
+        }
+
+        var wwwroot = Path.Combine(Path.GetDirectoryName(apiProject)!, "wwwroot");
+
+        return System.IO.File.Exists(Path.Combine(wwwroot, "index.html"))
+            ? $"The engine is running but isn't serving the web UI at {WebUiAddress} although {wwwroot} holds a build — {RestartAndCheck} to restart it."
+            : $"The web UI isn't served because the front end isn't built: {wwwroot} has no index.html. Run `pnpm run build:frontend` from {Path.Combine(source.Folder, "src")}, then {RestartAndCheck}.";
+    }
 
     private async Task<IReadOnlyList<DeviceSummary>> FindDevicesAsync(List<string> problems, CancellationToken ct)
     {
