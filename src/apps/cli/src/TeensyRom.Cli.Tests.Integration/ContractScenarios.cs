@@ -59,6 +59,7 @@ public sealed class ContractScenarios(SharedApiFixture api)
         using var report = JsonDocument.Parse(cli.Output);
         var root = report.RootElement;
         root.GetProperty("engine").GetProperty("running").GetBoolean().Should().BeTrue();
+        root.GetProperty("webUi").GetProperty("available").ValueKind.Should().BeOneOf(JsonValueKind.True, JsonValueKind.False);
         root.GetProperty("problems").ValueKind.Should().Be(JsonValueKind.Array);
         root.GetProperty("commands").EnumerateArray().Select(command => command.GetProperty("name").GetString())
             .Should().Contain(["file", "init"]);

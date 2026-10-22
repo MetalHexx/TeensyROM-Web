@@ -61,10 +61,7 @@ internal sealed class FileSearchCommand(
         switch (Output.Mode)
         {
             case OutputMode.Json:
-                IReadOnlyList<object> json = settings.Full
-                    ? items.Select(file => (object)FileItemJson.Full(file, storage.StorageType)).ToList()
-                    : results;
-                Output.Json(json);
+                Output.Json(FileItemJson.Many(items, storage.StorageType, settings.Full));
                 break;
             case OutputMode.Plain:
                 Output.Lines(results.Select(file => file.Path));

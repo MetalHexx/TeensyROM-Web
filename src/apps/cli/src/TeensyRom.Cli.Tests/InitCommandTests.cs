@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Text.Json;
+using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Init;
 using TeensyRom.Cli.Engine;
@@ -148,12 +149,12 @@ public sealed class InitCommandTests
     {
         using var host = NewHost();
         host.Devices.FindAsync(false, Arg.Any<CancellationToken>())
-            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new ApiException("boom", 500, "", new Dictionary<string, IEnumerable<string>>(), null));
+            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", 503));
 
         var exitCode = await host.RunAsync("init", "--json");
 
         exitCode.Should().Be(0);
-        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("Couldn't list");
+        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("Couldn't list").And.Contain("busy listing devices");
     }
 
     [Fact]

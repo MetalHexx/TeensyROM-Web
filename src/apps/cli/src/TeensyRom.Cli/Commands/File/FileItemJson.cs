@@ -58,6 +58,12 @@ internal sealed record FileItemJson(
         return record;
     }
 
+    /// <summary>The files for a JSON list: each in its <see cref="Full"/> form when <paramref name="full"/>, otherwise compact.</summary>
+    public static IReadOnlyList<object> Many(IEnumerable<IFileItem> items, TeensyStorageType storage, bool full) =>
+        full
+            ? items.Select(item => (object)Full(item, storage)).ToList()
+            : items.Select(item => (object)From(item, storage)).ToList();
+
     /// <summary>The storage as the commands write and accept it: <c>sd</c> or <c>usb</c>.</summary>
     public static string StorageName(TeensyStorageType storage) => storage == TeensyStorageType.USB ? "usb" : "sd";
 

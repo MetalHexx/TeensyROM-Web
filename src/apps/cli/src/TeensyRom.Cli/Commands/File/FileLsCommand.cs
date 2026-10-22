@@ -50,14 +50,11 @@ internal sealed class FileLsCommand(
 
         var directories = listing.Directories.Select(directory => new DirectoryItemJson(directory.Name, directory.Path, storageName)).ToList();
         var files = listing.Files.Select(file => FileItemJson.From(file, storage.StorageType)).ToList();
-        IReadOnlyList<object> jsonFiles = settings.Full
-            ? listing.Files.Select(file => (object)FileItemJson.Full(file, storage.StorageType)).ToList()
-            : files;
 
         switch (Output.Mode)
         {
             case OutputMode.Json:
-                Output.Json(new FileListingJson(path, storageName, directories, jsonFiles));
+                Output.Json(new FileListingJson(path, storageName, directories, FileItemJson.Many(listing.Files, storage.StorageType, settings.Full)));
                 break;
             case OutputMode.Plain:
                 Output.Lines(directories.Select(directory => directory.Path.EnsureUnixPathEnding()).Concat(files.Select(file => file.Path)));

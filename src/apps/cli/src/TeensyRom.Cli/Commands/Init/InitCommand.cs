@@ -104,9 +104,9 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         {
             found = await devices.FindAsync(fullScan: false, ct);
         }
-        catch (Exception ex) when (ex is ApiException or HttpRequestException)
+        catch (TeensyApiException ex)
         {
-            problems.Add($"Couldn't list the TeensyROM devices: {ex.Message.Split('\n')[0].TrimEnd()}");
+            problems.Add($"Couldn't list the TeensyROM devices: {ex.Message}");
             return [];
         }
 
