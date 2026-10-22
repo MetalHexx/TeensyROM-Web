@@ -88,7 +88,6 @@ export class DjMixerViewComponent {
     letter: slot,
     index,
   }));
-  readonly showCrossfader = computed(() => this.decks.length >= 2);
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);

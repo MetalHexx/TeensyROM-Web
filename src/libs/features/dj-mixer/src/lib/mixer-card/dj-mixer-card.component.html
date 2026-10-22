@@ -9,46 +9,38 @@
         (buttonClick)="bindingsToggle.emit()"
       ></lib-icon-button>
     </div>
-    <div class="strips" [style.--strip-count]="decks().length">
-      @for (strip of strips(); track strip.deck.index; let first = $first) {
-      <lib-deck-strip
-        [attr.data-deck]="strip.deck.letter"
-        [model]="strip.model"
-        size="medium"
-        [faderLength]="faderLength()"
-        (knobChange)="onKnobChange(strip.deck.slot, $event)"
-        (faderChange)="onFaderChange(strip.deck.slot, $event)"
+    <div class="key-notation" role="group" aria-label="Key notation">
+      @for (option of keyFormatOptions; track option.format) {
+      <button
+        type="button"
+        class="key-notation-option"
+        [class.key-notation-option--engaged]="keyDisplayFormat() === option.format"
+        [attr.aria-pressed]="keyDisplayFormat() === option.format"
+        (click)="onKeyFormatSelect(option.format)"
       >
-        <div deckStripAfterKnobs class="key-notation-slot">
-          @if (first) {
-          <div class="key-notation" role="group" aria-label="Key notation">
-            @for (option of keyFormatOptions; track option.format) {
-            <button
-              type="button"
-              class="key-notation-option"
-              [class.key-notation-option--engaged]="keyDisplayFormat() === option.format"
-              [attr.aria-pressed]="keyDisplayFormat() === option.format"
-              (click)="onKeyFormatSelect(option.format)"
-            >
-              {{ option.label }}
-            </button>
-            }
-          </div>
-          }
-        </div>
-      </lib-deck-strip>
+        {{ option.label }}
+      </button>
       }
     </div>
-    @if (showCrossfader()) {
-    <lib-crossfader
-      data-control="crossfader"
-      [value]="crossfader()"
-      startLabel=""
-      endLabel=""
-      [accessibleName]="crossfaderName()"
-      [trackLength]="faderLength()"
-      (valueChange)="onCrossfaderChange($event)"
-    ></lib-crossfader>
-    }
+    <div class="key-knobs">
+      @for (key of keys(); track key.deck.index) {
+      <div [attr.data-deck]="key.deck.letter">
+        <lib-rotary-knob
+          data-control="key"
+          label="Key"
+          size="medium"
+          [accessibleName]="'Key deck ' + key.deck.letter"
+          [value]="key.value"
+          [min]="keyRange.min"
+          [max]="keyRange.max"
+          [step]="keyRange.step"
+          [home]="keyRange.home"
+          [readout]="key.readout"
+          [disabled]="key.disabled"
+          (valueChange)="onKeyChange(key.deck.slot, $event)"
+        ></lib-rotary-knob>
+      </div>
+      }
+    </div>
   </div>
 </lib-scaling-compact-card>

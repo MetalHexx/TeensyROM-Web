@@ -10,10 +10,10 @@ import { setDeckRepeat } from './set-deck-repeat';
 import { setBinding } from './set-binding';
 import { setMidi } from './set-midi';
 import { markSeen } from './mark-seen';
-import { setDeckMix } from './set-deck-mix';
-import { setCrossfader } from './set-crossfader';
+import { setVoiceStrip } from './set-voice-strip';
+import { setDeckPanel } from './set-deck-panel';
 import { setKeyDisplayFormat } from './set-key-display-format';
-import { resetDeckTuneShaping } from './reset-deck-tune-shaping';
+import { resetDeckPanel } from './reset-deck-panel';
 import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
@@ -32,10 +32,10 @@ export function withDjActions() {
       ...setBinding(writableStore),
       ...setMidi(writableStore),
       ...markSeen(writableStore),
-      ...setDeckMix(writableStore),
-      ...setCrossfader(writableStore),
+      ...setVoiceStrip(writableStore),
+      ...setDeckPanel(writableStore),
       ...setKeyDisplayFormat(writableStore),
-      ...resetDeckTuneShaping(writableStore),
+      ...resetDeckPanel(writableStore),
       ...setDeckEngineControls(writableStore),
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),

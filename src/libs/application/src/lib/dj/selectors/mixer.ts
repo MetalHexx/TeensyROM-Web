@@ -1,15 +1,15 @@
 import { computed } from '@angular/core';
-import { DeckMixState, DeckStatus, DjState, WritableStore } from '../dj-store';
+import { DeckPanelState, DeckStatus, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
 import { keyDisplayFor } from '../mixer/key-display';
 
 const SHAPEABLE_STATUSES: readonly DeckStatus[] = ['playing', 'paused', 'stopped'];
 
-/** A slot's raw mix state. The crossfader and key display format are read through the state
- *  signals `store.crossfader()` and `store.keyDisplayFormat()`. */
-export function deckMix(store: WritableStore<DjState>) {
+/** A slot's SID panel. The key display format is read through the state signal
+ *  `store.keyDisplayFormat()`. */
+export function deckPanel(store: WritableStore<DjState>) {
   return {
-    deckMix: (slot: Slot) => computed<DeckMixState>(() => store.mix()[slot]),
+    deckPanel: (slot: Slot) => computed<DeckPanelState>(() => store.panel()[slot]),
   };
 }
 
@@ -39,7 +39,7 @@ export function keyReadout(store: WritableStore<DjState>) {
   return {
     keyReadout: (slot: Slot) =>
       computed<string>(() => {
-        const { keySemitones } = store.mix()[slot];
+        const { keySemitones } = store.panel()[slot];
         const key = keyDisplayFor(
           store.decks()[slot].detectedKey,
           store.keyDisplayFormat(),

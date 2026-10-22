@@ -1,52 +1,5 @@
-@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
-
 :host {
   grid-area: mx;
-}
-
-// The horizontal band form: below tablet width, at either fixed deck. A shallow band is no
-// longer possible with a full deck strip per deck, so it wraps rather than clips if the strips
-// and the crossfader don't fit on one line.
-@mixin band-form {
-  .mixer-body {
-    flex-direction: row;
-    flex-wrap: wrap;
-    // Bottom-aligned so the crossfader — shorter than a deck strip — sits flush with the
-    // channel faders' bottom edge (each strip's own fader grows to fill its strip's leftover
-    // height, `deck-strip.component.scss`) instead of sitting centred against the strip's full
-    // height.
-    align-items: flex-end;
-    justify-content: flex-start;
-    height: auto;
-  }
-
-  // Its own line above the strips, as in the column form.
-  .bindings-row {
-    flex-basis: 100%;
-  }
-
-  // Content-sized again in the row direction — the column form's grow-to-fill-leftover-height
-  // behaviour (below) is a vertical mechanism that doesn't apply once `.mixer-body` turns sideways.
-  .strips {
-    flex: 0 1 auto;
-  }
-
-  // `lib-crossfader`'s own host is `width: 100%` for the column form, which would force it onto
-  // its own wrapped line here. The band form instead shares the row with `.strips`, letting the
-  // crossfader grow into whatever horizontal room is left (`width: auto`, `flex: 1 1 0`) instead
-  // of filling — or being capped below — the full row. Reaches into the child's host element the
-  // same way the POC's `mixer-column.component.scss` already does; bottom-alignment comes for
-  // free from `.mixer-body`'s own `align-items: flex-end` above.
-  lib-crossfader {
-    width: auto;
-    flex: 1 1 0;
-  }
-}
-
-:host {
-  @include styles.below-tablet {
-    @include band-form;
-  }
 }
 
 .mixer-body {
@@ -55,63 +8,30 @@
   flex: 1 1 auto;
   min-height: 0;
   justify-content: flex-start;
-  // The single gap inside this card, in both forms — a column gap here, a row gap once
-  // `band-form` turns `.mixer-body` sideways.
   gap: var(--spacing-md);
 }
 
-// The Bindings button sits centred above the strips, as the wireframe draws it.
+// The Bindings button sits centred above the controls, as the wireframe draws it.
 .bindings-row {
   display: flex;
   flex: 0 0 auto;
   justify-content: center;
 }
 
-// Each strip's channel fader is cut to `faderLength` in the column form rather than growing with
-// it, so a strip's own natural content height no longer reaches `.mixer-body`'s full height by
-// itself. `flex: 1 1 auto` lets `.strips` claim whatever height `.mixer-body` has left beyond the
-// crossfader below it; each `lib-deck-strip` then stretches to match (the default cross-axis
-// `align-items: stretch` this row never overrides), and its own `.deck-strip-fader`'s
-// `margin-top: auto` (`deck-strip.component.scss`) pushes the fader into that newly-available
-// height, flush with the strip's — and so the crossfader's — bottom edge, with the leftover space
-// left above the fader instead of below the crossfader. Reset to content-sized in the band form
-// (below), a horizontal layout this vertical mechanism doesn't apply to.
-.strips {
+.key-knobs {
   display: flex;
-  flex: 1 1 auto;
-  justify-content: center;
-  // Two medium strips plus this gap have to fit the card's own content width — the same 148px the
-  // crossfader's track is cut to at desktop. Shared with the key switch's span below.
-  --strips-gap: var(--spacing-md);
-  gap: var(--strips-gap);
-}
-
-// Every strip reserves this row between its Key knob and its fader, so the two strips' controls
-// stay level; only the first strip's row holds the switch.
-.key-notation-slot {
-  position: relative;
   flex: 0 0 auto;
-  width: 100%;
-  height: 24px;
-  margin-top: auto;
+  justify-content: center;
+  gap: var(--spacing-md);
 }
 
-// The one Camelot / Note switch, styled like `lib-filter-mode-selector`'s medium option cells. It
-// lives in the first strip's row but is drawn across every strip: as wide as `--strip-count` strips
-// and their gaps (the strips share the width equally), centred on that span, never narrower than
-// its own labels. Out of flow, so it adds nothing to the strips' width. The z-index keeps the
-// later strips' own slots, which it overlaps, from covering the half drawn over them.
+// The one Camelot / Note switch, styled like `lib-filter-mode-selector`'s medium option cells.
 .key-notation {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  left: calc(var(--strip-count) * 50% + (var(--strip-count) - 1) * var(--strips-gap) / 2);
   display: flex;
+  align-self: center;
+  flex: 0 0 auto;
   box-sizing: border-box;
-  width: calc(var(--strip-count) * 100% + (var(--strip-count) - 1) * var(--strips-gap));
-  min-width: max-content;
-  height: 100%;
-  transform: translateX(-50%);
+  height: 24px;
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-sm);
   overflow: hidden;

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
-import type { FrameClock, PlayerStats, ReplayRunner, SidPlayer } from '@sidablist/core';
+import type { FrameClock, ReplayRunner, SidPlayer } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
@@ -255,70 +255,59 @@ describe('DeckRuntime', () => {
       runtime.build('B');
     });
 
-    it('setOutputGain reaches only the named slot player, with the gain', () => {
-      const a = vi.spyOn(playerFor(0), 'setOutputGain');
-      const b = vi.spyOn(playerFor(1), 'setOutputGain');
+    it('setVoicePitch reaches only the named slot and voice, with the multiplier', () => {
+      const a = vi.spyOn(playerFor(0), 'setVoicePitch');
+      const b = vi.spyOn(playerFor(1), 'setVoicePitch');
 
-      runtime.setOutputGain('A', 0.4);
+      runtime.setVoicePitch('A', 2, 1.5);
 
-      expect(a).toHaveBeenCalledExactlyOnceWith(0.4);
+      expect(a).toHaveBeenCalledExactlyOnceWith(2, 1.5);
       expect(b).not.toHaveBeenCalled();
     });
 
-    it('setRegisterScale forwards the group and coefficient', () => {
-      const spy = vi.spyOn(playerFor(1), 'setRegisterScale');
+    it('setFieldOffset sets a non-zero offset and clears the field at 0', () => {
+      const set = vi.spyOn(playerFor(0), 'setFieldOffset');
+      const clear = vi.spyOn(playerFor(0), 'clearFieldOffset');
+      const otherSet = vi.spyOn(playerFor(1), 'setFieldOffset');
+      const otherClear = vi.spyOn(playerFor(1), 'clearFieldOffset');
 
-      runtime.setRegisterScale('B', 'pulseWidth', 4);
-      runtime.setRegisterScale('B', 'cutoff', 0.25);
+      runtime.setFieldOffset('A', { name: 'attack', voice: 1 }, -3);
+      runtime.setFieldOffset('A', { name: 'cutoff' }, 0);
 
-      expect(spy).toHaveBeenNthCalledWith(1, 'pulseWidth', 4);
-      expect(spy).toHaveBeenNthCalledWith(2, 'cutoff', 0.25);
+      expect(set).toHaveBeenCalledExactlyOnceWith({ name: 'attack', voice: 1 }, -3);
+      expect(clear).toHaveBeenCalledExactlyOnceWith({ name: 'cutoff' });
+      expect(otherSet).not.toHaveBeenCalled();
+      expect(otherClear).not.toHaveBeenCalled();
     });
 
-    it('setKeyCoefficient sets the pitch coefficient on voices 0, 1 and 2', () => {
-      const spy = vi.spyOn(playerFor(0), 'setVoicePitch');
-
-      runtime.setKeyCoefficient('A', 2);
-
-      expect(spy.mock.calls).toEqual([
-        [0, 2],
-        [1, 2],
-        [2, 2],
-      ]);
-    });
-
-    it('setFilterMode forwards a mode and null', () => {
-      const spy = vi.spyOn(playerFor(0), 'setFilterMode');
-
-      runtime.setFilterMode('A', 'lowPass');
-      runtime.setFilterMode('A', null);
-
-      expect(spy).toHaveBeenNthCalledWith(1, 'lowPass');
-      expect(spy).toHaveBeenNthCalledWith(2, null);
-    });
-
-    it('holdField and releaseField reach only the named slot player, with the field, value and amount', () => {
+    it('holdField and releaseField reach only the named slot player, with the field and value', () => {
       const heldOnA = vi.spyOn(playerFor(0), 'holdField');
       const releasedOnA = vi.spyOn(playerFor(0), 'releaseField');
       const heldOnB = vi.spyOn(playerFor(1), 'holdField');
       const releasedOnB = vi.spyOn(playerFor(1), 'releaseField');
 
-      runtime.holdField('A', { name: 'filtered', voice: 1 }, 1, 0.5);
+      runtime.holdField('A', { name: 'filtered', voice: 1 }, 1);
       runtime.releaseField('A', { name: 'cutoff' });
 
-      expect(heldOnA).toHaveBeenCalledExactlyOnceWith({ name: 'filtered', voice: 1 }, 1, 0.5);
+      expect(heldOnA).toHaveBeenCalledExactlyOnceWith({ name: 'filtered', voice: 1 }, 1);
       expect(releasedOnA).toHaveBeenCalledExactlyOnceWith({ name: 'cutoff' });
       expect(heldOnB).not.toHaveBeenCalled();
       expect(releasedOnB).not.toHaveBeenCalled();
     });
 
-    it("tuneRegisters returns the registers the slot's player reports as written", () => {
-      const written = Uint8Array.from({ length: 25 }, (_, index) => index);
-      vi.spyOn(playerFor(0), 'getStats').mockReturnValue({
-        emitted: { written, sent: new Uint8Array(25) },
-      } as PlayerStats);
+    it("readRegisters fills the caller's buffers from the slot's player", () => {
+      const spy = vi.spyOn(playerFor(0), 'readRegisters').mockImplementation((written, sent) => {
+        written.fill(7);
+        sent.fill(9);
+      });
+      const written = new Uint8Array(25);
+      const sent = new Uint8Array(25);
 
-      expect(runtime.tuneRegisters('A')).toBe(written);
+      runtime.readRegisters('A', written, sent);
+
+      expect(spy).toHaveBeenCalledExactlyOnceWith(written, sent);
+      expect(written[24]).toBe(7);
+      expect(sent[24]).toBe(9);
     });
 
     it('setTempo reaches the player and reads back through the snapshot', () => {

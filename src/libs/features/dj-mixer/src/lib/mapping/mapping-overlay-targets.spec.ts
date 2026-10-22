@@ -8,7 +8,7 @@ import { buildOverlayTargets } from './mapping-overlay-targets';
 
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
-const CROSSFADER: ControlIdentity = { owner: 'mixer', control: 'crossfader' };
+const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
 
 const CONTROLS: readonly MappableControl[] = [
   {
@@ -25,14 +25,14 @@ const CONTROLS: readonly MappableControl[] = [
   },
   { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
   {
-    identity: CROSSFADER,
-    name: 'Crossfader',
+    identity: MIXER_KEY,
+    name: 'Key',
     nature: 'value',
-    min: -1,
-    max: 1,
+    min: -12,
+    max: 12,
     home: 0,
-    step: null,
-    defaults: { ccStyle: 'absolute', sensitivity: 0.01, stepAmount: 0.1 },
+    step: 1,
+    defaults: { ccStyle: 'relative-offset', sensitivity: 1 / 24, stepAmount: 1 / 24 },
     read: () => 0,
     set: () => undefined,
   },
@@ -74,10 +74,10 @@ describe('buildOverlayTargets', () => {
         accessibleName: 'Map Stop, deck B, not bound',
       },
       {
-        id: 'mixer:crossfader',
-        anchor: '[data-control="crossfader"]',
+        id: 'mixer:key',
+        anchor: '[data-control="key"]',
         state: 'selectable',
-        accessibleName: 'Map Crossfader, mixer, not bound',
+        accessibleName: 'Map Key, mixer, not bound',
       },
     ]);
   });
@@ -99,7 +99,7 @@ describe('buildOverlayTargets', () => {
   it('marks the control being learned selected, ahead of bound', () => {
     const targets = buildOverlayTargets(CONTROLS, {
       learn: { control: SPEED_A, phase: 'waiting', replacing: null, source: null },
-      mappings: [mapping('m1', SPEED_A, 'xl', 21), mapping('m2', CROSSFADER, 'xl', 8)],
+      mappings: [mapping('m1', SPEED_A, 'xl', 21), mapping('m2', MIXER_KEY, 'xl', 8)],
       controllers: CONTROLLERS,
     });
 

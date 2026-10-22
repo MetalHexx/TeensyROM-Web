@@ -29,10 +29,6 @@ const SERVER_DECK_CONTROLS = [
   'voice-2-hold',
   'voice-3-hold',
   'clear-voice-mutes',
-  'level',
-  'cutoff',
-  'resonance',
-  'pulse-width',
   'key',
 ];
 
@@ -70,9 +66,9 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 45 controls: every deck control for both decks, then the crossfader', () => {
-      expect(h.controls.all).toHaveLength(45);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(45);
+    it('holds 36 controls: every deck control for both decks', () => {
+      expect(h.controls.all).toHaveLength(36);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(36);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
@@ -80,57 +76,32 @@ describe('MappableControls', () => {
           .map((c) => c.identity.control);
         expect(ids.sort()).toEqual([...SERVER_DECK_CONTROLS].sort());
       }
-      expect(h.controls.all[44].identity).toEqual({ owner: 'mixer', control: 'crossfader' });
     });
 
     it('finds a control by identity and nothing for an owner that does not carry it', () => {
-      expect(h.controls.find({ owner: 'B', control: 'cutoff' })?.name).toBe('Cutoff');
-      expect(h.controls.find({ owner: 'mixer', control: 'level' })).toBeNull();
-      expect(h.controls.find({ owner: 'A', control: 'crossfader' })).toBeNull();
+      expect(h.controls.find({ owner: 'B', control: 'speed' })?.name).toBe('Speed');
+      expect(h.controls.find({ owner: 'mixer', control: 'speed' })).toBeNull();
     });
   });
 
   describe('value controls', () => {
-    it('level reads and sets the deck level, and is never gated', () => {
-      const level = pick('B', 'level', 'value');
-
-      level.set(0.4);
-
-      expect(h.djStore.deckMix('B')().level).toBe(0.4);
-      expect(level.read()).toBe(0.4);
-      expect(h.djStore.deckMix('A')().level).toBe(1);
-    });
-
-    it('the crossfader reads and sets the mixer position', () => {
-      const crossfader = pick('mixer', 'crossfader', 'value');
-
-      crossfader.set(-0.5);
-
-      expect(h.djStore.crossfader()).toBe(-0.5);
-      expect(crossfader.read()).toBe(-0.5);
-    });
-
-    it.each([
-      ['cutoff', 'cutoff', 0.5],
-      ['resonance', 'resonance', 0.7],
-      ['pulse-width', 'pulseWidth', -0.3],
-      ['key', 'keySemitones', 4],
-    ] as const)('%s reads and sets deck %s through the mixer', (id, field, target) => {
+    it('key reads and sets the deck key through the mixer', () => {
       h.makeShapeable('A');
-      const control = pick('A', id, 'value');
+      const key = pick('A', 'key', 'value');
 
-      control.set(target);
+      key.set(4);
 
-      expect(h.djStore.deckMix('A')()[field]).toBe(target);
-      expect(control.read()).toBe(target);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(4);
+      expect(key.read()).toBe(4);
+      expect(h.djStore.deckPanel('B')().keySemitones).toBe(0);
     });
 
-    it('a tune-shaping control keeps the mixer command gate: a deck with nothing loaded refuses', () => {
-      const cutoff = pick('A', 'cutoff', 'value');
+    it('key keeps the mixer command gate: a deck with nothing loaded refuses', () => {
+      const key = pick('A', 'key', 'value');
 
-      cutoff.set(0.5);
+      key.set(4);
 
-      expect(h.djStore.deckMix('A')().cutoff).toBe(0);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(0);
     });
 
     it('speed sets the engine tempo and reads it back clamped to the fader travel', () => {
@@ -165,10 +136,6 @@ describe('MappableControls', () => {
         sensitivity: 1 / 24,
         stepAmount: 1 / 24,
       });
-
-      const crossfader = pick('mixer', 'crossfader', 'value');
-      expect([crossfader.min, crossfader.max, crossfader.home]).toEqual([-1, 1, 0]);
-      expect(crossfader.defaults.ccStyle).toBe('absolute');
 
       const seek = pick('B', 'seek', 'value');
       expect([seek.min, seek.max, seek.home]).toEqual([0, 100, 0]);

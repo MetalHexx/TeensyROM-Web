@@ -6,7 +6,6 @@ import type { Slot } from './slot';
 import type { DjFileKey } from './dj-file-key.util';
 import type { MidiAccessState, MidiPortOption } from './ports/midi-access';
 import type { TuneReference } from '@sidablist/tunes';
-import type { SidFilterMode } from '@sidablist/core';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -42,23 +41,68 @@ export interface DeckVoiceState {
   readonly held: boolean;
 }
 
-/** One deck's mixer and tune-shaping controls. Positions are held at full resolution; only
- *  `keySemitones` is a whole number. */
-export interface DeckMixState {
-  /** 0…1, home 1. */
-  level: number;
-  /** −1…+1, home 0. */
-  cutoff: number;
-  /** 0…1, home 0 — 0 plays the tune's own resonance. */
-  resonance: number;
-  /** −1…+1, home 0. */
+export type PanelWaveform = 'triangle' | 'sawtooth' | 'pulse' | 'noise';
+
+export type PanelFilterMode = 'low-pass' | 'band-pass' | 'high-pass';
+
+/** `null` follows the tune; `true`/`false` is locked on/off. */
+export type SwitchLock = boolean | null;
+
+/** A voice's Ring, Sync or Filter-routing switch. */
+export type VoiceSwitch = 'ring' | 'sync' | 'filter';
+
+/** One voice's strip of the panel: offsets in the field's own units (integers except `fine`) and
+ *  locks that hand the field back to the tune when `null`. */
+export interface VoiceStripState {
+  /** Whole semitones. */
+  coarse: number;
+  /** Cents, full resolution. */
+  fine: number;
   pulseWidth: number;
-  /** Integer −12…+12, home 0. */
-  keySemitones: number;
-  /** `null` plays the tune's own filter-mode bits (home). The mixer card no longer offers a
-   *  selector, so this stays `null` in production; it is kept so the selector can come back. */
-  filterMode: SidFilterMode | null;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  waveformLock: PanelWaveform | null;
+  ringLock: SwitchLock;
+  syncLock: SwitchLock;
+  filterLock: SwitchLock;
 }
+
+/** One deck's SID panel: three voice strips, the filter offsets and lock, and Key. */
+export interface DeckPanelState {
+  /** Engine order, voice 0…2. */
+  voices: readonly [VoiceStripState, VoiceStripState, VoiceStripState];
+  cutoff: number;
+  resonance: number;
+  filterModeLock: PanelFilterMode | null;
+  /** Integer −12…+12. */
+  keySemitones: number;
+}
+
+/** A voice strip at home: every offset 0, every lock handed back to the tune. */
+export const HOME_VOICE_STRIP: VoiceStripState = {
+  coarse: 0,
+  fine: 0,
+  pulseWidth: 0,
+  attack: 0,
+  decay: 0,
+  sustain: 0,
+  release: 0,
+  waveformLock: null,
+  ringLock: null,
+  syncLock: null,
+  filterLock: null,
+};
+
+/** A whole panel at home. */
+export const HOME_DECK_PANEL: DeckPanelState = {
+  voices: [{ ...HOME_VOICE_STRIP }, { ...HOME_VOICE_STRIP }, { ...HOME_VOICE_STRIP }],
+  cutoff: 0,
+  resonance: 0,
+  filterModeLock: null,
+  keySemitones: 0,
+};
 
 export interface DeckState {
   loaded: TuneReference | null;
@@ -105,9 +149,7 @@ export interface DjState {
   bindings: Record<Slot, DeckBindingState>;
   midi: MidiState;
   seen: Record<DjFileKey, TuneReference>;
-  mix: Record<Slot, DeckMixState>;
-  /** −1 hard A … +1 hard B, home 0. */
-  crossfader: number;
+  panel: Record<Slot, DeckPanelState>;
   keyDisplayFormat: KeyDisplayFormat;
 }
 
@@ -132,15 +174,6 @@ const initialDeckState: DeckState = {
   switching: false,
 };
 
-const initialMixState: DeckMixState = {
-  level: 1,
-  cutoff: 0,
-  resonance: 0,
-  pulseWidth: 0,
-  keySemitones: 0,
-  filterMode: null,
-};
-
 const initialBindingState: DeckBindingState = {
   device: null,
   portId: null,
@@ -153,8 +186,7 @@ const initialState: DjState = {
   bindings: { A: { ...initialBindingState }, B: { ...initialBindingState } },
   midi: { accessState: 'idle', ports: [], lastError: null },
   seen: {},
-  mix: { A: { ...initialMixState }, B: { ...initialMixState } },
-  crossfader: 0,
+  panel: { A: HOME_DECK_PANEL, B: HOME_DECK_PANEL },
   keyDisplayFormat: 'camelot',
 };
 

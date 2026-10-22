@@ -9,7 +9,7 @@ import {
   stylesFor,
 } from './mapping-styles';
 
-const identity = { owner: 'A', control: 'level' } as const;
+const identity = { owner: 'A', control: 'speed' } as const;
 
 const trigger: MappableControl = { identity, name: 'T', nature: 'trigger', fire: () => undefined };
 const toggle: MappableControl = {

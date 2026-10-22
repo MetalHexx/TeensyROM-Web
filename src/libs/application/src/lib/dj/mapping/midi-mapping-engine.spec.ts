@@ -18,10 +18,8 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 });
 
 const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
-const LEVEL_A: ControlIdentity = { owner: 'A', control: 'level' };
-const CUTOFF_A: ControlIdentity = { owner: 'A', control: 'cutoff' };
+const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
-const CROSSFADER: ControlIdentity = { owner: 'mixer', control: 'crossfader' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const HOLD_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-hold' };
 
@@ -45,16 +43,17 @@ describe('MidiMappingEngine', () => {
   }
 
   const held = (voice: number): boolean => h.djStore.deck('A')().voices[voice].held;
+  const speed = (): number => h.djStore.deck('A')().speed;
 
   describe('matching', () => {
     it('does nothing for a source with no mapping, or one on another channel or controller', () => {
-      map(ccSource(7, 1), LEVEL_A, style('absolute'));
+      map(ccSource(7, 1), SPEED_A, style('absolute'));
 
       h.engine.handle(cc(7, 0, 2));
       h.engine.handle(cc(7, 0, 1, 'other-controller'));
       h.engine.handle(cc(8, 0));
 
-      expect(h.djStore.deckMix('A')().level).toBe(1);
+      expect(speed()).toBe(1);
     });
 
     it('ignores a mapping whose control is not on the list and warns once', () => {
@@ -76,14 +75,14 @@ describe('MidiMappingEngine', () => {
     });
 
     it('drives one control from several sources', () => {
-      map(ccSource(7), LEVEL_A, style('absolute'));
-      map(ccSource(8), LEVEL_A, style('absolute'));
+      map(ccSource(7), SPEED_A, style('absolute'));
+      map(ccSource(8), SPEED_A, style('absolute'));
 
       h.engine.handle(cc(7, 0));
-      expect(h.djStore.deckMix('A')().level).toBe(0);
+      expect(speed()).toBe(0.5);
 
       h.engine.handle(cc(8, 127));
-      expect(h.djStore.deckMix('A')().level).toBe(1);
+      expect(speed()).toBe(1.5);
     });
   });
 
@@ -157,87 +156,87 @@ describe('MidiMappingEngine', () => {
 
   describe('absolute', () => {
     it('maps 0–127 across the control range', () => {
-      map(ccSource(7), CROSSFADER, style('absolute'));
+      map(ccSource(7), SPEED_A, style('absolute'));
 
       h.engine.handle(cc(7, 0));
-      expect(h.djStore.crossfader()).toBe(-1);
+      expect(speed()).toBe(0.5);
 
       h.engine.handle(cc(7, 127));
-      expect(h.djStore.crossfader()).toBe(1);
+      expect(speed()).toBe(1.5);
 
       h.engine.handle(cc(7, 64));
-      expect(h.djStore.crossfader()).toBeCloseTo((64 / 127) * 2 - 1, 10);
+      expect(speed()).toBeCloseTo(0.5 + 64 / 127, 10);
     });
 
     it('rounds a stepped control to its step', () => {
       map(ccSource(7), KEY_A, style('absolute'));
 
       h.engine.handle(cc(7, 0));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(-12);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(-12);
 
       h.engine.handle(cc(7, 127));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(12);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(12);
 
       h.engine.handle(cc(7, 64));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(0);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(0);
     });
 
     it('does nothing from a note', () => {
       h.mappingStore.upsertMapping({
-        mapping: { id: 'odd', source: noteSource(7), control: LEVEL_A, style: style('absolute') },
+        mapping: { id: 'odd', source: noteSource(7), control: SPEED_A, style: style('absolute') },
       });
 
       h.engine.handle(note(7, 0));
       h.engine.handle(note(7, 100));
 
-      expect(h.djStore.deckMix('A')().level).toBe(1);
+      expect(speed()).toBe(1);
     });
   });
 
   describe('relative', () => {
     it('relative-offset moves by (raw − 64) ticks of the amount, either way', () => {
-      map(ccSource(10), CUTOFF_A, style('relative-offset', 0.05));
+      map(ccSource(10), SPEED_A, style('relative-offset', 0.05));
 
       h.engine.handle(cc(10, 66));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0.2, 10);
+      expect(speed()).toBeCloseTo(1.1, 10);
 
       h.engine.handle(cc(10, 63));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0.1, 10);
+      expect(speed()).toBeCloseTo(1.05, 10);
     });
 
     it('relative-signed counts up from 0 and down from 127', () => {
-      map(ccSource(10), CUTOFF_A, style('relative-signed', 0.05));
+      map(ccSource(10), SPEED_A, style('relative-signed', 0.05));
 
       h.engine.handle(cc(10, 2));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0.2, 10);
+      expect(speed()).toBeCloseTo(1.1, 10);
 
       h.engine.handle(cc(10, 126));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0, 10);
+      expect(speed()).toBeCloseTo(1, 10);
     });
 
     it('stops at the ends of the range', () => {
-      map(ccSource(10), CUTOFF_A, style('relative-offset', 0.5));
+      map(ccSource(10), SPEED_A, style('relative-offset', 0.5));
 
       h.engine.handle(cc(10, 127));
-      expect(h.djStore.deckMix('A')().cutoff).toBe(1);
+      expect(speed()).toBe(1.5);
 
       h.engine.handle(cc(10, 0));
-      expect(h.djStore.deckMix('A')().cutoff).toBe(-1);
+      expect(speed()).toBe(0.5);
     });
 
     it('a rest value moves nothing', () => {
-      map(ccSource(10), CUTOFF_A, style('relative-offset', 0.5));
-      map(ccSource(11), CUTOFF_A, style('relative-signed', 0.5));
+      map(ccSource(10), SPEED_A, style('relative-offset', 0.5));
+      map(ccSource(11), SPEED_A, style('relative-signed', 0.5));
 
       h.engine.handle(cc(10, 64));
       h.engine.handle(cc(11, 0));
 
-      expect(h.djStore.deckMix('A')().cutoff).toBe(0);
+      expect(speed()).toBe(1);
     });
 
     it('a stepped control accumulates small moves and moves by whole steps, keeping the remainder', () => {
       map(ccSource(10), KEY_A, style('relative-offset', 0.025));
-      const key = (): number => h.djStore.deckMix('A')().keySemitones;
+      const key = (): number => h.djStore.deckPanel('A')().keySemitones;
 
       h.engine.handle(cc(10, 65));
       expect(key()).toBe(0);
@@ -253,10 +252,10 @@ describe('MidiMappingEngine', () => {
       map(ccSource(10), KEY_A, style('relative-signed', 1 / 24));
 
       h.engine.handle(cc(10, 3));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(3);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(3);
 
       h.engine.handle(cc(10, 127));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(2);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(2);
     });
 
     it("keeps each mapping's remainder on its own", () => {
@@ -266,17 +265,17 @@ describe('MidiMappingEngine', () => {
       h.engine.handle(cc(10, 65));
       h.engine.handle(cc(11, 65));
 
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(0);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(0);
     });
 
     it('a stepped control pushed against its end does not bank the overshoot', () => {
       map(ccSource(10), KEY_A, style('relative-signed', 1 / 24));
       h.engine.handle(cc(10, 20));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(12);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(12);
 
       h.engine.handle(cc(10, 127));
 
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(11);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(11);
     });
 
     it('seek turns a relative encoder into seeks from the playhead', () => {
@@ -311,16 +310,16 @@ describe('MidiMappingEngine', () => {
 
   describe('step', () => {
     it('moves by its amount of the range on each press edge, up or down', () => {
-      map(noteSource(50), CUTOFF_A, style('step', 0.1));
-      map(noteSource(51), CUTOFF_A, style('step', -0.1));
+      map(noteSource(50), SPEED_A, style('step', 0.1));
+      map(noteSource(51), SPEED_A, style('step', -0.1));
 
       h.engine.handle(note(50, 100));
       h.engine.handle(note(50, 100));
       h.engine.handle(note(50, 0));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0.2, 10);
+      expect(speed()).toBeCloseTo(1.1, 10);
 
       h.engine.handle(note(51, 100));
-      expect(h.djStore.deckMix('A')().cutoff).toBeCloseTo(0, 10);
+      expect(speed()).toBeCloseTo(1, 10);
     });
 
     it('moves a stepped control at least one step, in the sign of the amount', () => {
@@ -329,20 +328,20 @@ describe('MidiMappingEngine', () => {
 
       h.engine.handle(note(50, 100));
       h.engine.handle(note(50, 0));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(1);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(1);
 
       h.engine.handle(note(51, 100));
       h.engine.handle(note(51, 0));
       h.engine.handle(note(51, 100));
-      expect(h.djStore.deckMix('A')().keySemitones).toBe(-1);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(-1);
     });
 
     it('stops at the ends of the range', () => {
-      map(noteSource(50), LEVEL_A, style('step', 0.4));
+      map(noteSource(50), SPEED_A, style('step', 0.6));
 
       h.engine.handle(note(50, 100));
 
-      expect(h.djStore.deckMix('A')().level).toBe(1);
+      expect(speed()).toBe(1.5);
     });
   });
 

@@ -7,7 +7,6 @@ import type {
   Frames,
   FrameClock,
   ReplayRunner,
-  SidFilterMode,
   SidField,
   SidModel,
 } from '@sidablist/core';
@@ -125,36 +124,24 @@ export class DeckRuntime {
     this.requireSlot(slot).player.setRepeatTrack(on);
   }
 
-  /** Sets this slot's output gain, 0…1. */
-  setOutputGain(slot: Slot, gain: number): void {
-    this.requireSlot(slot).player.setOutputGain(gain);
+  /** Voice 0…2's pitch multiplier — composes with the clock correction in the library. */
+  setVoicePitch(slot: Slot, voice: number, multiplier: number): void {
+    this.requireSlot(slot).player.setVoicePitch(voice, multiplier);
   }
 
-  /** Scales one register group's value by `coefficient` (1 = untouched). */
-  setRegisterScale(
-    slot: Slot,
-    group: 'cutoff' | 'resonance' | 'pulseWidth',
-    coefficient: number
-  ): void {
-    this.requireSlot(slot).player.setRegisterScale(group, coefficient);
-  }
-
-  /** Transposes all three voices by the same pitch `coefficient` (1 = untouched). */
-  setKeyCoefficient(slot: Slot, coefficient: number): void {
+  /** A signed offset in the field's own units; 0 clears it. */
+  setFieldOffset(slot: Slot, field: SidField, amount: number): void {
     const { player } = this.requireSlot(slot);
-    for (const voice of [0, 1, 2]) {
-      player.setVoicePitch(voice, coefficient);
+    if (amount === 0) {
+      player.clearFieldOffset(field);
+    } else {
+      player.setFieldOffset(field, amount);
     }
   }
 
-  /** Overrides the SID filter mode; `null` plays the tune's own filter-mode bits. */
-  setFilterMode(slot: Slot, mode: SidFilterMode | null): void {
-    this.requireSlot(slot).player.setFilterMode(mode);
-  }
-
-  /** Holds one chip field on this slot's engine — see `SidPlayer.holdField`. */
-  holdField(slot: Slot, field: SidField, value: number, amount: number): void {
-    this.requireSlot(slot).player.holdField(field, value, amount);
+  /** Holds a field at `value` on this slot's engine — see `SidPlayer.holdField`. */
+  holdField(slot: Slot, field: SidField, value: number): void {
+    this.requireSlot(slot).player.holdField(field, value);
   }
 
   /** Releases a field held by `holdField`; releasing one that is not held does nothing. */
@@ -162,9 +149,9 @@ export class DeckRuntime {
     this.requireSlot(slot).player.releaseField(field);
   }
 
-  /** The tune's own 25 register values as the engine reports them: raw, before any scale or hold. */
-  tuneRegisters(slot: Slot): Uint8Array {
-    return this.requireSlot(slot).player.getStats().emitted.written;
+  /** The registers as written and as sent, into caller-owned buffers — allocates nothing. */
+  readRegisters(slot: Slot, written: Uint8Array, sent: Uint8Array): void {
+    this.requireSlot(slot).player.readRegisters(written, sent);
   }
 
   /** Sets this slot's tempo multiplier (1 = the tune's own speed). */

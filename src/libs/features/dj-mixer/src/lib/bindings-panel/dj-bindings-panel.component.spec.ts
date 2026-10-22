@@ -23,7 +23,7 @@ import { DjBindingsPanelComponent } from './dj-bindings-panel.component';
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const STOP_A: ControlIdentity = { owner: 'A', control: 'stop' };
 const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
-const CROSSFADER: ControlIdentity = { owner: 'mixer', control: 'crossfader' };
+const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
 
 const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
 
@@ -43,14 +43,14 @@ const CONTROLS: readonly MappableControl[] = [
   },
   { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
   {
-    identity: CROSSFADER,
-    name: 'Crossfader',
+    identity: MIXER_KEY,
+    name: 'Key',
     nature: 'value',
-    min: -1,
-    max: 1,
+    min: -12,
+    max: 12,
     home: 0,
-    step: null,
-    defaults: { ...DEFAULTS, ccStyle: 'absolute' },
+    step: 1,
+    defaults: DEFAULTS,
     read: () => 0,
     set: () => undefined,
   },
@@ -171,13 +171,13 @@ describe('DjBindingsPanelComponent', () => {
   describe('the groups', () => {
     it('headed Deck A, Deck B and Mixer, with a placeholder for a group without bindings', () => {
       const { fixture, seed } = render();
-      seed([XL], [mapping('m1', CROSSFADER, { kind: 'absolute', amount: null })]);
+      seed([XL], [mapping('m1', MIXER_KEY, { kind: 'absolute', amount: null })]);
 
       const headings = Array.from(fixture.nativeElement.querySelectorAll('h3')).map((h) =>
         (h as HTMLElement).textContent?.trim()
       );
       expect(headings).toEqual(['Deck A', 'Deck B', 'Mixer', 'Controllers']);
-      expect(groupRows(fixture, 'Mixer')).toEqual(['Crossfader']);
+      expect(groupRows(fixture, 'Mixer')).toEqual(['Key']);
       expect(fixture.nativeElement.textContent.match(/No bindings yet/g)).toHaveLength(2);
     });
 
@@ -223,7 +223,7 @@ describe('DjBindingsPanelComponent', () => {
           mapping('value-cc', SPEED_A, { kind: 'absolute', amount: null }),
           mapping(
             'value-note',
-            CROSSFADER,
+            MIXER_KEY,
             { kind: 'step', amount: 0.1 },
             { kind: 'note', number: 2 }
           ),
@@ -249,7 +249,7 @@ describe('DjBindingsPanelComponent', () => {
         [XL],
         [
           mapping('relative', SPEED_A, { kind: 'relative-offset', amount: 0.015 }),
-          mapping('step', CROSSFADER, { kind: 'step', amount: -0.1 }, { number: 22 }),
+          mapping('step', MIXER_KEY, { kind: 'step', amount: -0.1 }, { number: 22 }),
           mapping('trigger', STOP_B, { kind: 'press', amount: null }, { number: 23 }),
         ]
       );

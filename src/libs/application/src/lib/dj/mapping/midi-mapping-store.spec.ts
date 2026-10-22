@@ -4,8 +4,9 @@ import type { ControlIdentity, ControlMapping, KnownController } from './mapping
 import { sourceKey } from './mapping.models';
 import { MidiMappingStore } from './midi-mapping-store';
 
-const LEVEL_A: ControlIdentity = { owner: 'A', control: 'level' };
-const CROSSFADER: ControlIdentity = { owner: 'mixer', control: 'crossfader' };
+const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
+const SPEED_B: ControlIdentity = { owner: 'B', control: 'speed' };
+const MIXER_OWNED: ControlIdentity = { owner: 'mixer', control: 'speed' };
 
 function mapping(
   id: string,
@@ -42,7 +43,7 @@ describe('MidiMappingStore', () => {
 
     store.setMidiMappingData({
       controllers: [controller('lc')],
-      mappings: [mapping('m1', 7, LEVEL_A)],
+      mappings: [mapping('m1', 7, SPEED_A)],
     });
 
     expect(store.loaded()).toBe(true);
@@ -52,11 +53,11 @@ describe('MidiMappingStore', () => {
 
   describe('mappings', () => {
     it('upserts by id: a new id appends and a known id replaces in place', () => {
-      store.upsertMapping({ mapping: mapping('m1', 7, LEVEL_A) });
-      store.upsertMapping({ mapping: mapping('m2', 8, CROSSFADER) });
+      store.upsertMapping({ mapping: mapping('m1', 7, SPEED_A) });
+      store.upsertMapping({ mapping: mapping('m2', 8, SPEED_B) });
 
       store.upsertMapping({
-        mapping: { ...mapping('m1', 7, LEVEL_A), style: { kind: 'step', amount: 0.1 } },
+        mapping: { ...mapping('m1', 7, SPEED_A), style: { kind: 'step', amount: 0.1 } },
       });
 
       expect(store.mappings().map((m) => m.id)).toEqual(['m1', 'm2']);
@@ -64,28 +65,28 @@ describe('MidiMappingStore', () => {
     });
 
     it('lets a source drive one control: upserting onto a used source drops the other mapping', () => {
-      store.upsertMapping({ mapping: mapping('m1', 7, LEVEL_A) });
+      store.upsertMapping({ mapping: mapping('m1', 7, SPEED_A) });
 
-      store.upsertMapping({ mapping: mapping('m2', 7, CROSSFADER) });
+      store.upsertMapping({ mapping: mapping('m2', 7, SPEED_B) });
 
       expect(store.mappings().map((m) => m.id)).toEqual(['m2']);
     });
 
     it('a control keeps several sources', () => {
-      store.upsertMapping({ mapping: mapping('m1', 7, LEVEL_A) });
-      store.upsertMapping({ mapping: mapping('m2', 8, LEVEL_A) });
-      store.upsertMapping({ mapping: mapping('m3', 9, CROSSFADER) });
+      store.upsertMapping({ mapping: mapping('m1', 7, SPEED_A) });
+      store.upsertMapping({ mapping: mapping('m2', 8, SPEED_A) });
+      store.upsertMapping({ mapping: mapping('m3', 9, SPEED_B) });
 
       expect(
         store
-          .mappingsForControl(LEVEL_A)()
+          .mappingsForControl(SPEED_A)()
           .map((m) => m.id)
       ).toEqual(['m1', 'm2']);
     });
 
     it('removes by id', () => {
-      store.upsertMapping({ mapping: mapping('m1', 7, LEVEL_A) });
-      store.upsertMapping({ mapping: mapping('m2', 8, LEVEL_A) });
+      store.upsertMapping({ mapping: mapping('m1', 7, SPEED_A) });
+      store.upsertMapping({ mapping: mapping('m2', 8, SPEED_A) });
 
       store.removeMapping({ id: 'm1' });
 
@@ -98,9 +99,9 @@ describe('MidiMappingStore', () => {
       store.setMidiMappingData({
         controllers: [controller('lc', 'Launch Control XL'), controller('pad')],
         mappings: [
-          mapping('m1', 7, LEVEL_A),
-          mapping('m2', 8, { owner: 'B', control: 'cutoff' }),
-          mapping('m3', 9, CROSSFADER),
+          mapping('m1', 7, SPEED_A),
+          mapping('m2', 8, SPEED_B),
+          mapping('m3', 9, MIXER_OWNED),
         ],
       });
     });
@@ -151,7 +152,7 @@ describe('MidiMappingStore', () => {
   });
 
   describe('mapping mode and learn', () => {
-    const learn = { control: LEVEL_A, phase: 'waiting', replacing: null, source: null } as const;
+    const learn = { control: SPEED_A, phase: 'waiting', replacing: null, source: null } as const;
 
     it('turning mapping mode off also ends the capture in the same update', () => {
       store.setMappingMode({ on: true });

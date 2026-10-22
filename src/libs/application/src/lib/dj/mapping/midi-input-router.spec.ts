@@ -16,10 +16,10 @@ const saved = (listening = true): MidiSettingsRecord => ({
   controllers: [{ id: LAUNCH_CONTROL, name: NAME, lastPortId: 'port-1', listening }],
   mappings: [
     {
-      id: 'level',
+      id: 'speed',
       source: ccSource(7),
       owner: 'A',
-      control: 'level',
+      control: 'speed',
       style: { kind: 'absolute', amount: null },
     },
   ],
@@ -47,7 +47,7 @@ describe('MidiInputRouter', () => {
     await settle();
   }
 
-  const level = () => h.djStore.deckMix('A')().level;
+  const speed = () => h.djStore.deck('A')().speed;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -71,7 +71,7 @@ describe('MidiInputRouter', () => {
 
     h.midiInput.emit('port-1', 'cc', 7, 0);
 
-    expect(level()).toBe(0);
+    expect(speed()).toBe(0.5);
   });
 
   it('keeps the channel and number apart: only the mapped source drives the control', async () => {
@@ -80,7 +80,7 @@ describe('MidiInputRouter', () => {
     h.midiInput.emit('port-1', 'cc', 7, 0, 2);
     h.midiInput.emit('port-1', 'cc', 8, 0);
 
-    expect(level()).toBe(1);
+    expect(speed()).toBe(1);
   });
 
   it('drops a message from a port no controller owns', async () => {
@@ -91,7 +91,7 @@ describe('MidiInputRouter', () => {
     h.midiInput.emit('unlisted', 'cc', 7, 0);
 
     expect(handle).not.toHaveBeenCalled();
-    expect(level()).toBe(1);
+    expect(speed()).toBe(1);
   });
 
   it('keeps a controller silent while its listening is off, though mapping mode holds its port', async () => {
@@ -102,7 +102,7 @@ describe('MidiInputRouter', () => {
 
     h.midiInput.emit('port-1', 'cc', 7, 0);
 
-    expect(level()).toBe(1);
+    expect(speed()).toBe(1);
   });
 
   it('gives learn the message first, so a captured message never reaches the engine', async () => {

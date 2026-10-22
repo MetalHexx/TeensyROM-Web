@@ -49,8 +49,6 @@ interface ValueRange {
 const VOICES = [1, 2, 3] as const;
 
 const SPEED_RANGE: ValueRange = { min: 0.5, max: 1.5, home: 1, step: null };
-const UNIT_RANGE: ValueRange = { min: 0, max: 1, home: 0, step: null };
-const BIPOLAR_RANGE: ValueRange = { min: -1, max: 1, home: 0, step: null };
 const KEY_RANGE: ValueRange = { min: -12, max: 12, home: 0, step: 1 };
 
 const SEEK_DEFAULTS: ValueDefaults = {
@@ -63,12 +61,6 @@ const SPEED_DEFAULTS: ValueDefaults = {
   sensitivity: 0.01,
   stepAmount: 0.05,
 };
-const KNOB_DEFAULTS: ValueDefaults = {
-  ccStyle: 'relative-offset',
-  sensitivity: 0.01,
-  stepAmount: 0.1,
-};
-const FADER_DEFAULTS: ValueDefaults = { ccStyle: 'absolute', sensitivity: 0.01, stepAmount: 0.1 };
 const KEY_DEFAULTS: ValueDefaults = {
   ccStyle: 'relative-offset',
   sensitivity: 1 / 24,
@@ -108,10 +100,9 @@ function value(
 }
 
 /**
- * Every control a MIDI source can drive, declared once: the 22 deck controls for each deck, then
- * the crossfader. Each entry reads from `DjStore` and commands through `DeckService` or
- * `MixerService`, so a mapped control is gated exactly like its on-screen twin. The list holds no
- * component and no mapping.
+ * Every control a MIDI source can drive, declared once: the 18 deck controls for each deck. Each
+ * entry reads from `DjStore` and commands through `DeckService` or `MixerService`, so a mapped
+ * control is gated exactly like its on-screen twin. The list holds no component and no mapping.
  */
 @Injectable({ providedIn: 'root' })
 export class MappableControls {
@@ -124,7 +115,7 @@ export class MappableControls {
   private readonly byKey: ReadonlyMap<string, MappableControl>;
 
   constructor() {
-    this.all = [...DECK_SLOTS.flatMap((slot) => this.deckControls(slot)), this.crossfader()];
+    this.all = DECK_SLOTS.flatMap((slot) => this.deckControls(slot));
     this.byKey = new Map(this.all.map((control) => [controlKey(control.identity), control]));
   }
 
@@ -137,7 +128,7 @@ export class MappableControls {
     const decks = this.deckService;
     const mixer = this.mixerService;
     const deck = this.djStore.deck(slot);
-    const mix = this.djStore.deckMix(slot);
+    const panel = this.djStore.deckPanel(slot);
     const transport = this.djStore.transportSummary(slot);
     const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
     const seek = this.coalescedSeek(slot);
@@ -187,57 +178,14 @@ export class MappableControls {
       ),
       trigger(id('clear-voice-mutes'), 'Clear voice mutes', () => decks.clearVoiceMutes(slot)),
       value(
-        id('level'),
-        'Level',
-        { ...UNIT_RANGE, home: 1 },
-        FADER_DEFAULTS,
-        () => mix().level,
-        (level) => mixer.setLevel(slot, level)
-      ),
-      value(
-        id('cutoff'),
-        'Cutoff',
-        BIPOLAR_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().cutoff,
-        (position) => mixer.setKnob(slot, 'cutoff', position)
-      ),
-      value(
-        id('resonance'),
-        'Resonance',
-        UNIT_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().resonance,
-        (position) => mixer.setKnob(slot, 'resonance', position)
-      ),
-      value(
-        id('pulse-width'),
-        'Pulse width',
-        BIPOLAR_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().pulseWidth,
-        (position) => mixer.setKnob(slot, 'pulseWidth', position)
-      ),
-      value(
         id('key'),
         'Key',
         KEY_RANGE,
         KEY_DEFAULTS,
-        () => mix().keySemitones,
+        () => panel().keySemitones,
         (semitones) => mixer.setKeySemitones(slot, semitones)
       ),
     ];
-  }
-
-  private crossfader(): MappableControl {
-    return value(
-      { owner: 'mixer', control: 'crossfader' },
-      'Crossfader',
-      BIPOLAR_RANGE,
-      FADER_DEFAULTS,
-      () => this.djStore.crossfader(),
-      (position) => this.mixerService.setCrossfader(position)
-    );
   }
 
   /** A seek command that never queues: while one is in flight only the latest requested value is

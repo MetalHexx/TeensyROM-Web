@@ -47,8 +47,8 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  * guard cannot see because it has already returned by then.
  *
  * It also fronts the speed and voice commands and reflects the engine's tempo and voice state into
- * the store. Every load and subtune switch returns the deck's tune-shaping controls to home before
- * anything else, so a new tune never inherits the last one's settings.
+ * the store. Every load and subtune switch returns the deck's SID panel, speed, mutes and holds to
+ * home before anything else, so a new tune never inherits the last one's settings.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -444,11 +444,11 @@ export class DeckService {
     }
   }
 
-  /** Returns the deck's tune-shaping controls to home on both the store and the engine: the
-   *  mixer knobs, key and filter (via the applier), tempo and any open speed excursion, latched
-   *  mutes and holds. Level and the crossfader are re-applied by the applier, not reset. */
+  /** Returns the deck's tune-shaping controls to home on both the store and the engine: the SID
+   *  panel and detected key (via the applier), tempo and any open speed excursion, latched mutes
+   *  and holds. */
   private resetTuneShaping(slot: Slot): void {
-    this.mixerApplier.resetTuneShaping(slot);
+    this.mixerApplier.resetPanel(slot);
     this.deckSpeed.reset(slot);
     this.runtime.clearVoiceMutes(slot);
     for (const voice of VOICES) {

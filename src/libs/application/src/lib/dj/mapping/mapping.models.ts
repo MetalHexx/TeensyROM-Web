@@ -24,16 +24,12 @@ export const DECK_CONTROL_IDS = [
   'voice-2-hold',
   'voice-3-hold',
   'clear-voice-mutes',
-  'level',
-  'cutoff',
-  'resonance',
-  'pulse-width',
   'key',
 ] as const;
 
 export type DeckControlId = (typeof DECK_CONTROL_IDS)[number];
 
-export type ControlId = DeckControlId | 'crossfader';
+export type ControlId = DeckControlId;
 
 /** Who a control belongs to. A later surface (a playlist) adds one member here. */
 export type ControlOwner = Slot | 'mixer';
@@ -84,7 +80,7 @@ export interface SourceEvent extends MidiSource {
   readonly pressed: boolean;
 }
 
-const CONTROL_IDS: ReadonlySet<string> = new Set<string>([...DECK_CONTROL_IDS, 'crossfader']);
+const CONTROL_IDS: ReadonlySet<string> = new Set<string>(DECK_CONTROL_IDS);
 
 export function isControlId(value: string): value is ControlId {
   return CONTROL_IDS.has(value);
