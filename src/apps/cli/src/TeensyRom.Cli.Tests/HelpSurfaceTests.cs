@@ -14,6 +14,45 @@ public sealed class HelpSurfaceTests
     public static IEnumerable<object[]> Verbs() =>
         CliHost.PublicTree.SelectMany(noun => noun.Verbs.Select(verb => new object[] { noun.Name, verb.Name }));
 
+    public static IEnumerable<object[]> TopLevelCommands() => CliHost.PublicCommands.Select(command => new object[] { command.Name });
+
+    [Theory]
+    [MemberData(nameof(TopLevelCommands))]
+    public async Task TopLevelCommandHelp_HasADescription_UsageAndAnExample_AndTouchesNothing(string name)
+    {
+        using var host = new TestHost();
+
+        var exitCode = await host.RunAsync(name, "--help");
+
+        exitCode.Should().Be(0);
+        host.Consoles.StdOut.Should().Contain("DESCRIPTION").And.Contain("USAGE").And.Contain("EXAMPLES").And.Contain($"trom {name}");
+        host.Consoles.StdErr.Should().BeEmpty();
+        await AssertNoEngineOrDeviceTouched(host);
+    }
+
+    [Fact]
+    public async Task RootHelp_ListsTheTopLevelCommands()
+    {
+        using var host = new TestHost();
+
+        await host.RunAsync("--help");
+
+        foreach (var command in CliHost.PublicCommands) host.Consoles.StdOut.Should().Contain(command.Name);
+    }
+
+    [Fact]
+    public async Task ABadOptionOnATopLevelCommand_PointsAtItsHelp()
+    {
+        using var host = new TestHost();
+
+        var exitCode = await host.RunAsync("init", "--bogus");
+
+        exitCode.Should().Be(2);
+        host.Consoles.StdOut.Should().BeEmpty();
+        host.Consoles.StdErr.Should().Contain("trom init --help");
+        await AssertNoEngineOrDeviceTouched(host);
+    }
+
     [Theory]
     [MemberData(nameof(Nouns))]
     public async Task NounHelp_HasADescription_UsageAndExamples_AndListsItsVerbs(string noun)

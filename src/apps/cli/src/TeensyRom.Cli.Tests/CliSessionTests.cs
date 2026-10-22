@@ -41,9 +41,10 @@ public sealed class CliSessionTests : IDisposable
         services.AddTransient<DenyCommand>().AddTransient<TromSettings>();
         services.AddTransient<BoomCommand>();
         services.AddTransient<ChattyCommand>();
+        services.AddTransient<TopCommand>();
         var registrar = new TypeRegistrar(services);
 
-        return new CliSession(Tree(registrar, _consoles.Consoles), Tree(registrar, _consoles.Consoles with { Out = _consoles.Err }), output, _consoles.Consoles, Nouns);
+        return new CliSession(Tree(registrar, _consoles.Consoles), Tree(registrar, _consoles.Consoles with { Out = _consoles.Err }), output, _consoles.Consoles, Nouns, ["top"]);
     }
 
     private static CommandApp Tree(ITypeRegistrar registrar, CliConsoles consoles)
@@ -55,6 +56,7 @@ public sealed class CliSessionTests : IDisposable
             config.UseStrictParsing();
             config.ConfigureConsole(consoles.Out);
             config.SetApplicationName("trom");
+            config.AddCommand<TopCommand>("top").WithDescription("A top-level command.");
             config.AddBranch("x", branch =>
             {
                 branch.SetDescription("A test noun.");
@@ -166,6 +168,29 @@ public sealed class CliSessionTests : IDisposable
 
         exitCode.Should().Be((int)CliExitCode.Usage);
         _consoles.StdErr.Should().Contain("`trom x` needs a command").And.Contain("COMMANDS");
+        _consoles.StdOut.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ATopLevelCommand_IsNotABareNoun_AndRuns()
+    {
+        var sut = SessionOver();
+
+        var exitCode = await sut.RunAsync(["top"]);
+
+        exitCode.Should().Be(0);
+        _consoles.StdErr.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AnUnknownOptionOnATopLevelCommand_PointsAtItsHelpOnStderr()
+    {
+        var sut = SessionOver();
+
+        var exitCode = await sut.RunAsync(["top", "--bogus"]);
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        _consoles.StdErr.Should().Contain("trom top --help").And.Contain("USAGE");
         _consoles.StdOut.Should().BeEmpty();
     }
 
@@ -282,6 +307,11 @@ public sealed class CliSessionTests : IDisposable
     {
         protected override Task<int> RunAsync(CommandContext context, TromSettings settings, CancellationToken ct) =>
             throw new InvalidOperationException("kaboom");
+    }
+
+    private sealed class TopCommand(ICliOutput output) : TromCommand<TromSettings>(output)
+    {
+        protected override Task<int> RunAsync(CommandContext context, TromSettings settings, CancellationToken ct) => Task.FromResult(0);
     }
 
     private sealed class ChattyCommand(ICliOutput output) : TromCommand<TromSettings>(output)

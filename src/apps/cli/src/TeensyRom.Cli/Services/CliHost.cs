@@ -11,6 +11,7 @@ using TeensyRom.Cli.Commands.Device;
 using TeensyRom.Cli.Commands.Engine;
 using TeensyRom.Cli.Commands.File;
 using TeensyRom.Cli.Commands.Index;
+using TeensyRom.Cli.Commands.Init;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
@@ -54,6 +55,18 @@ internal sealed record PublicVerb(string Name, Type Command, Type Settings, Acti
 
 /// <summary>One noun of the public command tree and the verbs under it.</summary>
 internal sealed record PublicNoun(string Name, string Description, IReadOnlyList<PublicVerb> Verbs);
+
+/// <summary>A command that sits beside the nouns, such as <c>trom init</c>.</summary>
+internal sealed record PublicCommand(string Name, string Description, Type Command, Type Settings, Action<IConfigurator> Configure)
+{
+    /// <summary>Describes <paramref name="name"/> as a top-level command run by <typeparamref name="TCommand"/>, shown with one example.</summary>
+    /// <param name="example">The arguments of the example: <c>["init"]</c>.</param>
+    public static PublicCommand Of<TCommand, TSettings>(string name, string description, string[] example)
+        where TCommand : class, ICommand<TSettings>
+        where TSettings : CommandSettings =>
+        new(name, description, typeof(TCommand), typeof(TSettings), config =>
+            config.AddCommand<TCommand>(name).WithDescription(description).WithExample(example));
+}
 
 /// <summary>
 /// Composition root shared by <c>Program</c> and the end-to-end tests.
@@ -110,6 +123,12 @@ internal static class CliHost
         [
             PublicVerb.Of<GeneratePresetsCommand, GeneratePresetsSettings>("generate", GeneratePresetsSettings.Description, ["chipsynth", "generate", "--clock", "ntsc", "--target", "ASID", "--source", "c:\\your\\preset\\directory"])
         ])
+    ];
+
+    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, and <c>trom wait</c> once it exists.</summary>
+    internal static readonly PublicCommand[] PublicCommands =
+    [
+        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"])
     ];
 
     /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>
@@ -182,6 +201,7 @@ internal static class CliHost
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
         services.AddSingleton<IEngineControl>(engine);
+        services.AddSingleton<IWebUiProbe>(new WebUiProbe());
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
         services.AddSingleton<ICliOutput>(output);
@@ -220,6 +240,11 @@ internal static class CliHost
             services.TryAddTransient(verb.Command);
             services.TryAddTransient(verb.Settings);
         }
+        foreach (var command in PublicCommands)
+        {
+            services.TryAddTransient(command.Command);
+            services.TryAddTransient(command.Settings);
+        }
         foreach (var (command, commandSettings) in TuiFlows)
         {
             services.TryAddSingleton(command);
@@ -233,14 +258,15 @@ internal static class CliHost
         CreateApp(host.Registrar, host.Consoles with { Out = host.Consoles.Err }),
         host.Output,
         host.Consoles,
-        PublicNouns);
+        PublicNouns,
+        PublicCommands.Select(command => command.Name).ToArray());
 
     /// <summary>Builds the interactive menu on the composition's registrar and consoles.</summary>
     public static TuiHost CreateTui(CliComposition host) =>
         new(CreateTuiApp(host.Registrar), host.Gate, host.Output, host.Consoles);
 
     /// <summary>
-    /// The public app: the <c>trom &lt;noun&gt; &lt;verb&gt;</c> tree and nothing else. Help and the version are written to
+    /// The public app: the <c>trom &lt;noun&gt; &lt;verb&gt;</c> tree and the top-level commands, nothing else. Help and the version are written to
     /// <paramref name="consoles"/>' <see cref="CliConsoles.Out"/>.
     /// </summary>
     public static CommandApp CreateApp(ITypeRegistrar registrar, CliConsoles consoles)
@@ -272,6 +298,8 @@ internal static class CliHost
                     foreach (var verb in noun.Verbs) verb.Configure(branch);
                 });
             }
+
+            foreach (var command in PublicCommands) command.Configure(config);
         });
 
         return app;
