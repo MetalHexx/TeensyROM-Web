@@ -195,9 +195,10 @@ function value(
 }
 
 /**
- * Every control a MIDI source can drive, declared once: the transport, voice and SID panel controls for each deck. Each
- * entry reads from `DjStore` and commands through `DeckService` or `MixerService`, so a mapped
- * control is gated exactly like its on-screen twin. The list holds no component and no mapping.
+ * Every control a MIDI source can drive, declared once: the transport, voice and SID panel
+ * controls for each deck. Each entry reads from `DjStore` and commands through `DeckService` or
+ * `MixerService`, so a mapped control is gated exactly like its on-screen twin. The list holds no
+ * component and no mapping.
  */
 @Injectable({ providedIn: 'root' })
 export class MappableControls {

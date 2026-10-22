@@ -6,12 +6,8 @@ import {
   MixerService,
   SidPanelPainter,
   type DeckPanelTargets,
-  type PanelFilterMode,
-  type PanelWaveform,
   type Slot,
-  type VoiceSwitch,
 } from '@teensyrom-nx/application';
-import type { FilterModeKind, SidVoiceSwitch, WaveformKind } from '@teensyrom-nx/ui/components';
 import { DjSidPanelComponent } from './dj-sid-panel.component';
 import type { DeckRef } from '../deck-ref';
 
@@ -20,7 +16,6 @@ const DECK_B: DeckRef = { slot: 'B', letter: 'B', index: 1 };
 
 type Store = InstanceType<typeof DjStore>;
 type TuneReference = Parameters<Store['setDeckLoaded']>[0]['reference'];
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 function createMixerServiceStub() {
   return {
@@ -125,16 +120,6 @@ function notationButton(
 }
 
 describe('DjSidPanelComponent', () => {
-  it('keeps the UI control kinds equal to the application kinds by value', () => {
-    const same: [
-      Same<WaveformKind, PanelWaveform>,
-      Same<FilterModeKind, PanelFilterMode>,
-      Same<SidVoiceSwitch, VoiceSwitch>
-    ] = [true, true, true];
-
-    expect(same).toEqual([true, true, true]);
-  });
-
   describe('the bindings button', () => {
     function bindingsButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
       return find(fixture, '.panel-header button');

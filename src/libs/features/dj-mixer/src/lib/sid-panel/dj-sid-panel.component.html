@@ -3,7 +3,7 @@
     <div class="panel">
       <div #header class="panel-header">
         @for (panel of panels(); track panel.deck.index) {
-        <span class="deck-label-cell" [attr.data-deck]="panel.deck.letter">
+        <span class="deck-label-cell">
           <lib-deck-label
             [label]="'Deck ' + panel.deck.letter"
             [accentSide]="panel.deck.index === 0 ? 'start' : 'end'"

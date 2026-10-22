@@ -40,10 +40,27 @@ No API (port 10213) was running and no device was attached, so the page showed n
 - Closing the bindings panel from its own close button returns focus to the bindings button.
 - Camelot is no longer truncated: the switch is 8.5rem wide, and each cell's text fits (client 67 =
   scroll 67).
-- **Not run: the live rings and lights.** No device or tune was reachable, so the rings following a
-  playing tune, holding on pause, and the ghost on a locked waveform were not checked in the DJ view.
-  Only the still states are verified. The painter's own unit tests cover the register-to-indicator
-  mapping.
+- **Narrow widths are a known limit.** The panel is laid out for 1920 × 1080 at minimum and keeps its
+  fixed 620px column. Measured in the same iframe, a deck card is 474px at 1920, 314px at 1600,
+  227px at 1400 and 167px at 1280, with no strip overflowing down to 1280 (strips 90-91px). At 400px
+  the six strips overflow inside the panel (48px each), though the page itself never scrolls. The old
+  stacked and one-device records were removed with the mixer card and not re-recorded; a breakpoint
+  for narrow layouts is not decided.
+
+## Live rings and lights
+
+Needs no device. Serve the app (`pnpm nx run teensyrom-ui:serve`), serve a bundled `.sid` from a
+local CORS-enabled server, stub the page's `/files/content` fetch to return it, and call
+`DeckService.load('A', ...)` through the dev-mode Angular debug API (`ng.getInjector`).
+
+- Deck A played: the voice-strip and filter-section style fingerprint took 3 distinct states across
+  6 samples, while deck B's stayed constant.
+- After pausing, deck A's fingerprint changed once and then held for 12 samples at 400ms (4.8s).
+- A screenshot showed lit pulse waveforms, the Ring and Filt lights, LP lit, live rings and a Key
+  readout of `5A`.
+
+Recorded from the phase review's browser run. The ghost on a locked waveform was not separately
+checked; the painter's unit tests cover the register-to-indicator mapping.
 
 ## The POC page still runs
 

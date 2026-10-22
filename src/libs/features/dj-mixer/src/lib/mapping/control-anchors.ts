@@ -1,23 +1,30 @@
 import {
+  VOICE_NUMBERS,
   VOICE_STRIP_CONTROLS,
   type ControlIdentity,
   type DeckControlId,
 } from '@teensyrom-nx/application';
 
+/** The mute and hold anchors: the voice strip renders its switches under `voice-mute` and
+ *  `voice-hold`, not under the control id. */
+const VOICE_SWITCH_ANCHORS: Record<string, string> = Object.fromEntries(
+  VOICE_NUMBERS.flatMap((voice) =>
+    ['mute', 'hold'].map((switchName) => [
+      `voice-${voice}-${switchName}`,
+      `[data-voice="${voice}"] [data-control="voice-${switchName}"]`,
+    ])
+  )
+);
+
 /** The anchors that do not follow the uniform patterns: the elements the UI components render
- *  under their own `data-part`, `jump-*` and `voice-mute|hold` names. */
+ *  under their own `data-part` and `jump-*` names, plus the voice switches. */
 const ANCHOR_OVERRIDES: Partial<Record<DeckControlId, string>> = {
   'subtune-previous': '[data-control="subtune"] [data-part="previous"]',
   'subtune-next': '[data-control="subtune"] [data-part="next"]',
   'speed-jump-up': '[data-control="jump-up"]',
   'speed-jump-home': '[data-control="jump-home"]',
   'speed-jump-down': '[data-control="jump-down"]',
-  'voice-1-mute': '[data-voice="1"] [data-control="voice-mute"]',
-  'voice-2-mute': '[data-voice="2"] [data-control="voice-mute"]',
-  'voice-3-mute': '[data-voice="3"] [data-control="voice-mute"]',
-  'voice-1-hold': '[data-voice="1"] [data-control="voice-hold"]',
-  'voice-2-hold': '[data-voice="2"] [data-control="voice-hold"]',
-  'voice-3-hold': '[data-voice="3"] [data-control="voice-hold"]',
+  ...VOICE_SWITCH_ANCHORS,
 };
 
 const VOICE_STRIP_CONTROL_SET: ReadonlySet<string> = new Set(VOICE_STRIP_CONTROLS);

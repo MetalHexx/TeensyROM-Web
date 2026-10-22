@@ -26,6 +26,7 @@ import {
   type Slot,
   type VoiceKnob,
   type VoiceSwitch,
+  VOICE_NUMBERS,
 } from '@teensyrom-nx/application';
 import {
   DeckLabelComponent,
@@ -44,8 +45,6 @@ import {
   type SidVoiceStripModel,
 } from '@teensyrom-nx/ui/components';
 import type { DeckRef } from '../deck-ref';
-
-const VOICES_PER_DECK = 3;
 
 const KEY_FORMAT_OPTIONS: readonly SegmentedControlOption[] = [
   { id: 'camelot', label: 'Camelot' },
@@ -166,7 +165,6 @@ function buildDeckPanel(
 @Component({
   selector: 'lib-dj-sid-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { style: 'grid-area: mx' },
   imports: [
     ScalingCompactCardComponent,
     SynthPanelComponent,
@@ -227,9 +225,9 @@ export class DjSidPanelComponent {
       this.decks().forEach(({ slot }, deckIndex) => {
         const filter = sections[deckIndex]?.liveTargets();
         const voices = strips
-          .slice(deckIndex * VOICES_PER_DECK, (deckIndex + 1) * VOICES_PER_DECK)
+          .slice(deckIndex * VOICE_NUMBERS.length, (deckIndex + 1) * VOICE_NUMBERS.length)
           .map((strip) => strip.liveTargets());
-        if (!filter || voices.length !== VOICES_PER_DECK) return;
+        if (!filter || voices.length !== VOICE_NUMBERS.length) return;
         const targets: DeckPanelTargets = {
           voices,
           cutoff: filter.cutoff,
