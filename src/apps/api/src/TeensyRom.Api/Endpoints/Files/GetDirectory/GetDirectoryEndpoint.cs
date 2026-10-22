@@ -12,6 +12,8 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
             Get("/api/devices/{deviceId}/storage/{storageType}/directories")
                 .Produces<GetDirectoryResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
+                .Produces<string>(StatusCodes.Status404NotFound, "application/json")
+                .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("GetDirectory")
                 .WithSummary("Get Directory")
                 .WithTags("Files")
@@ -37,15 +39,20 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
                 SendNotFound($"The storage {r.StorageType} is not available.");
                 return;
             }
-            var storageItem = await storage.GetDirectory(new DirectoryPath(r.Path!));
-            if (storageItem is null)
+            var read = await storage.ReadDirectory(new DirectoryPath(r.Path!));
+            if (read.Failure is not null)
+            {
+                SendExternalError(read.Failure);
+                return;
+            }
+            if (read.Item is null)
             {
                 SendNotFound($"The directory {r.Path} was not found.");
                 return;
             }
             Response = new()
             {
-                StorageItem = StorageCacheDto.FromCache(storageItem)
+                StorageItem = StorageCacheDto.FromCache(read.Item)
             };
             Send();
         }

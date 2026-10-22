@@ -5,6 +5,7 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial.Commands.LaunchFile;
 using TeensyRom.Core.Serial.Recovery;
@@ -68,18 +69,30 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 				{
 					if (!port.IsOpen)
 					{
-						port.OpenPort();
-					}
-					else
-					{
-						port.ClearBuffers();
+						port.OpenPort(options.ConnectTimeoutMs);
 					}
 				}
-				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
+				catch (Exception ex) when (device is not null && ex is not TeensyLinkException && TransportDrop.IsDrop(ex, port))
 				{
-					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
-					throw;
+					// Nothing has been sent yet: a unit that comes back runs the command, and the pre-checks
+					// below deal with wherever it came back to.
+					var transport = TransportOf(device, port);
+					var reopened = await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
+
+					if (reopened.StuckTcpSession)
+					{
+						throw await StuckSessionFailureAsync(device, cancellationToken);
+					}
+
+					if (!reopened.Reachable)
+					{
+						throw new TeensyLinkException(LinkMessages.LinkLost(transport));
+					}
 				}
+
+				// Whatever the last connection left queued must not be read as this command's reply, whether
+				// the link was already open, was reopened above, or came back through recovery.
+				if (port.IsOpen) port.ClearBuffers();
 
 				if (device is not null)
 				{
@@ -90,11 +103,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
 						if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
 						{
-							return new()
-							{
-								IsSuccess = false,
-								Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
-							};
+							return MinimalFailure();
 						}
 
 						if (device.Connection.MenuBootPending)
@@ -138,10 +147,16 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					}
 				}
 
-				var busyRetries = 0;
+				var commandName = typeof(TRequest).Name;
+				var sends = 0;
+				long? writtenAtSend = null;
 
+				// The command goes out at most twice in total, whichever of the busy or the link re-send uses
+				// the second.
 				async Task<TResponse> SendAsync()
 				{
+					sends++;
+					writtenAtSend = port.BytesWritten;
 					var response = await next();
 
 					// A launch owns its own end state - a handler-swapping launch deliberately leaves the
@@ -153,13 +168,39 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					return response;
 				}
 
+				bool IsLinkFailure(Exception ex) =>
+					device is not null && ex is not TeensyLinkException && (ex is TimeoutException || TransportDrop.IsDrop(ex, port));
+
+				// A link failure on the second and last send: leave the device consistent, then say what is true.
+				// A timeout on a link that still looks open is probed first, so a unit that is only slow keeps
+				// its link and its timeout.
+				async Task<Exception> FailAfterLastSendAsync(ConnectionType transport, Exception failure)
+				{
+					var reason = TransportDrop.IsDrop(failure, port) ? RecoveryReason.Drop : RecoveryReason.SuspectLink;
+					var settled = await recovery.RecoverAsync(device!, reason, cancellationToken);
+
+					if (settled.StuckTcpSession)
+					{
+						return await StuckSessionFailureAsync(device!, cancellationToken);
+					}
+
+					if (reason == RecoveryReason.SuspectLink && settled.Reachable && !settled.LinkReplaced)
+					{
+						return failure;
+					}
+
+					return new TeensyLinkException(settled.Reachable
+						? LinkMessages.OutcomeUnknown(transport)
+						: LinkMessages.LinkLost(transport));
+				}
+
 				try
 				{
 					try
 					{
 						return await SendAsync();
 					}
-					catch (TeensyBusyException) when (busyRetries++ == 0)
+					catch (TeensyBusyException) when (sends == 1)
 					{
 						device?.MarkBusy();
 						var resetFailure = ResetBusyDevice(port, device);
@@ -172,10 +213,84 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 						return await SendAsync();
 					}
 				}
-				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
+				catch (Exception ex) when (IsLinkFailure(ex))
 				{
-					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
-					throw;
+					var transport = TransportOf(device!, port);
+					var reason = TransportDrop.IsDrop(ex, port) ? RecoveryReason.Drop : RecoveryReason.SuspectLink;
+					var writtenAtFailure = port.BytesWritten;
+					var nothingWentOut = writtenAtSend is not null && writtenAtFailure is not null && writtenAtSend == writtenAtFailure;
+
+					if (sends > 1)
+					{
+						throw await FailAfterLastSendAsync(transport, ex);
+					}
+
+					var outcome = await recovery.RecoverAsync(device!, reason, cancellationToken);
+
+					if (outcome.StuckTcpSession)
+					{
+						throw await StuckSessionFailureAsync(device!, cancellationToken);
+					}
+
+					if (!outcome.Reachable)
+					{
+						throw new TeensyLinkException(LinkMessages.LinkLost(transport));
+					}
+
+					if (reason == RecoveryReason.SuspectLink && !outcome.LinkReplaced)
+					{
+						// The unit answered on the link it already had: it was only slow.
+						throw;
+					}
+
+					if (device!.Connection.Mode == DeviceMode.Minimal)
+					{
+						return MinimalFailure();
+					}
+
+					if (device.Connection.MenuBootPending)
+					{
+						return MenuStillBooting();
+					}
+
+					if (request is not IReadCommand && !nothingWentOut)
+					{
+						log.InternalWarning($"CommunicationPortBehavior: not re-sending {commandName}: bytes already went out");
+						throw new TeensyLinkException(LinkMessages.OutcomeUnknown(transport));
+					}
+
+					if (device.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
+					{
+						// Recovery found the firmware busy: reset it first, or the re-send meets Busy! on its last send.
+						var resetFailure = ResetBusyDevice(port, device);
+
+						if (resetFailure is not null)
+						{
+							return resetFailure;
+						}
+
+						device.MarkIdle();
+
+						if (request is ResetCommand)
+						{
+							return GateResetWasTheReset();
+						}
+					}
+
+					log.Internal($"CommunicationPortBehavior: link {reason} on {transport}: recovered in {(long)outcome.Elapsed.TotalMilliseconds} ms; re-sending {commandName} once");
+					port.ClearBuffers();
+
+					try
+					{
+						var resent = await SendAsync();
+						log.Internal($"CommunicationPortBehavior: re-send of {commandName} succeeded");
+						return resent;
+					}
+					catch (Exception resendEx) when (IsLinkFailure(resendEx))
+					{
+						log.InternalWarning($"CommunicationPortBehavior: re-send of {commandName} failed: {resendEx.Message}");
+						throw await FailAfterLastSendAsync(transport, resendEx);
+					}
 				}
 			}
 			finally
@@ -224,6 +339,28 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 			log.Internal("CommunicationPortBehavior: the gate's reset was the reset command's reset; not resetting again");
 			return new();
 		}
+
+		/// <summary>
+		/// Recovery found the unit's TCP session stuck: tries to rebuild it on its USB port and says which
+		/// happened. The command is not re-sent on the new device - its port is bound to the old one. Awaits
+		/// the manager's occasion queue while this device's lock is held; that cannot deadlock because nothing
+		/// in <c>TeensyRom.Core.Device</c> sends MediatR commands, so keep it that way.
+		/// </summary>
+		private async Task<TeensyLinkException> StuckSessionFailureAsync(TeensyRomDevice device, CancellationToken cancellationToken)
+		{
+			var fallback = await devices.FallBackToSerialAsync(device.DeviceId, cancellationToken);
+
+			return new TeensyLinkException(fallback is not null ? LinkMessages.FellBackToSerial : LinkMessages.StuckSession);
+		}
+
+		private static ConnectionType TransportOf(TeensyRomDevice device, ICommunicationPort port) =>
+			device.Connection.TransportInUse ?? port.GetConnectionType();
+
+		private static TResponse MinimalFailure() => new()
+		{
+			IsSuccess = false,
+			Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
+		};
 
 		private TResponse MenuStillBooting() => new()
 		{

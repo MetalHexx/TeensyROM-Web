@@ -64,6 +64,22 @@ public class PingDeviceEndpointTests
         endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("Unable to connect to COM7");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("\0\0")]
+    public async Task Handle_PingCommandFailsWithBlankError_SendsANonEmptyTitle(string error)
+    {
+        GivenDevice();
+        _mediator.Send(Arg.Any<PingCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new PingResult { IsSuccess = false, Error = error });
+        var endpoint = EndpointFactory.CreateEndpoint<PingDeviceEndpoint>(_deviceManager, _mediator);
+
+        await endpoint.Handle(new PingDeviceRequest { DeviceId = DeviceId }, CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
+        endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().NotBeNullOrWhiteSpace();
+    }
+
     [Fact]
     public async Task Handle_UnknownDevice_SendsNotFound()
     {

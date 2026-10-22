@@ -18,7 +18,6 @@ public class CartFinderIntegrationTests
     private readonly ILoggingService _log = Substitute.For<ILoggingService>();
     private readonly IStorageFactory _storageFactory = Substitute.For<IStorageFactory>();
     private readonly IDeviceInterrogator _interrogator = Substitute.For<IDeviceInterrogator>();
-    private readonly IAlertService _alert = Substitute.For<IAlertService>();
     private readonly IDeviceRecovery _recovery = Substitute.For<IDeviceRecovery>();
     private readonly IDeviceSettingsProvider _settingsProvider = Substitute.For<IDeviceSettingsProvider>();
 
@@ -64,7 +63,7 @@ public class CartFinderIntegrationTests
         _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), Arg.Any<TeensyStorageType>()).Returns(StoragePresence.Present);
         _storageFactory.Create(Arg.Any<CartStorage>(), Arg.Any<ICommunicationPort>()).Returns(Substitute.For<IStorageService>());
 
-        var finder = new CartFinder(_log, _storageFactory, _interrogator, _alert, _recovery, strategies, _settingsProvider, new ConnectionOptions());
+        var finder = new CartFinder(_log, _storageFactory, _interrogator, _recovery, strategies, _settingsProvider, new ConnectionOptions());
 
         var result = await finder.FindDevices(CancellationToken.None);
 

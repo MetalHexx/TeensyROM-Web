@@ -8,12 +8,10 @@ namespace TeensyRom.Core.Serial
     public class DeviceTransportFactory : IDeviceTransportFactory
     {
         private readonly ILoggingService _log;
-        private readonly IAlertService _alert;
 
-        public DeviceTransportFactory(ILoggingService log, IAlertService alert)
+        public DeviceTransportFactory(ILoggingService log)
         {
             _log = log;
-            _alert = alert;
         }
 
         public ICommunicationPort Create(TeensyRomDevice device)

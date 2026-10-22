@@ -69,7 +69,7 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Name = "Tune.sid" });
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Name = "Tune.sid" }));
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);
@@ -90,7 +90,7 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Name = "Tune.sid" });
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Name = "Tune.sid" }));
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);
@@ -103,10 +103,10 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(_ =>
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(_ =>
         {
             Update(s => s with { SearchSettings = s.SearchSettings with { BannedFiles = [.. s.SearchSettings.BannedFiles, "Tune.sid"] } });
-            return new FileItem { Name = "Tune.sid" };
+            return FileLookupResult.Found(new FileItem { Name = "Tune.sid" });
         });
         var endpoint = NewEndpoint();
 
@@ -124,10 +124,10 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(_ =>
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(_ =>
         {
             Update(s => s with { AppSettings = s.AppSettings with { FirstTimeSetup = false } });
-            return new FileItem { Name = "Tune.sid" };
+            return FileLookupResult.Found(new FileItem { Name = "Tune.sid" });
         });
         var endpoint = NewEndpoint();
 
@@ -145,7 +145,7 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(path: path), CancellationToken.None);
@@ -187,7 +187,7 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns((FileItem?)null);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);
@@ -202,12 +202,27 @@ public class BanFileEndpointTests
     {
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        _sdStorage.GetFile(Arg.Any<FilePath>()).Returns(new FileItem { Name = "Tune.sid" });
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Name = "Tune.sid" }));
         _settingsService.UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>()).Returns(false);
         var endpoint = NewEndpoint();
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
+    }
+
+    [Fact]
+    public async Task Handle_FileLookupFailed_SendsBadGatewayWithTheFailureAndBansNothing()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("The link dropped."));
+        var endpoint = NewEndpoint();
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
+        endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("The link dropped.");
+        _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
     }
 }

@@ -23,6 +23,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
                 .ProducesProblem(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("GetFileContent")
                 .WithSummary("Get File Content")
                 .WithTags("Files")
@@ -50,7 +51,14 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
             }
             var filePath = new FilePath(r.Path!);
 
-            var metadata = await storage.GetFile(filePath);
+            var lookup = await storage.LookupFile(filePath);
+            if (lookup.Failure is not null)
+            {
+                SendExternalError(lookup.Failure);
+                return;
+            }
+
+            var metadata = lookup.File;
             if (metadata is not null && metadata.Size > MaxFileBytes)
             {
                 SendTooLarge(r.Path!);

@@ -7,6 +7,7 @@ using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Games;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
+using TeensyRom.Core.Serial.Commands.Common;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.ValueObjects;
 
@@ -39,24 +40,28 @@ namespace TeensyRom.Core.Storage
     public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort) : IStorageService
     {
         private readonly ICommunicationPort _communicationPort = communicationPort;
-        public async Task<FileItem?> GetFile(FilePath path)
-        {
-            var directory = await GetDirectory(path.Directory);
+        public async Task<FileItem?> GetFile(FilePath path) => (await LookupFile(path)).File;
 
-            if (directory is null)
+        public async Task<FileLookupResult> LookupFile(FilePath path)
+        {
+            var read = await ReadDirectory(path.Directory);
+
+            if (read.Failure is not null) return FileLookupResult.Failed(read.Failure);
+
+            if (read.Item is null)
             {
                 log.InternalWarning($"The parent directory {path.Directory} was not found", settings.CartStorage.DeviceId);
-                return null;
+                return FileLookupResult.NotFound();
             }
-            var file = directory.Files
+            var file = read.Item.Files
                 .FirstOrDefault(f => f.Path.Equals(path));
 
             if (file is null)
             {
                 log.InternalWarning($"The file {path.FileName} was not found in the directory {path.Directory}", settings.CartStorage.DeviceId);
-                return null;
+                return FileLookupResult.NotFound();
             }
-            return file;
+            return FileLookupResult.Found(file);
         }
 
         public async Task<FileBytesResult> ReadFileBytes(FilePath filePath, CancellationToken ct)
@@ -94,17 +99,19 @@ namespace TeensyRom.Core.Storage
             }
         }
 
-        public async Task<IStorageCacheItem?> GetDirectory(DirectoryPath path)
+        public async Task<IStorageCacheItem?> GetDirectory(DirectoryPath path) => (await ReadDirectory(path)).Item;
+
+        public async Task<DirectoryReadResult> ReadDirectory(DirectoryPath path)
         {
             var bans = settings.GetBans();
 
-            if (BanMatcher.IsBannedDirectory(path.Value, bans.Directories)) return null;
+            if (BanMatcher.IsBannedDirectory(path.Value, bans.Directories)) return DirectoryReadResult.NotFound();
 
             var cacheItem = cache.GetByDirPath(path);
 
             if (cacheItem != null)
             {
-                return WithoutBannedItems(cacheItem, bans);
+                return DirectoryReadResult.Found(WithoutBannedItems(cacheItem, bans));
             }
 
             var response = await mediator.Send(new GetDirectoryRecursiveCommand
@@ -116,20 +123,37 @@ namespace TeensyRom.Core.Storage
                 CommunicationPort = _communicationPort
             });
 
-            if (!response.IsSuccess) return null;
+            if (!response.IsSuccess)
+            {
+                switch (response.ErrorCode)
+                {
+                    case GetDirectoryErrorCode.PathParamError:
+                    case GetDirectoryErrorCode.DirectoryNotFoundError:
+                    case GetDirectoryErrorCode.NotADirectoryError:
+                    case GetDirectoryErrorCode.EmptyDirectory:
+                        return DirectoryReadResult.NotFound();
+
+                    default:
+                        var failure = string.IsNullOrWhiteSpace(response.Error?.Trim('\0'))
+                            ? "Could not read the directory from the TeensyROM."
+                            : response.Error;
+                        log.InternalError($"The directory {path} could not be read: {failure}", settings.CartStorage.DeviceId);
+                        return DirectoryReadResult.Failed(failure);
+                }
+            }
 
             var dirContent = response.DirectoryContent.FirstOrDefault();
 
             if (dirContent is null)
             {
                 log.InternalWarning($"The directory {path} was not found", settings.CartStorage.DeviceId);
-                return null;
+                return DirectoryReadResult.NotFound();
             }
 
             cacheItem = await SaveDirectoryToCache(dirContent);
 
             cache.WriteToDisk();
-            return WithoutBannedItems(cacheItem, bans);
+            return DirectoryReadResult.Found(WithoutBannedItems(cacheItem, bans));
         }
         public async Task<bool> CacheAll(CancellationToken ct)
         {

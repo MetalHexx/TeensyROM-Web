@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ResponseError } from '@teensyrom-nx/data-access/api-client';
-import { extractErrorMessage } from './api-error.utils';
+import { extractErrorMessage, extractProblemMessage } from './api-error.utils';
 
 function responseErrorWithBody(body: unknown, contentType = 'application/json'): ResponseError {
   const response = new Response(JSON.stringify(body), {
@@ -8,6 +8,74 @@ function responseErrorWithBody(body: unknown, contentType = 'application/json'):
   });
   return new ResponseError(response, 'Response returned an error code');
 }
+
+describe('extractProblemMessage', () => {
+  it('resolves ProblemDetails.title when present', async () => {
+    const error = responseErrorWithBody({
+      title: 'Invalid request',
+      detail: 'Field X is required',
+    });
+
+    await expect(extractProblemMessage(error)).resolves.toBe('Invalid request');
+  });
+
+  it('falls back to ProblemDetails.detail when title is absent', async () => {
+    const error = responseErrorWithBody({ detail: 'Field X is required' });
+
+    await expect(extractProblemMessage(error)).resolves.toBe('Field X is required');
+  });
+
+  it('treats a blank title as absent and uses detail', async () => {
+    const error = responseErrorWithBody({ title: '   ', detail: 'Field X is required' });
+
+    await expect(extractProblemMessage(error)).resolves.toBe('Field X is required');
+  });
+
+  it('resolves undefined when the title is blank and there is no detail', async () => {
+    const error = responseErrorWithBody({ title: '   ' });
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves undefined when the title is NUL-only', async () => {
+    const error = responseErrorWithBody({ title: '\u0000\u0000' });
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves the message of a bare JSON string body, as the API sends for a 404', async () => {
+    const response = new Response('"The directory /games was not found."', {
+      status: 404,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    });
+    const error = new ResponseError(response, 'Response returned an error code');
+
+    await expect(extractProblemMessage(error)).resolves.toBe('The directory /games was not found.');
+  });
+
+  it('resolves undefined for a blank bare JSON string body', async () => {
+    const error = responseErrorWithBody('  \u0000 ');
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves undefined for a null JSON body', async () => {
+    const error = responseErrorWithBody(null);
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves undefined for a non-JSON response body', async () => {
+    const response = new Response('not json', { headers: { 'content-type': 'text/plain' } });
+    const error = new ResponseError(response, 'Boom');
+
+    await expect(extractProblemMessage(error)).resolves.toBeUndefined();
+  });
+
+  it('resolves undefined for an error that is not a ResponseError', async () => {
+    await expect(extractProblemMessage(new Error('Boom'))).resolves.toBeUndefined();
+  });
+});
 
 describe('extractErrorMessage', () => {
   it('resolves ProblemDetails.title when present', async () => {

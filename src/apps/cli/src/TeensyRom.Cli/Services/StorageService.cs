@@ -15,14 +15,15 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
     // tr-web has no more and only then drops the other storage's files.
     private const int SearchPageSize = 1000;
 
-    // tr-web answers 404 for any directory read that fails, including a read over a stale link to the device, which the
-    // next attempt re-establishes. A path that is really missing fails every attempt.
+    // tr-web re-sends failed reads itself and answers a read that still fails with 502 (surfaced as is), so a 404 means
+    // the directory was not found. The retries stay as a cheap guard against a transient miss; a path that is really
+    // missing fails every attempt.
     private const int DirectoryAttempts = 3;
 
     private static readonly string[] DirectoryFailureCauses =
     [
         "The directory does not exist on this storage.",
-        "The device did not answer: its connection may have gone stale, or it may be busy or powered off."
+        "The directory exists but is empty."
     ];
 
     public TeensyStorageType StorageType { get; private set; } = settingsService.GetSettings().StorageType;
@@ -54,13 +55,13 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
             {
                 if (attempt < DirectoryAttempts) continue;
 
-                // Only tr-web's directory 404 can be a failed read; "storage not available" and "device not found" are answers.
+                // Only tr-web's directory 404 is retried and reworded; "storage not available" and "device not found" are answers.
                 if (!ex.Message.StartsWith("The directory ", StringComparison.Ordinal)) throw;
 
                 var device = devices.SelectedDevice?.Name ?? deviceId;
 
                 throw new TeensyApiException(
-                    $"The directory {path} was not found, or {device} did not answer, after {attempt} attempts — check the path with `trom file ls`, or the device with `trom device ping`.",
+                    $"The directory {path} was not found on {device} after {attempt} attempts — check the path with `trom file ls`.",
                     ex.StatusCode,
                     ex,
                     new ErrorDetails(path, device, attempt, DirectoryFailureCauses));

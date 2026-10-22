@@ -81,8 +81,7 @@ public sealed class HardwareFixture : IAsyncLifetime
         Interrogator = new DeviceInterrogator(Log);
         Recovery = new DeviceRecovery(Interrogator, Locator, Options, Log);
 
-        var alert = Substitute.For<IAlertService>();
-        Transports = new DeviceTransportFactory(Log, alert);
+        Transports = new DeviceTransportFactory(Log);
 
         var discoveryStrategies = new IDiscoveryStrategy[]
         {
@@ -97,7 +96,7 @@ public sealed class HardwareFixture : IAsyncLifetime
             Log,
             Substitute.For<ISearchSettingsProvider>());
 
-        _finder = new CartFinder(Log, storageFactory, Interrogator, alert, Recovery, discoveryStrategies, Substitute.For<IDeviceSettingsProvider>(), Options);
+        _finder = new CartFinder(Log, storageFactory, Interrogator, Recovery, discoveryStrategies, Substitute.For<IDeviceSettingsProvider>(), Options);
 
         Manager = BuildManager();
 

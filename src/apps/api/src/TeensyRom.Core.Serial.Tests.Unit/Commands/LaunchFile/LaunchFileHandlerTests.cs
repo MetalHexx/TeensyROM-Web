@@ -234,6 +234,44 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.LaunchResult.Should().Be(LaunchFileResultType.Disconnected);
         }
 
+        /// <summary>A SID cannot reboot the unit into minimal, so a link lost after the ack is a plain drop and the launch may have run.</summary>
+        [Fact]
+        public async Task Handle_SidLaunch_LinkDropsAfterTheAckAndComesBack_ReportsOutcomeUnknown()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty);
+            _recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
+                .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.FromSeconds(1), null));
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/music/tune.sid"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeFalse();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Error);
+            result.Error.Should().Be(LinkMessages.OutcomeUnknown(ConnectionType.Serial));
+            await _recovery.DidNotReceive().RecoverAsync(device, RecoveryReason.LargeLaunch, Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_SidLaunch_LinkDropsAfterTheAckAndCannotBeRecovered_ReportsLinkLost()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty);
+            _recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
+                .Returns(new RecoveryOutcome(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.FromSeconds(1), "no reply"));
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/music/tune.sid"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeFalse();
+            result.LaunchResult.Should().Be(LaunchFileResultType.Disconnected);
+            result.Error.Should().Be(LinkMessages.LinkLost(ConnectionType.Serial));
+        }
+
         [Fact]
         public async Task Handle_LargeLaunchOverSerial_PortClosedOnNextRead_RecoversWithoutCallingInterrogator()
         {

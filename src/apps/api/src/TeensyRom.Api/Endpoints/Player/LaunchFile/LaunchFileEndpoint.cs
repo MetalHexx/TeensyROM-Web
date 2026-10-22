@@ -13,6 +13,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
             Post("/api/devices/{deviceId}/storage/{storageType}/launch")
                 .Produces<LaunchFileResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
+                .Produces<string>(StatusCodes.Status404NotFound, "application/json")
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("LaunchFile")
                 .WithSummary("Launch File")
@@ -52,7 +53,15 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
                 storage = device.UsbStorage;
             }
 
-            var file = await storage.GetFile(new FilePath(r.FilePath));
+            var lookup = await storage.LookupFile(new FilePath(r.FilePath));
+
+            if (lookup.Failure is not null)
+            {
+                SendExternalError(lookup.Failure);
+                return;
+            }
+
+            var file = lookup.File;
 
             if (file is null) 
             {

@@ -9,7 +9,9 @@ namespace TeensyRom.Core.Serial.Recovery
     /// <summary>
     /// Classifies an exception a command raised against an open port as "the transport is gone" versus
     /// "the device answered badly or slowly" - the line recovery uses to decide whether a failure is
-    /// worth reacquiring the connection for.
+    /// worth reacquiring the connection for. A TCP connection the unit closed or reset reads as a closed
+    /// port (<see cref="ICommunicationPort.IsOpen"/> is false), so it is a drop by the first rule whatever
+    /// the exception; a read that merely timed out on a live connection is not.
     /// </summary>
     public static class TransportDrop
     {

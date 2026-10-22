@@ -88,9 +88,44 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
+			if (r.LaunchItem.FileType == TeensyFileType.Crt)
+			{
+				// Only a CRT larger than CertainFitCrtBytes can reboot into minimal.
+				var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
 
-			return BuildRecoveryResult(outcome);
+				return BuildRecoveryResult(outcome);
+			}
+
+			var transport = device.Connection.TransportInUse ?? r.CommunicationPort.GetConnectionType();
+			var settled = await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
+
+			if (settled.StuckTcpSession)
+			{
+				// Nothing in TeensyRom.Core.Device sends MediatR commands, so awaiting the manager's occasion queue
+				// while the gate holds this device's lock cannot deadlock.
+				var fallback = await devices.FallBackToSerialAsync(device.DeviceId, cancellationToken);
+
+				return new()
+				{
+					IsSuccess = false,
+					Error = fallback is not null ? LinkMessages.FellBackToSerial : LinkMessages.StuckSession,
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
+			}
+
+			return settled.Reachable
+				? new()
+				{
+					IsSuccess = false,
+					Error = LinkMessages.OutcomeUnknown(transport),
+					LaunchResult = LaunchFileResultType.Error
+				}
+				: new()
+				{
+					IsSuccess = false,
+					Error = LinkMessages.LinkLost(transport),
+					LaunchResult = LaunchFileResultType.Disconnected
+				};
 		}
 
 		/// <summary>
@@ -170,7 +205,18 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				return;
 			}
 
-			var received = ReadResetLines(port, string.Empty, owed, options.LaunchSettleMs, Stopwatch.StartNew());
+			string received;
+
+			try
+			{
+				received = ReadResetLines(port, string.Empty, owed, options.LaunchSettleMs, Stopwatch.StartNew());
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
+			{
+				log.Internal("LaunchFileHandler: the link dropped after the launch was accepted");
+				return;
+			}
+
 			var seen = CountResetLines(received);
 
 			if (seen < owed)

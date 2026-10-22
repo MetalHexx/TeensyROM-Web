@@ -11,6 +11,7 @@ import {
   FileItemDto,
   FileItemType as ApiFileItemType,
   NullableOfTeensyFilterType,
+  ResponseError,
 } from '@teensyrom-nx/data-access/api-client';
 import { StorageService } from './storage.service';
 import {
@@ -1168,6 +1169,69 @@ describe('StorageService', () => {
 
     afterEach(() => {
       logSpy.mockRestore();
+    });
+
+    describe('API ProblemDetails alert messages', () => {
+      const problemDetailsError = (body: unknown): ResponseError =>
+        new ResponseError(
+          new Response(JSON.stringify(body), {
+            status: 502,
+            headers: { 'content-type': 'application/problem+json' },
+          }),
+          'Response returned an error code'
+        );
+
+      const getDirectory = () =>
+        new Promise((resolve, reject) => {
+          service.getDirectory('device-1', StorageType.Sd, '/games').subscribe({
+            next: resolve,
+            error: reject,
+          });
+        });
+
+      it('should alert the ProblemDetails title and rethrow the original error', async () => {
+        const error = problemDetailsError({ title: 'Directory /games does not exist' });
+        mockFilesApiService.getDirectory.mockRejectedValue(error);
+
+        await expect(getDirectory()).rejects.toBe(error);
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('Directory /games does not exist');
+      });
+
+      it('should alert the bare JSON string message of a 404 response', async () => {
+        const error = new ResponseError(
+          new Response('"The directory /games was not found."', {
+            status: 404,
+            headers: { 'content-type': 'application/json; charset=utf-8' },
+          }),
+          'Response returned an error code'
+        );
+        mockFilesApiService.getDirectory.mockRejectedValue(error);
+
+        await expect(getDirectory()).rejects.toBe(error);
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('The directory /games was not found.');
+      });
+
+      it('should alert the ProblemDetails detail when the title is absent', async () => {
+        mockFilesApiService.getDirectory.mockRejectedValue(
+          problemDetailsError({ detail: 'Storage is busy' })
+        );
+
+        await expect(getDirectory()).rejects.toThrow();
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('Storage is busy');
+      });
+
+      it('should alert the fixed message when the title is NUL-only', async () => {
+        mockFilesApiService.getDirectory.mockRejectedValue(
+          problemDetailsError({ title: '\u0000\u0000' })
+        );
+
+        await expect(getDirectory()).rejects.toThrow();
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to retrieve directory');
+      });
     });
 
     describe('getDirectory error handling with alerts', () => {

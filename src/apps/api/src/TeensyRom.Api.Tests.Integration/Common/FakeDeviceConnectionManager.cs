@@ -87,6 +87,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
             return Task.FromResult(result);
         }
 
+        public Task<TeensyRomDevice?> FallBackToSerialAsync(string deviceId, CancellationToken ct)
+            => Task.FromResult<TeensyRomDevice?>(null);
+
         public Task<RenameOutcome> RenameAsync(string deviceId, string name, CancellationToken ct)
         {
             if (!DeviceNameRules.TryNormalize(name, out var normalized))

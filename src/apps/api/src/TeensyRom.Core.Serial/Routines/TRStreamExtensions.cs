@@ -256,6 +256,10 @@ namespace TeensyRom.Core.Serial.Routines
 				{
 					break;
 				}
+				catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
+				{
+					break;
+				}
 
 				var toRead = communicationPort.BytesToRead;
 

@@ -28,6 +28,8 @@ namespace TeensyRom.Core.Serial
       DtrEnable = false
     };
 
+    private long _bytesWritten;
+
     public int BytesToRead => _serialPort.BytesToRead;
     public bool IsOpen => _serialPort.IsOpen;
     public void ClearBuffers() => _serialPort.ClearBuffers();
@@ -38,13 +40,47 @@ namespace TeensyRom.Core.Serial
     public string ReadSerialAsString(int msToWait = 0) => _serialPort.ReadSerialAsString(msToWait);
     public byte[] ReadSerialBytes() => _serialPort.ReadSerialBytes();
     public byte[] ReadSerialBytes(int msToWait = 0) => _serialPort.ReadSerialBytes(msToWait);
-    public void SendIntBytes(uint intToSend, short numBytes) => _serialPort.SendIntBytes(intToSend, numBytes);
-    public void SendSignedChar(sbyte charToSend) => _serialPort.SendSignedChar(charToSend);
-    public void SendSignedShort(short value) => _serialPort.SendSignedShort(value);
     public void WaitForSerialData(int numBytes, int timeoutMs) => _serialPort.WaitForSerialData(numBytes, timeoutMs);
-    public void Write(string text) => _serialPort.Write(text);
-    public void Write(byte[] buffer, int offset, int count) => _serialPort.Write(buffer, offset, count);
-    public void Write(char[] buffer, int offset, int count) => _serialPort.Write(buffer, offset, count);
+
+    public long? BytesWritten => _bytesWritten;
+
+    // Each write wrapper counts before delegating: SendIntBytes writes a byte at a time, so a count taken
+    // afterwards would miss a partial write that threw.
+    public void SendIntBytes(uint intToSend, short numBytes)
+    {
+      _bytesWritten += numBytes;
+      _serialPort.SendIntBytes(intToSend, numBytes);
+    }
+
+    public void SendSignedChar(sbyte charToSend)
+    {
+      _bytesWritten += 1;
+      _serialPort.SendSignedChar(charToSend);
+    }
+
+    public void SendSignedShort(short value)
+    {
+      _bytesWritten += 2;
+      _serialPort.SendSignedShort(value);
+    }
+
+    public void Write(string text)
+    {
+      _bytesWritten += Encoding.UTF8.GetByteCount(text);
+      _serialPort.Write(text);
+    }
+
+    public void Write(byte[] buffer, int offset, int count)
+    {
+      _bytesWritten += count;
+      _serialPort.Write(buffer, offset, count);
+    }
+
+    public void Write(char[] buffer, int offset, int count)
+    {
+      _bytesWritten += count;
+      _serialPort.Write(buffer, offset, count);
+    }
 
     public Unit SetPort(string port) => SetPort(port, isTeensyRomPort: false);
 

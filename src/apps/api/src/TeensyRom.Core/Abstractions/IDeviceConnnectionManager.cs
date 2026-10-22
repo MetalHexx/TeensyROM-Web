@@ -61,6 +61,16 @@ namespace TeensyRom.Core.Abstractions
         Task<ReconnectOutcome> ReconnectAsync(string deviceId, CancellationToken ct);
 
         /// <summary>
+        /// After recovery found a unit's TCP session stuck (the unit is marked unreachable): rebuilds it on its USB serial
+        /// port when one is on record or the descriptor filter names one for its chip, through the same confirm-and-adopt
+        /// path Reconnect uses, but serial only and with no search for missing units. Null when the unit has no known serial
+        /// connection (nothing is opened, nothing beyond an internal log line is written) or the serial confirm misses.
+        /// The record keeps its TCP endpoint and the preferred transport is untouched, so the next start and any Reconnect
+        /// try TCP first and a restarted unit returns to TCP on its own.
+        /// </summary>
+        Task<TeensyRomDevice?> FallBackToSerialAsync(string deviceId, CancellationToken ct);
+
+        /// <summary>
         /// Removes a known, unreachable unit from memory and the saved file - <see cref="ForgetResult.Forgotten"/>.
         /// An available unit is left untouched (<see cref="ForgetResult.StillAvailable"/>); an unknown
         /// chip is <see cref="ForgetResult.UnknownDevice"/>. Runs exclusively of every other occasion, so

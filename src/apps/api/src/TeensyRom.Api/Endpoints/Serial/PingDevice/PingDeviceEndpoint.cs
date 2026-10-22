@@ -39,7 +39,7 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
 
             if (!result.IsSuccess)
             {
-                SendExternalError(result.Error);
+                SendExternalError(string.IsNullOrWhiteSpace(result.Error?.Trim('\0')) ? "The TeensyROM did not answer the ping." : result.Error);
                 return;
             }
 

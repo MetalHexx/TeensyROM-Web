@@ -13,6 +13,9 @@ namespace TeensyRom.Core.Serial.Recovery
         LeaveMinimal,
 
         /// <summary>An unexplained transport drop; either mode counts as success. Ceiling = max(ToMinimal, ToFull).</summary>
-        Drop
+        Drop,
+
+        /// <summary>A command timed out on a link that still looked open; probe it before replacing it. Either mode counts as success. Ceiling = Drop's.</summary>
+        SuspectLink
     }
 }

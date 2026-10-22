@@ -183,6 +183,103 @@ namespace TeensyRom.Core.Device
             RunExclusive(DiscoveryOccasion.Forget, token => RunForget(deviceId), ct);
 
         /// <summary>
+        /// Serial-only confirm of an unreachable unit whose TCP session recovery found stuck, through the
+        /// same confirm-and-adopt path Reconnect uses but with no search for missing units: a network sweep
+        /// is not wanted, and a TCP-only user must not pay for it. Whether serial is known is decided before
+        /// anything touches a COM port. The record keeps its TCP endpoint and the preferred transport is
+        /// untouched, so the next start and any Reconnect try TCP first and a restarted unit returns to it.
+        /// </summary>
+        public Task<TeensyRomDevice?> FallBackToSerialAsync(string deviceId, CancellationToken ct) =>
+            RunExclusive(DiscoveryOccasion.Reconnect, token => RunFallBackToSerial(deviceId, token), ct);
+
+        private async Task<TeensyRomDevice?> RunFallBackToSerial(string deviceId, CancellationToken ct)
+        {
+            if (!_byChip.TryGetValue(deviceId, out var existing) || existing.Connection.Mode != DeviceMode.Unreachable)
+            {
+                return null;
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            var knownPort = existing.Connection.SerialPortName;
+            IReadOnlyList<TeensyRomPort> candidates = [];
+
+            if (string.IsNullOrEmpty(knownPort))
+            {
+                var lookup = _locator.FindByChipId(deviceId);
+
+                if (lookup.FilterAvailable)
+                {
+                    candidates = lookup.Candidates;
+                }
+
+                if (candidates.Count == 0)
+                {
+                    _log.Internal($"DeviceConnectionManager: no serial connection known for {deviceId}; not falling back");
+                    return null;
+                }
+            }
+
+            var row = new CachedConnectionRecord(
+                existing.DeviceId,
+                knownPort,
+                existing.Connection.TcpEndpoint,
+                ConnectionType.Serial,
+                Offline: true,
+                existing.Cart.FwVersion,
+                existing.Cart.HardwareVariant,
+                existing.Cart.IsCompatible,
+                Name: _names.GetValueOrDefault(existing.DeviceId));
+
+            TeensyRomDevice? device;
+
+            try
+            {
+                device = string.IsNullOrEmpty(knownPort)
+                    ? await TryConfirmSerialCandidates(row, candidates, ct)
+                    : await TryConfirmCachedSerialRow(row, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log.Internal($"DeviceConnectionManager: serial fall-back miss for {deviceId}: {ex.Message}");
+                return null;
+            }
+
+            if (device is null)
+            {
+                _log.Internal($"DeviceConnectionManager: serial fall-back for {deviceId} found no answering port in {stopwatch.ElapsedMilliseconds} ms");
+                return null;
+            }
+
+            CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
+            CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+            AdoptConfirmedDevice(device);
+            SaveRecords();
+            _log.InternalSuccess($"DeviceConnectionManager: fell back to serial on {device.Connection.SerialPortName} after a stuck TCP session");
+            return device;
+        }
+
+        /// <summary>Opens each descriptor candidate in order and adopts the first that answers as this chip - the candidate loop of <see cref="TryConfirmCachedSerialRow"/> for a unit with no port on record.</summary>
+        private async Task<TeensyRomDevice?> TryConfirmSerialCandidates(CachedConnectionRecord row, IReadOnlyList<TeensyRomPort> candidates, CancellationToken ct)
+        {
+            foreach (var candidate in candidates)
+            {
+                var isTeensyRomPort = candidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal;
+                var device = await TryOpenAndConfirm(() => _transports.CreateSerial(candidate.PortName, isTeensyRomPort), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
+
+                if (device is not null)
+                {
+                    return device;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Deliberately outside the occasion queue: a rename contacts no device and must not wait behind a
         /// multi-second discovery. It shares the one save path and the names lock instead.
         /// </summary>

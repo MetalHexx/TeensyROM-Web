@@ -34,7 +34,6 @@ namespace TeensyRom.Core.Device
 		ILoggingService log,
 		IStorageFactory storageFactory,
 		IDeviceInterrogator interrogator,
-		IAlertService alert,
 		IDeviceRecovery recovery,
 		IEnumerable<IDiscoveryStrategy> discoveryStrategies,
 		IDeviceSettingsProvider settingsProvider,
@@ -240,17 +239,15 @@ namespace TeensyRom.Core.Device
 		}
 
 		/// <summary>
-		/// Publishes the user-facing alert and log trail for a device whose firmware is below the
+		/// Writes the log trail for a device whose firmware is below the
 		/// supported floor. The device is still created and listed so the UI can report it.
 		/// </summary>
 		private void ReportIncompatibleFirmware(VersionReply reply)
 		{
-			alert.Publish($"TeensyROM firmware check failed. v{VersionReplyParser.FullFirmwareFloor}+ is required. (See: Terminal Logs)");
 			log.InternalError($"TeensyROM firmware check failed. v{VersionReplyParser.FullFirmwareFloor}+ is required.");
 
 			if (reply.FirmwareVersion is null)
 			{
-				alert.Publish("Unable to determine the version of TeensyROM. (See: Terminal Logs)");
 				log.InternalError("Unable to determine the version of TeensyROM.");
 			}
 			else

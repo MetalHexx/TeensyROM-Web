@@ -9,6 +9,7 @@ import {
   TeensyStorageType,
   FileItemDto,
   FileItemType as ApiFileItemType,
+  ResponseError,
 } from '@teensyrom-nx/data-access/api-client';
 import { PlayerService } from './player.service';
 import {
@@ -622,6 +623,57 @@ describe('PlayerService', () => {
       });
 
       service = TestBed.inject(PlayerService);
+    });
+
+    describe('API ProblemDetails alert messages', () => {
+      const problemDetailsError = (body: unknown): ResponseError =>
+        new ResponseError(
+          new Response(JSON.stringify(body), {
+            status: 502,
+            headers: { 'content-type': 'application/problem+json' },
+          }),
+          'Response returned an error code'
+        );
+
+      const launchFile = () => {
+        const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
+        return new Promise((resolve, reject) => {
+          service.launchFile('device-1', fileItem).subscribe({ next: resolve, error: reject });
+        });
+      };
+
+      it('should alert the ProblemDetails title and rethrow the original error', async () => {
+        const error = problemDetailsError({ title: 'Device is not connected' });
+        mockPlayerApi.launchFile.mockRejectedValue(error);
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        await expect(launchFile()).rejects.toBe(error);
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('Device is not connected');
+        consoleSpy.mockRestore();
+      });
+
+      it('should alert the ProblemDetails detail when the title is absent', async () => {
+        mockPlayerApi.launchFile.mockRejectedValue(
+          problemDetailsError({ detail: 'File is locked' })
+        );
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        await expect(launchFile()).rejects.toThrow();
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('File is locked');
+        consoleSpy.mockRestore();
+      });
+
+      it('should alert the fixed message when the title is blank', async () => {
+        mockPlayerApi.launchFile.mockRejectedValue(problemDetailsError({ title: '   ' }));
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        await expect(launchFile()).rejects.toThrow();
+
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to launch file');
+        consoleSpy.mockRestore();
+      });
     });
 
     describe('launchFile error handling with alerts', () => {

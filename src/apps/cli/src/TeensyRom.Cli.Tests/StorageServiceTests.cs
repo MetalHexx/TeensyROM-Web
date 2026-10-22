@@ -137,7 +137,7 @@ public class StorageServiceTests
     }
 
     [Fact]
-    public async Task GetDirectory_WhenEveryAttemptIs404_FailsAfterThree_SayingMissingOrNotAnswering_WithDetails()
+    public async Task GetDirectory_WhenEveryAttemptIs404_FailsAfterThree_SayingNotFound_WithDetails()
     {
         _devices.SelectedDevice.Returns(new DeviceSummary(DeviceId, "TR-1", true, "Ethernet 1.2.3.4", "Connected"));
         DirectoryReads(DirectoryNotFound());
@@ -146,7 +146,7 @@ public class StorageServiceTests
 
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
         failure.StatusCode.Should().Be(404);
-        failure.Message.Should().Contain("/music/H/ was not found").And.Contain("TR-1 did not answer").And.Contain("3 attempts");
+        failure.Message.Should().Contain("/music/H/ was not found").And.Contain("TR-1").And.Contain("3 attempts");
         failure.Details.Should().NotBeNull();
         failure.Details!.Path.Should().Be("/music/H/");
         failure.Details.Device.Should().Be("TR-1");

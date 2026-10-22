@@ -15,8 +15,11 @@ namespace TeensyRom.Core.Abstractions
     /// </summary>
     public int BytesToRead { get; }
     public bool IsOpen { get; }
-    
-    
+
+    /// <summary>Running count of bytes this port has handed to its transport since it was created. Null when the
+    /// port cannot tell - callers must read null as "bytes may have gone out".</summary>
+    long? BytesWritten => null;
+
 
     /// <summary>
     /// Clears the input and output buffers of the serial port
