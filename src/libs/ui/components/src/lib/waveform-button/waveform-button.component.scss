@@ -1,0 +1,71 @@
+:host {
+  display: inline-block;
+  --wf-border: var(--synth-control-border);
+  --wf-glyph: var(--synth-control-text-off);
+  --wf-glyph-width: 1.5;
+  --wf-glow: none;
+  --wf-border-style: solid;
+}
+
+:host([data-ghost]) {
+  --wf-glyph: rgba(var(--color-highlight-rgb), 0.45);
+  --wf-border: rgba(var(--color-highlight-rgb), 0.4);
+  --wf-border-style: dashed;
+}
+
+:host([data-lit]) {
+  --wf-glyph: var(--color-highlight);
+  --wf-border: rgba(var(--color-highlight-rgb), 0.6);
+  --wf-border-style: solid;
+  --wf-glyph-width: 2;
+  --wf-glyph-filter: drop-shadow(0 0 2px var(--color-highlight));
+  --wf-glow:
+    0 0 8px rgba(var(--color-highlight-rgb), 0.35), inset 0 0 6px rgba(var(--color-highlight-rgb), 0.18);
+}
+
+:host([data-locked]) {
+  --wf-border: var(--color-primary-bright);
+  --wf-glow:
+    0 0 0 1px var(--color-primary-bright), 0 0 9px rgba(var(--color-primary-bright-rgb), 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.waveform-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--synth-control-face-top), var(--synth-control-face-bottom));
+  border: 1px var(--wf-border-style) var(--wf-border);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--wf-glow);
+  color: var(--wf-glyph);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+svg {
+  width: 16px;
+  height: 10px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--wf-glyph-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: var(--wf-glyph-filter, none);
+}
