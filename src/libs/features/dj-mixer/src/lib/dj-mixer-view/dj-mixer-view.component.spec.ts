@@ -612,7 +612,7 @@ describe('DjMixerViewComponent', () => {
         matches: grid.querySelectorAll(anchorFor(identity)).length,
       })).filter(({ matches }) => matches !== 1);
 
-      expect(ALL_IDENTITIES).toHaveLength(36);
+      expect(ALL_IDENTITIES).toHaveLength(132);
       expect(mismatched).toEqual([]);
     });
   });

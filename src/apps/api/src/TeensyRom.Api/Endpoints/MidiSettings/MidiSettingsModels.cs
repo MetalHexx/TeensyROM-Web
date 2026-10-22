@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using TeensyRom.Core.Common;
 
@@ -74,7 +75,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
     }
 
     /// <summary>
-    /// Binds a MIDI source to a control on a deck or the mixer.
+    /// Binds a MIDI source to a control on a deck.
     /// </summary>
     public record MidiControlMappingDto
     {
@@ -89,12 +90,12 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         [Required] public MidiSourceDto Source { get; set; } = null!;
 
         /// <summary>
-        /// Who owns the control: "A" or "B" for a deck, "mixer" for the mixer.
+        /// Who owns the control: "A" or "B" for a deck. "mixer" is accepted as an owner but owns no controls today.
         /// </summary>
         [Required] public string Owner { get; set; } = string.Empty;
 
         /// <summary>
-        /// The control to drive. A deck control for owner "A" or "B"; "crossfader" for owner "mixer".
+        /// The control to drive: one of the deck control names in the app's deck control list, for owner "A" or "B".
         /// </summary>
         [Required] public string Control { get; set; } = string.Empty;
 
@@ -146,18 +147,15 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         public static readonly IReadOnlySet<string> Owners = new HashSet<string>(StringComparer.Ordinal) { "A", "B", MixerOwner };
 
         /// <summary>
-        /// Mirrors the app's deck control list. A control added there is added here too.
+        /// The deck control names, loaded from the generated contract file embedded in this assembly.
+        /// The app's own test regenerates that file from its deck control list, so the two cannot drift.
         /// </summary>
-        public static readonly IReadOnlySet<string> DeckControls = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "play-pause", "stop", "subtune-previous", "subtune-next", "seek", "speed",
-            "speed-jump-up", "speed-jump-home", "speed-jump-down", "repeat",
-            "voice-1-mute", "voice-2-mute", "voice-3-mute",
-            "voice-1-hold", "voice-2-hold", "voice-3-hold", "clear-voice-mutes",
-            "level", "cutoff", "resonance", "pulse-width", "key"
-        };
+        public static readonly IReadOnlySet<string> DeckControls = LoadDeckControls();
 
-        public static readonly IReadOnlySet<string> MixerControls = new HashSet<string>(StringComparer.Ordinal) { "crossfader" };
+        /// <summary>
+        /// The controls the mixer owns. It owns none today.
+        /// </summary>
+        public static readonly IReadOnlySet<string> MixerControls = new HashSet<string>(StringComparer.Ordinal);
 
         public static readonly IReadOnlySet<string> StyleKinds = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -170,6 +168,19 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         };
 
         public static bool IsValidId(string? id) => id is not null && IdPattern.IsMatch(id);
+
+        private static HashSet<string> LoadDeckControls()
+        {
+            const string resourceName = "TeensyRom.Api.DeckControlIds.json";
+
+            using var stream = typeof(MidiSettingsAllowLists).Assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' is missing from the build.");
+
+            var names = JsonSerializer.Deserialize<string[]>(stream)
+                ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' holds no control list.");
+
+            return new HashSet<string>(names, StringComparer.Ordinal);
+        }
     }
 
     // Validators

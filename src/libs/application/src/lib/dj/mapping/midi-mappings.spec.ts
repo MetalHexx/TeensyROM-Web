@@ -99,6 +99,29 @@ describe('MidiMappings', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
     });
 
+    it('skips a saved mapping on a removed mixer control, keeps a key mapping, and saves only what remains', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [
+          record('level', 7, 'A', 'level'),
+          record('cutoff', 8, 'A', 'cutoff'),
+          record('resonance', 9, 'B', 'resonance'),
+          record('width', 10, 'B', 'pulse-width'),
+          record('crossfader', 11, 'mixer', 'crossfader'),
+          record('key', 12, 'B', 'key'),
+        ],
+      });
+
+      await h.mappings.hydrate();
+      h.mappings.bind(ccSource(20), SPEED_A, style('absolute'));
+
+      expect(h.mappingStore.mappings().map((m) => m.control)).toEqual([KEY_B, SPEED_A]);
+      expect((await saved()).mappings.map((m) => `${m.owner}:${m.control}`)).toEqual([
+        'B:key',
+        'A:speed',
+      ]);
+    });
+
     it('keeps the first mapping when two saved mappings share a source', async () => {
       setUp({
         ...SAVED,

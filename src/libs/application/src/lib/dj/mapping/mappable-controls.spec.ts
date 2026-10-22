@@ -2,35 +2,20 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MappableControl } from './mappable-controls';
 import { logWarn } from '@teensyrom-nx/utils';
-import { controlKey, type ControlId, type ControlOwner } from './mapping.models';
+import {
+  DECK_CONTROL_IDS,
+  VOICE_NUMBERS,
+  VOICE_STRIP_CONTROLS,
+  controlKey,
+  type ControlId,
+  type ControlOwner,
+} from './mapping.models';
 import { setUpMappingHarness, type MappingHarness } from './testing/mapping-harness';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
   return { ...actual, logWarn: vi.fn(actual.logWarn) };
 });
-
-/** The deck controls the server's allow-list accepts. */
-const SERVER_DECK_CONTROLS = [
-  'play-pause',
-  'stop',
-  'subtune-previous',
-  'subtune-next',
-  'seek',
-  'speed',
-  'speed-jump-up',
-  'speed-jump-home',
-  'speed-jump-down',
-  'repeat',
-  'voice-1-mute',
-  'voice-2-mute',
-  'voice-3-mute',
-  'voice-1-hold',
-  'voice-2-hold',
-  'voice-3-hold',
-  'clear-voice-mutes',
-  'key',
-];
 
 /** Lets every pending promise callback run. */
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -66,15 +51,31 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 36 controls: every deck control for both decks', () => {
-      expect(h.controls.all).toHaveLength(36);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(36);
+    it('holds 66 controls per deck, 132 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(132);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(132);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids.sort()).toEqual([...SERVER_DECK_CONTROLS].sort());
+        expect(ids).toHaveLength(66);
+        expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
+      }
+    });
+
+    it('gives every voice every panel control and none of the removed names', () => {
+      const ids = new Set(
+        h.controls.all.filter((c) => c.identity.owner === 'A').map((c) => c.identity.control)
+      );
+
+      for (const n of VOICE_NUMBERS) {
+        for (const control of VOICE_STRIP_CONTROLS) {
+          expect(ids.has(`voice-${n}-${control}` as ControlId)).toBe(true);
+        }
+      }
+      for (const removed of ['level', 'cutoff', 'resonance', 'pulse-width', 'crossfader']) {
+        expect(ids.has(removed as ControlId)).toBe(false);
       }
     });
 
@@ -274,6 +275,133 @@ describe('MappableControls', () => {
 
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith('B', ...extra);
+    });
+  });
+
+  describe('panel controls', () => {
+    beforeEach(() => h.makeShapeable('A'));
+
+    const voiceOf = (voice: number) => h.djStore.deckPanel('A')().voices[voice];
+
+    it.each([
+      ['coarse', 'coarse', 5],
+      ['fine', 'fine', 12.5],
+      ['pulse-width', 'pulseWidth', 300],
+      ['attack', 'attack', 3],
+      ['decay', 'decay', -4],
+      ['sustain', 'sustain', 6],
+      ['release', 'release', -2],
+    ] as const)('voice knob %s sets and reads its own voice only', (id, field, offset) => {
+      for (const n of VOICE_NUMBERS) {
+        const knob = pick('A', `voice-${n}-${id}` as ControlId, 'value');
+        knob.set(offset);
+
+        expect(voiceOf(n - 1)[field]).toBe(offset);
+        expect(knob.read()).toBe(offset);
+        VOICE_NUMBERS.filter((other) => other > n).forEach((other) =>
+          expect(voiceOf(other - 1)[field]).toBe(0)
+        );
+      }
+    });
+
+    it('declares each knob with the panel range and its CC defaults', () => {
+      const coarse = pick('A', 'voice-2-coarse', 'value');
+      expect([coarse.min, coarse.max, coarse.home, coarse.step]).toEqual([-96, 96, 0, 1]);
+      expect(coarse.defaults).toEqual({
+        ccStyle: 'relative-offset',
+        sensitivity: 1 / 192,
+        stepAmount: 1 / 192,
+      });
+      expect(pick('A', 'voice-1-fine', 'value').defaults.sensitivity).toBe(0.01);
+      expect(pick('A', 'voice-3-attack', 'value').defaults.sensitivity).toBe(1 / 30);
+      expect(pick('B', 'filter-cutoff', 'value').defaults.sensitivity).toBe(0.005);
+      expect(pick('B', 'filter-resonance', 'value').defaults.sensitivity).toBe(1 / 30);
+    });
+
+    it.each([
+      ['wave-triangle', 'triangle'],
+      ['wave-sawtooth', 'sawtooth'],
+      ['wave-pulse', 'pulse'],
+      ['wave-noise', 'noise'],
+    ] as const)('%s locks its voice to the waveform and its read follows the lock', (id, kind) => {
+      const wave = pick('A', `voice-3-${id}`, 'state');
+      expect(wave.read()).toBe(false);
+
+      wave.set(true);
+      expect(voiceOf(2).waveformLock).toBe(kind);
+      expect(voiceOf(0).waveformLock).toBeNull();
+      expect(wave.read()).toBe(true);
+
+      wave.set(false);
+      expect(voiceOf(2).waveformLock).toBeNull();
+      expect(wave.read()).toBe(false);
+    });
+
+    it('a waveform reads off while another waveform holds the lock', () => {
+      pick('A', 'voice-1-wave-noise', 'state').set(true);
+
+      expect(pick('A', 'voice-1-wave-pulse', 'state').read()).toBe(false);
+    });
+
+    it.each([
+      ['ring', 'ringLock'],
+      ['sync', 'syncLock'],
+      ['filter', 'filterLock'],
+    ] as const)('%s locks its voice and its read follows the lock', (id, lock) => {
+      const sw = pick('A', `voice-2-${id}`, 'state');
+      expect(sw.read()).toBe(false);
+
+      sw.set(true);
+      expect(voiceOf(1)[lock]).not.toBeNull();
+      expect(voiceOf(0)[lock]).toBeNull();
+      expect(sw.read()).toBe(true);
+
+      sw.set(false);
+      expect(voiceOf(1)[lock]).toBeNull();
+      expect(sw.read()).toBe(false);
+    });
+
+    it('filter knobs set and read the deck filter', () => {
+      pick('A', 'filter-cutoff', 'value').set(400);
+      pick('A', 'filter-resonance', 'value').set(7);
+
+      expect(h.djStore.deckPanel('A')().cutoff).toBe(400);
+      expect(pick('A', 'filter-cutoff', 'value').read()).toBe(400);
+      expect(pick('A', 'filter-resonance', 'value').read()).toBe(7);
+      expect(h.djStore.deckPanel('B')().cutoff).toBe(0);
+    });
+
+    it.each([
+      ['filter-low-pass', 'low-pass'],
+      ['filter-band-pass', 'band-pass'],
+      ['filter-high-pass', 'high-pass'],
+    ] as const)('%s locks the filter mode and its read follows the lock', (id, mode) => {
+      const control = pick('A', id, 'state');
+
+      control.set(true);
+      expect(h.djStore.deckPanel('A')().filterModeLock).toBe(mode);
+      expect(control.read()).toBe(true);
+      expect(pick('A', 'filter-low-pass', 'state').read()).toBe(mode === 'low-pass');
+
+      control.set(false);
+      expect(h.djStore.deckPanel('A')().filterModeLock).toBeNull();
+    });
+
+    it('panic returns its own deck to home and leaves the other alone', () => {
+      h.makeShapeable('B');
+      pick('A', 'voice-1-attack', 'value').set(5);
+      pick('B', 'voice-1-attack', 'value').set(5);
+
+      pick('A', 'panic', 'trigger').fire();
+
+      expect(voiceOf(0).attack).toBe(0);
+      expect(h.djStore.deckPanel('B')().voices[0].attack).toBe(5);
+    });
+
+    it('a deck with nothing loaded refuses a panel knob', () => {
+      pick('B', 'voice-1-coarse', 'value').set(3);
+
+      expect(h.djStore.deckPanel('B')().voices[0].coarse).toBe(0);
     });
   });
 });
