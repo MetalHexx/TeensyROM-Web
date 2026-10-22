@@ -18,6 +18,7 @@ import {
   MidiMappings,
   MidiMappingStore,
   MixerService,
+  SidPanelPainter,
   StorageStore,
   controlKey,
   type ControlIdentity,
@@ -143,9 +144,19 @@ function createDjStoreStub() {
 
 function createMixerServiceStub() {
   return {
+    setVoiceKnob: vi.fn(),
+    setFilterKnob: vi.fn(),
     setKeySemitones: vi.fn(),
+    pressWaveform: vi.fn(),
+    pressSwitch: vi.fn(),
+    pressFilterMode: vi.fn(),
+    panic: vi.fn(),
     setKeyDisplayFormat: vi.fn(),
   };
+}
+
+function createSidPanelPainterStub() {
+  return { attach: vi.fn(() => () => undefined) };
 }
 
 function createDeckServiceStub() {
@@ -220,6 +231,7 @@ function render(
       { provide: DjStore, useValue: createDjStoreStub() },
       { provide: DeckService, useValue: createDeckServiceStub() },
       { provide: MixerService, useValue: createMixerServiceStub() },
+      { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
       { provide: MidiControllers, useValue: midi.controllers },
       { provide: MidiLearn, useValue: midi.learn },
@@ -259,12 +271,12 @@ describe('DjMixerViewComponent', () => {
     // JIT-compiling this component and its deck columns' lifted panels. That cold compile can
     // exceed the project's tight 2000ms testTimeout under CI load; every later test here reuses
     // the compiled TestBed and stays fast, so only this test needs the extra headroom.
-    it('renders exactly two deck columns, lettered A and B, and one mixer card with no enabled devices', () => {
+    it('renders exactly two deck columns, lettered A and B, and one SID panel with no enabled devices', () => {
       const { fixture } = render([]);
 
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
-      expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-sid-panel').length).toBe(1);
     }, 10000);
 
     it('still renders exactly two deck columns with one enabled device', () => {
@@ -476,7 +488,7 @@ describe('DjMixerViewComponent', () => {
   describe('the bindings panel', () => {
     function bindingsButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
       return fixture.nativeElement.querySelector(
-        'lib-dj-mixer-card button[aria-label$="bindings panel"]'
+        'lib-dj-sid-panel button[aria-label$="bindings panel"]'
       );
     }
 
@@ -499,7 +511,7 @@ describe('DjMixerViewComponent', () => {
       expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
     });
 
-    it('opens the panel from the mixer card and closes it from the same button', () => {
+    it('opens the panel from the SID panel and closes it from the same button', () => {
       const { fixture } = render([]);
 
       press(fixture);

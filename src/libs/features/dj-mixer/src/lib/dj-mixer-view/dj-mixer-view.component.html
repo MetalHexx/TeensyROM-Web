@@ -3,11 +3,11 @@
     @for (deck of decks; track deck.index) {
     <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
     }
-    <lib-dj-mixer-card
+    <lib-dj-sid-panel
       [decks]="decks"
       [bindingsOpen]="panelOpen()"
       (bindingsToggle)="togglePanel()"
-    ></lib-dj-mixer-card>
+    ></lib-dj-sid-panel>
     <div class="bottom-band">
       @if (enabledDevices().length === 0) {
 

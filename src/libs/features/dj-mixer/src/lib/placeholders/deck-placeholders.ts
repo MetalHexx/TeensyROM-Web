@@ -3,8 +3,8 @@ import type { DeckRef } from '../deck-ref';
 
 /**
  * Everything one deck column needs to render the panel that stays inert — Loops/Cues. Transport,
- * the binding card, the mixer strip, Voice and Speed are wired live from `DjStore` (see
- * `DjDeckColumnComponent` and `DjMixerCardComponent`) and no longer come from here.
+ * the binding card, the SID panel, Voice and Speed are wired live from `DjStore` (see
+ * `DjDeckColumnComponent` and `DjSidPanelComponent`) and no longer come from here.
  */
 export interface DeckPlaceholderModels {
   readonly loopsCues: LoopsCuesPanelModel;

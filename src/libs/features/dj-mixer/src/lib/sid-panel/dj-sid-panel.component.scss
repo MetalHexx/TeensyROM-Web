@@ -1,0 +1,119 @@
+:host {
+  grid-area: mx;
+}
+
+// The faceplate fills the card and keeps its screws in the corners; its inner padding is trimmed to
+// the scale's small steps so the voice strips get the width the 620px column was sized for.
+.faceplate {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--spacing-sm);
+}
+
+// Voices and lower rows share `1fr 1px 1fr` so the two halves meet at the faint divider. The
+// header and footer centre their middle item over the whole width instead, so nothing but the
+// divider ever sits in the 1px track.
+.panel {
+  --notation-width: 8.5rem;
+
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'head head head'
+    'voices voices voices'
+    'lower lower lower'
+    'foot foot foot';
+  column-gap: var(--spacing-sm);
+  row-gap: var(--spacing-sm);
+}
+
+.panel-header {
+  grid-area: head;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.deck-label-cell {
+  display: contents;
+}
+
+// Each label sits centred over its own half, as the mockup draws it.
+.deck-label-cell lib-deck-label {
+  justify-self: center;
+}
+
+.bindings-button {
+  justify-self: center;
+}
+
+.divider {
+  grid-column: 2;
+  grid-row: voices-start / lower-end;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(var(--glassy-color), 0.2) 20%,
+    rgba(var(--glassy-color), 0.2) 80%,
+    transparent
+  );
+}
+
+// A deck's controls belong to its half; the wrapper takes no box, so its children are placed
+// straight into the panel's grid, in the column the wrapper names.
+.deck {
+  display: contents;
+}
+
+.voices {
+  grid-area: voices;
+  grid-column: var(--deck-column);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 0;
+}
+
+.lower {
+  grid-area: lower;
+  grid-column: var(--deck-column);
+  display: flex;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.lower-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lower-key {
+  flex: 0 0 auto;
+}
+
+// Panic sits under its own half, clear of the notation switch that straddles the middle.
+.panic {
+  grid-area: foot;
+  grid-column: var(--deck-column);
+  justify-self: center;
+  margin-inline-end: calc(var(--notation-width) / 2);
+}
+
+.deck--end .panic {
+  margin-inline-end: 0;
+  margin-inline-start: calc(var(--notation-width) / 2);
+}
+
+.key-notation {
+  grid-area: foot;
+  grid-column: 1 / -1;
+  justify-self: center;
+  align-self: center;
+  width: var(--notation-width);
+}

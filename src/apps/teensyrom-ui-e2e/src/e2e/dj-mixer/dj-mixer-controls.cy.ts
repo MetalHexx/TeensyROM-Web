@@ -1,11 +1,10 @@
-import { VIEWPORT } from '../../support/constants/test.constants';
 import { noDevices } from '../../support/test-data/fixtures';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 
 const DECK_LETTERS = ['A', 'B'] as const;
-const CROSSFADER = 'Crossfader, deck A to deck B';
 const KEY_NOTATION = '[aria-label="Key notation"]';
+const SID_PANEL_VIEWPORT = { width: 1920, height: 1080 } as const;
 
 /** Clears the DJ bindings database before each test so a port bound by one spec never leaks its
  *  selection into the next — bindings persist across page loads by design. */
@@ -41,64 +40,55 @@ describe('DJ Mixer — controls with no tune loaded', () => {
     cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
   });
 
-  it('keeps the gain faders and the crossfader enabled', () => {
+  it('renders the SID panel with both decks voice strips and Panic buttons, and no crossfader', () => {
+    cy.get('lib-dj-sid-panel').should('have.length', 1);
     DECK_LETTERS.forEach((letter) => {
-      cy.get(`[aria-label="Gain deck ${letter}"]`).should('be.enabled');
+      cy.get(`lib-dj-sid-panel [data-deck="${letter}"] lib-sid-voice-strip`).should(
+        'have.length',
+        3
+      );
+      cy.get(`lib-dj-sid-panel [data-deck="${letter}"] [data-control="panic"]`).should(
+        'have.length',
+        1
+      );
     });
-    cy.get(`[aria-label="${CROSSFADER}"]`).should('be.enabled');
+    cy.get('[aria-label]')
+      .filter((_, el) => /crossfader/i.test(el.getAttribute('aria-label') ?? ''))
+      .should('have.length', 0);
   });
 
-  it('keeps every key notation button enabled', () => {
-    cy.get(`${KEY_NOTATION} button`).should('have.length', 2).each((button) => {
-      cy.wrap(button).should('be.enabled');
+  it('keeps Panic and every key notation button enabled', () => {
+    DECK_LETTERS.forEach((letter) => {
+      cy.get(`[data-deck="${letter}"] [data-control="panic"] button`).should('be.enabled');
     });
-  });
-
-  [
-    { name: 'column', width: VIEWPORT.STANDARD.width, height: VIEWPORT.STANDARD.height },
-    { name: 'band', width: VIEWPORT.TABLET.width, height: VIEWPORT.TABLET.height },
-    { name: 'stacked', width: 400, height: 900 },
-  ].forEach(({ name, width, height }) => {
-    it(`centres the one key notation switch between the Key knobs and the faders, and keeps both halves clickable, at the ${name} width`, () => {
-      cy.viewport(width, height);
-
-      cy.get(KEY_NOTATION).should('have.length', 1);
-      cy.get(KEY_NOTATION).should(($switch) => {
-        const root = $switch[0].ownerDocument;
-        const rectOf = (el: Element | null | undefined) => (el as Element).getBoundingClientRect();
-        const keyKnobs = ['A', 'B'].map((letter) =>
-          rectOf(
-            root.querySelector(`[aria-label="Key deck ${letter}"]`)?.closest('lib-rotary-knob')
-          )
-        );
-        const faders = Array.from(root.querySelectorAll('lib-deck-strip .deck-strip-fader')).map(
-          rectOf
-        );
-        const crossfader = rectOf(root.querySelector('lib-crossfader'));
-        const bounds = rectOf($switch[0]);
-        const spanCentre = (faders[0].left + faders[1].right) / 2;
-
-        expect(bounds.top, 'below both Key knobs').to.be.at.least(
-          Math.max(...keyKnobs.map((knob) => knob.bottom)) - 1
-        );
-        expect(bounds.bottom, 'above both faders').to.be.at.most(
-          Math.min(...faders.map((fader) => fader.top)) + 1
-        );
-        expect(bounds.bottom, 'above the crossfader').to.be.at.most(crossfader.top + 1);
-        expect((bounds.left + bounds.right) / 2, 'centred across both decks').to.be.closeTo(
-          spanCentre,
-          1.5
-        );
-        expect(bounds.left, 'reaches the first deck').to.be.at.most(faders[0].left + 1);
-        expect(bounds.right, 'reaches the second deck').to.be.at.least(faders[1].right - 1);
+    cy.get(`${KEY_NOTATION} button`)
+      .should('have.length', 2)
+      .each((button) => {
+        cy.wrap(button).should('be.enabled');
       });
+  });
 
-      // The switch is drawn over the second strip too; a real click proves nothing there covers it.
-      cy.contains(`${KEY_NOTATION} button`, 'Note').click();
-      cy.contains(`${KEY_NOTATION} button`, 'Note').should('have.attr', 'aria-pressed', 'true');
-      cy.contains(`${KEY_NOTATION} button`, 'Camelot').click();
-      cy.contains(`${KEY_NOTATION} button`, 'Camelot').should('have.attr', 'aria-pressed', 'true');
+  it('seats the one key notation switch between the two Panic buttons, and keeps it clickable', () => {
+    cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
+
+    cy.get(KEY_NOTATION).should('have.length', 1);
+    cy.get(KEY_NOTATION).should(($switch) => {
+      const root = $switch[0].ownerDocument;
+      const rectOf = (el: Element | null) => (el as Element).getBoundingClientRect();
+      const [panicA, panicB] = DECK_LETTERS.map((letter) =>
+        rectOf(root.querySelector(`[data-deck="${letter}"] [data-control="panic"]`))
+      );
+      const bounds = rectOf($switch[0]);
+
+      expect(bounds.left, 'right of deck A Panic').to.be.at.least(panicA.right - 1);
+      expect(bounds.right, 'left of deck B Panic').to.be.at.most(panicB.left + 1);
+      expect(Math.abs(bounds.top - panicA.top), 'on the Panic row').to.be.lessThan(panicA.height);
     });
+
+    cy.contains(`${KEY_NOTATION} button`, 'Note').click();
+    cy.contains(`${KEY_NOTATION} button`, 'Note').should('have.attr', 'aria-checked', 'true');
+    cy.contains(`${KEY_NOTATION} button`, 'Camelot').click();
+    cy.contains(`${KEY_NOTATION} button`, 'Camelot').should('have.attr', 'aria-checked', 'true');
   });
 
   it('disables the speed, jump, shaping and voice controls on both decks', () => {
@@ -108,25 +98,27 @@ describe('DJ Mixer — controls with no tune loaded', () => {
       cy.get(`[aria-label="Speed home deck ${letter}"]`).should('be.disabled');
       cy.get(`[aria-label="Speed down 50% deck ${letter}"]`).should('be.disabled');
 
-      ['Cutoff', 'Resonance', 'Pulse width', 'Key'].forEach((control) => {
-        cy.get(`[aria-label="${control} deck ${letter}"]`).should('be.disabled');
+      [
+        `Deck ${letter} filter cutoff`,
+        `Deck ${letter} filter resonance`,
+        `Deck ${letter} voice 1 pulse width`,
+        `Deck ${letter} key`,
+      ].forEach((name) => {
+        cy.get(`[aria-label="${name}"]`).should('be.disabled');
       });
 
-      cy.get(`[aria-label="Resonance deck ${letter}"]`)
-        .should('have.attr', 'min', '0')
-        .and('have.attr', 'max', '1');
-
-      cy.get('[aria-label^="Filter mode"]').should('not.exist');
+      cy.get(`[aria-label="Deck ${letter} filter resonance"]`)
+        .should('have.attr', 'min', '-15')
+        .and('have.attr', 'max', '15');
 
       [1, 2, 3].forEach((voice) => {
         cy.get(`[aria-label="Mute voice ${voice} deck ${letter}"]`).should('be.disabled');
+        cy.get(`[aria-label="Deck ${letter} voice ${voice} ring"]`).should('be.disabled');
       });
     });
   });
 
-  it('keeps gain, crossfader, and key notation across a round trip to another route', () => {
-    cy.get('[aria-label="Gain deck A"]').invoke('val', 0.4).trigger('input');
-    cy.get(`[aria-label="${CROSSFADER}"]`).invoke('val', 0.5).trigger('input');
+  it('keeps the key notation across a round trip to another route', () => {
     cy.contains(`${KEY_NOTATION} button`, 'Note').click();
 
     // The bottom bar's phone nav renders the same `aria-label`, hidden by CSS at desktop width —
@@ -137,8 +129,6 @@ describe('DJ Mixer — controls with no tune loaded', () => {
     cy.get('.nav-rail-item[aria-label="DJ Mixer"]').click();
     cy.url().should('include', APP_ROUTES.djMixer);
 
-    cy.get('[aria-label="Gain deck A"]').should('have.value', '0.4');
-    cy.get(`[aria-label="${CROSSFADER}"]`).should('have.value', '0.5');
-    cy.contains(`${KEY_NOTATION} button`, 'Note').should('have.attr', 'aria-pressed', 'true');
+    cy.contains(`${KEY_NOTATION} button`, 'Note').should('have.attr', 'aria-checked', 'true');
   });
 });
