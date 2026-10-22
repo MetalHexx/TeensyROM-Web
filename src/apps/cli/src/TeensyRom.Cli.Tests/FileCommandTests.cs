@@ -100,12 +100,23 @@ public sealed class FileCommandTests : IDisposable
         IsCompatible = compatible
     };
 
+    private static SongItem EngineSong(string path) => (SongItem)Api.ApiMapper.ToFileItem(FileItemJsonTests.SongDto(path));
+
+    private static readonly string[] FullFields = ["description", "playLength", "subtuneLengths", "startSubtuneNum", "links", "tags", "youTubeVideos", "competitions", "ratingCount", "images", "metadataSource", "meta1", "meta2", "parentPath", "type"];
+
+    private static void AssertFull(JsonElement file)
+    {
+        file.TryGetProperty("storageType", out _).Should().BeFalse();
+        file.GetProperty("storage").GetString().Should().Be("sd");
+        foreach (var field in FullFields.Concat(ItemShape)) file.TryGetProperty(field, out _).Should().BeTrue(field);
+    }
+
     private static JsonElement Parse(string json) => JsonDocument.Parse(json).RootElement;
 
     private static string[] Names(JsonElement element) => element.EnumerateObject().Select(p => p.Name).ToArray();
 
     private static readonly string[] ItemShape =
-        ["name", "path", "storage", "fileType", "size", "isFavorite", "isCompatible", "title", "creator", "releaseInfo", "shareUrl"];
+        ["name", "path", "storage", "fileType", "size", "isFavorite", "isCompatible", "title", "creator", "releaseInfo", "shareUrl", "playLength"];
 
     private static void Leave(TestHost host)
     {
@@ -257,6 +268,45 @@ public sealed class FileCommandTests : IDisposable
         Names(results[0]).Should().Equal(ItemShape);
         results[0].GetProperty("path").GetString().Should().Be("/music/a.sid");
         results[0].GetProperty("storage").GetString().Should().Be("sd");
+    }
+
+    [Fact]
+    public async Task Search_Json_WithFull_WritesEveryFilesFullRecord_AndPlainStaysPaths()
+    {
+        Found(EngineSong("/music/a.sid"));
+
+        var json = NewHost();
+        await json.RunAsync("file", "search", "commando", "--full", "--json");
+        var plain = NewHost();
+        await plain.RunAsync("file", "search", "commando", "--full");
+
+        AssertFull(Parse(json.Consoles.StdOut)[0]);
+        plain.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/a.sid\n");
+    }
+
+    [Fact]
+    public async Task Search_Json_WithoutFull_StaysCompact_EvenForAnEngineRecord()
+    {
+        Found(EngineSong("/music/a.sid"));
+        var host = NewHost();
+
+        await host.RunAsync("file", "search", "commando", "--json");
+
+        Names(Parse(host.Consoles.StdOut)[0]).Should().Equal(ItemShape);
+    }
+
+    [Fact]
+    public async Task Ls_Json_ListsFilesCompact_AndFullWithTheFlag()
+    {
+        _storage.GetDirectory("/music").Returns(new DirectoryListing { Path = "/music", Files = [EngineSong("/music/a.sid")] });
+
+        var compact = NewHost();
+        await compact.RunAsync("file", "ls", "/music", "--json");
+        var full = NewHost();
+        await full.RunAsync("file", "ls", "/music", "--full", "--json");
+
+        Names(Parse(compact.Consoles.StdOut).GetProperty("files")[0]).Should().Equal(ItemShape);
+        AssertFull(Parse(full.Consoles.StdOut).GetProperty("files")[0]);
     }
 
     private const string AlphaFix = "trom index build --device Alpha --storage sd";
@@ -414,6 +464,22 @@ public sealed class FileCommandTests : IDisposable
         result.GetProperty("status").GetString().Should().Be("launched");
         result.GetProperty("message").GetString().Should().Be("Launched");
         Names(result.GetProperty("file")).Should().Equal(ItemShape);
+    }
+
+    [Fact]
+    public async Task Launch_Json_WritesTheFullRecord_AndPlainOutputIsUnchanged()
+    {
+        var song = EngineSong("/music/1.sid");
+        _storage.GetFile("/music/1.sid").Returns(song);
+        _launches.LaunchFile(Arg.Any<TeensyStorageType>(), song).Returns(new LaunchOutcome(LaunchStatus.Launched, song, "Launched"));
+
+        var json = NewHost();
+        await json.RunAsync("file", "launch", "/music/1.sid", "--json");
+        var plain = NewHost();
+        await plain.RunAsync("file", "launch", "/music/1.sid");
+
+        AssertFull(Parse(json.Consoles.StdOut).GetProperty("file"));
+        plain.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/1.sid\n");
     }
 
     [Fact]

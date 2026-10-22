@@ -20,7 +20,8 @@
             ShareUrl = ShareUrl,
             MetadataSource = MetadataSource,
             MetadataSourcePath = MetadataSourcePath,
-            Images = Images.Select(x => x.Clone()).ToList()
+            Images = Images.Select(x => x.Clone()).ToList(),
+            ApiRecord = ApiRecord
         };
     }
 }
