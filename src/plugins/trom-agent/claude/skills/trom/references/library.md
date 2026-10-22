@@ -18,4 +18,4 @@ Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: 
 
 ## Not yet
 
-Copy, delete or send files are not available. Say plainly: "this version of trom can't do that yet".
+If `init`'s `capabilities` does not list a command for what the user asks (copy, delete, send), say plainly: "this version of trom can't do that yet".

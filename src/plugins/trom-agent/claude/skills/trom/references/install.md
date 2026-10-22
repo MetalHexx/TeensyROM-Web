@@ -24,6 +24,7 @@ Check each; for a missing one, offer to install it from its official source or t
 6. Build `trom`: `dotnet build apps/cli/TeensyRom.Cli.sln -c Release`.
 7. Put it on the PATH: run the built `trom` once with `path add` (this adds the folder holding the built `trom`). Open a new terminal, or use the full path, for the rest of the session.
 8. Verify: `trom init --json`. `engine.running` must be true (the CLI builds and starts the engine from the same checkout) and `webUi.available` must be true.
+9. Continue the opening from step 2 in `SKILL.md`, using the `init` result you just got and the full path to `trom` until a new terminal exists.
 
 ## Long steps
 
