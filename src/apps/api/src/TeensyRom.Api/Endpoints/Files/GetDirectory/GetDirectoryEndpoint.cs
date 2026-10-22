@@ -12,7 +12,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
             Get("/api/devices/{deviceId}/storage/{storageType}/directories")
                 .Produces<GetDirectoryResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
-                .ProducesProblem(StatusCodes.Status404NotFound)
+                .Produces<string>(StatusCodes.Status404NotFound, "application/json")
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("GetDirectory")
                 .WithSummary("Get Directory")

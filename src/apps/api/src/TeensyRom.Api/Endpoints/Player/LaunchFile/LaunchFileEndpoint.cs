@@ -13,7 +13,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
             Post("/api/devices/{deviceId}/storage/{storageType}/launch")
                 .Produces<LaunchFileResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
-                .ProducesProblem(StatusCodes.Status404NotFound)
+                .Produces<string>(StatusCodes.Status404NotFound, "application/json")
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("LaunchFile")
                 .WithSummary("Launch File")

@@ -233,7 +233,7 @@ namespace TeensyRom.Core.Commands
 
                     if (stopwatch.Elapsed > timeout)
                     {
-                        throw new TeensyException($"Timeout waiting for expected reply from TeensyROM -- Received Bytes:\r\n{GetLogString(receivedBytes)}");
+                        throw new TimeoutException($"Timeout waiting for expected reply from TeensyROM -- Received Bytes:\r\n{GetLogString(receivedBytes)}");
                     }
 
                     if (_communicationPort.BytesToRead > 0)

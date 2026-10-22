@@ -71,10 +71,6 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					{
 						port.OpenPort(options.ConnectTimeoutMs);
 					}
-					else
-					{
-						port.ClearBuffers();
-					}
 				}
 				catch (Exception ex) when (device is not null && ex is not TeensyLinkException && TransportDrop.IsDrop(ex, port))
 				{
@@ -93,6 +89,10 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 						throw new TeensyLinkException(LinkMessages.LinkLost(transport));
 					}
 				}
+
+				// Whatever the last connection left queued must not be read as this command's reply, whether
+				// the link was already open, was reopened above, or came back through recovery.
+				if (port.IsOpen) port.ClearBuffers();
 
 				if (device is not null)
 				{
@@ -172,13 +172,21 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					device is not null && ex is not TeensyLinkException && (ex is TimeoutException || TransportDrop.IsDrop(ex, port));
 
 				// A link failure on the second and last send: leave the device consistent, then say what is true.
-				async Task<TeensyLinkException> FailAfterLastSendAsync(ConnectionType transport)
+				// A timeout on a link that still looks open is probed first, so a unit that is only slow keeps
+				// its link and its timeout.
+				async Task<Exception> FailAfterLastSendAsync(ConnectionType transport, Exception failure)
 				{
-					var settled = await recovery.RecoverAsync(device!, RecoveryReason.Drop, cancellationToken);
+					var reason = TransportDrop.IsDrop(failure, port) ? RecoveryReason.Drop : RecoveryReason.SuspectLink;
+					var settled = await recovery.RecoverAsync(device!, reason, cancellationToken);
 
 					if (settled.StuckTcpSession)
 					{
 						return await StuckSessionFailureAsync(device!, cancellationToken);
+					}
+
+					if (reason == RecoveryReason.SuspectLink && settled.Reachable && !settled.LinkReplaced)
+					{
+						return failure;
 					}
 
 					return new TeensyLinkException(settled.Reachable
@@ -214,7 +222,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
 					if (sends > 1)
 					{
-						throw await FailAfterLastSendAsync(transport);
+						throw await FailAfterLastSendAsync(transport, ex);
 					}
 
 					var outcome = await recovery.RecoverAsync(device!, reason, cancellationToken);
@@ -281,7 +289,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					catch (Exception resendEx) when (IsLinkFailure(resendEx))
 					{
 						log.InternalWarning($"CommunicationPortBehavior: re-send of {commandName} failed: {resendEx.Message}");
-						throw await FailAfterLastSendAsync(transport);
+						throw await FailAfterLastSendAsync(transport, resendEx);
 					}
 				}
 			}

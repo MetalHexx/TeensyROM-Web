@@ -51,7 +51,8 @@ public class CommunicationPortBehaviorTests
         /// <summary>Runs instead of the default immediate timeout; throw a non-<see cref="TimeoutException"/> to simulate a drop mid-read.</summary>
         public Action? WaitForSerialDataAction { get; set; }
 
-        public void ClearBuffers() { }
+        public int ClearBuffersCallCount { get; private set; }
+        public void ClearBuffers() => ClearBuffersCallCount++;
         public void SendIntBytes(uint intToSend, short numBytes) => SentTokens.Add(intToSend);
         public uint ReadIntBytes(short byteLength) => 0;
         public int Read(byte[] buffer, int offset, int count) => 0;
@@ -1221,13 +1222,12 @@ public class CommunicationPortBehaviorTests
     }
 
     [Fact]
-    public async Task Handle_ResendTimesOut_RecoversWithDropAndReportsOutcomeUnknownWhenReachable()
+    public async Task Handle_ResendTimesOutAndLinkWasReplaced_ReportsOutcomeUnknown()
     {
         var deviceId = Guid.NewGuid().ToString("N");
         var port = new StubCommunicationPort { BytesWritten = 10 };
         var gate = BuildGate<FakeReadCommand>(port, deviceId);
         gate.RecoveryReturns(RecoveryReason.SuspectLink, Reachable(linkReplaced: true));
-        gate.RecoveryReturns(RecoveryReason.Drop, Reachable());
         var invocations = 0;
 
         Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
@@ -1238,7 +1238,47 @@ public class CommunicationPortBehaviorTests
 
         (await act.Should().ThrowAsync<TeensyLinkException>()).WithMessage(LinkMessages.OutcomeUnknown(ConnectionType.Tcp));
         invocations.Should().Be(2);
-        await gate.Recovery.Received(1).RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+        await gate.Recovery.Received(2).RecoverAsync(gate.Device, RecoveryReason.SuspectLink, Arg.Any<CancellationToken>());
+        await gate.Recovery.DidNotReceive().RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ResendTimesOutAndUnitAnswersOnTheExistingLink_RethrowsTheTimeoutAndKeepsTheLink()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { BytesWritten = 10 };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        gate.Recovery.RecoverAsync(gate.Device, RecoveryReason.SuspectLink, Arg.Any<CancellationToken>())
+            .Returns(Reachable(linkReplaced: true), Reachable(linkReplaced: false));
+        var invocations = 0;
+
+        Func<Task> act = () => gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            invocations++;
+            throw new TimeoutException();
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<TimeoutException>();
+        invocations.Should().Be(2);
+        port.ClosePortCallCount.Should().Be(0);
+        await gate.Recovery.DidNotReceive().RecoverAsync(gate.Device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_PortReportingClosed_ClearsWhatTheOldConnectionLeftQueuedBeforeTheCommandRuns()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { IsOpen = false };
+        var gate = BuildGate<FakeReadCommand>(port, deviceId);
+        var clearedBeforeHandler = -1;
+
+        await gate.Behavior.Handle(new FakeReadCommand { DeviceId = deviceId, CommunicationPort = port }, () =>
+        {
+            clearedBeforeHandler = port.ClearBuffersCallCount;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        clearedBeforeHandler.Should().BeGreaterThan(0);
     }
 
     [Fact]
