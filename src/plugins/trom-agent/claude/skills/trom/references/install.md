@@ -2,6 +2,8 @@
 
 Until a release exists, `trom` is built from source. Explain this plan and get a yes before running anything. Show each command before running it.
 
+Everything is built in Release: the web UI, `trom`, and the engine (which the first `trom init` builds the same way).
+
 ## Prerequisites
 
 Check each; for a missing one, offer to install it from its official source or the OS package manager only with the user's permission, otherwise tell them how.
@@ -20,16 +22,17 @@ Check each; for a missing one, offer to install it from its official source or t
 2. Build SIDablist: in `SIDablist`, `pnpm install`, then `pnpm -r run build`.
 3. In `TeensyROM-Web/src`: `pnpm install`.
 4. Create `apps/api/src/TeensyRom.Api/wwwroot` if it does not exist. It is git-ignored, so a fresh clone lacks it, and the build script exits 1 without it.
-5. In `TeensyROM-Web/src`: `pnpm run build:frontend`. This builds the web UI into the engine's `wwwroot`.
+5. In `TeensyROM-Web/src`: `pnpm run build:frontend`. This builds the web UI into the engine's `wwwroot`. Without it the engine starts but serves no web UI.
 6. Build `trom`: `dotnet build apps/cli/TeensyRom.Cli.sln -c Release`.
 7. Put it on the PATH: run the built `trom` once with `path add` (this adds the folder holding the built `trom`). Open a new terminal, or use the full path, for the rest of the session.
-8. Verify: `trom init --json`. `engine.running` must be true (the CLI builds and starts the engine from the same checkout) and `webUi.available` must be true.
+8. Verify: `trom init --json`. `engine.running` must be true (the CLI builds the engine in Release from the same checkout and starts it) and `webUi.available` must be true.
+   - `webUi.available` false: relay the web UI entry in `problems`, then follow "When it isn't served" in `references/web-ui.md`. Don't continue until it is true or the user decides to go on without the web UI.
 9. Continue the opening from step 2 in `SKILL.md`, using the `init` result you just got and the full path to `trom` until a new terminal exists.
 
 ## Long steps
 
-`pnpm install`, `pnpm -r run build`, `pnpm run build:frontend`, `dotnet build`, and the first `trom init` (which builds the engine) can run past the harness's default command timeout (two minutes in Claude Code). Run them with a long timeout, or as background commands, and wait for them to finish.
+`pnpm install`, `pnpm -r run build`, `pnpm run build:frontend`, `dotnet build`, and the first `trom init` (which builds the engine) can run past the harness's default command timeout (two minutes in Claude Code). Run them with a long timeout, or as background commands, and wait for them to finish. The front end build can leave a helper process holding the command's output open after it has finished; if a finished build seems stuck, check that `wwwroot` has an `index.html`, and run `pnpm nx daemon --stop` from `TeensyROM-Web/src` to release it.
 
 ## Updating
 
-Only when asked: `git pull` in both repos, then repeat the build steps above.
+Only when asked: `git pull` in both repos, then repeat the build steps above. The next `trom` command rebuilds and restarts the engine on its own.
