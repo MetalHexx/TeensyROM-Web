@@ -93,6 +93,9 @@ hub.
 node .claude/skills/api-live-debug/scripts/logtap.mjs <out.log>
 ```
 
+It needs `@microsoft/signalr` under `src/node_modules`, which a fresh worktree does not have: run
+`pnpm install` in `src/` first, or run the same script from a worktree that has it installed.
+
 Connects to `/api/logHub`, invokes the hub's `Subscribe` method to start receiving, appends every
 `LogProduced` line with a **UTC** timestamp — and it's an *arrival* time, not the moment the API logged
 it: the API batches at most 20 lines onto the hub, then waits 100 ms
