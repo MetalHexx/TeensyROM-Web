@@ -14,8 +14,11 @@ internal interface IEngineLauncher
     EngineStep Launch(EngineLocation location);
 }
 
-/// <summary>What to run to start the engine: the executable, the dll it needs when run through <c>dotnet</c>, and where.</summary>
-internal sealed record EngineLaunch(string Executable, string? Dll, string WorkingDirectory);
+/// <summary>
+/// What to run to start the engine: the executable, the dll it needs when run through <c>dotnet</c>, where, and the
+/// arguments the engine itself gets (none for a packaged engine).
+/// </summary>
+internal sealed record EngineLaunch(string Executable, string? Dll, string WorkingDirectory, IReadOnlyList<string> Arguments);
 
 /// <summary>
 /// Builds and starts the engine through the shell, with every standard stream redirected away from this process.
@@ -63,7 +66,7 @@ internal sealed class EngineLauncher : IEngineLauncher
 
         TeensyRomHome.ExportToProcess();
 
-        string[] command = launch.Dll is null ? [launch.Executable] : [launch.Executable, launch.Dll];
+        string[] command = [launch.Executable, .. launch.Dll is null ? [] : new[] { launch.Dll }, .. launch.Arguments];
         var logPath = Path.Combine(TeensyRomHome.EngineLogsPath, "engine-console.log");
 
         try
@@ -125,11 +128,12 @@ internal sealed class EngineLauncher : IEngineLauncher
         return start;
     }
 
-    private static EngineLaunch? Resolve(EngineLocation location) => location.Mode == EngineMode.Packaged
-        ? new EngineLaunch(Path.Combine(location.Folder, EngineLocator.ExecutableName), null, location.Folder)
+    internal static EngineLaunch? Resolve(EngineLocation location) => location.Mode == EngineMode.Packaged
+        ? new EngineLaunch(Path.Combine(location.Folder, EngineLocator.ExecutableName), null, location.Folder, [])
         : ResolveBuilt(Path.GetDirectoryName(location.ApiProject!)!);
 
-    // The newest build wins; it may sit in a runtime-identifier subfolder such as win-x64.
+    // The newest build wins; it may sit in a runtime-identifier subfolder such as win-x64. The engine runs from the
+    // build folder, which has no wwwroot, so it is pointed at the API project's wwwroot to serve the built front end.
     private static EngineLaunch? ResolveBuilt(string apiProjectFolder)
     {
         var binFolder = Path.Combine(apiProjectFolder, "bin", "Debug", BuildTarget);
@@ -146,8 +150,10 @@ internal sealed class EngineLauncher : IEngineLauncher
         var folder = Path.GetDirectoryName(dll)!;
         var apphost = Path.Combine(folder, EngineLocator.ExecutableName);
 
+        string[] arguments = ["--webroot", Path.Combine(apiProjectFolder, "wwwroot")];
+
         return File.Exists(apphost)
-            ? new EngineLaunch(apphost, null, folder)
-            : new EngineLaunch("dotnet", dll, folder);
+            ? new EngineLaunch(apphost, null, folder, arguments)
+            : new EngineLaunch("dotnet", dll, folder, arguments);
     }
 }

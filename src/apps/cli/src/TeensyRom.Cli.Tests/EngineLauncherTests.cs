@@ -52,6 +52,39 @@ public class EngineLauncherTests
     }
 
     [Fact]
+    public void Resolve_OfASourceEngine_PassesTheApiProjectsWwwrootAsTheWebRoot()
+    {
+        var root = Directory.CreateTempSubdirectory("teensyrom-launcher").FullName;
+
+        try
+        {
+            var apiFolder = Path.Combine(root, "api", "TeensyRom.Api");
+            var built = Path.Combine(apiFolder, "bin", "Debug", "net9.0");
+            Directory.CreateDirectory(built);
+            File.WriteAllText(Path.Combine(built, "TeensyRom.Api.dll"), "");
+            File.WriteAllText(Path.Combine(built, "TeensyRom.Api.runtimeconfig.json"), "{}");
+
+            var launch = EngineLauncher.Resolve(new EngineLocation(EngineMode.Source, root, Path.Combine(apiFolder, "TeensyRom.Api.csproj")));
+
+            launch.Should().NotBeNull();
+            launch!.WorkingDirectory.Should().Be(built);
+            launch.Arguments.Should().Equal("--webroot", Path.Combine(apiFolder, "wwwroot"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Resolve_OfAPackagedEngine_PassesNoArguments()
+    {
+        var launch = EngineLauncher.Resolve(new EngineLocation(EngineMode.Packaged, Path.GetTempPath(), null));
+
+        launch!.Arguments.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task BuildAsync_OfAProjectThatDoesNotBuild_FailsAndKeepsTheOutputInTheBuildLog()
     {
         Directory.CreateDirectory(TeensyRomHome.CliLogsPath);

@@ -17,6 +17,7 @@ using TeensyRom.Cli.Commands.Main.Asid;
 using TeensyRom.Cli.Commands.Main.Launcher;
 using TeensyRom.Cli.Commands.PathCommands;
 using TeensyRom.Cli.Commands.Settings;
+using TeensyRom.Cli.Commands.Wait;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
@@ -125,10 +126,11 @@ internal static class CliHost
         ])
     ];
 
-    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, and <c>trom wait</c> once it exists.</summary>
+    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, and <c>trom wait</c>.</summary>
     internal static readonly PublicCommand[] PublicCommands =
     [
-        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"])
+        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"]),
+        PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents.", ["wait", "3m20s"])
     ];
 
     /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>
@@ -185,13 +187,14 @@ internal static class CliHost
         };
         var apiClient = new TeensyRomApiClient(httpClient);
         var deviceService = new DeviceService(apiClient);
+        var clock = new SystemEngineClock();
         var engine = new EngineControl(
             new EngineProbe(),
             new EngineLock(),
             new EngineLocator(AppContext.BaseDirectory),
             new EngineLauncher(),
             new SourceFingerprint(),
-            new SystemEngineClock(),
+            clock,
             AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly()),
             output.Notice);
         var chooser = new DeviceChooser(deviceService, output);
@@ -201,6 +204,7 @@ internal static class CliHost
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
         services.AddSingleton<IEngineControl>(engine);
+        services.AddSingleton<IEngineClock>(clock);
         services.AddSingleton<IWebUiProbe>(new WebUiProbe());
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
