@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { FakeClock, replayToFrame } from '@sidablist/core';
+import { FakeClock, frames, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
@@ -18,6 +18,7 @@ import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
+import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, HOME_DECK_PANEL } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
@@ -1251,6 +1252,159 @@ describe('DeckService', () => {
         expect(store.deckPanel('B')()).toEqual(bPanel);
         expect(runtime.snapshot('B').tempo.multiplier).toBe(1.3);
         expect(tempoSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      });
+    });
+  });
+
+  describe('animation-frame loop', () => {
+    let pending: Map<number, FrameRequestCallback>;
+    let nextFrameId: number;
+    let paintSpy: MockInstance<SidPanelPainter['paint']>;
+    let positionSpy: MockInstance<DeckRuntime['position']>;
+    let hidden = false;
+
+    /** Paints for the A deck only: B's idle still-paint also runs through the frame queue. */
+    function paintsOfA(): number {
+      return paintSpy.mock.calls.filter(([slot]) => slot === 'A').length;
+    }
+
+    function setPosition(position: number): void {
+      positionSpy.mockReturnValue(frames(position));
+    }
+
+    /** Runs the callbacks that are due now; any a callback schedules wait for the next call. */
+    function runFrame(): void {
+      const due = [...pending.values()];
+      pending.clear();
+      for (const callback of due) {
+        callback(0);
+      }
+    }
+
+    function setHidden(value: boolean): void {
+      hidden = value;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    beforeEach(async () => {
+      pending = new Map();
+      nextFrameId = 1;
+      hidden = false;
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
+        pending.set(nextFrameId, callback);
+        return nextFrameId++;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number): void => {
+        pending.delete(id);
+      });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+
+      paintSpy = vi.spyOn(TestBed.inject(SidPanelPainter), 'paint');
+      positionSpy = vi.spyOn(runtime, 'position');
+      await loadAndWait('A', register(makeFixture()));
+      TestBed.flushEffects();
+      paintSpy.mockClear();
+      setPosition(5);
+    });
+
+    afterEach(() => {
+      delete (document as { hidden?: boolean }).hidden;
+    });
+
+    it('paints only when the position moved, and always reschedules', () => {
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+
+      setPosition(6);
+      runFrame();
+      expect(paintsOfA()).toBe(2);
+    });
+
+    it('does not paint while paused', async () => {
+      await service.togglePlayPause('A');
+      TestBed.flushEffects();
+      expect(store.deck('A')().status).toBe('paused');
+      // The painter's own one-shot paint for the status change runs here; the loop's must not.
+      runFrame();
+      paintSpy.mockClear();
+
+      setPosition(9);
+      runFrame();
+
+      expect(paintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+    });
+
+    it('does not paint while the document is hidden, and resumes when it is shown', () => {
+      setHidden(true);
+      setPosition(9);
+      runFrame();
+      expect(paintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+
+      setHidden(false);
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+    });
+
+    describe('a fault while painting', () => {
+      function attachNoopTargets(): void {
+        const level = { setLiveLevel: vi.fn() };
+        const light = { setLiveLight: vi.fn() };
+        const strip = {
+          waveforms: [light, light, light, light],
+          coarse: level,
+          fine: level,
+          pulseWidth: level,
+          attack: level,
+          decay: level,
+          sustain: level,
+          release: level,
+          ring: light,
+          sync: light,
+          filter: light,
+        };
+        TestBed.inject(SidPanelPainter).attach('A', {
+          voices: [strip, strip, strip],
+          cutoff: level,
+          resonance: level,
+          filterModes: [light, light, light],
+        });
+      }
+
+      it('a failing register read keeps the loop running and warns once', () => {
+        vi.spyOn(runtime, 'readRegisters').mockImplementation(() => {
+          throw new Error('DeckRuntime: slot A has not been built');
+        });
+        paintSpy.mockRestore();
+        vi.mocked(logWarn).mockClear();
+        attachNoopTargets();
+
+        for (const position of [5, 6, 7]) {
+          setPosition(position);
+          runFrame();
+          expect(pending.size).toBe(1);
+        }
+
+        const warnings = vi.mocked(logWarn).mock.calls.filter(([message]) => message.startsWith('SidPanelPainter'));
+        expect(warnings).toHaveLength(1);
+      });
+
+      it('a paint that throws still leaves the next frame scheduled', () => {
+        paintSpy.mockImplementation((slot) => {
+          if (slot === 'A') {
+            throw new Error('boom');
+          }
+        });
+
+        expect(() => runFrame()).toThrow('boom');
+
+        expect(pending.size).toBe(1);
       });
     });
   });

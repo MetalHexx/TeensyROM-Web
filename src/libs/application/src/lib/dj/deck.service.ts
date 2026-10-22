@@ -4,6 +4,7 @@ import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { DeckSpeed } from './deck-speed';
 import { MixerApplier } from './mixer-applier';
+import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, type DeckDetectedKey, type DeckStatus, type DeckVoiceState } from './dj-store';
 import { DECK_SLOTS, type Slot } from './slot';
@@ -61,6 +62,7 @@ export class DeckService {
   private readonly bindings = inject(DeckBindings);
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly mixerApplier = inject(MixerApplier);
+  private readonly panelPainter = inject(SidPanelPainter);
 
   /** This service's own per-slot command counter — distinct from the loader's generation, which
    *  guards only the loader's own awaits. Bumped by `load` and `selectSubtune` on entry; every
@@ -469,19 +471,21 @@ export class DeckService {
 
   /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` and paused
    *  while the document is hidden — the POC's `animationFrameSignal` bridge rule, generalised per
-   *  slot. Samples only when the polled frame actually moved; every other reason to sample runs
-   *  through the explicit calls each command already makes. */
+   *  slot. Samples and paints the SID panel only when the polled frame actually moved; every other
+   *  reason to sample runs through the explicit calls each command already makes. Reschedules
+   *  first, so a fault in either cannot end the loop. */
   private watchPosition(slot: Slot): void {
     let frameId: number | null = null;
     let lastFrame: number | null = null;
 
     const tick = (): void => {
+      frameId = requestAnimationFrame(tick);
       const position = this.runtime.position(slot);
       if (position !== lastFrame) {
         lastFrame = position;
         this.sample(slot);
+        this.panelPainter.paint(slot);
       }
-      frameId = requestAnimationFrame(tick);
     };
 
     const start = (): void => {
