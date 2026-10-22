@@ -1,0 +1,43 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+// Two 36px knobs and a 4px gap are 76px: the strip's content width at the DJ view's mixer column.
+lib-panel-section {
+  --panel-section-padding-inline: var(--spacing-xs);
+}
+
+.strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.waveforms {
+  display: grid;
+  grid-template-columns: repeat(2, 32px);
+  gap: 4px;
+}
+
+.pair {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.adsr {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: var(--spacing-xs);
+}
+
+.switches {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-xs);
+  width: 100%;
+  max-width: 64px;
+}

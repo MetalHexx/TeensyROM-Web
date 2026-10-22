@@ -9,7 +9,7 @@
 .panel-section {
   min-width: 0;
   margin: 0;
-  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  padding: var(--spacing-sm) var(--panel-section-padding-inline, var(--spacing-md)) var(--spacing-md);
   border: 1px solid var(--synth-section-border);
   border-radius: var(--border-radius-sm);
 }

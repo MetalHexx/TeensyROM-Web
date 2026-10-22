@@ -1,0 +1,172 @@
+<lib-panel-section [title]="model().title">
+  <div class="strip">
+    <div class="waveforms">
+      @for (kind of waveforms; track kind) {
+        <lib-waveform-button
+          [attr.data-control]="'wave-' + kind"
+          [waveform]="kind"
+          [accessibleName]="model().waveformNames[kind]"
+          [locked]="model().waveformLock === kind"
+          [disabled]="model().disabled"
+          (press)="waveformPress.emit(kind)"
+        />
+      }
+    </div>
+
+    <div class="pair">
+      <lib-rotary-knob
+        #coarse
+        data-control="coarse"
+        label="Coarse"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.coarse.value"
+        [min]="model().knobs.coarse.min"
+        [max]="model().knobs.coarse.max"
+        [home]="model().knobs.coarse.home"
+        [step]="model().knobs.coarse.step"
+        [accessibleName]="model().knobs.coarse.accessibleName"
+        [valueUnit]="model().knobs.coarse.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'coarse', value: $event })"
+      />
+      <lib-rotary-knob
+        #fine
+        data-control="fine"
+        label="Fine"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.fine.value"
+        [min]="model().knobs.fine.min"
+        [max]="model().knobs.fine.max"
+        [home]="model().knobs.fine.home"
+        [step]="model().knobs.fine.step"
+        [accessibleName]="model().knobs.fine.accessibleName"
+        [valueUnit]="model().knobs.fine.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'fine', value: $event })"
+      />
+    </div>
+
+    <lib-rotary-knob
+      #pulseWidth
+      data-control="pulse-width"
+      label="Pulse"
+      size="large"
+      appearance="panel"
+      [liveRing]="true"
+      [value]="model().knobs.pulseWidth.value"
+      [min]="model().knobs.pulseWidth.min"
+      [max]="model().knobs.pulseWidth.max"
+      [home]="model().knobs.pulseWidth.home"
+      [step]="model().knobs.pulseWidth.step"
+      [accessibleName]="model().knobs.pulseWidth.accessibleName"
+      [valueUnit]="model().knobs.pulseWidth.valueUnit ?? null"
+      [disabled]="model().disabled"
+      (valueChange)="knobChange.emit({ knob: 'pulseWidth', value: $event })"
+    />
+
+    <div class="adsr">
+      <lib-rotary-knob
+        #attack
+        data-control="attack"
+        label="A"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.attack.value"
+        [min]="model().knobs.attack.min"
+        [max]="model().knobs.attack.max"
+        [home]="model().knobs.attack.home"
+        [step]="model().knobs.attack.step"
+        [accessibleName]="model().knobs.attack.accessibleName"
+        [valueUnit]="model().knobs.attack.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'attack', value: $event })"
+      />
+      <lib-rotary-knob
+        #decay
+        data-control="decay"
+        label="D"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.decay.value"
+        [min]="model().knobs.decay.min"
+        [max]="model().knobs.decay.max"
+        [home]="model().knobs.decay.home"
+        [step]="model().knobs.decay.step"
+        [accessibleName]="model().knobs.decay.accessibleName"
+        [valueUnit]="model().knobs.decay.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'decay', value: $event })"
+      />
+      <lib-rotary-knob
+        #sustain
+        data-control="sustain"
+        label="S"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.sustain.value"
+        [min]="model().knobs.sustain.min"
+        [max]="model().knobs.sustain.max"
+        [home]="model().knobs.sustain.home"
+        [step]="model().knobs.sustain.step"
+        [accessibleName]="model().knobs.sustain.accessibleName"
+        [valueUnit]="model().knobs.sustain.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'sustain', value: $event })"
+      />
+      <lib-rotary-knob
+        #release
+        data-control="release"
+        label="R"
+        size="small"
+        appearance="panel"
+        [liveRing]="true"
+        [value]="model().knobs.release.value"
+        [min]="model().knobs.release.min"
+        [max]="model().knobs.release.max"
+        [home]="model().knobs.release.home"
+        [step]="model().knobs.release.step"
+        [accessibleName]="model().knobs.release.accessibleName"
+        [valueUnit]="model().knobs.release.valueUnit ?? null"
+        [disabled]="model().disabled"
+        (valueChange)="knobChange.emit({ knob: 'release', value: $event })"
+      />
+    </div>
+
+    <div class="switches">
+      <lib-led-switch
+        #ring
+        data-control="ring"
+        label="Ring"
+        [accessibleName]="model().switches.ring.accessibleName"
+        [locked]="model().switches.ring.locked"
+        [disabled]="model().disabled"
+        (press)="switchPress.emit('ring')"
+      />
+      <lib-led-switch
+        #sync
+        data-control="sync"
+        label="Sync"
+        [accessibleName]="model().switches.sync.accessibleName"
+        [locked]="model().switches.sync.locked"
+        [disabled]="model().disabled"
+        (press)="switchPress.emit('sync')"
+      />
+      <lib-led-switch
+        #filter
+        data-control="filter"
+        label="Filt"
+        [accessibleName]="model().switches.filter.accessibleName"
+        [locked]="model().switches.filter.locked"
+        [disabled]="model().disabled"
+        (press)="switchPress.emit('filter')"
+      />
+    </div>
+  </div>
+</lib-panel-section>

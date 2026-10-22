@@ -1,0 +1,50 @@
+<lib-panel-section title="Filter">
+  <div class="filter">
+    <lib-rotary-knob
+      #cutoff
+      data-control="filter-cutoff"
+      label="Cutoff"
+      size="medium"
+      appearance="panel"
+      [liveRing]="true"
+      [value]="model().cutoff.value"
+      [min]="model().cutoff.min"
+      [max]="model().cutoff.max"
+      [home]="model().cutoff.home"
+      [step]="model().cutoff.step"
+      [accessibleName]="model().cutoff.accessibleName"
+      [valueUnit]="model().cutoff.valueUnit ?? null"
+      [disabled]="model().disabled"
+      (valueChange)="knobChange.emit({ knob: 'cutoff', value: $event })"
+    />
+    <lib-rotary-knob
+      #resonance
+      data-control="filter-resonance"
+      label="Res"
+      size="medium"
+      appearance="panel"
+      [liveRing]="true"
+      [value]="model().resonance.value"
+      [min]="model().resonance.min"
+      [max]="model().resonance.max"
+      [home]="model().resonance.home"
+      [step]="model().resonance.step"
+      [accessibleName]="model().resonance.accessibleName"
+      [valueUnit]="model().resonance.valueUnit ?? null"
+      [disabled]="model().disabled"
+      (valueChange)="knobChange.emit({ knob: 'resonance', value: $event })"
+    />
+    <div class="modes">
+      @for (mode of modes; track mode.kind) {
+        <lib-led-switch
+          [attr.data-control]="'filter-' + mode.kind"
+          [label]="mode.label"
+          [accessibleName]="model().modeNames[mode.kind]"
+          [locked]="model().modeLock === mode.kind"
+          [disabled]="model().disabled"
+          (press)="modePress.emit(mode.kind)"
+        />
+      }
+    </div>
+  </div>
+</lib-panel-section>

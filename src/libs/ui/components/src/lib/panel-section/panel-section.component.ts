@@ -3,7 +3,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 /**
  * A titled group on the SID panel: a hairline frame with the title centred in its top edge. It is
  * a native fieldset, so assistive technology announces the title as the group's name. It does not
- * lay out its content; the consumer arranges whatever is projected into it.
+ * lay out its content; the consumer arranges whatever is projected into it. A consumer narrows the
+ * frame's horizontal padding by setting `--panel-section-padding-inline` on the element.
  *
  * @example
  * ```html
