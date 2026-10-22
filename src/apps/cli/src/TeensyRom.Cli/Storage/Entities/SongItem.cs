@@ -34,7 +34,8 @@ namespace TeensyRom.Cli.Storage.Entities
             Meta2 = Meta2,
             MetadataSourcePath = MetadataSourcePath,
             PlayLength = PlayLength,
-            Images = Images.Select(x => x.Clone()).ToList()
+            Images = Images.Select(x => x.Clone()).ToList(),
+            ApiRecord = ApiRecord
         };
     }
 }

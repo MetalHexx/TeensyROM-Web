@@ -1,4 +1,6 @@
-﻿namespace TeensyRom.Cli.Storage.Entities
+﻿using TeensyRom.Cli.Api.Generated;
+
+namespace TeensyRom.Cli.Storage.Entities
 {
     public interface IFileItem: IStorageItem
     {
@@ -15,6 +17,9 @@
         string MetadataSourcePath { get; set; }
         string FavChildPath { get; set; }
         string FavParentPath { get; set; }
+
+        /// <summary>The tr-web record this item was mapped from, kept whole so output can carry fields the item model has no place for. Null for items not built from the API.</summary>
+        FileItemDto? ApiRecord { get; }
 
         FileItem Clone();
     }

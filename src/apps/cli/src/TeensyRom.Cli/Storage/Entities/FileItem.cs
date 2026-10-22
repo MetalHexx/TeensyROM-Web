@@ -1,4 +1,5 @@
-﻿using TeensyRom.Cli.Common;
+﻿using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Common;
 
 namespace TeensyRom.Cli.Storage.Entities
 {
@@ -15,6 +16,7 @@ namespace TeensyRom.Cli.Storage.Entities
         public string MetadataSourcePath { get; set; } = string.Empty;
         public string FavChildPath { get; set; } = string.Empty;
         public string FavParentPath { get; set; } = string.Empty;
+        public FileItemDto? ApiRecord { get; set; }
         public string Id => $"{Size}{Path.GetFileNameFromPath()}";
         public TeensyFileType FileType => Path.GetUnixFileExtension().GetFileType();
 
@@ -36,7 +38,8 @@ namespace TeensyRom.Cli.Storage.Entities
                 MetadataSource = MetadataSource,
                 Meta1 = Meta1,
                 Meta2 = Meta2,
-                MetadataSourcePath = MetadataSourcePath
+                MetadataSourcePath = MetadataSourcePath,
+                ApiRecord = ApiRecord
             };
         }
 

@@ -28,7 +28,18 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         exitCode.Should().Be(0, cli.Error);
         var result = JsonDocument.Parse(cli.Output).RootElement;
         result.GetProperty("status").GetString().Should().Be("launched");
-        result.GetProperty("file").GetProperty("path").GetString().Should().BeEquivalentTo(path);
+        var file = result.GetProperty("file");
+        file.GetProperty("path").GetString().Should().BeEquivalentTo(path);
+        AssertFullRecord(file);
+    }
+
+    private static readonly string[] FullRecordFields =
+        ["description", "links", "tags", "youTubeVideos", "competitions", "ratingCount", "images", "metadataSource", "meta1", "meta2", "parentPath", "type"];
+
+    private static void AssertFullRecord(JsonElement file)
+    {
+        file.TryGetProperty("storageType", out _).Should().BeFalse();
+        foreach (var field in FullRecordFields) file.TryGetProperty(field, out _).Should().BeTrue($"a launched file carries {field}");
     }
 
     [SkippableFact]
@@ -67,6 +78,24 @@ public sealed class HardwareScenarios(SharedApiFixture api)
             .Should().OnlyContain(item => item.GetProperty("storage").GetString() == storage && item.GetProperty("path").GetString()!.StartsWith('/'));
     }
 
+    /// <summary>A song in the search results carries its play length in the compact form.</summary>
+    [SkippableFact]
+    public async Task FileSearch_CarriesThePlayLengthOfSongs()
+    {
+        var text = Environment.GetEnvironmentVariable("CLI_BENCH_SEARCH");
+        if (string.IsNullOrWhiteSpace(text)) text = Path.GetFileNameWithoutExtension(Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty);
+        Skip.If(string.IsNullOrWhiteSpace(text), "neither CLI_BENCH_SEARCH nor CLI_BENCH_FILE is set");
+        var (device, storage) = BenchDeviceOrSkip();
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("file", "search", text!, "--filter", "music", "--take", "5", "--device", device.DeviceId, "--storage", storage, "--json");
+
+        exitCode.Should().Be(0, cli.Error);
+        var songs = JsonDocument.Parse(cli.Output).RootElement.EnumerateArray().ToList();
+        Skip.If(songs.Count == 0, "the bench storage has no matching music");
+        songs.Select(song => song.TryGetProperty("playLength", out var length) && length.ValueKind == JsonValueKind.String).Should().AllBeEquivalentTo(true);
+    }
+
     /// <summary>Has tr-web pick a music file on the bench storage; the scenario is skipped when the storage has none.</summary>
     [SkippableFact]
     public async Task FileRandom_LaunchesAMusicFileFromTheBenchStorage()
@@ -80,7 +109,10 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         exitCode.Should().Be(0, cli.Error);
         var result = JsonDocument.Parse(cli.Output).RootElement;
         result.GetProperty("status").GetString().Should().Be("launched");
-        result.GetProperty("file").GetProperty("fileType").GetString().Should().Be("sid");
+        var file = result.GetProperty("file");
+        file.GetProperty("fileType").GetString().Should().Be("sid");
+        AssertFullRecord(file);
+        foreach (var field in new[] { "playLength", "subtuneLengths", "startSubtuneNum" }) file.TryGetProperty(field, out _).Should().BeTrue($"a launched song carries {field}");
     }
 
     /// <summary>Tags the bench file as a favorite, then untags it, leaving the storage as it was found.</summary>

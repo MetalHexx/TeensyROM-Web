@@ -41,7 +41,7 @@ internal sealed class DeviceListCommand(ICliOutput output, IEngineControl engine
         return 0;
     }
 
-    private static Table ToTable(IReadOnlyList<DeviceSummary> found)
+    internal static Table ToTable(IReadOnlyList<DeviceSummary> found)
     {
         var table = new Table().BorderColor(RadHelper.Theme.Secondary.Color).Border(TableBorder.Rounded);
 

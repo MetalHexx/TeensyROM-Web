@@ -9,7 +9,7 @@ namespace TeensyRom.Cli.Tests.Integration;
 /// <summary>
 /// The one engine every suite, agent and user of this checkout shares: started or reused through the CLI's own
 /// <see cref="EngineControl"/> (source mode, because this assembly sits under <c>src/apps/cli</c>) in a throwaway home,
-/// so no test touches the real <c>~/.teensyrom</c>. Freshness after engine edits is the control's source fingerprint.
+/// so no test touches the real <c>~/.teensyrom</c>. Freshness after engine edits (or a change of build configuration) is the control's source fingerprint and configuration stamp.
 /// </summary>
 /// <remarks>
 /// State lives in <see cref="StateDirectory"/>: <c>state.json</c> names the home in use, and <c>ensure.lock</c> is held

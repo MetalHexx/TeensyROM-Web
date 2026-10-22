@@ -39,11 +39,13 @@ internal static class CommandRouting
 
     /// <summary>
     /// The words that name the nearest help for a usage error: the noun and verb when the line starts with a known pair,
-    /// else the noun when it starts with one, else none (the root).
+    /// else the noun when it starts with one, else a top-level command when it starts with one, else none (the root).
     /// </summary>
-    public static string[] HelpPrefix(string[] args, IReadOnlyDictionary<string, string[]> nouns)
+    /// <param name="commands">The names of the top-level commands, which are not nouns.</param>
+    public static string[] HelpPrefix(string[] args, IReadOnlyDictionary<string, string[]> nouns, IReadOnlyCollection<string>? commands = null)
     {
-        if (args.Length == 0 || !nouns.TryGetValue(args[0], out var verbs)) return [];
+        if (args.Length == 0) return [];
+        if (!nouns.TryGetValue(args[0], out var verbs)) return commands?.Contains(args[0], StringComparer.Ordinal) == true ? [args[0]] : [];
 
         return args.Length > 1 && verbs.Contains(args[1], StringComparer.Ordinal) ? [args[0], args[1]] : [args[0]];
     }

@@ -1,0 +1,9 @@
+{
+  "name": "trom-agent",
+  "description": "Trom is your TeensyROM companion, a suite of tools to help you get the most out of your cart: launch and shuffle games, SID tunes, demos and images, run timed sets, search and curate your library, open the web UI, and check your setup, all through the trom CLI.",
+  "version": "1.0.0-alpha.8",
+  "author": { "name": "MetalHexx" },
+  "repository": "https://github.com/MetalHexx/TeensyROM-Web",
+  "homepage": "https://github.com/MetalHexx/TeensyROM-Web",
+  "license": "MIT"
+}

@@ -32,7 +32,7 @@ Reference for how TeensyROM Web is built, packaged, and released as a self-conta
 
 **Homebrew**: the formula installs `teensyrom-web` and, when the package has `cli/`, `trom` (it conflicts with the older `metalhexx/teensyrom-cli/teensyrom-cli` formula). A package without `cli/` keeps the previous single-wrapper install.
 
-**Release trigger**: pushing a git tag matching `v{major}.{minor}.{patch}[-{prerelease}]`; the tag version must match `<Version>` in `src/apps/Version.props` (shared by the engine and the CLI). Pre-release tags (e.g. `-alpha.1`) are marked as pre-releases on GitHub and **do** update the Homebrew formula (the `update-formula` job has no `if:`); every release produces all 4 platform artifacts.
+**Release trigger**: pushing a git tag matching `v{major}.{minor}.{patch}[-{prerelease}]`; the tag version must match `<Version>` in `src/apps/Version.props` (shared by the engine and the CLI); the `trom-agent` plugin's `plugin.json` and its marketplace entry carry the same version, bumped in the same commit. Pre-release tags (e.g. `-alpha.1`) are marked as pre-releases on GitHub and **do** update the Homebrew formula (the `update-formula` job has no `if:`); every release produces all 4 platform artifacts.
 
 ## Full Reference
 

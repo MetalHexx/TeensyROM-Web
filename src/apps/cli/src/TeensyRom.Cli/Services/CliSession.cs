@@ -12,7 +12,8 @@ namespace TeensyRom.Cli.Services;
 /// <param name="app">The public app.</param>
 /// <param name="errHelpApp">An app over the same tree whose help goes to stderr, for the nearest help of a usage error.</param>
 /// <param name="nouns">The nouns of the public tree, each with the names of its verbs.</param>
-internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutput output, CliConsoles consoles, IReadOnlyDictionary<string, string[]> nouns)
+/// <param name="commands">The names of the top-level commands; kept apart from <paramref name="nouns"/> so they are never taken for a bare noun.</param>
+internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutput output, CliConsoles consoles, IReadOnlyDictionary<string, string[]> nouns, IReadOnlyCollection<string>? commands = null)
 {
     /// <summary>
     /// Runs <paramref name="args"/> once and returns the exit code. In order: reads <c>--json</c> from the raw
@@ -43,7 +44,7 @@ internal sealed class CliSession(CommandApp app, CommandApp errHelpApp, ICliOutp
 
     private int Report(Exception ex, string[] args)
     {
-        var prefix = CommandRouting.HelpPrefix(args, nouns);
+        var prefix = CommandRouting.HelpPrefix(args, nouns, commands);
         var error = ExitCodeMapper.Map(ex, $"trom {string.Join(' ', prefix.Append("--help"))}");
 
         if (error.Code == CliExitCode.Usage) errHelpApp.Run([.. prefix, "--help"]);

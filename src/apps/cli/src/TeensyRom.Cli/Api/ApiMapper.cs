@@ -73,6 +73,7 @@ internal static class ApiMapper
         item.Meta1 = dto.Meta1;
         item.Meta2 = dto.Meta2;
         item.MetadataSourcePath = dto.MetadataSourcePath;
+        item.ApiRecord = dto;
         return item;
     }
 

@@ -49,6 +49,23 @@ public sealed class ContractScenarios(SharedApiFixture api)
     }
 
     [Fact]
+    public async Task Init_AgainstTheTestEngine_ReportsARunningEngine_Problems_AndTheCommands()
+    {
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync("init", "--json");
+
+        exitCode.Should().Be(0);
+        using var report = JsonDocument.Parse(cli.Output);
+        var root = report.RootElement;
+        root.GetProperty("engine").GetProperty("running").GetBoolean().Should().BeTrue();
+        root.GetProperty("webUi").GetProperty("available").ValueKind.Should().BeOneOf(JsonValueKind.True, JsonValueKind.False);
+        root.GetProperty("problems").ValueKind.Should().Be(JsonValueKind.Array);
+        root.GetProperty("commands").EnumerateArray().Select(command => command.GetProperty("name").GetString())
+            .Should().Contain(["file", "init"]);
+    }
+
+    [Fact]
     public async Task AnUnknownCommand_ExitsUsage_WithItsSentenceAndTheNearestHelpOnStderr()
     {
         using var cli = new CliHarness();

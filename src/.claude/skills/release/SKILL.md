@@ -27,13 +27,15 @@ Ask the user for the new version number, then update the `<Version>` element in 
 <Version>NEW_VERSION_HERE</Version>
 ```
 
+The `trom-agent` plugin is versioned with the tool suite, so set the same version in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`. In the `tr-plugin-marketplace` repo set it in `plugins/trom-agent/claude/.claude-plugin/plugin.json` and in the `trom-agent` entry of `.claude-plugin/marketplace.json`. A CLI test fails when the plugin manifest in this repo drifts from `Version.props`.
+
 Example versions:
 - Stable release: `1.0.0`, `1.2.3`, `2.0.0`
 - Pre-release: `1.0.0-alpha.1`, `1.0.0-beta.1`, `2.0.0-rc.1`
 
 Commit the version bump:
 ```bash
-git add src/apps/Version.props
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json
 git commit -m "chore: bump version to {version}"
 git push origin main
 ```
@@ -89,6 +91,7 @@ Agent: ✅ Release notes updated! Release is now complete: https://github.com/Me
 ## Important Notes
 
 - The version in `src/apps/Version.props` MUST match the git tag version (without the `v` prefix)
+- The plugin version (`plugin.json`, and the marketplace entry in `tr-plugin-marketplace`) MUST match `Version.props`
 - Pre-release versions (containing `-`) are automatically marked as pre-release in GitHub
 - The workflow builds self-contained executables - no .NET SDK required to run them
 - Every artifact includes the CLI in a `cli/` subfolder beside the engine; the CLI finds the engine at `../TeensyRom.Api[.exe]`

@@ -24,6 +24,10 @@ internal sealed class FileSearchSettings : StorageSettings
     [Description("The most results to show. Defaults to 50.")]
     public int Take { get; set; } = 50;
 
+    [CommandOption("--full")]
+    [Description("Write every file's full metadata in JSON, as file launch does.")]
+    public bool Full { get; set; }
+
     public override ValidationResult Validate()
     {
         if (string.IsNullOrWhiteSpace(Text)) return ValidationResult.Error("Search text can't be empty.");
@@ -51,12 +55,13 @@ internal sealed class FileSearchCommand(
     protected override async Task<int> RunAsync(CommandContext context, FileSearchSettings settings, CancellationToken ct)
     {
         var found = await storage.Search(settings.Text, FileCommandOptions.ParseFilter(settings.Filter));
-        var results = found.Take(settings.Take).Select(file => FileItemJson.From(file, storage.StorageType)).ToList();
+        var items = found.Take(settings.Take).ToList();
+        var results = items.Select(file => FileItemJson.From(file, storage.StorageType)).ToList();
 
         switch (Output.Mode)
         {
             case OutputMode.Json:
-                Output.Json(results);
+                Output.Json(FileItemJson.Many(items, storage.StorageType, settings.Full));
                 break;
             case OutputMode.Plain:
                 Output.Lines(results.Select(file => file.Path));

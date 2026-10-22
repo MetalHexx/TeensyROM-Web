@@ -83,7 +83,7 @@ internal abstract class FileLaunchingCommand<T>(
     /// <exception cref="CliException">The file didn't launch.</exception>
     protected int Report(LaunchOutcome outcome, TeensyStorageType storageType, string notFoundMessage)
     {
-        if (outcome.Item is { } item) Show(outcome, FileItemJson.From(item, storageType));
+        if (outcome.Item is { } item) Show(outcome, item, storageType);
 
         return outcome.Status switch
         {
@@ -94,12 +94,14 @@ internal abstract class FileLaunchingCommand<T>(
         };
     }
 
-    private void Show(LaunchOutcome outcome, FileItemJson file)
+    private void Show(LaunchOutcome outcome, IFileItem item, TeensyStorageType storageType)
     {
+        var file = FileItemJson.From(item, storageType);
+
         switch (Output.Mode)
         {
             case OutputMode.Json:
-                Output.Json(new FileLaunchJson(outcome.Status, file, outcome.Message));
+                Output.Json(new FileLaunchJson(outcome.Status, FileItemJson.Full(item, storageType), outcome.Message));
                 break;
             case OutputMode.Plain:
                 Output.Lines([file.Path]);

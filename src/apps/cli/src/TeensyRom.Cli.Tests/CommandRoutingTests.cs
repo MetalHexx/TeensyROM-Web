@@ -64,4 +64,22 @@ public class CommandRoutingTests
     {
         CommandRouting.HelpPrefix(args, Nouns).Should().Equal(expected);
     }
+
+    [Theory]
+    [InlineData(new[] { "init", "--bogus" }, new[] { "init" })]
+    [InlineData(new[] { "init" }, new[] { "init" })]
+    [InlineData(new[] { "engine", "status", "--bogus" }, new[] { "engine", "status" })]
+    [InlineData(new[] { "launch", "init" }, new string[0])]
+    public void HelpPrefix_RecognisesATopLevelCommand_WithoutChangingNounHandling(string[] args, string[] expected)
+    {
+        CommandRouting.HelpPrefix(args, Nouns, ["init"]).Should().Equal(expected);
+    }
+
+    [Theory]
+    [InlineData("init")]
+    [InlineData("init", "--json")]
+    public void FindBareNoun_LeavesATopLevelCommandAlone_BecauseItIsNotInTheNounDictionary(params string[] args)
+    {
+        CommandRouting.FindBareNoun(args, Nouns).Should().BeNull();
+    }
 }

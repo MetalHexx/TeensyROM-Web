@@ -17,6 +17,10 @@ internal sealed class FileLsSettings : StorageSettings
     [Description("The directory to list. Defaults to the root of the storage. Use - to read it from stdin.")]
     public string Path { get; set; } = "/";
 
+    [CommandOption("--full")]
+    [Description("Write every file's full metadata in JSON, as file launch does.")]
+    public bool Full { get; set; }
+
     public override ValidationResult Validate()
     {
         var path = FileCommandOptions.ValidatePath(Path);
@@ -50,7 +54,7 @@ internal sealed class FileLsCommand(
         switch (Output.Mode)
         {
             case OutputMode.Json:
-                Output.Json(new FileListingJson(path, storageName, directories, files));
+                Output.Json(new FileListingJson(path, storageName, directories, FileItemJson.Many(listing.Files, storage.StorageType, settings.Full)));
                 break;
             case OutputMode.Plain:
                 Output.Lines(directories.Select(directory => directory.Path.EnsureUnixPathEnding()).Concat(files.Select(file => file.Path)));

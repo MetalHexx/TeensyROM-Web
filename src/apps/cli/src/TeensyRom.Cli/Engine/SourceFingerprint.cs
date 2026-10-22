@@ -15,10 +15,11 @@ internal interface ISourceFreshness
     /// <summary>The fingerprint of the engine sources in the checkout at <paramref name="repoRoot"/>, or <see cref="SourceFingerprint.Unknown"/>.</summary>
     string Current(string repoRoot);
 
-    /// <summary>The fingerprint recorded when this CLI last started an engine from source; null when none.</summary>
+    /// <summary>The stamp recorded when this CLI last started an engine from source; null when none.</summary>
     string? Recorded();
 
-    void Record(string fingerprint);
+    /// <summary>Records <paramref name="stamp"/>: the sources' fingerprint with the build configuration the engine was built in.</summary>
+    void Record(string stamp);
 }
 
 /// <summary>
@@ -60,13 +61,13 @@ internal sealed class SourceFingerprint : ISourceFreshness
         }
     }
 
-    public void Record(string fingerprint)
+    public void Record(string stamp)
     {
         Directory.CreateDirectory(TeensyRomHome.CliPath);
 
         File.WriteAllText(
             TeensyRomHome.SourceEngineRecordPath,
-            JsonSerializer.Serialize(new { fingerprint, startedAt = DateTimeOffset.UtcNow }));
+            JsonSerializer.Serialize(new { fingerprint = stamp, startedAt = DateTimeOffset.UtcNow }));
     }
 
     private static string? RunGit(string repoRoot, params string[] arguments)

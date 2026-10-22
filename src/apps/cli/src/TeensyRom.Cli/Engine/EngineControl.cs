@@ -147,13 +147,15 @@ internal sealed class EngineControl(
     }
 
     // The version is the same across builds, so a source-mode engine is fresh only if this CLI started it from the
-    // sources as they are now.
+    // sources as they are now, built in the configuration it would build today.
     private bool IsStale(EngineLocation source)
     {
         var current = freshness.Current(source.Folder);
 
-        return current != SourceFingerprint.Unknown && freshness.Recorded() != current;
+        return current != SourceFingerprint.Unknown && freshness.Recorded() != Stamp(current);
     }
+
+    private string Stamp(string fingerprint) => $"{fingerprint}|{launcher.Configuration}";
 
     private async Task<EngineReady> StartOrWaitAsync(Attempt attempt, CancellationToken ct) =>
         engineLock.IsHeld() ? await WaitAsync(attempt, ct) : await StartAndWaitAsync(attempt, ct);
@@ -215,7 +217,7 @@ internal sealed class EngineControl(
             switch (await probe.ProbeAsync(ct))
             {
                 case EngineProbeResult.Engine running when SameVersion(running.Version):
-                    if (attempt.SourceFingerprint is { } fingerprint) freshness.Record(fingerprint);
+                    if (attempt.SourceFingerprint is { } fingerprint) freshness.Record(Stamp(fingerprint));
                     return EngineReady.Ready;
 
                 case EngineProbeResult.Engine running:
