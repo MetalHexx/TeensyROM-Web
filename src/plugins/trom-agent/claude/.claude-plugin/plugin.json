@@ -1,0 +1,9 @@
+{
+  "name": "trom-agent",
+  "description": "Turn your coding agent into a companion for your C64 and TeensyROM: play music and demos, explore your library, and check your setup through the trom CLI.",
+  "version": "0.1.0",
+  "author": { "name": "MetalHexx" },
+  "repository": "https://github.com/MetalHexx/TeensyROM-Web",
+  "homepage": "https://github.com/MetalHexx/TeensyROM-Web",
+  "license": "MIT"
+}

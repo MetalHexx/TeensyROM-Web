@@ -7,6 +7,7 @@ Hybrid **.NET 9 Web API + Angular 19 (Nx monorepo)** application for TeensyROM d
 - Frontend app: `apps/teensyrom-ui` (source in `src/`, assets in `public/`). Cypress e2e: `apps/teensyrom-ui-e2e`.
 - Backend solution: `apps/api/TeensyRom.Ui.sln`. API project: `apps/api/src/TeensyRom.Api` (RadEndpoints, MediatR, SignalR), Scalar docs at `/scalar/v1`.
 - CLI: `apps/cli` (own solution `TeensyRom.Cli.sln`; .NET 9 terminal client of the API, shipped with it). Agents: run `trom init` first to orient (engine, web UI, devices, index state, commands); the `cli` skill describes the rest.
+- Plugin: `plugins/trom-agent/` is the user-facing Claude Code plugin (the `/trom` companion skill), published to the `tr-plugin-marketplace` repo. Not to be confused with the developer skills in `.claude/skills/`, which are for working on this repo.
 
 ## Architecture
 
