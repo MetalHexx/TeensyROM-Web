@@ -17,6 +17,7 @@
       (pointerup)="onPointerUp($event)"
       (pointercancel)="onPointerUp($event)"
     />
+    @if (!isPanel()) {
     <svg viewBox="0 0 80 80" aria-hidden="true">
       <path class="ring-track" d="M 15.96,64.04 A 34,34 0 1,1 64.04,64.04" />
       @if (valueRingPath(); as ringPath) {
@@ -31,9 +32,35 @@
       <line class="pointer" x1="40" y1="40" [attr.x2]="pointerEnd().x" [attr.y2]="pointerEnd().y" />
       <circle class="hub" cx="40" cy="40" r="4" />
     </svg>
+    } @else {
+    <svg viewBox="0 0 80 80" aria-hidden="true">
+      @if (showLiveRing()) {
+      <path class="live-track" [attr.d]="liveTrackPath" />
+      <path #liveRingPath class="live-ring" [attr.d]="liveTrackPath" pathLength="100" />
+      }
+      <path class="inner-track" [attr.d]="innerTrackPath" />
+      @if (panelArcPath(); as arcPath) {
+      <path class="offset-arc" [attr.d]="arcPath" />
+      }
+      <circle class="knob-skirt" cx="40" cy="40" r="23" />
+      <circle class="knob-cap" cx="40" cy="40" r="17" />
+      @if (!restsAtMinimum()) {
+      <line class="panel-home-tick" x1="40" y1="12" x2="40" y2="5" />
+      }
+      <line
+        class="panel-pointer"
+        [attr.x1]="panelPointerStart().x"
+        [attr.y1]="panelPointerStart().y"
+        [attr.x2]="panelPointerEnd().x"
+        [attr.y2]="panelPointerEnd().y"
+      />
+    </svg>
+    }
   </div>
   @if (readout(); as readoutText) {
   <span class="scale-knob-readout">{{ readoutText }}</span>
   }
+  @if (label()) {
   <span class="scale-knob-label">{{ label() }}</span>
+  }
 </div>

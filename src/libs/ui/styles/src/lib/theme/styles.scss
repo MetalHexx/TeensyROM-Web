@@ -42,6 +42,29 @@ html {
   --color-directory: #f5d76e;
   --glassy-color: 255, 255, 255;
 
+  // Synth panel tokens (SID panel and its parts)
+  --color-highlight-rgb: 0, 247, 255;
+  --color-primary-bright-rgb: 179, 51, 179;
+  --synth-face: #151116;
+  --synth-face-border: #3d3540;
+  --synth-section-border: rgba(255, 255, 255, 0.16);
+  --synth-legend: #a99fae;
+  --synth-label: #d9cfdc;
+  --synth-control-face-top: #2a2430;
+  --synth-control-face-bottom: #1a161c;
+  --synth-control-border: #4a4250;
+  --synth-control-text: #7d7480;
+  --synth-control-text-off: #665d6a;
+  --synth-led-off: #3a313b;
+  --synth-knob-skirt: #100d11;
+  --synth-knob-skirt-border: #4d4551;
+  --synth-knob-cap: #2a242d;
+  --synth-knob-track: #3b343e;
+  --synth-pointer: #f4ecf2;
+  --synth-panic-face-top: #341a36;
+  --synth-panic-face-bottom: #1f0f20;
+  --synth-panic-text: #f0b3f0;
+
   // Design Tokens - Spacing (4px grid)
   --spacing-xs: 0.25rem; // 4px
   --spacing-sm: 0.5rem; // 8px
@@ -109,6 +132,29 @@ html.dark-mode {
   --color-dimmed-light: rgba(255, 255, 255, 0.6); // Light grey - subtle disabled state
   --color-directory: #f5e29e;
   --glassy-color: 255, 255, 255;
+
+  // Synth panel tokens (SID panel and its parts)
+  --color-highlight-rgb: 0, 247, 255;
+  --color-primary-bright-rgb: 179, 51, 179;
+  --synth-face: #151116;
+  --synth-face-border: #3d3540;
+  --synth-section-border: rgba(255, 255, 255, 0.16);
+  --synth-legend: #a99fae;
+  --synth-label: #d9cfdc;
+  --synth-control-face-top: #2a2430;
+  --synth-control-face-bottom: #1a161c;
+  --synth-control-border: #4a4250;
+  --synth-control-text: #7d7480;
+  --synth-control-text-off: #665d6a;
+  --synth-led-off: #3a313b;
+  --synth-knob-skirt: #100d11;
+  --synth-knob-skirt-border: #4d4551;
+  --synth-knob-cap: #2a242d;
+  --synth-knob-track: #3b343e;
+  --synth-pointer: #f4ecf2;
+  --synth-panic-face-top: #341a36;
+  --synth-panic-face-bottom: #1f0f20;
+  --synth-panic-text: #f0b3f0;
 
   // Design Tokens - Spacing (4px grid, inherited from light mode)
   --spacing-xs: 0.25rem;

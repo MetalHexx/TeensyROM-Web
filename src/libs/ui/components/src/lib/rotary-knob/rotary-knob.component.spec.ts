@@ -456,4 +456,150 @@ describe('RotaryKnobComponent', () => {
       expect(emitted).toEqual([0.5]);
     });
   });
+
+  describe('default appearance', () => {
+    it('carries no data-appearance attribute', () => {
+      expect(fixture.nativeElement.hasAttribute('data-appearance')).toBe(false);
+    });
+
+    it('draws none of the panel or live-ring elements, even with liveRing set', () => {
+      fixture.componentRef.setInput('liveRing', true);
+      fixture.componentRef.setInput('value', 0.5);
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement;
+      for (const selector of ['.live-ring', '.live-track', '.knob-skirt', '.knob-cap', '.offset-arc']) {
+        expect(host.querySelector(selector)).toBeNull();
+      }
+    });
+
+    it('treats setLiveLevel as a no-op', () => {
+      fixture.componentRef.setInput('liveRing', true);
+      fixture.detectChanges();
+
+      expect(() => component.setLiveLevel(0.5)).not.toThrow();
+      expect(fixture.nativeElement.querySelector('.live-ring')).toBeNull();
+    });
+
+    it('renders no label span for an empty label', () => {
+      fixture.componentRef.setInput('label', '');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.scale-knob-label')).toBeNull();
+    });
+
+    it('keeps the hyphen-minus for a negative departure, appending the unit', () => {
+      fixture.componentRef.setInput('value', -0.2);
+      fixture.componentRef.setInput('valueUnit', 'cents');
+      fixture.detectChanges();
+
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('-0.2 cents');
+    });
+  });
+
+  describe('panel appearance', () => {
+    const host = (): HTMLElement => fixture.nativeElement;
+
+    function usePanel(): void {
+      fixture.componentRef.setInput('appearance', 'panel');
+      fixture.detectChanges();
+    }
+
+    it('reflects data-appearance on the host', () => {
+      usePanel();
+
+      expect(host().getAttribute('data-appearance')).toBe('panel');
+    });
+
+    it('draws skirt, cap and home tick, but no offset arc at home, and not the default dial', () => {
+      usePanel();
+
+      expect(host().querySelector('.knob-skirt')).not.toBeNull();
+      expect(host().querySelector('.knob-cap')).not.toBeNull();
+      expect(host().querySelector('.panel-home-tick')).not.toBeNull();
+      expect(host().querySelector('.offset-arc')).toBeNull();
+      expect(host().querySelector('.hub')).toBeNull();
+    });
+
+    it('draws the offset arc once the value departs home', () => {
+      usePanel();
+      fixture.componentRef.setInput('value', 0.5);
+      fixture.detectChanges();
+
+      expect(host().querySelector('.offset-arc')).not.toBeNull();
+    });
+
+    it('omits the home tick on a knob that rests at its minimum', () => {
+      fixture.componentRef.setInput('min', 0);
+      fixture.componentRef.setInput('max', 1);
+      fixture.componentRef.setInput('home', 0);
+      usePanel();
+
+      expect(host().querySelector('.panel-home-tick')).toBeNull();
+    });
+
+    it('draws no live ring unless liveRing is set', () => {
+      usePanel();
+
+      expect(host().querySelector('.live-ring')).toBeNull();
+      expect(host().querySelector('.live-track')).toBeNull();
+    });
+
+    it('writes the unit and U+2212 into aria-valuetext off home, and "home" at home', () => {
+      fixture.componentRef.setInput('min', -24);
+      fixture.componentRef.setInput('max', 24);
+      fixture.componentRef.setInput('valueUnit', 'semitones');
+      usePanel();
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('home');
+
+      fixture.componentRef.setInput('value', 12);
+      fixture.detectChanges();
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('+12 semitones');
+
+      fixture.componentRef.setInput('value', -3);
+      fixture.detectChanges();
+      expect(rangeInput().getAttribute('aria-valuetext')).toBe('\u22123 semitones');
+    });
+  });
+
+  describe('live ring', () => {
+    function ring(): SVGPathElement {
+      return fixture.nativeElement.querySelector('.live-ring');
+    }
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('appearance', 'panel');
+      fixture.componentRef.setInput('liveRing', true);
+      fixture.detectChanges();
+    });
+
+    it('writes the dash offset immediately, without change detection', () => {
+      component.setLiveLevel(0.5);
+
+      expect(ring().style.strokeDashoffset).toBe('50');
+    });
+
+    it('clamps below 0 to empty, above 1 to full, and reads NaN as empty', () => {
+      component.setLiveLevel(2);
+      expect(ring().style.strokeDashoffset).toBe('0');
+
+      component.setLiveLevel(-1);
+      expect(ring().style.strokeDashoffset).toBe('100');
+
+      component.setLiveLevel(1);
+      component.setLiveLevel(Number.NaN);
+      expect(ring().style.strokeDashoffset).toBe('100');
+    });
+
+    it('does not rewrite the offset when the quantized level is unchanged', () => {
+      component.setLiveLevel(0.5);
+      ring().style.strokeDashoffset = 'sentinel';
+
+      component.setLiveLevel(0.5004);
+      expect(ring().style.strokeDashoffset).toBe('sentinel');
+
+      component.setLiveLevel(0.6);
+      expect(ring().style.strokeDashoffset).toBe('40');
+    });
+  });
 });
