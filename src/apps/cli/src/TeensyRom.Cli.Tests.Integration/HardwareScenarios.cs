@@ -447,6 +447,69 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         }
     }
 
+    /// <summary>Uploads one program, then downloads it into a throwaway folder: the bytes come back unchanged.</summary>
+    [SkippableFact]
+    public async Task FileDownload_OneFile_IsSavedByItsName()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+        var saved = NewLocalFolder();
+
+        try
+        {
+            var name = $"down-{Guid.NewGuid():N}.prg";
+            var file = WriteProgram(local, name);
+
+            var upload = await RunJsonAsync("file", "upload", file, "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+            upload.ExitCode.Should().Be(0, upload.Error);
+
+            var download = await RunJsonAsync("file", "download", $"{target}/{name}", "--to", saved, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            download.ExitCode.Should().Be(0, download.Error);
+            download.Json.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(1);
+            File.ReadAllBytes(Path.Combine(saved, name)).Should().Equal(TinyProgram);
+            Directory.GetFiles(saved, "*.partial", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+            Directory.Delete(saved, recursive: true);
+        }
+    }
+
+    /// <summary>Uploads a nested folder, then downloads it: it arrives as a folder of its own name with the layout kept.</summary>
+    [SkippableFact]
+    public async Task FileDownload_ANestedFolder_KeepsItsLayoutUnderItsOwnName()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+        var saved = NewLocalFolder();
+
+        try
+        {
+            var tree = $"tree-{Guid.NewGuid():N}";
+            WriteProgram(local, $"{tree}/top.prg");
+            WriteProgram(local, $"{tree}/inner/deep.prg");
+
+            var upload = await RunJsonAsync("file", "upload", Path.Combine(local, tree), "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+            upload.ExitCode.Should().Be(0, upload.Error);
+
+            var download = await RunJsonAsync("file", "download", $"{target}/{tree}", "--to", saved, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            download.ExitCode.Should().Be(0, download.Error);
+            download.Json.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(2);
+            File.Exists(Path.Combine(saved, tree, "top.prg")).Should().BeTrue();
+            File.Exists(Path.Combine(saved, tree, "inner", "deep.prg")).Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+            Directory.Delete(saved, recursive: true);
+        }
+    }
+
     private static string BenchFileOrSkip()
     {
         var path = Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty;

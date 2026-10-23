@@ -950,6 +950,9 @@ public sealed class UploadRunnerTests
             return Task.FromResult(Job());
         }
 
+        public Task DownloadAsync(TeensyStorageType storage, string devicePath, Stream destination, CancellationToken ct) =>
+            throw new NotSupportedException();
+
         public async Task CancelAsync(string jobId)
         {
             Record("cancel");
