@@ -25,8 +25,9 @@ internal sealed class FileLaunchOneShotSettings : FileLaunchingSettings
 }
 
 /// <summary>
-/// <c>trom file launch &lt;PATH&gt;</c>: launches one file and returns the prompt. With <c>--player</c> the player opens on
-/// it. The file is the one at exactly that path: a neighbour whose path merely contains it is never launched instead.
+/// <c>trom file launch &lt;PATH&gt;</c>: launches one file and returns the prompt, leaving the player's record so that
+/// <c>file next</c> carries on from it. With <c>--player</c> the player opens on it. The file is the one at exactly that
+/// path: a neighbour whose path merely contains it is never launched instead.
 /// </summary>
 internal sealed class FileLaunchOneShotCommand(
     ICliOutput output,
@@ -35,10 +36,9 @@ internal sealed class FileLaunchOneShotCommand(
     IDeviceService devices,
     IStorageService storage,
     ISettingsService settingsService,
-    ILaunchService launchService,
     IPlayerService player,
     ITypeResolver resolver,
-    IStdinPaths stdin) : FileLaunchingCommand<FileLaunchOneShotSettings>(output, engine, chooser, devices, storage, settingsService, launchService, player, resolver)
+    IStdinPaths stdin) : FileLaunchingCommand<FileLaunchOneShotSettings>(output, engine, chooser, devices, storage, settingsService, player, resolver)
 {
     protected override async Task<int> RunAsync(CommandContext context, FileLaunchOneShotSettings settings, CancellationToken ct)
     {
@@ -48,12 +48,13 @@ internal sealed class FileLaunchOneShotCommand(
         var item = await storage.GetFile(path)
             ?? throw new CliException(CliExitCode.NotFound, $"There is no launchable file at {path}.");
 
+        Player.UseStorage(storage.StorageType);
+
         if (playerCommand is null)
         {
-            return Report(await Launches.LaunchFile(storage.StorageType, item), storage.StorageType, $"{path} wasn't found.");
+            return Report(await Player.LaunchOnceAsync(item), storage.StorageType, $"{path} wasn't found.");
         }
 
-        Player.UseStorage(storage.StorageType);
         Player.SetDirectoryMode(path);
 
         if (!await Player.LaunchItem(item)) throw new CliException(CliExitCode.Failed, $"Couldn't play {path}.");

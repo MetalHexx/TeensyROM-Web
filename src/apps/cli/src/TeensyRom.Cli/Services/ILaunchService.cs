@@ -8,7 +8,10 @@ namespace TeensyRom.Cli.Services;
 /// </summary>
 internal interface ILaunchService
 {
-    /// <summary>Launches the file; <see cref="LaunchOutcome.Item"/> is <paramref name="item"/> itself.</summary>
+    /// <summary>
+    /// Launches the file. <see cref="LaunchOutcome.Item"/> is the engine's own record of it when the answer carries one,
+    /// so a bare item (one restored from the last launch, say) comes back with its full metadata; otherwise it is <paramref name="item"/> itself.
+    /// </summary>
     /// <exception cref="Api.TeensyApiException">tr-web didn't answer, or no device is selected.</exception>
     Task<LaunchOutcome> LaunchFile(TeensyStorageType storage, ILaunchableItem item);
 

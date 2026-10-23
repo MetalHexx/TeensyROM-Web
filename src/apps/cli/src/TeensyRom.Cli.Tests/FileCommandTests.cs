@@ -51,6 +51,9 @@ public sealed class FileCommandTests : IDisposable
 
         _player.FileLaunched.Returns(_fileLaunched);
         _player.GetState().Returns(_ => _playerState with { });
+        _player.LaunchOnceAsync(Arg.Any<ILaunchableItem>()).Returns(call => _launches.LaunchFile(_storageType, call.Arg<ILaunchableItem>()));
+        _player.RandomOnceAsync(Arg.Any<StorageScope>(), Arg.Any<string>(), Arg.Any<TeensyFilterType>())
+            .Returns(call => _launches.LaunchRandom(_storageType, call.ArgAt<StorageScope>(0), call.ArgAt<string>(1), call.ArgAt<TeensyFilterType>(2)));
         _player.LaunchItem(Arg.Any<ILaunchableItem>()).Returns(call =>
         {
             _calls.Add("launch");
@@ -125,6 +128,9 @@ public sealed class FileCommandTests : IDisposable
     }
 
     private static bool PlayerOpened(TestHost host) => host.Consoles.StdOut.Contains(PlayerHeader);
+
+    /// <summary>The names of the player members the commands called, in order.</summary>
+    private IEnumerable<string> PlayerCalls() => _player.ReceivedCalls().Select(call => call.GetMethodInfo().Name);
 
     // ---- ls ----------------------------------------------------------------------------------------------------------
 
@@ -437,7 +443,7 @@ public sealed class FileCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Launch_LaunchesTheExactlyMatchedFile_PrintsItsPath_AndTouchesNoPlayerState()
+    public async Task Launch_LaunchesTheExactlyMatchedFile_PrintsItsPath_AndOpensNoPlayer()
     {
         var song = Launchable();
         var host = NewHost();
@@ -447,7 +453,7 @@ public sealed class FileCommandTests : IDisposable
         exitCode.Should().Be(0);
         await _launches.Received(1).LaunchFile(TeensyStorageType.SD, song);
         host.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/1.sid\n");
-        _player.ReceivedCalls().Should().BeEmpty();
+        PlayerCalls().Should().Equal("UseStorage", "LaunchOnceAsync");
         _resolver.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -648,7 +654,7 @@ public sealed class FileCommandTests : IDisposable
         exitCode.Should().Be(0);
         await _launches.Received(1).LaunchRandom(TeensyStorageType.SD, StorageScope.DirDeep, "/", TeensyFilterType.All);
         host.Consoles.StdOut.Replace("\r\n", "\n").Should().Be("/music/pick.sid\n");
-        _player.ReceivedCalls().Should().BeEmpty();
+        PlayerCalls().Should().Equal("UseStorage", "RandomOnceAsync");
     }
 
     [Fact]
@@ -810,22 +816,27 @@ public sealed class FileCommandTests : IDisposable
 
     // ---- random --player --------------------------------------------------------------------------------------------
 
-    private void PlayerPicks(ILaunchableItem? item, PlayState state)
+    /// <summary>The player's random pick ends as <paramref name="outcome"/>; null is what the menu's guard answers when tr-web failed.</summary>
+    private void PlayerPicks(LaunchOutcome? outcome)
     {
         _player.PlayRandom().Returns(_ =>
         {
             _calls.Add("random");
-            _playerState.CurrentItem = item;
-            _playerState.PlayState = state;
-            if (item is not null) _fileLaunched.OnNext(item);
-            return Task.CompletedTask;
+            if (outcome is { Item: { } item })
+            {
+                _playerState.CurrentItem = item;
+                _fileLaunched.OnNext(item);
+            }
+            return Task.FromResult(outcome);
         });
     }
+
+    private LaunchOutcome Launched(string path) => new(LaunchStatus.Launched, Song(path), "Launched");
 
     [Fact]
     public async Task RandomPlayer_ConfiguresThePlayerFromTheOptions_ResolvesItFirst_AndOpensIt()
     {
-        PlayerPicks(Song("/music/pick.sid"), PlayState.Playing);
+        PlayerPicks(Launched("/music/pick.sid"));
         var host = NewHost(terminal: true);
         Leave(host);
 
@@ -848,7 +859,7 @@ public sealed class FileCommandTests : IDisposable
     [Fact]
     public async Task RandomPlayer_WithoutTimerOrOverride_PlaysSidsForTheirLength_WithNoTimer()
     {
-        PlayerPicks(Song("/music/pick.sid"), PlayState.Playing);
+        PlayerPicks(Launched("/music/pick.sid"));
         var host = NewHost(terminal: true);
         Leave(host);
 
@@ -863,7 +874,20 @@ public sealed class FileCommandTests : IDisposable
     [Fact]
     public async Task RandomPlayer_WhenNothingWasPicked_IsNotFound_AndDoesNotOpenThePlayer()
     {
-        PlayerPicks(null, PlayState.Playing);
+        PlayerPicks(new LaunchOutcome(LaunchStatus.NotFound, null, LaunchOutcome.NoFilesFoundMessage));
+        var host = NewHost(terminal: true);
+
+        var exitCode = await host.RunAsync("file", "random", "--player");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        host.Consoles.StdErr.Should().Contain(LaunchOutcome.NoFilesFoundMessage);
+        PlayerOpened(host).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RandomPlayer_WhenTr_WebFailedAndThePlayerAnsweredNothing_IsNotFound_AndDoesNotOpenThePlayer()
+    {
+        PlayerPicks(null);
         var host = NewHost(terminal: true);
 
         var exitCode = await host.RunAsync("file", "random", "--player");
@@ -873,9 +897,25 @@ public sealed class FileCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task RandomPlayer_WhenAFileWasPickedButIsNotPlaying_Fails_AndDoesNotOpenThePlayer()
+    public async Task RandomPlayer_WithARestoredFileAndNothingPicked_IsNotFound_AndDoesNotOpenThePlayer()
     {
-        PlayerPicks(Song("/music/pick.sid"), PlayState.Stopped);
+        _playerState.CurrentItem = Song("/music/left-over.sid");
+        _playerState.PlayState = PlayState.Playing;
+        PlayerPicks(new LaunchOutcome(LaunchStatus.NotFound, null, LaunchOutcome.NoFilesFoundMessage));
+        var host = NewHost(terminal: true);
+
+        var exitCode = await host.RunAsync("file", "random", "--player");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound, "the state left from an earlier run says Playing, but this pick found nothing");
+        PlayerOpened(host).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("Failed")]
+    [InlineData("Incompatible")]
+    public async Task RandomPlayer_WhenTheLaunchEndedAnotherWay_Fails_AndDoesNotOpenThePlayer(string status)
+    {
+        PlayerPicks(new LaunchOutcome(Enum.Parse<LaunchStatus>(status), Song("/music/pick.sid"), "The device is busy."));
         var host = NewHost(terminal: true);
 
         var exitCode = await host.RunAsync("file", "random", "--player");

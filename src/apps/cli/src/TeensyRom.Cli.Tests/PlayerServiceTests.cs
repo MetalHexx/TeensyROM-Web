@@ -18,7 +18,7 @@ using TeensyRom.Cli.Logging;
 
 namespace TeensyRom.Cli.Tests
 {
-    public class PlayerServiceTests
+    public partial class PlayerServiceTests
     {
         private IStorageService _storageService;
         private ILaunchService _launchService;
@@ -27,7 +27,9 @@ namespace TeensyRom.Cli.Tests
         private IProgressTimer _progressTimer;
         private ISettingsService _settingsService;
         private ILaunchHistory _launchHistory;
+        private readonly InMemoryLastLaunchStore _store = new();
         private const string _sidPath = "/music/MUSIC/1.sid";
+        private static readonly DeviceSummary Bench = new("dev-1", "Bench", true, "USB COM3", "Connected");
 
         private IFixture _fixture = new Fixture().Customize(new AutoNSubstituteCustomization() { ConfigureMembers = true });
 
@@ -38,9 +40,12 @@ namespace TeensyRom.Cli.Tests
             _deviceService = _fixture.Freeze<IDeviceService>();
             _alert = _fixture.Freeze<IAlertService>();
             _progressTimer = _fixture.Freeze<IProgressTimer>();
+            _fixture.Inject<ILastLaunchStore>(_store);
 
+            _deviceService.SelectedDevice.Returns(Bench);
+            _deviceService.RequireDeviceId().Returns(Bench.Id);
             _deviceService.ToggleMusicAsync().Returns(Task.CompletedTask);
-            _deviceService.ResetAsync().Returns(Task.CompletedTask);
+            _deviceService.ResetDeviceAsync(Any<string>(), Any<CancellationToken>()).Returns("Reset.");
             SetupLaunch();
             _launchService
                 .LaunchRandom(Any<TeensyStorageType>(), Any<StorageScope>(), Any<string>(), Any<TeensyFilterType>())
@@ -1021,7 +1026,7 @@ namespace TeensyRom.Cli.Tests
             settings.CurrentItem.Should().BeEquivalentTo(expectedFile);
             _progressTimer.Received(1).PauseTimer();
             await _deviceService.Received(1).ToggleMusicAsync();
-            await _deviceService.DidNotReceive().ResetAsync();
+            await _deviceService.DidNotReceive().ResetDeviceAsync(Any<string>(), Any<CancellationToken>());
         }
 
         [Fact]
@@ -1049,7 +1054,7 @@ namespace TeensyRom.Cli.Tests
         }
 
         [Fact]
-        public async Task Given_NonSongPlaying_When_Toggled_ItemIsPaused()
+        public async Task Given_NonSongPlaying_When_Toggled_ItemIsStopped()
         {
             //Arrange
             var playerService = _fixture.Create<PlayerService>();
@@ -1064,15 +1069,15 @@ namespace TeensyRom.Cli.Tests
 
             //Assert
             var settings = playerService.GetState();
-            settings.PlayState.Should().Be(PlayState.Paused);
+            settings.PlayState.Should().Be(PlayState.Stopped);
             settings.CurrentItem.Should().BeEquivalentTo(expectedFile);
             _progressTimer.Received(1).PauseTimer();
-            await _deviceService.Received(1).ResetAsync();
+            await _deviceService.Received(1).ResetDeviceAsync(Any<string>(), Any<CancellationToken>());
             await _deviceService.DidNotReceive().ToggleMusicAsync();
         }
 
         [Fact]
-        public async Task Given_NonSongPaused_When_Toggled_ItemResumes()
+        public async Task Given_NonSongStopped_When_Toggled_ItemIsLaunchedAgain()
         {
             //Arrange
             var playerService = _fixture.Create<PlayerService>();
@@ -1090,7 +1095,7 @@ namespace TeensyRom.Cli.Tests
             var settings = playerService.GetState();
             settings.CurrentItem.Should().BeEquivalentTo(expectedFile);
             settings.PlayState.Should().Be(PlayState.Playing);
-            _progressTimer.Received(1).ResumeTimer();
+            _progressTimer.DidNotReceive().ResumeTimer();
             await _launchService.Received(2).LaunchFile(Any<TeensyStorageType>(), expectedFile);
             await _deviceService.DidNotReceive().ToggleMusicAsync();
         }

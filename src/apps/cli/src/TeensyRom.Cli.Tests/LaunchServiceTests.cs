@@ -45,10 +45,28 @@ public class LaunchServiceTests
     };
 
     [Fact]
-    public async Task LaunchFile_WhenCompatible_IsLaunched_WithTheItemItWasGiven()
+    public async Task LaunchFile_WhenCompatible_IsLaunched_WithTheEnginesRecordOfTheFile()
     {
         var requested = Requested();
         var sut = Sut(HttpStatusCode.OK, LaunchBody(true, FileJson()));
+
+        var outcome = await sut.LaunchFile(TeensyStorageType.USB, requested);
+
+        outcome.Status.Should().Be(LaunchStatus.Launched);
+        outcome.Item.Should().NotBeSameAs(requested);
+        outcome.Item.Should().BeOfType<SongItem>().Which.Should().BeEquivalentTo(new { requested.Path, Size = 4123L, Title = "Artillery", IsCompatible = true });
+        outcome.Item!.ApiRecord.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("\"path\": \"/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid\"", "\"path\": \"\"")]
+    [InlineData("\"type\": \"Song\"", "\"type\": \"Unknown\"")]
+    public async Task LaunchFile_WhenTheAnswerNamesNoLaunchableFile_IsLaunched_WithTheItemItWasGiven(string found, string replacement)
+    {
+        var requested = Requested();
+        var file = FileJson().Replace(found, replacement);
+        file.Should().NotBe(FileJson(), "the answer was changed");
+        var sut = Sut(HttpStatusCode.OK, LaunchBody(true, file));
 
         var outcome = await sut.LaunchFile(TeensyStorageType.USB, requested);
 
@@ -81,7 +99,9 @@ public class LaunchServiceTests
         var outcome = await sut.LaunchFile(TeensyStorageType.SD, requested);
 
         outcome.Status.Should().Be(LaunchStatus.Incompatible);
-        outcome.Item.Should().BeSameAs(requested);
+        outcome.Item.Should().NotBeSameAs(requested);
+        outcome.Item!.Path.Should().Be(requested.Path);
+        outcome.Item.IsCompatible.Should().BeFalse("the answer says the unit can't run it");
     }
 
     [Fact]

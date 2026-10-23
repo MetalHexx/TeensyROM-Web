@@ -30,10 +30,6 @@ internal interface IDeviceService
     /// <exception cref="TeensyApiException">No device is selected, or tr-web couldn't toggle the music.</exception>
     Task ToggleMusicAsync();
 
-    /// <summary>Resets the selected device, which stops whatever it is running.</summary>
-    /// <exception cref="TeensyApiException">No device is selected, or tr-web couldn't reset it.</exception>
-    Task ResetAsync();
-
     /// <summary>Reconnects the device, whether or not it is online now, and returns it as it is afterwards.</summary>
     /// <exception cref="TeensyApiException">tr-web doesn't know the device or couldn't reconnect it.</exception>
     Task<DeviceSummary> ReconnectDeviceAsync(string deviceId, CancellationToken ct = default);

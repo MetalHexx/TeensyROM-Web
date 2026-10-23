@@ -4,6 +4,7 @@ using System.ComponentModel;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Output;
+using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Services;
 
 namespace TeensyRom.Cli.Commands.Device;
@@ -119,9 +120,19 @@ internal sealed class DevicePingCommand(ICliOutput output, IEngineControl engine
     protected override Task<string> CallAsync(string deviceId, CancellationToken ct) => Devices.PingDeviceAsync(deviceId, ct);
 }
 
-/// <summary><c>trom device reset</c>: resets an online device, which stops whatever it is running.</summary>
-internal sealed class DeviceResetCommand(ICliOutput output, IEngineControl engine, IDeviceChooser chooser, IDeviceService devices)
+/// <summary>
+/// <c>trom device reset</c>: resets an online device, which stops whatever it is running, and records that its last
+/// launch is no longer playing.
+/// </summary>
+internal sealed class DeviceResetCommand(ICliOutput output, IEngineControl engine, IDeviceChooser chooser, IDeviceService devices, ILastLaunchStore lastLaunches)
     : OnlineDeviceMessageCommand(output, engine, chooser, devices)
 {
-    protected override Task<string> CallAsync(string deviceId, CancellationToken ct) => Devices.ResetDeviceAsync(deviceId, ct);
+    protected override async Task<string> CallAsync(string deviceId, CancellationToken ct)
+    {
+        var message = await Devices.ResetDeviceAsync(deviceId, ct);
+
+        lastLaunches.MarkStopped(deviceId);
+
+        return message;
+    }
 }

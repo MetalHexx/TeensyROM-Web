@@ -14,6 +14,22 @@ namespace TeensyRom.Cli.Storage.Services
         private int _currentIndex = -1;        
         public bool CurrentIsNew { get; private set; }
 
+        public IReadOnlyList<ILaunchableItem> Items => _history.Select(entry => entry.Item2).ToList();
+
+        public int CurrentIndex => _currentIndex;
+
+        public void Restore(IEnumerable<ILaunchableItem> items, int currentIndex)
+        {
+            _history.Clear();
+
+            foreach (var item in items)
+            {
+                _history.Add(new(_history.Count, item));
+            }
+            _currentIndex = Math.Clamp(currentIndex, -1, _history.Count - 1);
+            CurrentIsNew = false;
+        }
+
         public void Add(ILaunchableItem fileItem) 
         {
             if (_currentIndex < _history.Count - 1) 
@@ -40,7 +56,11 @@ namespace TeensyRom.Cli.Storage.Services
                 CurrentIsNew = false;
             }
         }
-        public void Clear() => _history.Clear();
+        public void Clear()
+        {
+            _history.Clear();
+            _currentIndex = -1;
+        }
 
         public void ClearForwardHistory() => _history.RemoveRange(_currentIndex + 1, _history.Count - _currentIndex - 1);
 
