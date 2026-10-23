@@ -116,7 +116,7 @@ internal static class CliHost
         ]),
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [
-            PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one.", ["index", "build", "/music", "--storage", "sd"])
+            PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one. --all indexes every storage on every connected TeensyROM instead.", ["index", "build", "/music", "--storage", "sd"])
         ]),
         new("path", "Put trom on your PATH, or take it off again.",
         [

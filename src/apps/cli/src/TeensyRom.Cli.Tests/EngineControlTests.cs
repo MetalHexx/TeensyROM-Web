@@ -470,11 +470,48 @@ public class EngineControlTests
     [Fact]
     public async Task Status_OfAnEngineOfThisVersion_IsRunningAndMatching()
     {
+        ClearEngineLogs();
         _world.Answer = OwnEngine;
 
         var status = await _sut.GetStatusAsync(default);
 
-        status.Should().Be(new EngineStatus(true, FakeEngineWorld.OwnVersion, FakeEngineWorld.OwnVersion, true, "localhost:10213", null));
+        status.Should().Be(new EngineStatus(
+            true, FakeEngineWorld.OwnVersion, FakeEngineWorld.OwnVersion, true, "localhost:10213", null, TeensyRomHome.EngineLogsPath, LogFile: null));
+    }
+
+    [Fact]
+    public async Task Status_OfARunningEngine_NamesTheLogFolder_AndTheNewestLogFile()
+    {
+        ClearEngineLogs();
+        Directory.CreateDirectory(TeensyRomHome.EngineLogsPath);
+        foreach (var name in new[] { "Logs-2026-10-02_09-00-00.txt", "Logs-2026-10-01_10-00-00.txt", "engine-console.log" })
+        {
+            File.WriteAllText(Path.Combine(TeensyRomHome.EngineLogsPath, name), string.Empty);
+        }
+        _world.Answer = OwnEngine;
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.LogFolder.Should().Be(TeensyRomHome.EngineLogsPath);
+        status.LogFile.Should().Be(Path.Combine(TeensyRomHome.EngineLogsPath, "Logs-2026-10-02_09-00-00.txt"));
+    }
+
+    [Fact]
+    public async Task Status_WhenNothingListens_NamesTheLogFolderOnly()
+    {
+        ClearEngineLogs();
+        Directory.CreateDirectory(TeensyRomHome.EngineLogsPath);
+        File.WriteAllText(Path.Combine(TeensyRomHome.EngineLogsPath, "Logs-2026-10-02_09-00-00.txt"), string.Empty);
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.LogFolder.Should().Be(TeensyRomHome.EngineLogsPath);
+        status.LogFile.Should().BeNull();
+    }
+
+    private static void ClearEngineLogs()
+    {
+        if (Directory.Exists(TeensyRomHome.EngineLogsPath)) Directory.Delete(TeensyRomHome.EngineLogsPath, recursive: true);
     }
 
     [Theory]

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TeensyRom.Cli.Common;
 
 namespace TeensyRom.Cli.Tests.Integration;
 
@@ -46,6 +47,20 @@ public sealed class ContractScenarios(SharedApiFixture api)
         exitCode.Should().Be(0);
         var parse = () => JsonDocument.Parse(cli.Output).Dispose();
         parse.Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task EngineStatus_Json_NamesTheEnginesLogFolder_AndAnExistingLogFile()
+    {
+        using var cli = new CliHarness();
+
+        (await cli.RunAsync("engine", "status", "--json")).Should().Be(0);
+
+        var status = JsonDocument.Parse(cli.Output).RootElement;
+        status.GetProperty("logFolder").GetString().Should().Be(TeensyRomHome.EngineLogsPath);
+        var logFile = status.GetProperty("logFile").GetString();
+        Path.GetFileName(logFile).Should().StartWith("Logs-").And.EndWith(".txt");
+        File.Exists(logFile).Should().BeTrue();
     }
 
     [Fact]

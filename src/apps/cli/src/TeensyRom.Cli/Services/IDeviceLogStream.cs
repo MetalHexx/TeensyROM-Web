@@ -15,4 +15,12 @@ internal interface IDeviceLogStream
     /// <remarks><paramref name="onLine"/> runs on a background thread.</remarks>
     /// <exception cref="TeensyApiException">No device is selected, or tr-web wouldn't let this CLI follow its log.</exception>
     Task<IAsyncDisposable> FollowAsync(Action<string> onLine, CancellationToken ct = default);
+
+    /// <summary>
+    /// Like <see cref="FollowAsync"/> but for every device: <paramref name="onLine"/> gets the device id and the
+    /// message of each line tr-web logs for any device. Needs no selected device.
+    /// </summary>
+    /// <remarks><paramref name="onLine"/> runs on a background thread.</remarks>
+    /// <exception cref="TeensyApiException">tr-web wouldn't let this CLI follow its log.</exception>
+    Task<IAsyncDisposable> FollowEveryDeviceAsync(Action<string, string> onLine, CancellationToken ct = default);
 }
