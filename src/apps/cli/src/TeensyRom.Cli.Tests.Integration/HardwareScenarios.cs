@@ -277,6 +277,176 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         pause.Json.GetProperty("action").GetString().Should().Be("relaunched");
     }
 
+    /// <summary>
+    /// The scratch folder on the bench storage that the upload scenarios write into (for example /cli-bench). Uploads are
+    /// never cleaned up from the device, so use a folder you can empty by hand.
+    /// </summary>
+    private static string UploadFolderOrSkip()
+    {
+        var folder = (Environment.GetEnvironmentVariable("CLI_BENCH_UPLOAD_FOLDER") ?? string.Empty).TrimEnd('/');
+        Skip.If(string.IsNullOrWhiteSpace(folder), "CLI_BENCH_UPLOAD_FOLDER is not set");
+        return folder;
+    }
+
+    /// <summary>The smallest launchable program: <c>10 END</c> in BASIC at $0801.</summary>
+    private static readonly byte[] TinyProgram = [0x01, 0x08, 0x0B, 0x08, 0x0A, 0x00, 0x80, 0x00, 0x00, 0x00];
+
+    private static string NewLocalFolder() => Directory.CreateTempSubdirectory("trom-bench-upload-").FullName;
+
+    private static string WriteProgram(string folder, string relative)
+    {
+        var path = Path.Combine(folder, relative);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, TinyProgram);
+        return path;
+    }
+
+    private static async Task<(int ExitCode, JsonElement Json, string Error)> ListAsync(string folder, string deviceId, string storage) =>
+        await RunJsonAsync("file", "ls", folder, "--device", deviceId, "--storage", storage, "--json");
+
+    private static string[] FilePaths(JsonElement listing) =>
+        listing.GetProperty("files").EnumerateArray().Select(file => file.GetProperty("path").GetString()!).ToArray();
+
+    /// <summary>Uploads one local file, then finds it in the device folder.</summary>
+    [SkippableFact]
+    public async Task FileUpload_OneFile_LandsInTheDeviceFolder()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+
+        try
+        {
+            var name = $"bench-{Guid.NewGuid():N}.prg";
+            var file = WriteProgram(local, name);
+
+            var upload = await RunJsonAsync("file", "upload", file, "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            upload.ExitCode.Should().Be(0, upload.Error);
+            upload.Json.GetProperty("files")[0].GetProperty("ok").GetBoolean().Should().BeTrue();
+            upload.Json.GetProperty("files")[0].GetProperty("devicePath").GetString().Should().Be($"{target}/{name}");
+            var listing = await ListAsync(target, device.DeviceId, storage);
+            FilePaths(listing.Json).Should().Contain(path => path.Equals($"{target}/{name}", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    /// <summary>Uploads a folder with a nested folder: it arrives as a folder of its own name with the layout kept.</summary>
+    [SkippableFact]
+    public async Task FileUpload_ANestedFolder_KeepsItsLayoutUnderItsOwnName()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+
+        try
+        {
+            var tree = $"tree-{Guid.NewGuid():N}";
+            WriteProgram(local, $"{tree}/top.prg");
+            WriteProgram(local, $"{tree}/inner/deep.prg");
+
+            var upload = await RunJsonAsync("file", "upload", Path.Combine(local, tree), "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            upload.ExitCode.Should().Be(0, upload.Error);
+            upload.Json.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(2);
+            var inner = await ListAsync($"{target}/{tree}/inner", device.DeviceId, storage);
+            FilePaths(inner.Json).Should().Contain(path => path.EndsWith("/deep.prg", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    /// <summary>Uploads a .zip, which the engine expands into a folder named after it.</summary>
+    [SkippableFact]
+    public async Task FileUpload_AnArchive_IsExpandedOnTheDevice()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+
+        try
+        {
+            var pack = $"pack-{Guid.NewGuid():N}";
+            WriteProgram(local, "contents/one.prg");
+            WriteProgram(local, "contents/two.prg");
+            var archive = Path.Combine(local, $"{pack}.zip");
+            System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(local, "contents"), archive);
+
+            var upload = await RunJsonAsync("file", "upload", archive, "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+
+            upload.ExitCode.Should().Be(0, upload.Error);
+            upload.Json.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(2);
+            var expanded = await ListAsync($"{target}/{pack}", device.DeviceId, storage);
+            FilePaths(expanded.Json).Should().HaveCount(2);
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    /// <summary>With no paths and --yes, the current folder's contents arrive directly in the device folder.</summary>
+    [SkippableFact]
+    public async Task FileUpload_WithNoPathsAndYes_SendsTheCurrentFoldersContents()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+        var original = Directory.GetCurrentDirectory();
+
+        try
+        {
+            var destination = $"{target}/cwd-{Guid.NewGuid():N}";
+            WriteProgram(local, "first.prg");
+            WriteProgram(local, "sub/second.prg");
+            Directory.SetCurrentDirectory(local);
+
+            var upload = await RunJsonAsync("file", "upload", "--to", destination, "--yes", "--device", device.DeviceId, "--storage", storage, "--json");
+
+            upload.ExitCode.Should().Be(0, upload.Error);
+            upload.Json.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(2);
+            var listing = await ListAsync(destination, device.DeviceId, storage);
+            FilePaths(listing.Json).Should().Contain(path => path.EndsWith("/first.prg", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(original);
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    /// <summary>Uploads one program with --launch, which then runs and is reported as <c>file launch</c> reports it.</summary>
+    [SkippableFact]
+    public async Task FileUploadLaunch_SendsTheFile_ThenLaunchesIt()
+    {
+        var target = UploadFolderOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+        var local = NewLocalFolder();
+
+        try
+        {
+            var name = $"launch-{Guid.NewGuid():N}.prg";
+            var file = WriteProgram(local, name);
+
+            var upload = await RunJsonAsync("file", "upload", "--launch", file, "--to", target, "--device", device.DeviceId, "--storage", storage, "--json");
+            await RunJsonAsync("file", "stop", "--device", device.DeviceId, "--json");
+
+            upload.ExitCode.Should().Be(0, upload.Error);
+            upload.Json.GetProperty("status").GetString().Should().Be("launched");
+            FilePath(upload.Json).Should().BeEquivalentTo($"{target}/{name}");
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
     private static string BenchFileOrSkip()
     {
         var path = Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty;
