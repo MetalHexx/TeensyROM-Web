@@ -8,9 +8,25 @@ Guide the user through the library with `trom file ls "<dir>" --json`. It works 
 
 When a file is launched, tell a short story under the rules in `dj.md` (see its Stories section). Do not repeat them here.
 
+## Copying
+
+Copy between this computer and the TeensyROM with `trom file upload` and `trom file download`. Both take `--json`.
+
+- Upload: `trom file upload "<local path>" --to "<device folder>" --device <name> [--storage sd|usb] --json`. Always name the source.
+- Download: `trom file download "<device path>" --to "<local folder>" --device <name> --json`.
+- Folders keep their layout. `.zip`, `.7z` and `.rar` are expanded on the TeensyROM. Files over 10 MB are skipped on download and reported.
+- Ask where files go when the user hasn't said: the device folder for an upload, the folder on the computer for a download. Your own working folder is wherever this session started, which is rarely where the user wants files.
+- Before any copy, confirm what goes where. A copy replaces a same-named file at the destination.
+- Report the summary, and each failure in plain words.
+- A busy device means "try again when the other transfer finishes".
+- To copy and launch one file, see `dj.md` (Launching).
+
 ## Curating
 
 Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: confirm before a ban.
+
+- List the bans: `trom file banned --json` returns `[{entry, kind}]`, where `kind` is `file` or `folder`. Takes no `--device`.
+- Lift a ban on request: `trom file unban "<entry>" --json`. Give the entry as `trom file banned` prints it, or a device file path. Takes no `--device`.
 
 ## Search and random
 
@@ -18,4 +34,4 @@ Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: 
 
 ## Not yet
 
-If `init`'s `capabilities` does not list a command for what the user asks (copy, delete, send), say plainly: "this version of trom can't do that yet".
+Deleting files, and copying or moving files on the TeensyROM itself, are not in trom yet. If `init`'s `capabilities` does not list a command for what the user asks, say plainly: "this version of trom can't do that yet".
