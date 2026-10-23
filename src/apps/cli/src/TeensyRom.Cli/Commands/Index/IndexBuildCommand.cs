@@ -106,10 +106,34 @@ internal sealed class IndexBuildCommand(
 
         MarkIndexed();
 
-        if (Output.Mode == OutputMode.Json) Output.Json(new IndexBuildResult(["sd", "usb"], "/") { AllDevices = true });
+        if (Output.Mode == OutputMode.Json) Output.Json(new IndexBuildResult(await IndexedStoragesAsync(ct), "/") { AllDevices = true });
         else Output.Lines(["Indexed every storage on every connected TeensyROM."]);
 
         return 0;
+    }
+
+    /// <summary>
+    /// The storages the online devices have, read from the plain (unthrottled) listing after the index ran. An
+    /// unreadable listing yields none: the index already succeeded.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> IndexedStoragesAsync(CancellationToken ct)
+    {
+        IReadOnlyList<DeviceSummary> found;
+
+        try
+        {
+            found = await devices.FindAsync(fullScan: false, ct);
+        }
+        catch (TeensyApiException)
+        {
+            return [];
+        }
+
+        var names = new List<string>();
+        if (found.Any(device => device.SdAvailable)) names.Add("sd");
+        if (found.Any(device => device.UsbAvailable)) names.Add("usb");
+
+        return names;
     }
 
     private void MarkIndexed()

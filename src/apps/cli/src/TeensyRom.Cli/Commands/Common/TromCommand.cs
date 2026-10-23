@@ -50,7 +50,8 @@ internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engin
 
 /// <summary>
 /// A command that works with one online TeensyROM: after the engine is ready the device is chosen and selected, and
-/// for <see cref="StorageSettings"/> the storage is chosen for this invocation without saving it.
+/// for <see cref="StorageSettings"/> the storage is chosen for this invocation without saving it, unless
+/// <c>NeedsDevice</c> says the run acts on every device.
 /// </summary>
 internal abstract class DeviceCommand<T>(
     ICliOutput output,
