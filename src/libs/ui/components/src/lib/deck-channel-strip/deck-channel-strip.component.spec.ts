@@ -18,7 +18,7 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
     fader: {
       value: 1,
       min: 0.5,
-      max: 2,
+      max: 1.5,
       step: 0.001,
       home: 1,
       accessibleName: 'Speed multiplier deck A',
@@ -26,8 +26,8 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
     nudge: { downAccessibleName: 'Nudge speed down deck A', upAccessibleName: 'Nudge speed up deck A' },
     jumpButtons: [
       { id: 'up', label: '+50%', accessibleName: 'Speed up 50% deck A' },
-      { id: 'home', label: '1×', accessibleName: 'Speed home deck A' },
-      { id: 'down', label: '-50%', accessibleName: 'Speed down 50% deck A' },
+      { id: 'home', label: 'Home', accessibleName: 'Speed home deck A' },
+      { id: 'down', label: '−50%', accessibleName: 'Speed down 50% deck A' },
     ],
     disabled: false,
     ...overrides,

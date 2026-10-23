@@ -11,7 +11,8 @@ import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
  * One deck's loops/cues faceplate: an engraved caption, the Add and Stop keys, and one
  * `MarkerRowComponent` per `model().rows` entry. The row list scrolls once the rows outgrow the
  * plate, and the plate fills its slot's height. Purely presentational and inert — the caller owns
- * every marker, every drag offset and every write.
+ * every marker, every drag offset and every write. The keys carry no `data-control` anchor: Stop
+ * here would collide with the transport's mappable `stop` on the same deck.
  *
  * The twelve row-level outputs arrive as one `rowAction` carrying the row's index, the same shape
  * as `LoopsCuesPanelComponent`.

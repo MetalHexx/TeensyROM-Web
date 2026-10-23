@@ -55,6 +55,14 @@ export const PillIdle: Story = { args: pill, render };
 
 export const PillHeld: Story = { args: pill, render, play: pressWithEnter };
 
+const focusPad = async ({ canvasElement }: { canvasElement: HTMLElement }): Promise<void> => {
+  canvasElement.querySelector('button')?.focus();
+};
+
+export const PillFocused: Story = { args: pill, render, play: focusPad };
+
+export const RoundFocused: Story = { args: round, render, play: focusPad };
+
 export const PillDisabled: Story = { args: { ...pill, disabled: true }, render };
 
 export const RoundIdle: Story = { args: round, render };

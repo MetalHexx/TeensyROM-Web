@@ -54,7 +54,7 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
     fader: {
       value: 1,
       min: 0.5,
-      max: 2,
+      max: 1.5,
       step: 0.001,
       home: 1,
       accessibleName: `Speed multiplier deck ${deck}`,
@@ -65,8 +65,8 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
     },
     jumpButtons: [
       { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${deck}` },
-      { id: 'home', label: '1×', accessibleName: `Speed home deck ${deck}` },
-      { id: 'down', label: '-50%', accessibleName: `Speed down 50% deck ${deck}` },
+      { id: 'home', label: 'Home', accessibleName: `Speed home deck ${deck}` },
+      { id: 'down', label: '−50%', accessibleName: `Speed down 50% deck ${deck}` },
     ],
     disabled: false,
   };

@@ -4,14 +4,12 @@
       <span class="caption" aria-hidden="true">Loops / Cues</span>
       <div class="keys">
         <lib-synth-key
-          data-control="add"
           label="Add"
           icon="add"
           [accessibleName]="model().addAccessibleName"
           (press)="addMarker.emit()"
         />
         <lib-synth-key
-          data-control="stop"
           label="Stop"
           icon="stop"
           [accessibleName]="model().stopAccessibleName"
