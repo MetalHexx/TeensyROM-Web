@@ -236,7 +236,7 @@ public sealed class IndexBuildTests : IDisposable
         await _storage.Received(1).IndexAllAsync(Arg.Any<CancellationToken>());
         await _storage.DidNotReceive().Index(Arg.Any<string>());
         await _host.Devices.DidNotReceive().GetDevicesAsync(Arg.Any<CancellationToken>());
-        _host.Devices.DidNotReceive().Select(Arg.Any<DeviceSummary?>());
+        _host.Devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
         StdOut.Should().Be("Indexed every storage on every connected TeensyROM.\n");
     }
 
@@ -307,11 +307,52 @@ public sealed class IndexBuildTests : IDisposable
     [Fact]
     public async Task All_Json_IsEveryStorage_WithAllDevicesTrue()
     {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { Both });
+
         await _host.RunAsync("index", "build", "--all", "--json");
 
         var result = JsonDocument.Parse(StdOut).RootElement;
         result.EnumerateObject().Select(p => p.Name).Should().Equal("storages", "path", "allDevices");
         result.GetProperty("storages").EnumerateArray().Select(s => s.GetString()).Should().Equal("sd", "usb");
+        result.GetProperty("allDevices").GetBoolean().Should().BeTrue();
+        await _host.Devices.DidNotReceive().FindAsync(true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task All_Json_ReportsOnlyTheStoragesTheDevicesHave()
+    {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { Both with { UsbAvailable = false } });
+
+        await _host.RunAsync("index", "build", "--all", "--json");
+
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("storages").EnumerateArray()
+            .Select(s => s.GetString()).Should().Equal("sd");
+    }
+
+    [Fact]
+    public async Task All_Json_ReportsUsb_WhenOnlyAnotherDeviceHasIt()
+    {
+        var sdOnly = Both with { UsbAvailable = false };
+        var usbOnly = new DeviceSummary("b-2", "Beta", true, "USB COM4", "Connected", UsbAvailable: true);
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { usbOnly, sdOnly });
+
+        await _host.RunAsync("index", "build", "--all", "--json");
+
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("storages").EnumerateArray()
+            .Select(s => s.GetString()).Should().Equal("sd", "usb");
+    }
+
+    [Fact]
+    public async Task All_Json_WhenTheListingFails_StillSucceeds_WithNoStorages()
+    {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("tr-web is busy.", 503)));
+
+        var exitCode = await _host.RunAsync("index", "build", "--all", "--json");
+
+        exitCode.Should().Be(0);
+        var result = JsonDocument.Parse(StdOut).RootElement;
+        result.GetProperty("storages").GetArrayLength().Should().Be(0);
         result.GetProperty("allDevices").GetBoolean().Should().BeTrue();
     }
 
