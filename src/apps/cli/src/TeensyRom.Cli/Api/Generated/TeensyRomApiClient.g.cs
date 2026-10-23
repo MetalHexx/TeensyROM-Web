@@ -327,7 +327,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique
         /// <br/>- Each mapping source names a controller in the same request, and no two mappings share a source
         /// <br/>- Mapping owner is A, B or mixer; the control must be a known deck control (A, B); the mixer owns none
-        /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, and null otherwise
+        /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, optional (range-checked) for hold, and null otherwise
         /// <br/>- Deck slots are A or B, each bound at most once, to different devices
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -2571,7 +2571,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique
         /// <br/>- Each mapping source names a controller in the same request, and no two mappings share a source
         /// <br/>- Mapping owner is A, B or mixer; the control must be a known deck control (A, B); the mixer owns none
-        /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, and null otherwise
+        /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, optional (range-checked) for hold, and null otherwise
         /// <br/>- Deck slots are A or B, each bound at most once, to different devices
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.

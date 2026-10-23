@@ -69,7 +69,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
         /// <summary>
         /// Step size. Required for relative-offset and relative-signed (greater than 0, up to 1) and for step
-        /// (-1 to 1, not 0). Must be null for every other kind.
+        /// (-1 to 1, not 0). Optional for hold (greater than 0, up to 1; null holds the voice). Must be null for every other kind.
         /// </summary>
         public double? Amount { get; set; }
     }
@@ -137,6 +137,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
         public const string MixerOwner = "mixer";
         public const string StepStyleKind = "step";
+        public const string HoldStyleKind = "hold";
 
         public static readonly Regex IdPattern = new(@"^[A-Za-z0-9_-]{1,64}\z", RegexOptions.CultureInvariant);
 
@@ -242,6 +243,13 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
                         if (amount is not { } a || !double.IsFinite(a) || a < -1 || a > 1 || a == 0)
                         {
                             context.AddFailure("Amount is required for style 'step' and must be between -1 and 1, and not 0.");
+                        }
+                    }
+                    else if (kind == MidiSettingsAllowLists.HoldStyleKind)
+                    {
+                        if (amount is { } a && (!double.IsFinite(a) || a <= 0 || a > 1))
+                        {
+                            context.AddFailure("Amount for style 'hold' must be null, or greater than 0 and at most 1.");
                         }
                     }
                     else if (amount is not null)

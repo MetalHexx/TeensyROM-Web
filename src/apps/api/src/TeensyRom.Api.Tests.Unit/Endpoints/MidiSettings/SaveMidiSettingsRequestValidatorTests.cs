@@ -319,6 +319,7 @@ public class SaveMidiSettingsRequestValidatorTests
 
     [Theory]
     [InlineData("A", "play-pause")]
+    [InlineData("A", "speed-nudge-up")]
     [InlineData("B", "speed-nudge-down")]
     [InlineData("B", "key")]
     [InlineData("A", "voice-2-coarse")]
@@ -341,6 +342,7 @@ public class SaveMidiSettingsRequestValidatorTests
     [Theory]
     [InlineData("A", "crossfader")]
     [InlineData("B", "volume")]
+    [InlineData("B", "clear-voice-mutes")]
     [InlineData("A", "Speed")]
     [InlineData("A", "level")]
     [InlineData("B", "cutoff")]
@@ -361,9 +363,9 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsSixtySixNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsSixtySevenNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(66);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(67);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }
 
@@ -377,7 +379,6 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("latch")]
     [InlineData("on")]
     [InlineData("off")]
-    [InlineData("hold")]
     [InlineData("absolute")]
     public void Validate_StyleWithoutAmount_PassesAndRejectsAnAmount(string kind)
     {
@@ -436,6 +437,31 @@ public class SaveMidiSettingsRequestValidatorTests
     {
         var request = ValidRequest();
         request.Mappings[0].Style = new MidiMappingStyleDto { Kind = kind, Amount = amount };
+
+        AssertRejectedAt(request, "Mappings[0].Style.Amount");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0.05)]
+    [InlineData(1.0)]
+    public void Validate_HoldAmountAbsentOrInRange_Passes(double? amount)
+    {
+        var request = ValidRequest();
+        request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "hold", Amount = amount };
+
+        _validator.Validate(request).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-0.05)]
+    [InlineData(1.5)]
+    [InlineData(double.NaN)]
+    public void Validate_HoldAmountOutOfRangeOrNotFinite_IsRejected(double amount)
+    {
+        var request = ValidRequest();
+        request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "hold", Amount = amount };
 
         AssertRejectedAt(request, "Mappings[0].Style.Amount");
     }

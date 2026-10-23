@@ -22,7 +22,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                     "- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique\n" +
                     "- Each mapping source names a controller in the same request, and no two mappings share a source\n" +
                     "- Mapping owner is A, B or mixer; the control must be a known deck control (A, B); the mixer owns none\n" +
-                    "- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, and null otherwise\n" +
+                    "- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed and step, optional (range-checked) for hold, and null otherwise\n" +
                     "- Deck slots are A or B, each bound at most once, to different devices\n\n" +
                     "Anything outside these rules is rejected with a 400 and nothing is written."
                 );
