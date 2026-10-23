@@ -16,12 +16,9 @@
   data-control="voice-hold"
   [attr.aria-label]="model().holdAccessibleName"
   [disabled]="disabled()"
-  (pointerdown)="onHoldStart($event)"
-  (pointerup)="onHoldEnd()"
-  (pointercancel)="onHoldEnd()"
-  (keydown)="onHoldKeyDown($event)"
-  (keyup)="onHoldKeyUp($event)"
-  (blur)="onHoldBlur()"
+  libHoldPress
+  [holdDisabled]="disabled()"
+  (holdChange)="heldChange.emit($event)"
 >
   {{ model().holdLabel }}
 </button>

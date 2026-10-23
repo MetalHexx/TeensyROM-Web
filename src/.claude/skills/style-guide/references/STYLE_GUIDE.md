@@ -57,6 +57,7 @@ Defined in both theme blocks of `styles.scss` for the SID synth panel and its pa
 - `--synth-led-off`: unlit LED
 - `--synth-knob-skirt`, `--synth-knob-skirt-border`, `--synth-knob-cap`, `--synth-knob-track`, `--synth-pointer`: parts of the panel rotary knob
 - `--synth-panic-face-top`, `--synth-panic-face-bottom`, `--synth-panic-text`: the panic button's magenta-tinted face and text
+- `--synth-display-face`, `--synth-display-border`, `--synth-display-text`, `--synth-display-dim`: the recessed readout face, its hairline border, its text and its dimmed text. Apply them together with `@include styles.synth-display;` (from `theme/mixins`), which adds the inset shadow and mono text. Colour state lights on a display with `--color-highlight`, `--color-primary-bright`, `--color-success`, `--color-directory` and `--color-error`.
 
 ---
 

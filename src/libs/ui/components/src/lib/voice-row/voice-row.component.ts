@@ -1,11 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnDestroy,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { HoldPressDirective } from '../hold-press/hold-press.directive';
 
 /** One voice's caller-composed state within a voice panel. */
 export interface VoiceRowModel {
@@ -45,6 +39,7 @@ export interface VoiceRowModel {
  */
 @Component({
   selector: 'lib-voice-row',
+  imports: [HoldPressDirective],
   templateUrl: './voice-row.component.html',
   styleUrl: './voice-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,7 +47,7 @@ export interface VoiceRowModel {
     '[attr.data-disabled]': "disabled() ? '' : null",
   },
 })
-export class VoiceRowComponent implements OnDestroy {
+export class VoiceRowComponent {
   /** The voice row's display model and state. */
   readonly model = input.required<VoiceRowModel>();
   /** Disables the mute checkbox and the hold button and dims the row. Defaults to `false`, so every
@@ -64,102 +59,8 @@ export class VoiceRowComponent implements OnDestroy {
   /** Emits on hold button press (`true`) and release/cancel (`false`). Momentary; both press and release are meaningful. */
   readonly heldChange = output<boolean>();
 
-  /** Whether a hold (pointer or keyboard) is in progress, so a row disabled mid-hold knows to
-   *  release it. */
-  private held = false;
-
-  /** Tracks a keyboard-initiated hold so `onHoldBlur` knows whether to end one — a pointer hold
-   *  ends through `onHoldEnd` regardless of focus, via pointer capture. */
-  private keyHeld = false;
-
-  /** Releases a hold in progress when the row becomes disabled: a disabled button never delivers its
-   *  own release, so without this the voice would stay inverted. */
-  constructor() {
-    effect(() => {
-      if (this.disabled() && this.held) {
-        this.keyHeld = false;
-        this.endHold();
-      }
-    });
-  }
-
-  /** Releases a hold still in progress when the row is removed (e.g. navigating away mid-hold): the
-   *  element goes before its release event, and the deck engine outlives the page, so without this
-   *  the voice would stay inverted. Emits from `ngOnDestroy` rather than a `DestroyRef` callback,
-   *  which runs after the parent's listeners are unsubscribed and so would reach no one. */
-  ngOnDestroy(): void {
-    if (this.held) {
-      this.keyHeld = false;
-      this.endHold();
-    }
-  }
-
   /** Forwards the mute checkbox's toggled state. */
   protected onMutedChange(event: Event): void {
     this.mutedChange.emit((event.target as HTMLInputElement).checked);
-  }
-
-  /** Pointer capture keeps the release on this element even if the press drags off it — without it
-   *  the browser fires no `pointerup` here and the row stays inverted. Guarded with `?.` because
-   *  this API isn't implemented in the jsdom test environment. */
-  protected onHoldStart(event: PointerEvent): void {
-    if (this.disabled()) {
-      return;
-    }
-    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
-    this.held = true;
-    this.heldChange.emit(true);
-  }
-
-  /** Handles both `pointerup` and `pointercancel` — either way the hold ends. */
-  protected onHoldEnd(): void {
-    if (this.disabled()) {
-      return;
-    }
-    this.endHold();
-  }
-
-  /** Keyboard equivalent of `onHoldStart` for Enter/Space; `event.repeat` guards against the
-   *  browser's auto-repeat re-triggering the press while the key stays down. Bound to the plain
-   *  `keydown` event (rather than Angular's `keydown.enter`/`keydown.space` filter syntax) because
-   *  strict template type checking can't resolve those filtered event names to `KeyboardEvent`. */
-  protected onHoldKeyDown(event: KeyboardEvent): void {
-    if (this.disabled() || (event.key !== 'Enter' && event.key !== ' ')) {
-      return;
-    }
-    event.preventDefault();
-    if (event.repeat) {
-      return;
-    }
-    this.keyHeld = true;
-    this.held = true;
-    this.heldChange.emit(true);
-  }
-
-  /** Keyboard equivalent of `onHoldEnd` for Enter/Space. */
-  protected onHoldKeyUp(event: KeyboardEvent): void {
-    if (this.disabled() || (event.key !== 'Enter' && event.key !== ' ')) {
-      return;
-    }
-    event.preventDefault();
-    this.keyHeld = false;
-    this.endHold();
-  }
-
-  /** Ends a keyboard hold the browser will never deliver a matching `keyup` for — focus left this
-   *  button (e.g. Tab, or a click elsewhere) while Enter/Space was still down. A no-op otherwise,
-   *  so a pointer hold (which does not touch `keyHeld`) is untouched by a coincidental blur. */
-  protected onHoldBlur(): void {
-    if (!this.keyHeld) {
-      return;
-    }
-    this.keyHeld = false;
-    this.endHold();
-  }
-
-  /** Clears the hold state and emits the release. */
-  private endHold(): void {
-    this.held = false;
-    this.heldChange.emit(false);
   }
 }
