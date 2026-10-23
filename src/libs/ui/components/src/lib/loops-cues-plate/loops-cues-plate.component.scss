@@ -1,0 +1,60 @@
+// Fills the caller's slot: the scaling container gives it a `height: 100%` box, and the plate fills
+// that box rather than its own content's height.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Trimmed to the scale's small step, as the channel strip's faceplate is, to fit the narrow column.
+.plate {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--spacing-sm);
+  overflow: hidden;
+}
+
+.loops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+}
+
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.caption {
+  color: var(--synth-legend);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.keys {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// Rows stack from the top and become the scroll container once they outgrow the plate.
+.rows {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  overflow-y: auto;
+}

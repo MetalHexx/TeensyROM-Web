@@ -1,0 +1,43 @@
+<lib-synth-panel class="plate">
+  <section class="loops" [attr.aria-label]="model().accessibleName">
+    <div class="header">
+      <span class="caption" aria-hidden="true">Loops / Cues</span>
+      <div class="keys">
+        <lib-synth-key
+          data-control="add"
+          label="Add"
+          icon="add"
+          [accessibleName]="model().addAccessibleName"
+          (press)="addMarker.emit()"
+        />
+        <lib-synth-key
+          data-control="stop"
+          label="Stop"
+          icon="stop"
+          [accessibleName]="model().stopAccessibleName"
+          (press)="stopLoop.emit()"
+        />
+      </div>
+    </div>
+
+    <div class="rows">
+      @for (row of model().rows; track $index) {
+      <lib-marker-row
+        [model]="row"
+        (trigger)="onRowAction($index, 'trigger')"
+        (setEnd)="onRowAction($index, 'setEnd')"
+        (clearEnd)="onRowAction($index, 'clearEnd')"
+        (delete)="onRowAction($index, 'delete')"
+        (startNudgeInput)="onRowAction($index, 'startNudgeInput', $event)"
+        (startNudgeCommit)="onRowAction($index, 'startNudgeCommit', $event)"
+        (startSnapPrevious)="onRowAction($index, 'startSnapPrevious')"
+        (startSnapNext)="onRowAction($index, 'startSnapNext')"
+        (endNudgeInput)="onRowAction($index, 'endNudgeInput', $event)"
+        (endNudgeCommit)="onRowAction($index, 'endNudgeCommit', $event)"
+        (endSnapPrevious)="onRowAction($index, 'endSnapPrevious')"
+        (endSnapNext)="onRowAction($index, 'endSnapNext')"
+      />
+      }
+    </div>
+  </section>
+</lib-synth-panel>
