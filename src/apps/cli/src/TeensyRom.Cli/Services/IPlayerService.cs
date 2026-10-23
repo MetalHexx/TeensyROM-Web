@@ -43,9 +43,10 @@ namespace TeensyRom.Cli.Services
 
         /// <summary>
         /// Launches what follows the current file: the next file of its folder or search results, the next random pick in
-        /// the history or a new one. Files the unit can't run are skipped. Null when there is nothing to carry on from.
+        /// the history or a new one. Files the unit can't run are skipped, until one launches or none is left to try. Null
+        /// when there is nothing to carry on from.
         /// </summary>
-        /// <returns>The outcome of the launch it ended on.</returns>
+        /// <returns>The outcome of the launch it ended on: <see cref="LaunchStatus.Incompatible"/> when every file it tried was skipped.</returns>
         /// <exception cref="Api.TeensyApiException">tr-web didn't answer.</exception>
         Task<LaunchOutcome?> NextAsync();
 
@@ -61,7 +62,8 @@ namespace TeensyRom.Cli.Services
 
         /// <summary>
         /// Has tr-web pick and launch a random file in random mode and adds a launched pick to the history. A file the
-        /// unit can't run is reported, not skipped.
+        /// unit can't run is reported, not skipped. When there are no files to pick from, the player and its record stay as
+        /// they were.
         /// </summary>
         /// <exception cref="Api.TeensyApiException">tr-web didn't answer.</exception>
         Task<LaunchOutcome> RandomOnceAsync(StorageScope scope, string startingDirectory, TeensyFilterType filter);

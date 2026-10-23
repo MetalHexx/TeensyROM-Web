@@ -2,6 +2,7 @@ using System.Net;
 using NSubstitute;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Commands.File;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Entities;
@@ -72,6 +73,21 @@ public class LaunchServiceTests
 
         outcome.Status.Should().Be(LaunchStatus.Launched);
         outcome.Item.Should().BeSameAs(requested);
+    }
+
+    [Fact]
+    public async Task LaunchFile_WhenTheEngineAnswersWithTheFile_ItsFullJsonIsThatOfTheListingRecord()
+    {
+        var listed = ApiMapper.ToListing(new StorageCacheDto { Path = "/music", Files = [FileItemJsonTests.SongDto()] }).Files.OfType<ILaunchableItem>().Single();
+        var api = Substitute.For<ITeensyRomApiClient>();
+        api.LaunchFileAsync(DeviceId, ApiStorageType.USB, listed.Path, Arg.Any<CancellationToken>())
+            .Returns(new LaunchFileResponse { IsCompatible = true, LaunchedFile = FileItemJsonTests.SongDto() });
+
+        var outcome = await new LaunchService(api, _devices).LaunchFile(TeensyStorageType.USB, listed);
+
+        outcome.Item.Should().NotBeSameAs(listed);
+        FileItemJson.Full(outcome.Item!, TeensyStorageType.USB).ToJsonString()
+            .Should().Be(FileItemJson.Full(listed, TeensyStorageType.USB).ToJsonString());
     }
 
     [Fact]

@@ -61,11 +61,27 @@ public sealed class LastLaunchStoreTests : IDisposable
         _sut.Find("Bench").Should().BeNull();
     }
 
+    private const string HandWrittenHead = "{ \"version\": 1, \"devices\": { \"dev-1\": { \"deviceId\": \"dev-1\", \"deviceName\": \"Bench\", \"storage\": \"USB\", ";
+    private const string HandWrittenTail = ", \"mode\": \"Search\", \"filter\": \"Music\", \"scope\": \"DirShallow\", \"scopePath\": \"/music\", \"playState\": \"Paused\", \"randomIndex\": 0 } } }";
+
+    [Fact]
+    public void Load_OfAHandWrittenRecordWithEveryPath_ReadsIt_SoTheCasesBelowFailOnTheirNullsAlone()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(RecordPath)!);
+        File.WriteAllText(RecordPath, HandWrittenHead + "\"current\": { \"path\": \"/music/1.sid\", \"size\": 5 }, \"randomPicks\": [{ \"path\": \"/music/2.sid\", \"size\": 6 }]" + HandWrittenTail);
+
+        _sut.Load("dev-1").Should().BeEquivalentTo(new { Current = new LaunchedFile("/music/1.sid", 5), RandomPicks = new[] { new LaunchedFile("/music/2.sid", 6) } });
+    }
+
     [Theory]
     [InlineData("this is not json")]
     [InlineData("{ \"version\": 2, \"devices\": { \"dev-1\": { \"deviceId\": \"dev-1\" } } }")]
     [InlineData("{ \"version\": 1 }")]
     [InlineData("")]
+    [InlineData(HandWrittenHead + "\"current\": { \"path\": null, \"size\": 5 }, \"randomPicks\": []" + HandWrittenTail)]
+    [InlineData(HandWrittenHead + "\"current\": { \"path\": \"\", \"size\": 5 }, \"randomPicks\": []" + HandWrittenTail)]
+    [InlineData(HandWrittenHead + "\"current\": null, \"randomPicks\": [{ \"path\": \"/music/1.sid\", \"size\": 5 }, { \"path\": null, \"size\": 6 }]" + HandWrittenTail)]
+    [InlineData(HandWrittenHead + "\"current\": null, \"randomPicks\": [null]" + HandWrittenTail)]
     public void Load_OfAnUnreadableFileOrAnotherVersion_IsNull_AndTheNextSaveReplacesIt(string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(RecordPath)!);
@@ -113,32 +129,47 @@ public sealed class LastLaunchStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_KeepsOnlyTheNewestHundredPicks()
+    public void Save_OfExactlyThePicksARecordMayHold_KeepsThemAll()
     {
-        var picks = Enumerable.Range(0, 130).Select(Pick).ToList();
+        var picks = Enumerable.Range(0, 1000).Select(Pick).ToList();
 
-        _sut.Save(Record() with { RandomPicks = picks, RandomIndex = 129 });
+        _sut.Save(Record() with { RandomPicks = picks, RandomIndex = 999 });
 
         var loaded = _sut.Load("dev-1")!;
-        loaded.RandomPicks.Should().Equal(picks.Skip(30));
-        loaded.RandomIndex.Should().Be(99);
+        loaded.RandomPicks.Should().Equal(picks);
+        loaded.RandomIndex.Should().Be(999);
     }
 
     [Fact]
-    public void Save_WhenTrimming_KeepsTheIndexOnTheSamePick()
+    public void Save_KeepsOnlyTheNewestThousandPicks()
     {
-        var picks = Enumerable.Range(0, 130).Select(Pick).ToList();
+        var picks = Enumerable.Range(0, 1030).Select(Pick).ToList();
 
-        _sut.Save(Record() with { RandomPicks = picks, RandomIndex = 110 });
+        _sut.Save(Record() with { RandomPicks = picks, RandomIndex = 1029 });
 
         var loaded = _sut.Load("dev-1")!;
-        loaded.RandomPicks[loaded.RandomIndex].Should().Be(picks[110]);
+        loaded.RandomPicks.Should().Equal(picks.Skip(30));
+        loaded.RandomIndex.Should().Be(999);
+    }
+
+    [Theory]
+    [InlineData(1001, 1000)]
+    [InlineData(1030, 1010)]
+    public void Save_WhenTrimming_KeepsTheIndexOnTheSamePick(int count, int index)
+    {
+        var picks = Enumerable.Range(0, count).Select(Pick).ToList();
+
+        _sut.Save(Record() with { RandomPicks = picks, RandomIndex = index });
+
+        var loaded = _sut.Load("dev-1")!;
+        loaded.RandomPicks.Should().HaveCount(1000).And.StartWith(picks[count - 1000]);
+        loaded.RandomPicks[loaded.RandomIndex].Should().Be(picks[index]);
     }
 
     [Fact]
     public void Save_WhenTrimmingDropsThePickTheIndexWasOn_ClampsTheIndexToMinusOne()
     {
-        var picks = Enumerable.Range(0, 130).Select(Pick).ToList();
+        var picks = Enumerable.Range(0, 1030).Select(Pick).ToList();
 
         _sut.Save(Record() with { RandomPicks = picks, RandomIndex = 5 });
 

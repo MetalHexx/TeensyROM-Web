@@ -892,18 +892,103 @@ namespace TeensyRom.Cli.Tests
         }
 
         [Fact]
-        public async Task When_RandomOnceAsyncFindsNoFiles_Then_TheOutcomeIsReturned_AndWhatWasPlayingIsStillRecordedAsPlaying()
+        public async Task When_RandomOnceAsyncFindsNoFiles_Then_TheOutcomeIsReturned_AndThePlayerAndItsRecordAreAsTheyWere()
         {
             var expected = Outcome(LaunchStatus.NotFound, null, LaunchOutcome.NoFilesFoundMessage);
             _launchService.LaunchRandom(Any<TeensyStorageType>(), Any<StorageScope>(), Any<string>(), Any<TeensyFilterType>()).Returns(expected);
-            var player = Restored(Record(current: "/music/1.sid", state: PlayState.Playing, mode: PlayMode.Random));
+            var seeded = Record(current: "/music/1.sid", state: PlayState.Playing, mode: PlayMode.Random, picks: [Pick("/music/a.sid")], index: 0);
+            var player = Restored(seeded);
+            var before = player.GetState();
 
-            var outcome = await player.RandomOnceAsync(StorageScope.DirDeep, "/", TeensyFilterType.Images);
+            var outcome = await player.RandomOnceAsync(StorageScope.DirShallow, "/games", TeensyFilterType.Images);
 
             outcome.Should().BeSameAs(expected);
+            await _launchService.Received(1).LaunchRandom(TeensyStorageType.SD, StorageScope.DirShallow, "/games", TeensyFilterType.Images);
             _alert.DidNotReceiveWithAnyArgs().PublishError(default!);
-            player.GetState().PlayState.Should().Be(PlayState.Playing);
-            _store.Load(Bench.Id)!.Filter.Should().Be(TeensyFilterType.Images);
+            _store.SaveCount.Should().Be(0);
+            _store.Load(Bench.Id).Should().BeEquivalentTo(seeded);
+            player.GetState().Should().BeEquivalentTo(before);
+        }
+
+        [Theory]
+        [InlineData(PlayMode.CurrentDirectory, null)]
+        [InlineData(PlayMode.Search, "sid")]
+        public async Task Given_AFolderOrSearchStreamWithOldPicks_When_RandomOnceAsyncFindsNoFiles_Then_TheStreamAndItsHistoryAreAsTheyWere(PlayMode mode, string? query)
+        {
+            _launchService
+                .LaunchRandom(Any<TeensyStorageType>(), Any<StorageScope>(), Any<string>(), Any<TeensyFilterType>())
+                .Returns(Outcome(LaunchStatus.NotFound, null, LaunchOutcome.NoFilesFoundMessage));
+            var seeded = Record(current: "/music/2.sid", mode: mode, query: query, filter: TeensyFilterType.Music, scope: StorageScope.DirShallow,
+                scopePath: "/music/", picks: [Pick("/music/old.sid")], index: 0);
+            var player = Restored(seeded);
+
+            await player.RandomOnceAsync(StorageScope.DirDeep, "/", TeensyFilterType.Images);
+
+            _store.SaveCount.Should().Be(0);
+            _store.Load(Bench.Id).Should().BeEquivalentTo(seeded);
+            player.GetState().Should().BeEquivalentTo(new PlayerState
+            {
+                PlayMode = mode,
+                SearchQuery = query,
+                FilterType = TeensyFilterType.Music,
+                Scope = StorageScope.DirShallow,
+                ScopePath = "/music/",
+                PlayState = PlayState.Playing
+            }, options => options.Excluding(state => state.CurrentItem));
+            _launchHistory.Items.Select(pick => pick.Path).Should().Equal("/music/old.sid");
+            _launchHistory.CurrentIndex.Should().Be(0);
+        }
+
+        // ---- skipping files the unit can't run ---------------------------------------------------------------------
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task Given_AFolderHoldingOneIncompatibleFile_When_StepAsync_Then_ItIsTriedOnce_AndTheIncompatibleOutcomeIsReturned(bool forward)
+        {
+            var only = Listed<SongItem>("/music/1.sid");
+            SetupStorageService(only);
+            SetupLaunch(only);
+            var player = Restored(Record(current: only.Path));
+
+            var outcome = forward ? await player.NextAsync() : await player.PreviousAsync();
+
+            outcome!.Status.Should().Be(LaunchStatus.Incompatible);
+            outcome.Item.Should().BeSameAs(only);
+            await _launchService.Received(1).LaunchFile(Any<TeensyStorageType>(), Any<ILaunchableItem>());
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task Given_AFolderWhereNothingCanLaunch_When_StepAsync_Then_EachFileIsTriedOnce_AndTheLastIncompatibleOutcomeIsReturned(bool forward)
+        {
+            var (one, two, three) = (Listed<SongItem>("/music/1.sid"), Listed<SongItem>("/music/2.sid"), Listed<SongItem>("/music/3.sid"));
+            SetupStorageService(one, two, three);
+            SetupLaunch(one, two, three);
+            var player = Restored(Record(current: two.Path));
+
+            var outcome = forward ? await player.NextAsync() : await player.PreviousAsync();
+
+            outcome!.Status.Should().Be(LaunchStatus.Incompatible);
+            await _launchService.Received(3).LaunchFile(Any<TeensyStorageType>(), Any<ILaunchableItem>());
+            outcome.Item.Should().BeSameAs(two, "the chain came back around to where it started");
+        }
+
+        [Fact]
+        public async Task Given_ARestoredRandomStreamWhoseEveryPickIsIncompatible_When_NextAsync_Then_ItGivesUpWithTheIncompatibleOutcome()
+        {
+            var bad = Listed<SongItem>("/music/bad.sid");
+            _launchService
+                .LaunchRandom(Any<TeensyStorageType>(), Any<StorageScope>(), Any<string>(), Any<TeensyFilterType>())
+                .Returns(_ => Outcome(LaunchStatus.Incompatible, bad, "That SID needs more RAM."));
+            var player = Restored(Record(current: "/music/1.sid", mode: PlayMode.Random));
+
+            var outcome = await player.NextAsync();
+
+            outcome!.Status.Should().Be(LaunchStatus.Incompatible);
+            var picks = _launchService.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(ILaunchService.LaunchRandom));
+            picks.Should().BeInRange(2, 1000, "it tried again, then stopped");
         }
     }
 }
