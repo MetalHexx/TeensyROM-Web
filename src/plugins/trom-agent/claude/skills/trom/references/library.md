@@ -15,6 +15,11 @@ Copy between this computer and the TeensyROM with `trom file upload` and `trom f
 - Upload: `trom file upload "<local path>" --to "<device folder>" --device <name> [--storage sd|usb] --json`. Always name the source.
 - Download: `trom file download "<device path>" --to "<local folder>" --device <name> --json`.
 - Folders keep their layout. `.zip`, `.7z` and `.rar` are expanded on the TeensyROM. Files over 10 MB are skipped on download and reported.
+- Upload sends only the types the TeensyROM takes: `.sid`, `.crt`, `.prg`, `.p00`, `.hex`, `.kla`, `.koa`, `.art`, `.aas`, `.hpi`, `.seq`, `.txt`, `.d64`, `.zip`, `.7z`, `.rar`. A folder upload leaves other files out, and a single file of another type is reported as not sent. Don't promise to copy other types.
+- An upload that leaves files out prints a notice on stderr with the count, in `--json` too. Read the count from it and say it in plain words, for example "Two files weren't sent: the TeensyROM doesn't take their file types."
+- An empty device folder is "nothing to download", exit 5, not success. Its folder is still created on the computer.
+- A saved file's `localPath` is a full path under the chosen folder.
+- `totals.copied` counts the files an archive expands to, so it can exceed the number of rows in `files`.
 - Ask where files go when the user hasn't said: the device folder for an upload, the folder on the computer for a download. Your own working folder is wherever this session started, which is rarely where the user wants files.
 - Before any copy, confirm what goes where. A copy replaces a same-named file at the destination.
 - Never pass `--yes`. It sends the whole current folder, which is rarely what the user means; ask for the files instead.
