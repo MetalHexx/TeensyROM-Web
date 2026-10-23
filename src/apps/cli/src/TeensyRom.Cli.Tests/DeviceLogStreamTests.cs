@@ -70,6 +70,7 @@ public class DeviceLogStreamTests
         await trWeb.LogAsync("(abc123) Internal: => Indexing (SD): /music");
         await trWeb.LogAsync("(other) Internal: => Indexing (USB): /games");
         await trWeb.LogAsync("Log streaming faulted: boom");
+        await WaitForEventsAsync(trWeb, expectedLines: 2);
         await following.DisposeAsync();
 
         trWeb.Events.Should().Equal("subscribe", "abc123: => Indexing (SD): /music", "other: => Indexing (USB): /games", "unsubscribe");
@@ -86,6 +87,7 @@ public class DeviceLogStreamTests
         await trWeb.LogAsync("(other) Internal: => Indexing (SD): /games");
         await trWeb.LogAsync("Log streaming faulted: boom");
         await trWeb.LogAsync("(abc123) Internal: Indexing completed for SD storage.");
+        await WaitForEventsAsync(trWeb, expectedLines: 2);
         await following.DisposeAsync();
 
         trWeb.Events.Should().Equal("subscribe", "line: => Indexing (SD): /music", "line: Indexing completed for SD storage.", "unsubscribe");
@@ -149,6 +151,17 @@ public class DeviceLogStreamTests
         var follow = () => stream.FollowAsync(_ => { });
 
         (await follow.Should().ThrowAsync<TeensyApiException>()).Which.Message.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>Waits until the hub has recorded "subscribe" and the expected number of delivered lines, so disposing doesn't race the delivery.</summary>
+    private static async Task WaitForEventsAsync(FakeTrWebLogs trWeb, int expectedLines)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (trWeb.Events.Count < 1 + expectedLines)
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException($"Only {trWeb.Events.Count} of {1 + expectedLines} events arrived: {string.Join(" | ", trWeb.Events)}");
+            await Task.Delay(10);
+        }
     }
 
     private static DeviceLogStream StreamTo(Uri address, ILoggingService? log = null)
