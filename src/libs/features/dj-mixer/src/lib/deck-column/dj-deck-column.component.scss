@@ -3,10 +3,10 @@
 }
 
 // A deck contributes two items to the view's grid, and both are column stacks with one growing
-// card. The grid row that holds them is content-sized, so the row's height is the tallest thing in
+// slot. The grid row that holds them is content-sized, so the row's height is the tallest thing in
 // it and every stack is stretched to match — that stretch, not a fixed height, is what gives
-// Loops/Cues and Speed their fill. `min-height: 0` on the stack and on the growing card is what
-// keeps the pair shrinkable instead of flooring the row at their own content.
+// Loops/Cues and the channel strip their fill. `min-height: 0` on the stack and on the growing slot
+// is what keeps the pair shrinkable instead of flooring the row at their own content.
 .deck-stack,
 .voice-speed-column {
   display: flex;
@@ -16,57 +16,50 @@
   min-height: 0;
 }
 
-// `lib-scaling-compact-card`'s own host is `height: 100%`, which as a flex item's `auto` basis
-// resolves against the whole stack rather than the card's own content — hence `height: auto` on
-// every card here, growing or not.
+// `lib-scaling-container`'s own host is `height: 100%`, which as a flex item's `auto` basis
+// resolves against the whole stack rather than the slot's own content — hence `height: auto` on
+// every slot here, growing or not.
 .deck-stack {
   .transport-slot {
     position: relative; // anchors the drop overlay
     flex: 0 0 auto;
+    height: auto;
   }
 
-  .binding-card-slot {
+  .binding-slot {
     flex: 0 0 auto;
     height: auto;
   }
 }
 
-.voice-speed-column {
-  .voice-card {
-    flex: 0 0 auto;
-    height: auto;
-  }
-}
-
-// The one card in each stack that takes the slack. An `auto` basis rather than a zero one: in the
+// The one slot in each stack that takes the slack. An `auto` basis rather than a zero one: in the
 // column form the row is stretched taller than this stack's content and either basis fills it, but
 // the stacked forms size every row by its own content, where a zero-basis item has no leftover
-// space to grow into and renders at zero — an empty card. Basing on its own content keeps it
-// usable in both.
-.loops-card,
-.speed-card {
+// space to grow into and renders at zero — an empty plate. Basing on its own content keeps it
+// usable in both. The plate inside fills the slot and clips itself.
+.loops-slot,
+.channel-slot {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
 }
 
+// Sits on the faceplate: the plate's radius and an inset glow in place of a glass fill.
 .drop-overlay {
   position: absolute;
   inset: 0;
-  // Above the scaling card's own hover stacking (scaling-compact-card.component.scss reaches 1000).
+  // Above the scaling container's own 1000 while it is visible.
   z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--border-radius-lg);
-  background: color-mix(in srgb, var(--color-highlight) 12%, transparent);
+  border-radius: var(--border-radius-md);
   border: 1px solid var(--color-highlight);
-  box-shadow: 0 0 24px color-mix(in srgb, var(--color-highlight) 45%, transparent);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--color-highlight) 40%, transparent);
+  transition: box-shadow 0.2s ease;
 
   &.drop-overlay--hot {
-    background: color-mix(in srgb, var(--color-highlight) 24%, transparent);
-    box-shadow: 0 0 24px color-mix(in srgb, var(--color-highlight) 70%, transparent);
+    box-shadow: inset 0 0 28px color-mix(in srgb, var(--color-highlight) 75%, transparent);
   }
 }
 

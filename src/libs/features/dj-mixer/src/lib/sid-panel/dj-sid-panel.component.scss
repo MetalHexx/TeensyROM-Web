@@ -1,14 +1,24 @@
 :host {
   grid-area: mx;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-// The faceplate fills the card and keeps its screws in the corners; its inner padding is trimmed to
-// the scale's small steps so the voice strips get the width the 620px column was sized for.
+lib-scaling-container {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+// The scaling container projects the faceplate with no wrapper, so the faceplate fills it by
+// height rather than by flex growth. It keeps its screws in the corners; its inner padding is
+// trimmed to the scale's small steps so the voice strips get the width the 620px column was sized for.
 .faceplate {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   padding: var(--spacing-sm);
 }
 

@@ -612,14 +612,10 @@ describe('DjMixerViewComponent', () => {
       const { fixture } = render([]);
       const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
 
-      // The nudge pads arrive in P03-T01, which removes this exclusion.
-      const NUDGES_NOT_YET_RENDERED: readonly string[] = ['speed-nudge-up', 'speed-nudge-down'];
       const mismatched = ALL_IDENTITIES.map((identity) => ({
         identity: controlKey(identity),
-        control: identity.control,
         matches: grid.querySelectorAll(anchorFor(identity)).length,
       }))
-        .filter(({ control }) => !NUDGES_NOT_YET_RENDERED.includes(control))
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 

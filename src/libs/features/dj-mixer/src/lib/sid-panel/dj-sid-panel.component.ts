@@ -34,7 +34,7 @@ import {
   PanelSectionComponent,
   PanicButtonComponent,
   RotaryKnobComponent,
-  ScalingCompactCardComponent,
+  ScalingContainerComponent,
   SegmentedControlComponent,
   SidFilterSectionComponent,
   SidVoiceStripComponent,
@@ -166,7 +166,7 @@ function buildDeckPanel(
   selector: 'lib-dj-sid-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ScalingCompactCardComponent,
+    ScalingContainerComponent,
     SynthPanelComponent,
     DeckLabelComponent,
     IconButtonComponent,
