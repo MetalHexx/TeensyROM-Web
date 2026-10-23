@@ -112,6 +112,11 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock, ILastLa
 
         var record = settings.Device is null ? null : store.Find(settings.Device);
 
+        if (settings.Device is not null && record is null)
+        {
+            Output.Notice($"no last launch recorded for {settings.Device}; counting down without holding");
+        }
+
         try
         {
             await CommandRun.CancellableAsync(async token =>
@@ -132,7 +137,10 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock, ILastLa
         return 0;
     }
 
-    /// <summary>Counts <paramref name="duration"/> down in ticks, skipping any tick after which the device's record reads paused.</summary>
+    /// <summary>
+    /// Counts <paramref name="duration"/> down in ticks, skipping any tick after which the device's record reads paused.
+    /// The last tick is only as long as what is left, so the wait never runs past <paramref name="duration"/>.
+    /// </summary>
     private async Task CountDownUnlessPausedAsync(TimeSpan duration, string deviceId, CancellationToken ct)
     {
         var remaining = duration;
@@ -141,7 +149,7 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock, ILastLa
         {
             var before = clock.UtcNow;
 
-            await clock.DelayAsync(Tick, ct);
+            await clock.DelayAsync(remaining < Tick ? remaining : Tick, ct);
 
             var elapsed = clock.UtcNow - before;
 

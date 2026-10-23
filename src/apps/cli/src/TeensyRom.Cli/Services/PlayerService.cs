@@ -26,6 +26,7 @@ namespace TeensyRom.Cli.Services
         private const string NotPausableReason = "games and programs can't be paused, so it was stopped by resetting the device";
         private const string RefusedPauseReason = "the TeensyROM refused to pause — something that can't be paused, like a game, is probably running — so it was stopped by resetting the device";
         private const int BadGateway = 502;
+        private const int MaxSkips = 50;
 
         public IObservable<ILaunchableItem> FileLaunched => _fileLaunched.AsObservable();
         private Subject<ILaunchableItem> _fileLaunched = new();
@@ -256,6 +257,30 @@ namespace TeensyRom.Cli.Services
             }
         }
 
+        /// <summary>
+        /// The files one next, previous or random pick has skipped as incompatible. It ends the chain of skips when the pick
+        /// comes back to one of them, or when too many were skipped, so a folder where nothing can launch isn't walked forever.
+        /// </summary>
+        private sealed class SkipRun
+        {
+            private readonly HashSet<string> _tried = new(StringComparer.OrdinalIgnoreCase);
+            private int _skips;
+
+            /// <summary>The outcome of the latest skip: what the chain ends on when it gives up.</summary>
+            public LaunchOutcome? Last { get; private set; }
+
+            public bool Exhausted => _skips >= MaxSkips;
+
+            public bool Tried(ILaunchableItem item) => _tried.Contains(item.Path);
+
+            public void Skipped(ILaunchableItem item, LaunchOutcome outcome)
+            {
+                _tried.Add(item.Path);
+                _skips++;
+                Last = outcome;
+            }
+        }
+
         private async Task Guarded(Func<Task> operation)
         {
             try
@@ -296,9 +321,10 @@ namespace TeensyRom.Cli.Services
 
         /// <summary>
         /// Has tr-web pick a random file and launches it, in random mode. In the menu a pick the unit can't run is skipped
-        /// for the next file; otherwise it is the outcome.
+        /// for the next file; otherwise it is the outcome. Outside the menu, finding no files writes no record: the caller
+        /// puts back the state it replaced.
         /// </summary>
-        private async Task<LaunchOutcome> PickRandom(bool menu)
+        private async Task<LaunchOutcome> PickRandom(bool menu, SkipRun? run = null)
         {
             if (_state.PlayMode is not PlayMode.Random)
             {
@@ -320,13 +346,16 @@ namespace TeensyRom.Cli.Services
                     _state = _state with { CurrentItem = badItem, PlayState = PlayState.Playing };
                     SkipIncompatible(badItem, outcome);
                     Persist();
-                    return await NextCore() ?? outcome;
+                    run ??= new();
+                    run.Skipped(badItem, outcome);
+                    return run.Exhausted ? outcome : await NextCore(run) ?? outcome;
 
                 case { Status: LaunchStatus.Incompatible, Item: { } badItem }:
                     _state = _state with { CurrentItem = badItem, PlayState = PlayState.Stopped };
                     break;
 
                 case { Status: LaunchStatus.NotFound, Message: LaunchOutcome.NoFilesFoundMessage }:
+                    if (!menu) return outcome;
                     break;
 
                 default:
@@ -347,8 +376,9 @@ namespace TeensyRom.Cli.Services
             return await PreviousCore();
         }
 
-        private async Task<LaunchOutcome?> PreviousCore()
+        private async Task<LaunchOutcome?> PreviousCore(SkipRun? run = null)
         {
+            run ??= new();
             ILaunchableItem? fileToPlay = _state.PlayMode switch
             {
                 PlayMode.Random => _randomHistory.GetPrevious(GetFilterFileTypes()),
@@ -364,11 +394,14 @@ namespace TeensyRom.Cli.Services
                 }
                 fileToPlay = _state.CurrentItem;
             }
+            if (run.Tried(fileToPlay)) return run.Last;
+
             var outcome = await Launch(fileToPlay);
 
-            return outcome.Status is LaunchStatus.Incompatible
-                ? await PreviousCore() ?? outcome
-                : outcome;
+            if (outcome.Status is not LaunchStatus.Incompatible) return outcome;
+
+            run.Skipped(fileToPlay, outcome);
+            return run.Exhausted ? outcome : await PreviousCore(run) ?? outcome;
         }
 
         private async Task<ILaunchableItem?> GetPreviousSearchItem()
@@ -469,8 +502,9 @@ namespace TeensyRom.Cli.Services
             return await NextCore();
         }
 
-        private async Task<LaunchOutcome?> NextCore()
+        private async Task<LaunchOutcome?> NextCore(SkipRun? run = null)
         {
+            run ??= new();
             ILaunchableItem? fileToPlay = null;
 
             switch (_state.PlayMode)
@@ -480,7 +514,7 @@ namespace TeensyRom.Cli.Services
 
                     if (fileToPlay is null)
                     {
-                        return await PickRandom(menu: true);
+                        return await PickRandom(menu: true, run);
                     }
                     break;
 
@@ -498,12 +532,14 @@ namespace TeensyRom.Cli.Services
                 fileToPlay = _state.CurrentItem;
             }
             if (fileToPlay is null) return null;
+            if (run.Tried(fileToPlay)) return run.Last;
 
             var outcome = await Launch(fileToPlay);
 
-            return outcome.Status is LaunchStatus.Incompatible
-                ? await NextCore() ?? outcome
-                : outcome;
+            if (outcome.Status is not LaunchStatus.Incompatible) return outcome;
+
+            run.Skipped(fileToPlay, outcome);
+            return run.Exhausted ? outcome : await NextCore(run) ?? outcome;
         }
 
         private async Task<ILaunchableItem?> GetNextSearchItem()
@@ -776,6 +812,11 @@ namespace TeensyRom.Cli.Services
         public async Task<LaunchOutcome> RandomOnceAsync(StorageScope scope, string startingDirectory, TeensyFilterType filter)
         {
             EnsureRestored();
+
+            var stateBefore = _state with { };
+            var picksBefore = _randomHistory.Items.ToList();
+            var indexBefore = _randomHistory.CurrentIndex;
+
             _state = _state with
             {
                 Scope = scope,
@@ -783,7 +824,14 @@ namespace TeensyRom.Cli.Services
                 FilterType = filter,
                 SearchQuery = null
             };
-            return await PickRandom(menu: false);
+            var outcome = await PickRandom(menu: false);
+
+            if (outcome is { Status: LaunchStatus.NotFound, Message: LaunchOutcome.NoFilesFoundMessage })
+            {
+                _state = stateBefore;
+                _randomHistory.Restore(picksBefore, indexBefore);
+            }
+            return outcome;
         }
 
         public Task TogglePlay() => Guarded(async () =>

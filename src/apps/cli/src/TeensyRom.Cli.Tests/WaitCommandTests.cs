@@ -177,6 +177,22 @@ public sealed class WaitCommandTests
     }
 
     [Fact]
+    public async Task Wait_WithADevice_ForADurationThatIsNotWholeTicks_WaitsExactlyThatLong()
+    {
+        var delays = RunClockForward();
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns(Record());
+        store.Load("dev-1").Returns(Record());
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "0:01.1", "--device", "Bench");
+
+        exitCode.Should().Be(0);
+        delays.Should().Equal(Tick, Tick, Tick, Tick, TimeSpan.FromMilliseconds(100));
+        (_now - DateTimeOffset.UnixEpoch).Should().Be(TimeSpan.FromSeconds(1.1));
+    }
+
+    [Fact]
     public async Task Wait_WithADevice_TreatsAnUnreadableRecordAsNotPaused()
     {
         RunClockForward();
@@ -204,6 +220,8 @@ public sealed class WaitCommandTests
         exitCode.Should().Be(0);
         delays.Should().Equal(TimeSpan.FromSeconds(10));
         store.DidNotReceiveWithAnyArgs().Load(default!);
+        host.Consoles.StdErr.Should().Contain("no last launch recorded for Bench; counting down without holding");
+        host.Consoles.StdOut.Should().BeEmpty();
     }
 
     [Fact]
@@ -220,7 +238,7 @@ public sealed class WaitCommandTests
     }
 
     [Fact]
-    public async Task Wait_WithoutADevice_NeverReadsTheStore()
+    public async Task Wait_WithoutADevice_NeverReadsTheStore_AndSaysNothing()
     {
         var store = Substitute.For<ILastLaunchStore>();
         using var host = NewHost(store);
@@ -228,6 +246,7 @@ public sealed class WaitCommandTests
         var exitCode = await host.RunAsync("wait", "10s");
 
         exitCode.Should().Be(0);
+        host.Consoles.StdErr.Should().BeEmpty();
         await _clock.Received(1).DelayAsync(TimeSpan.FromSeconds(10), Arg.Any<CancellationToken>());
         store.ReceivedCalls().Should().BeEmpty();
     }

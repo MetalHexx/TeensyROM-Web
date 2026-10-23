@@ -56,8 +56,8 @@ internal interface ILastLaunchStore
 /// </remarks>
 internal sealed class LastLaunchStore(ILoggingService log) : ILastLaunchStore
 {
-    /// <summary>The most random picks a record keeps: the newest ones.</summary>
-    public const int MaxRandomPicks = 100;
+    /// <summary>The most random picks a record keeps: the newest ones. The web app's player history keeps as many.</summary>
+    public const int MaxRandomPicks = 1000;
 
     private const int FileVersion = 1;
     private const int MoveAttempts = 5;
@@ -133,8 +133,16 @@ internal sealed class LastLaunchStore(ILoggingService log) : ILastLaunchStore
         }
     }
 
+    /// <summary>
+    /// Whether a record read from the file can be used. The deserializer doesn't enforce non-nullable annotations, so a
+    /// hand-edited file can hold nulls the player would throw on: those records read as missing.
+    /// </summary>
     private static bool IsUsable(LastLaunchRecord? record) =>
-        record is { DeviceId: not null, DeviceName: not null, ScopePath: not null, RandomPicks: not null };
+        record is { DeviceId: not null, DeviceName: not null, ScopePath: not null, RandomPicks: not null }
+        && (record.Current is null || HasPath(record.Current))
+        && record.RandomPicks.All(HasPath);
+
+    private static bool HasPath(LaunchedFile? file) => !string.IsNullOrEmpty(file?.Path);
 
     /// <summary>Keeps the newest <see cref="MaxRandomPicks"/> picks, moving <see cref="LastLaunchRecord.RandomIndex"/> with them.</summary>
     private static LastLaunchRecord Trimmed(LastLaunchRecord record)
