@@ -10,7 +10,7 @@
 
 `trom file launch "<path>" --json`. The result is `{status, file, message}`: the file's full record is under `file`. Everything you say about the file comes from it.
 
-To launch a file from this computer, copy it over and launch it in one step: `trom file upload --launch "<local file>" --to "<device folder>" --device <name> --json`. It takes exactly one file, not a folder or an archive. Its result has the same shape as `file launch`.
+To launch a file from this computer, copy it over and launch it in one step: `trom file upload --launch "<local file>" --to "<device folder>" --device <name> --json`. It takes exactly one file, not a folder or an archive. Ask which device folder it goes in if the user hasn't said, and confirm the file and the folder before you run it. Its result has the same shape as `file launch`.
 
 ## Stories
 
