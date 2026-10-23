@@ -35,6 +35,14 @@ Routing reference for the TeensyROM CLI, the terminal client of the engine's API
 - **Windows file locks**: on Windows a running engine locks the DLLs in its `bin/Release` folder (`bin/Debug` when `TROM_ENGINE_CONFIGURATION=Debug`). Stop it with `trom engine stop` (from source, run `dotnet run --project apps/cli/src/TeensyRom.Cli -- engine stop` in `src/`) before you build the engine yourself, for example for engine tests or `generate-api-client.ps1`.
 - **Non-interactive shells**: without a terminal, a direct command runs and exits instead of showing the menu.
 - **Log following**: a listener calls the log hub's `Subscribe` and `Unsubscribe` on `/api/logHub`, and lines arrive as `LogProduced`.
+- **File verbs**: `file upload` and `file download` copy between this computer and the TeensyROM; `file upload --launch` launches the one file once it lands. `file next` and `file previous` step through the folder, search or shuffle the last launch came from; `file pause` and `file stop` control playback. `file banned` and `file unban` list and lift bans and take no `--device`, since bans are engine-wide.
+- **Copy conventions**: `--to` names the destination, the device folder for upload and the local folder for download. Download defaults to the current folder. Upload with no paths sends the current folder's contents, and asks first unless `--yes` (the guard). A copy replaces a same-named file at the destination. Upload requires `--to`.
+- **Last launch and the player**: each TeensyROM's last launch is kept in `<home>/cli/last-launch.json`. The player restores its state from that file and writes every change through, so `next`, `previous`, `pause`, `stop` and `wait --device` carry on across processes.
+- **Wait and pause**: `wait --device <name>` holds the countdown while that TeensyROM's song is paused through trom, reading the last-launch record. Pauses made in the web app aren't seen.
+- **Index build**: `index build` indexes every available storage, or the one `--storage` names. `index build --all` indexes every storage on every connected TeensyROM.
+- **Engine logs**: `engine status --json` reports `logFolder` and `logFile`, the folder the engine writes to and its newest log file. `logFile` is absent unless an engine answers and has written one.
+- **Hand-written client code**: `Api/TeensyRomApiClient.Upload.cs` is a hand-written partial of the API client, next to the generated `Api/Generated/`. Regeneration never touches it.
+- **Rate limits**: only full scans of `/api/devices` (device discovery) are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.
 
 ## Routing
 

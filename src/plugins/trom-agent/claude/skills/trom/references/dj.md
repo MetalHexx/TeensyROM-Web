@@ -8,7 +8,9 @@
 
 ## Launching
 
-`trom file launch "<path>" --json`. The result is the file's full record. Everything you say about the file comes from it.
+`trom file launch "<path>" --json`. The result is `{status, file, message}`: the file's full record is under `file`. Everything you say about the file comes from it.
+
+To launch a file from this computer, copy it over and launch it in one step: `trom file upload --launch "<local file>" --to "<device folder>" --device <name> --json`. It takes exactly one file, not a folder or an archive. Its result has the same shape as `file launch`.
 
 ## Stories
 
@@ -22,11 +24,21 @@ After a launch, tell a few nicely formatted lines built from the launch result: 
 
 A song `playLength` of exactly `00:03:00` is the engine's default, not a real length. Say "length unknown (3-minute default)". Never present it as the real length.
 
+## Play controls
+
+Each takes `--device <name>` and `--json`.
+
+- Pause or resume the song: `trom file pause --device <name> --json`. Its `action` is `paused`, `resumed`, `stopped`, `relaunched` or `toggled`. `reason` and `file` are absent when there is nothing to say.
+- Games and programs can't pause. `file pause` stops them instead, and the next pause launches them again. Tell the user what `action` says happened.
+- Stop whatever is running: `trom file stop --device <name> --json`. It resets the TeensyROM.
+- Previous and next: `trom file previous --device <name> --json` and `trom file next --device <name> --json`. They move through the folder, search results or shuffle that the last launch came from. Tell the new file's story as under Stories.
+- A timed set's tracks are the agent's own list, not that folder. Inside a set, a skip launches the next track; it is not `file next`.
+
 ## Curating
 
 - Liked it: `trom file favorite "<path>"`.
 - Unfavorite on request: `trom file unfavorite "<path>"`.
-- Ban only after confirming, because a ban cannot be undone: `trom file ban "<path>"`.
+- Ban only after confirming: `trom file ban "<path>"`. A ban applies to every TeensyROM, and you can lift it later with `trom file unban` (see `library.md`, Curating).
 
 When stderr carries an `indexIncomplete` notice, gently remind the user and offer the index build.
 
@@ -37,9 +49,12 @@ Offer timed sets only where the harness can run a background command and wake yo
 1. Ask the set length. Suggest one if the user says "keep it going".
 2. Pick tracks to fill it: search with `--full`, or use `playLength` from the compact results.
 3. Say roughly when the set ends. Say "approximately" when any track has the 3-minute default.
-4. For each track: launch it, tell its story, then run `trom wait <length>` as a **background** command. When it finishes, launch the next.
+4. For each track: launch it, tell its story, then run the wait as a **background** command. When it finishes, launch the next.
+   - With `file pause` in `init`'s `capabilities`: `trom wait <length> --device <name>`. The countdown holds while that TeensyROM's song is paused through `trom file pause`. Pauses made in the web UI are not seen.
+   - Without it: `trom wait <length>`. An older `trom` exits 2 on `--device`, and the timer would be lost. Don't promise that a pause holds the timer.
 5. The user can skip, stop or redirect at any time.
-6. At the end, stop and ask before continuing.
+6. A stop ends the set: stop the outstanding background `trom wait` (see Only one wait is live), then ask before continuing.
+7. At the end, stop and ask before continuing.
 
 ### Which length to wait on
 
