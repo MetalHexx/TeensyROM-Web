@@ -1,9 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System.Text.Json;
 using TeensyRom.Cli.Commands.Wait;
 using TeensyRom.Cli.Engine;
+using TeensyRom.Cli.Errors;
+using TeensyRom.Cli.Player;
+using TeensyRom.Cli.Settings;
+using TeensyRom.Cli.Storage.Entities;
 
 namespace TeensyRom.Cli.Tests;
 
@@ -121,5 +126,125 @@ public sealed class WaitCommandTests
         host.Consoles.StdErr.Should().Contain("The wait was cancelled.").And.Contain("\"error\"");
     }
 
-    private TestHost NewHost() => new(configure: services => services.AddSingleton(_clock));
+    private static readonly TimeSpan Tick = TimeSpan.FromMilliseconds(250);
+
+    private static LastLaunchRecord Record(PlayState state = PlayState.Playing) => new(
+        "dev-1", "Bench", TeensyStorageType.USB, new LaunchedFile("/music/Commando.sid", 4096), PlayMode.CurrentDirectory,
+        null, TeensyFilterType.Music, StorageScope.DirShallow, "/music", state, [], 0);
+
+    private DateTimeOffset _now = DateTimeOffset.UnixEpoch;
+
+    private List<TimeSpan> RunClockForward()
+    {
+        var delays = new List<TimeSpan>();
+
+        _clock.UtcNow.Returns(_ => _now);
+        _clock.DelayAsync(default, default).ReturnsForAnyArgs(call =>
+        {
+            var delay = call.ArgAt<TimeSpan>(0);
+
+            delays.Add(delay);
+            _now += delay;
+            return Task.CompletedTask;
+        });
+
+        return delays;
+    }
+
+    private TestHost NewHost(ILastLaunchStore? store = null) => new(configure: services =>
+    {
+        services.AddSingleton(_clock);
+        if (store is not null) services.Replace(ServiceDescriptor.Singleton(store));
+    });
+
+    [Fact]
+    public async Task Wait_WithADevice_HoldsTheCountdownWhileTheRecordSaysPaused()
+    {
+        var delays = RunClockForward();
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns(Record());
+        store.Load("dev-1").Returns(Record(), Record(PlayState.Paused), Record(PlayState.Paused), Record(PlayState.Paused), Record());
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "1s", "--device", "Bench");
+
+        exitCode.Should().Be(0);
+        delays.Should().OnlyContain(delay => delay == Tick);
+        delays.Count.Should().Be(4 + 3);
+        (_now - DateTimeOffset.UnixEpoch).Should().Be(TimeSpan.FromSeconds(1) + 3 * Tick);
+        await host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+        store.DidNotReceiveWithAnyArgs().Save(default!);
+    }
+
+    [Fact]
+    public async Task Wait_WithADevice_TreatsAnUnreadableRecordAsNotPaused()
+    {
+        RunClockForward();
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns(Record());
+        store.Load("dev-1").Returns((LastLaunchRecord?)null);
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "1s", "--device", "Bench");
+
+        exitCode.Should().Be(0);
+        (_now - DateTimeOffset.UnixEpoch).Should().Be(TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Wait_WithADeviceThatHasNoRecord_CountsDownPlainly()
+    {
+        var delays = RunClockForward();
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns((LastLaunchRecord?)null);
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "10s", "--device", "Bench");
+
+        exitCode.Should().Be(0);
+        delays.Should().Equal(TimeSpan.FromSeconds(10));
+        store.DidNotReceiveWithAnyArgs().Load(default!);
+    }
+
+    [Fact]
+    public async Task Wait_WithAnAmbiguousDeviceName_IsAUsageError()
+    {
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns(_ => throw new CliException(CliExitCode.Usage, "More than one device is named 'Bench'."));
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "10s", "--device", "Bench");
+
+        exitCode.Should().Be(2);
+        await _clock.DidNotReceiveWithAnyArgs().DelayAsync(default, default);
+    }
+
+    [Fact]
+    public async Task Wait_WithoutADevice_NeverReadsTheStore()
+    {
+        var store = Substitute.For<ILastLaunchStore>();
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "10s");
+
+        exitCode.Should().Be(0);
+        await _clock.Received(1).DelayAsync(TimeSpan.FromSeconds(10), Arg.Any<CancellationToken>());
+        store.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Wait_WithADeviceUnderJson_WritesTheDurationCountedDown()
+    {
+        RunClockForward();
+        var store = Substitute.For<ILastLaunchStore>();
+        store.Find("Bench").Returns(Record());
+        store.Load("dev-1").Returns(Record(PlayState.Paused), Record());
+        using var host = NewHost(store);
+
+        var exitCode = await host.RunAsync("wait", "1s", "--device", "Bench", "--json");
+
+        exitCode.Should().Be(0);
+        using var document = JsonDocument.Parse(host.Consoles.StdOut);
+        document.RootElement.GetProperty("waited").GetString().Should().Be("00:00:01");
+    }
 }
