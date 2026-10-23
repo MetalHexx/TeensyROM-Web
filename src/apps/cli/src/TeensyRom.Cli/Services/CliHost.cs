@@ -135,7 +135,7 @@ internal static class CliHost
     internal static readonly PublicCommand[] PublicCommands =
     [
         PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"]),
-        PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents.", ["wait", "3m20s"])
+        PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])
     ];
 
     /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>

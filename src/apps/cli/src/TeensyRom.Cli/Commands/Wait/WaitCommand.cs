@@ -7,6 +7,7 @@ using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
+using TeensyRom.Cli.Player;
 
 namespace TeensyRom.Cli.Commands.Wait;
 
@@ -83,6 +84,10 @@ internal sealed class WaitSettings : TromSettings
     [CommandArgument(0, "<DURATION>")]
     public string Duration { get; set; } = "";
 
+    [Description("Hold the countdown while this TeensyROM's song is paused through trom (by name or id). Pauses made in the web app aren't seen.")]
+    [CommandOption("-d|--device <DEVICE>")]
+    public string? Device { get; set; }
+
     public override ValidationResult Validate() =>
         WaitDuration.TryParse(Duration, out _)
             ? base.Validate()
@@ -94,13 +99,18 @@ internal sealed record WaitDocument(string Waited);
 
 /// <summary>
 /// <c>trom wait</c>: a timer that behaves the same on every operating system, for scripts and agents. Needs no
-/// engine and no device. Ctrl+C cancels it and exits 1.
+/// engine and no device. With <c>--device</c> the countdown holds while that device's last-launch record says paused.
+/// Ctrl+C cancels it and exits 1.
 /// </summary>
-internal sealed class WaitCommand(ICliOutput output, IEngineClock clock) : TromCommand<WaitSettings>(output)
+internal sealed class WaitCommand(ICliOutput output, IEngineClock clock, ILastLaunchStore store) : TromCommand<WaitSettings>(output)
 {
+    private static readonly TimeSpan Tick = TimeSpan.FromMilliseconds(250);
+
     protected override async Task<int> RunAsync(CommandContext context, WaitSettings settings, CancellationToken ct)
     {
         WaitDuration.TryParse(settings.Duration, out var duration);
+
+        var record = settings.Device is null ? null : store.Find(settings.Device);
 
         using var cancel = new CancellationTokenSource();
         ConsoleCancelEventHandler onCancel = (_, args) =>
@@ -113,7 +123,8 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock) : TromC
 
         try
         {
-            await clock.DelayAsync(duration, cancel.Token);
+            if (record is null) await clock.DelayAsync(duration, cancel.Token);
+            else await CountDownUnlessPausedAsync(duration, record.DeviceId, cancel.Token);
         }
         catch (OperationCanceledException)
         {
@@ -127,5 +138,22 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock) : TromC
         if (Output.Mode == OutputMode.Json) Output.Json(new WaitDocument(duration.ToString("c", CultureInfo.InvariantCulture)));
 
         return 0;
+    }
+
+    /// <summary>Counts <paramref name="duration"/> down in ticks, skipping any tick after which the device's record reads paused.</summary>
+    private async Task CountDownUnlessPausedAsync(TimeSpan duration, string deviceId, CancellationToken ct)
+    {
+        var remaining = duration;
+
+        while (remaining > TimeSpan.Zero)
+        {
+            var before = clock.UtcNow;
+
+            await clock.DelayAsync(Tick, ct);
+
+            var elapsed = clock.UtcNow - before;
+
+            if (store.Load(deviceId)?.PlayState != PlayState.Paused) remaining -= elapsed;
+        }
     }
 }
