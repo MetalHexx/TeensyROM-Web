@@ -21,8 +21,9 @@ internal class FileLaunchingSettings : StorageSettings
 }
 
 /// <summary>
-/// Launches through <see cref="ILaunchService"/> and prints what launched. With <c>--player</c> the launch goes through
-/// the menu's player instead, which is then opened on the same terminal and left with exit code 0.
+/// Launches through <see cref="IPlayerService"/>, so the launch is recorded for <c>file next</c> and the like, and prints
+/// what launched. With <c>--player</c> the launch goes through the menu's side of the player instead, which is then opened
+/// on the same terminal and left with exit code 0.
 /// </summary>
 internal abstract class FileLaunchingCommand<T>(
     ICliOutput output,
@@ -31,13 +32,10 @@ internal abstract class FileLaunchingCommand<T>(
     IDeviceService devices,
     IStorageService storage,
     ISettingsService settingsService,
-    ILaunchService launchService,
     IPlayerService player,
     ITypeResolver resolver) : DeviceCommand<T>(output, engine, chooser, devices, storage, settingsService)
     where T : FileLaunchingSettings
 {
-    protected ILaunchService Launches { get; } = launchService;
-
     protected IPlayerService Player { get; } = player;
 
     /// <summary>Refuses <c>--player</c> before the engine starts or anything launches when the player couldn't be used.</summary>
@@ -81,43 +79,6 @@ internal abstract class FileLaunchingCommand<T>(
     /// </summary>
     /// <param name="notFoundMessage">What to say when tr-web didn't say why it found nothing.</param>
     /// <exception cref="CliException">The file didn't launch.</exception>
-    protected int Report(LaunchOutcome outcome, TeensyStorageType storageType, string notFoundMessage)
-    {
-        if (outcome.Item is { } item) Show(outcome, item, storageType);
-
-        return outcome.Status switch
-        {
-            LaunchStatus.Launched => 0,
-            LaunchStatus.Incompatible => throw new CliException(CliExitCode.Failed, Said(outcome, $"{outcome.Item?.Name ?? "The file"} can't run on the TeensyROM.")),
-            LaunchStatus.NotFound => throw new CliException(CliExitCode.NotFound, Said(outcome, notFoundMessage)),
-            _ => throw new CliException(CliExitCode.Failed, Said(outcome, "tr-web couldn't launch the file."))
-        };
-    }
-
-    private void Show(LaunchOutcome outcome, IFileItem item, TeensyStorageType storageType)
-    {
-        var file = FileItemJson.From(item, storageType);
-
-        switch (Output.Mode)
-        {
-            case OutputMode.Json:
-                Output.Json(new FileLaunchJson(outcome.Status, FileItemJson.Full(item, storageType), outcome.Message));
-                break;
-            case OutputMode.Plain:
-                Output.Lines([file.Path]);
-                break;
-            default:
-                Output.Fields(
-                [
-                    ("Status", outcome.Status.ToString().ToLowerInvariant()),
-                    ("Name", file.Name),
-                    ("Path", file.Path),
-                    ("Storage", file.Storage)
-                ]);
-                break;
-        }
-    }
-
-    private static string Said(LaunchOutcome outcome, string fallback) =>
-        string.IsNullOrWhiteSpace(outcome.Message) ? fallback : outcome.Message;
+    protected int Report(LaunchOutcome outcome, TeensyStorageType storageType, string notFoundMessage) =>
+        new LaunchReport(Output).Report(outcome, storageType, notFoundMessage);
 }

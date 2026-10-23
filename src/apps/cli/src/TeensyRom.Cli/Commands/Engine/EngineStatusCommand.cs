@@ -30,8 +30,9 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
         return 0;
     }
 
-    private static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status) =>
-        status.Running
+    private static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
+    {
+        List<(string Label, string Value)> rows = status.Running
             ?
             [
                 ("Status", "running"),
@@ -46,4 +47,10 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
                 ("Address", status.Address),
                 ("CLI version", status.CliVersion)
             ];
+
+        if (status.LogFolder is not null) rows.Add(("Log folder", status.LogFolder));
+        if (status.LogFile is not null) rows.Add(("Log file", status.LogFile));
+
+        return rows;
+    }
 }

@@ -114,6 +114,8 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
         await ApiErrors.Call(() => api.IndexAsync(deviceId, storage, startingPath));
     }
 
+    public async Task IndexAllAsync(CancellationToken ct = default) => await ApiErrors.Call(() => api.IndexAllAsync(ct));
+
     public async Task SaveFavorite(ILaunchableItem item)
     {
         var deviceId = devices.RequireDeviceId();
@@ -146,5 +148,24 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
 
         alert.Publish(response.Message);
         return new BanResult(response.BannedFileName, response.AlreadyBanned, response.Message);
+    }
+
+    public async Task<IReadOnlyList<BanEntry>> GetBansAsync(CancellationToken ct = default)
+    {
+        var search = (await ApiErrors.Call(() => api.GetSettingsAsync(ct))).SearchSettings;
+
+        return
+        [
+            .. search.BannedDirectories.Where(entry => !string.IsNullOrWhiteSpace(entry)).Select(entry => new BanEntry(entry, BanEntryKind.Folder)),
+            .. search.BannedFiles.Where(entry => !string.IsNullOrWhiteSpace(entry)).Select(entry => new BanEntry(entry, BanEntryKind.File))
+        ];
+    }
+
+    public async Task<LiftBanResult> LiftBanAsync(string entry, BanEntryKind kind, CancellationToken ct = default)
+    {
+        var apiKind = kind == BanEntryKind.Folder ? BanKind.Folder : BanKind.File;
+        var response = await ApiErrors.Call(() => api.LiftBanAsync(entry, apiKind, ct));
+
+        return new LiftBanResult(response.Entry, response.Kind == BanKind.Folder ? BanEntryKind.Folder : BanEntryKind.File, response.Lifted, response.Message);
     }
 }

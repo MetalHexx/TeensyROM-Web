@@ -5,6 +5,7 @@ using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Common;
+using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Storage.Entities;
 using TextCopy;
@@ -293,38 +294,7 @@ namespace TeensyRom.Cli.Commands.Main.Launcher
         private void DisplayLaunchedFile(ILaunchableItem item) 
         {
             AnsiConsole.WriteLine(RadHelper.ClearHack);
-            var release = string.IsNullOrWhiteSpace(item.ReleaseInfo) ? "Unknown" : item.ReleaseInfo.EscapeBrackets();
-
-            var body = string.Empty;
-
-            if (item is SongItem song)
-            {
-                body = $"\r\nCreator: {song.Creator}\r\nRelease: {release}\r\nLength: {song.PlayLength}\r\nClock: {song.Meta1}\r\nSID: {song.Meta2}";
-            }
-            var isFavorite = item.IsFavorite ? "Yes" : "No";
-
-            body = $"{body}\r\nPath: {item.Path.EscapeBrackets()}\r\nFavorite: {isFavorite}\r\n";
-
-            var fileInfoPanel = new Panel(body.EscapeBrackets())
-                .Header($" Now Playing: {item.Title.EscapeBrackets()} ".AddHighlights())
-                .PadLeft(3)
-                .BorderColor(RadHelper.Theme.Secondary.Color)
-                .Border(BoxBorder.Rounded)
-                .Expand();
-
-            AnsiConsole.Write(fileInfoPanel);
-
-            if (item is SongItem && !string.IsNullOrWhiteSpace(item.Description))
-            {
-                var stilCommentPanel = new Panel($"\r\n{item.Description.EscapeBrackets().Trim()}\r\n")
-                .Header(" SID Comments ".AddSecondaryColor())
-                .PadLeft(3)
-                .BorderColor(RadHelper.Theme.Primary.Color)
-                .Border(BoxBorder.Rounded)
-                .Expand();
-
-                AnsiConsole.Write(stilCommentPanel);
-            }            
+            AnsiConsole.Write(FileDetailsPanel.Build(item));
         }
     }
 }

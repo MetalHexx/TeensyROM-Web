@@ -35,7 +35,17 @@ internal sealed record EngineReady(bool Ok, string? FailureMessage)
 /// <param name="Matches">The engine's version equals the CLI's, ignoring build metadata after <c>+</c>.</param>
 /// <param name="Address">Where the engine is looked for.</param>
 /// <param name="Problem">Why no engine is running, as a sentence for the user; null when one is.</param>
-internal sealed record EngineStatus(bool Running, string? Version, string CliVersion, bool Matches, string Address, string? Problem);
+/// <param name="LogFolder">The folder the engine writes its logs to.</param>
+/// <param name="LogFile">The engine's newest log file; null unless an engine answers and has written one.</param>
+internal sealed record EngineStatus(
+    bool Running,
+    string? Version,
+    string CliVersion,
+    bool Matches,
+    string Address,
+    string? Problem,
+    string? LogFolder = null,
+    string? LogFile = null);
 
 internal enum EngineStopOutcome
 {

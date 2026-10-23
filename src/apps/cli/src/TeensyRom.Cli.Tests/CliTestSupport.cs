@@ -7,6 +7,7 @@ using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Output;
+using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
 
@@ -82,6 +83,8 @@ internal sealed class TestHost : IDisposable
         Services.AddSingleton(Engine);
         Services.AddSingleton(Devices);
         Services.AddSingleton<ICliLoggingService>(Logging);
+        Services.AddSingleton<ILoggingService>(Logging);
+        Services.AddSingleton<ILastLaunchStore, LastLaunchStore>();
         Services.AddSingleton<ISettingsService>(settings);
         Services.AddSingleton<IAlertService>(Substitute.For<IAlertService>());
         Services.AddSingleton(Substitute.For<ITeensyRomApiClient>());

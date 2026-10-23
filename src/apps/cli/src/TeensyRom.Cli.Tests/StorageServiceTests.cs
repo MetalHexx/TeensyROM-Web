@@ -363,6 +363,69 @@ public class StorageServiceTests
 
         await act.Should().ThrowAsync<TeensyApiException>().WithMessage("No TeensyROM is selected.");
     }
+
+    [Fact]
+    public async Task IndexAllAsync_AsksTrWebToIndexEveryDeviceOnce()
+    {
+        await _sut.IndexAllAsync();
+
+        await _api.Received(1).IndexAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetBansAsync_ListsFoldersBeforeFiles_SkippingBlankEntries_AndMapsTheKind()
+    {
+        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(new GetSettingsResponse
+        {
+            SearchSettings = new SearchSettingsDto
+            {
+                BannedFiles = ["Commando.sid", " ", ""],
+                BannedDirectories = ["/music/junk", "", "  "]
+            }
+        });
+
+        var bans = await _sut.GetBansAsync();
+
+        bans.Should().Equal(
+            new BanEntry("/music/junk", BanEntryKind.Folder),
+            new BanEntry("Commando.sid", BanEntryKind.File));
+    }
+
+    [Fact]
+    public async Task GetBansAsync_WithNoBans_IsEmpty()
+    {
+        _api.GetSettingsAsync(Arg.Any<CancellationToken>()).Returns(new GetSettingsResponse());
+
+        (await _sut.GetBansAsync()).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LiftBanAsync_SendsTheEntryAndKind_AndReturnsTheLiftedAnswer(bool folder)
+    {
+        var kind = folder ? BanEntryKind.Folder : BanEntryKind.File;
+        var apiKind = folder ? BanKind.Folder : BanKind.File;
+        _api.LiftBanAsync("Commando.sid", apiKind, Arg.Any<CancellationToken>())
+            .Returns(new LiftBanResponse { Entry = "Commando.sid", Kind = apiKind, Lifted = true, Message = "Ban lifted." });
+
+        var result = await _sut.LiftBanAsync("Commando.sid", kind);
+
+        result.Should().Be(new LiftBanResult("Commando.sid", kind, true, "Ban lifted."));
+        await _api.Received(1).LiftBanAsync("Commando.sid", apiKind, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LiftBanAsync_WhenNothingWasBanned_ReportsItWasNotLifted()
+    {
+        _api.LiftBanAsync("Nope.sid", BanKind.File, Arg.Any<CancellationToken>())
+            .Returns(new LiftBanResponse { Entry = "Nope.sid", Kind = BanKind.File, Lifted = false, Message = "Not banned." });
+
+        var result = await _sut.LiftBanAsync("Nope.sid", BanEntryKind.File);
+
+        result.Lifted.Should().BeFalse();
+    }
+
     [Fact]
     public async Task GetDirectory_WithNoSelectedDevice_Throws()
     {

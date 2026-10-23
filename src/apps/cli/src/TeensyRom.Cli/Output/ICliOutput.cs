@@ -28,6 +28,9 @@ internal interface ICliOutput
     /// <summary>Stdin, stdout and stderr are all terminals, so a prompt (rendered on stderr) can be answered.</summary>
     bool CanPrompt { get; }
 
+    /// <summary>Stderr is a terminal rather than a pipe or a file, so a live progress line can be drawn on <see cref="Err"/>.</summary>
+    bool ErrIsTerminal { get; }
+
     /// <summary>Switches to <see cref="OutputMode.Json"/> for the rest of this invocation, or back to the terminal/redirect default.</summary>
     void UseJson(bool json);
 

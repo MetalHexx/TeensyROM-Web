@@ -203,4 +203,25 @@ public class DeviceServiceTests
         _sut.SelectedDevice.Should().Be(device);
         _sut.RequireDeviceId().Should().Be("abc123");
     }
+
+    [Fact]
+    public async Task ToggleMusic_WhenTheUnitRefuses_ThrowsWithTheBadGatewayStatus()
+    {
+        _sut.Select(new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected"));
+        _api.ToggleMusicAsync("a", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ToggleMusicResponse>(ApiFailure(502, """{"title":"The TeensyROM did not answer.","status":502}""")));
+
+        var act = () => _sut.ToggleMusicAsync();
+
+        (await act.Should().ThrowAsync<TeensyApiException>()).Which.StatusCode.Should().Be(502);
+    }
+
+    [Fact]
+    public async Task ToggleMusic_WithoutASelectedDevice_Throws()
+    {
+        var act = () => _sut.ToggleMusicAsync();
+
+        await act.Should().ThrowAsync<TeensyApiException>();
+        await _api.DidNotReceiveWithAnyArgs().ToggleMusicAsync(default!);
+    }
 }

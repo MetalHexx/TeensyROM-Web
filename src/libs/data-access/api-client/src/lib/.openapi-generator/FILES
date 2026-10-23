@@ -14,6 +14,7 @@ models/AppSettingsDto.ts
 models/AudioDeviceDto.ts
 models/AudioSettingsDto.ts
 models/BanFileResponse.ts
+models/BanKind.ts
 models/CancelJobResponse.ts
 models/CartDto.ts
 models/CartStorageDto.ts
@@ -47,6 +48,7 @@ models/IndexingStatusDto.ts
 models/KnownMidiControllerDto.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
+models/LiftBanResponse.ts
 models/ListDevicesResponse.ts
 models/MachineType.ts
 models/MidiControlMappingDto.ts

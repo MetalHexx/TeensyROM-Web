@@ -16,9 +16,11 @@
 import * as runtime from '../runtime';
 import type {
   BanFileResponse,
+  BanKind,
   GetDirectoryResponse,
   IndexAllResponse,
   IndexResponse,
+  LiftBanResponse,
   NullableOfTeensyFilterType,
   ProblemDetails,
   RemoveFavoriteResponse,
@@ -29,12 +31,16 @@ import type {
 import {
     BanFileResponseFromJSON,
     BanFileResponseToJSON,
+    BanKindFromJSON,
+    BanKindToJSON,
     GetDirectoryResponseFromJSON,
     GetDirectoryResponseToJSON,
     IndexAllResponseFromJSON,
     IndexAllResponseToJSON,
     IndexResponseFromJSON,
     IndexResponseToJSON,
+    LiftBanResponseFromJSON,
+    LiftBanResponseToJSON,
     NullableOfTeensyFilterTypeFromJSON,
     NullableOfTeensyFilterTypeToJSON,
     ProblemDetailsFromJSON,
@@ -71,6 +77,11 @@ export interface IndexRequest {
     deviceId: string;
     storageType: TeensyStorageType;
     startingPath?: string;
+}
+
+export interface LiftBanRequest {
+    entry: string;
+    kind: BanKind;
 }
 
 export interface RemoveFavoriteRequest {
@@ -314,6 +325,56 @@ export class FilesApiService extends runtime.BaseAPI {
      */
     async indexAll(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<IndexAllResponse> {
         const response = await this.indexAllRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Removes one entry from the banned files or banned folders list. Bans are engine-wide, so no device is needed. Lifting an entry that is not banned changes nothing.
+     * Lift Ban
+     */
+    async liftBanRaw(requestParameters: LiftBanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LiftBanResponse>> {
+        if (requestParameters['entry'] == null) {
+            throw new runtime.RequiredError(
+                'entry',
+                'Required parameter "entry" was null or undefined when calling liftBan().'
+            );
+        }
+
+        if (requestParameters['kind'] == null) {
+            throw new runtime.RequiredError(
+                'kind',
+                'Required parameter "kind" was null or undefined when calling liftBan().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['entry'] != null) {
+            queryParameters['Entry'] = requestParameters['entry'];
+        }
+
+        if (requestParameters['kind'] != null) {
+            queryParameters['Kind'] = requestParameters['kind'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/bans/lift`,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => LiftBanResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Removes one entry from the banned files or banned folders list. Bans are engine-wide, so no device is needed. Lifting an entry that is not banned changes nothing.
+     * Lift Ban
+     */
+    async liftBan(requestParameters: LiftBanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LiftBanResponse> {
+        const response = await this.liftBanRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

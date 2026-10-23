@@ -33,6 +33,10 @@ internal interface IStorageService
     /// <summary>Indexes a directory and everything below it; an empty path or "/" indexes the whole storage.</summary>
     Task Index(string path);
 
+    /// <summary>Indexes every storage on every connected TeensyROM. Needs no device.</summary>
+    /// <exception cref="TeensyApiException">tr-web answered 404 when no device is connected, or 500 when a storage failed to index.</exception>
+    Task IndexAllAsync(CancellationToken ct = default);
+
     /// <summary>Tags the file as a favorite and flips <see cref="IStorageItem.IsFavorite"/> on success.</summary>
     Task SaveFavorite(ILaunchableItem item);
 
@@ -46,7 +50,23 @@ internal interface IStorageService
     /// </summary>
     /// <param name="storage">The storage the file is on, which is not necessarily <see cref="StorageType"/>.</param>
     Task<BanResult> BanFile(string path, TeensyStorageType storage);
+
+    /// <summary>Every banned folder then every banned file name, as tr-web's settings hold them. Needs no device.</summary>
+    Task<IReadOnlyList<BanEntry>> GetBansAsync(CancellationToken ct = default);
+
+    /// <summary>Lifts one ban through tr-web. Needs no device.</summary>
+    /// <param name="entry">The banned file name, or the banned folder entry.</param>
+    Task<LiftBanResult> LiftBanAsync(string entry, BanEntryKind kind, CancellationToken ct = default);
 }
+
+/// <summary>What a ban entry bans. Named apart from the generated <c>BanKind</c> so files importing both stay unambiguous.</summary>
+internal enum BanEntryKind { File, Folder }
+
+/// <summary>One ban in tr-web's settings, exactly as stored.</summary>
+internal sealed record BanEntry(string Entry, BanEntryKind Kind);
+
+/// <summary>What tr-web answered to lifting a ban; <paramref name="Lifted"/> is false when the entry was not banned.</summary>
+internal sealed record LiftBanResult(string Entry, BanEntryKind Kind, bool Lifted, string Message);
 
 /// <summary>What tr-web answered to a ban: the name now banned and whether it already was.</summary>
 internal sealed record BanResult(string BannedFileName, bool AlreadyBanned, string Message);

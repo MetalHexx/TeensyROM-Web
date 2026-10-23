@@ -2,6 +2,7 @@ using System.Net;
 using NSubstitute;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Commands.File;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Entities;
@@ -45,7 +46,7 @@ public class LaunchServiceTests
     };
 
     [Fact]
-    public async Task LaunchFile_WhenCompatible_IsLaunched_WithTheItemItWasGiven()
+    public async Task LaunchFile_WhenCompatible_IsLaunched_WithTheEnginesRecordOfTheFile()
     {
         var requested = Requested();
         var sut = Sut(HttpStatusCode.OK, LaunchBody(true, FileJson()));
@@ -53,7 +54,40 @@ public class LaunchServiceTests
         var outcome = await sut.LaunchFile(TeensyStorageType.USB, requested);
 
         outcome.Status.Should().Be(LaunchStatus.Launched);
+        outcome.Item.Should().NotBeSameAs(requested);
+        outcome.Item.Should().BeOfType<SongItem>().Which.Should().BeEquivalentTo(new { requested.Path, Size = 4123L, Title = "Artillery", IsCompatible = true });
+        outcome.Item!.ApiRecord.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("\"path\": \"/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid\"", "\"path\": \"\"")]
+    [InlineData("\"type\": \"Song\"", "\"type\": \"Unknown\"")]
+    public async Task LaunchFile_WhenTheAnswerNamesNoLaunchableFile_IsLaunched_WithTheItemItWasGiven(string found, string replacement)
+    {
+        var requested = Requested();
+        var file = FileJson().Replace(found, replacement);
+        file.Should().NotBe(FileJson(), "the answer was changed");
+        var sut = Sut(HttpStatusCode.OK, LaunchBody(true, file));
+
+        var outcome = await sut.LaunchFile(TeensyStorageType.USB, requested);
+
+        outcome.Status.Should().Be(LaunchStatus.Launched);
         outcome.Item.Should().BeSameAs(requested);
+    }
+
+    [Fact]
+    public async Task LaunchFile_WhenTheEngineAnswersWithTheFile_ItsFullJsonIsThatOfTheListingRecord()
+    {
+        var listed = ApiMapper.ToListing(new StorageCacheDto { Path = "/music", Files = [FileItemJsonTests.SongDto()] }).Files.OfType<ILaunchableItem>().Single();
+        var api = Substitute.For<ITeensyRomApiClient>();
+        api.LaunchFileAsync(DeviceId, ApiStorageType.USB, listed.Path, Arg.Any<CancellationToken>())
+            .Returns(new LaunchFileResponse { IsCompatible = true, LaunchedFile = FileItemJsonTests.SongDto() });
+
+        var outcome = await new LaunchService(api, _devices).LaunchFile(TeensyStorageType.USB, listed);
+
+        outcome.Item.Should().NotBeSameAs(listed);
+        FileItemJson.Full(outcome.Item!, TeensyStorageType.USB).ToJsonString()
+            .Should().Be(FileItemJson.Full(listed, TeensyStorageType.USB).ToJsonString());
     }
 
     [Fact]
@@ -81,7 +115,9 @@ public class LaunchServiceTests
         var outcome = await sut.LaunchFile(TeensyStorageType.SD, requested);
 
         outcome.Status.Should().Be(LaunchStatus.Incompatible);
-        outcome.Item.Should().BeSameAs(requested);
+        outcome.Item.Should().NotBeSameAs(requested);
+        outcome.Item!.Path.Should().Be(requested.Path);
+        outcome.Item.IsCompatible.Should().BeFalse("the answer says the unit can't run it");
     }
 
     [Fact]

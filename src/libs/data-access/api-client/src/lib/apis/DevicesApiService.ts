@@ -74,7 +74,7 @@ export interface ResetDeviceRequest {
 export class DevicesApiService extends runtime.BaseAPI {
 
     /**
-     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Offline units are listed after the online ones, with deviceState ConnectionLost.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost.
      * Find Devices
      */
     async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
@@ -104,7 +104,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Offline units are listed after the online ones, with deviceState ConnectionLost.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost.
      * Find Devices
      */
     async findDevices(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {

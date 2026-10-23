@@ -23,6 +23,7 @@ public sealed class IndexBuildTests : IDisposable
     private readonly List<(TeensyStorageType Storage, string Path)> _indexed = [];
     private readonly TestHost _host;
     private Action<string> _onLine = _ => { };
+    private Action<string, string> _onEveryLine = (_, _) => { };
     private bool _followStopped;
     private string _stdin = "/from/stdin\n";
 
@@ -51,6 +52,17 @@ public sealed class IndexBuildTests : IDisposable
         {
             _onLine = call.Arg<Action<string>>();
             return Task.FromResult<IAsyncDisposable>(new Stop(() => _followStopped = true));
+        });
+        _deviceLog.FollowEveryDeviceAsync(Arg.Any<Action<string, string>>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            _onEveryLine = call.Arg<Action<string, string>>();
+            return Task.FromResult<IAsyncDisposable>(new Stop(() => _followStopped = true));
+        });
+        _storage.IndexAllAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            _onEveryLine("a-1", "=> Indexing (SD): /");
+            _onEveryLine("b-2", "Resetting TeensyROM");
+            return Task.CompletedTask;
         });
     }
 
@@ -202,14 +214,146 @@ public sealed class IndexBuildTests : IDisposable
     }
 
     [Fact]
-    public async Task Json_IsTheStoragesIndexedAndThePath()
+    public async Task Json_IsTheStoragesIndexedThePath_AndThatNotEveryDeviceWas()
     {
         await _host.RunAsync("index", "build", "/music", "--json");
 
         var result = JsonDocument.Parse(StdOut).RootElement;
-        result.EnumerateObject().Select(p => p.Name).Should().Equal("storages", "path");
+        result.EnumerateObject().Select(p => p.Name).Should().Equal("storages", "path", "allDevices");
+        result.GetProperty("allDevices").GetBoolean().Should().BeFalse();
         result.GetProperty("storages").EnumerateArray().Select(s => s.GetString()).Should().Equal("sd", "usb");
         result.GetProperty("path").GetString().Should().Be("/music");
+    }
+
+    // ---- --all ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task All_IndexesEveryDeviceAtOnce_WithoutChoosingOne()
+    {
+        var exitCode = await _host.RunAsync("index", "build", "--all");
+
+        exitCode.Should().Be(0);
+        await _storage.Received(1).IndexAllAsync(Arg.Any<CancellationToken>());
+        await _storage.DidNotReceive().Index(Arg.Any<string>());
+        await _host.Devices.DidNotReceive().GetDevicesAsync(Arg.Any<CancellationToken>());
+        _host.Devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
+        StdOut.Should().Be("Indexed every storage on every connected TeensyROM.\n");
+    }
+
+    [Fact]
+    public async Task All_ShowsEachDevicesIndexingLinesOnStderr_WithTheDeviceId()
+    {
+        await _host.RunAsync("index", "build", "--all");
+
+        StdErr.Should().Contain("a-1: => Indexing (SD): /").And.NotContain("Resetting TeensyROM");
+        _followStopped.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task All_SetsHasIndexed()
+    {
+        SetHasIndexed(false);
+
+        await _host.RunAsync("index", "build", "--all");
+
+        Settings.GetSettings().HasIndexed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task All_WhenNoDeviceIsConnected_IsNoDevice()
+    {
+        SetHasIndexed(false);
+        _storage.IndexAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(new TeensyApiException("No devices found.", 404)));
+
+        var exitCode = await _host.RunAsync("index", "build", "--all");
+
+        exitCode.Should().Be((int)CliExitCode.NoDevice);
+        StdErr.Should().Contain("No TeensyROM is online. Connect one, then run `trom device discover`.");
+        _followStopped.Should().BeTrue();
+        Settings.GetSettings().HasIndexed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task All_WhenAStorageFailsToIndex_IsFailed()
+    {
+        _storage.IndexAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(new TeensyApiException("Indexing failure.", 500)));
+
+        var exitCode = await _host.RunAsync("index", "build", "--all");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        StdErr.Should().Contain("Indexing failure.");
+    }
+
+    [Theory]
+    [InlineData("--device", "Alpha")]
+    [InlineData("--storage", "sd")]
+    public async Task All_WithADeviceOrStorage_IsAUsageError_AndIndexesNothing(string option, string value)
+    {
+        var exitCode = await _host.RunAsync("index", "build", "--all", option, value);
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        await _storage.DidNotReceive().IndexAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task All_WithAPath_IsAUsageError_AndIndexesNothing()
+    {
+        var exitCode = await _host.RunAsync("index", "build", "--all", "/music");
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        await _storage.DidNotReceive().IndexAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task All_Json_IsEveryStorage_WithAllDevicesTrue()
+    {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { Both });
+
+        await _host.RunAsync("index", "build", "--all", "--json");
+
+        var result = JsonDocument.Parse(StdOut).RootElement;
+        result.EnumerateObject().Select(p => p.Name).Should().Equal("storages", "path", "allDevices");
+        result.GetProperty("storages").EnumerateArray().Select(s => s.GetString()).Should().Equal("sd", "usb");
+        result.GetProperty("allDevices").GetBoolean().Should().BeTrue();
+        await _host.Devices.DidNotReceive().FindAsync(true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task All_Json_ReportsOnlyTheStoragesTheDevicesHave()
+    {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { Both with { UsbAvailable = false } });
+
+        await _host.RunAsync("index", "build", "--all", "--json");
+
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("storages").EnumerateArray()
+            .Select(s => s.GetString()).Should().Equal("sd");
+    }
+
+    [Fact]
+    public async Task All_Json_ReportsUsb_WhenOnlyAnotherDeviceHasIt()
+    {
+        var sdOnly = Both with { UsbAvailable = false };
+        var usbOnly = new DeviceSummary("b-2", "Beta", true, "USB COM4", "Connected", UsbAvailable: true);
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>()).Returns(new[] { usbOnly, sdOnly });
+
+        await _host.RunAsync("index", "build", "--all", "--json");
+
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("storages").EnumerateArray()
+            .Select(s => s.GetString()).Should().Equal("sd", "usb");
+    }
+
+    [Fact]
+    public async Task All_Json_WhenTheListingFails_StillSucceeds_WithNoStorages()
+    {
+        _host.Devices.FindAsync(false, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("tr-web is busy.", 503)));
+
+        var exitCode = await _host.RunAsync("index", "build", "--all", "--json");
+
+        exitCode.Should().Be(0);
+        var result = JsonDocument.Parse(StdOut).RootElement;
+        result.GetProperty("storages").GetArrayLength().Should().Be(0);
+        result.GetProperty("allDevices").GetBoolean().Should().BeTrue();
     }
 
     private sealed class Stop(Action onStop) : IAsyncDisposable

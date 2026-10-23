@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using System.Text.Json;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Errors;
@@ -30,6 +31,8 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
 
     public bool CanPrompt => consoles.InIsTerminal && consoles.OutIsTerminal && consoles.ErrIsTerminal;
 
+    public bool ErrIsTerminal => consoles.ErrIsTerminal;
+
     public void SetRunMode(CliRunMode mode) => RunMode = mode;
 
     public void UseJson(bool json) => _json = json;
@@ -53,7 +56,11 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
         table.AddColumn(new TableColumn(string.Empty));
         table.AddColumn(new TableColumn(string.Empty));
 
-        foreach (var (label, value) in fields) table.AddRow(new Text(label), new Text(value));
+        foreach (var (label, value) in fields)
+        {
+            IRenderable cell = Mode == OutputMode.Human && TerminalText.IsWebLink(value) ? TerminalText.Link(null, value) : new Text(value);
+            table.AddRow(new Text(label), cell);
+        }
 
         Out.Write(table);
     }

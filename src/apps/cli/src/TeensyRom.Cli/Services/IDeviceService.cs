@@ -15,7 +15,7 @@ internal interface IDeviceService
 
     /// <summary>
     /// Lists the devices tr-web knows; with <paramref name="fullScan"/> it first scans for ones it doesn't know yet.
-    /// <c>GetDevicesAsync</c> is <c>FindAsync(fullScan: false)</c>. tr-web answers one lookup per 5 seconds.
+    /// <c>GetDevicesAsync</c> is <c>FindAsync(fullScan: false)</c>. tr-web limits full scans to one per 5 seconds.
     /// </summary>
     /// <exception cref="TeensyApiException">tr-web could not list its devices.</exception>
     Task<IReadOnlyList<DeviceSummary>> FindAsync(bool fullScan, CancellationToken ct = default);
@@ -29,10 +29,6 @@ internal interface IDeviceService
     /// <summary>Pauses or resumes the music playing on the selected device.</summary>
     /// <exception cref="TeensyApiException">No device is selected, or tr-web couldn't toggle the music.</exception>
     Task ToggleMusicAsync();
-
-    /// <summary>Resets the selected device, which stops whatever it is running.</summary>
-    /// <exception cref="TeensyApiException">No device is selected, or tr-web couldn't reset it.</exception>
-    Task ResetAsync();
 
     /// <summary>Reconnects the device, whether or not it is online now, and returns it as it is afterwards.</summary>
     /// <exception cref="TeensyApiException">tr-web doesn't know the device or couldn't reconnect it.</exception>

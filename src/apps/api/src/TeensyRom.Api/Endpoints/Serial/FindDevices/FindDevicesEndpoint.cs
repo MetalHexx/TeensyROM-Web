@@ -22,6 +22,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                     "- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n" +
                     "- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, " +
                     "and every currently connected device is momentarily disconnected while the sweep runs.\n" +
+                    "- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.\n" +
                     "- Offline units are listed after the online ones, with deviceState ConnectionLost."
                 );
         }
