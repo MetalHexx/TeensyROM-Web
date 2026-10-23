@@ -112,27 +112,19 @@ internal sealed class WaitCommand(ICliOutput output, IEngineClock clock, ILastLa
 
         var record = settings.Device is null ? null : store.Find(settings.Device);
 
-        using var cancel = new CancellationTokenSource();
-        ConsoleCancelEventHandler onCancel = (_, args) =>
-        {
-            args.Cancel = true;
-            cancel.Cancel();
-        };
-
-        Console.CancelKeyPress += onCancel;
-
         try
         {
-            if (record is null) await clock.DelayAsync(duration, cancel.Token);
-            else await CountDownUnlessPausedAsync(duration, record.DeviceId, cancel.Token);
+            await CommandRun.CancellableAsync(async token =>
+            {
+                if (record is null) await clock.DelayAsync(duration, token);
+                else await CountDownUnlessPausedAsync(duration, record.DeviceId, token);
+
+                return true;
+            });
         }
         catch (OperationCanceledException)
         {
             throw new CliException(CliExitCode.Failed, "The wait was cancelled.");
-        }
-        finally
-        {
-            Console.CancelKeyPress -= onCancel;
         }
 
         if (Output.Mode == OutputMode.Json) Output.Json(new WaitDocument(duration.ToString("c", CultureInfo.InvariantCulture)));

@@ -73,25 +73,7 @@ internal sealed class FileDownloadCommand(
         {
             throw new CliException(CliExitCode.Failed, $"Couldn't create {target}: {error.Message}");
         }
-        using var cancel = new CancellationTokenSource();
-        ConsoleCancelEventHandler onCancel = (_, args) =>
-        {
-            args.Cancel = true;
-            cancel.Cancel();
-        };
-
-        Console.CancelKeyPress += onCancel;
-
-        DownloadRunResult run;
-
-        try
-        {
-            run = await TransferAsync(target, cancel.Token);
-        }
-        finally
-        {
-            Console.CancelKeyPress -= onCancel;
-        }
+        var run = await CommandRun.CancellableAsync(token => TransferAsync(target, token));
         var failed = run.Results.Count(result => !result.Ok);
         var report = new CopyReportJson(run.Results, new CopyTotalsJson(run.Results.Count - failed, failed));
 
@@ -101,17 +83,9 @@ internal sealed class FileDownloadCommand(
     }
 
     /// <summary>Runs the download, with a live progress line on stderr when a person is watching one.</summary>
-    private async Task<DownloadRunResult> TransferAsync(string target, CancellationToken ct)
-    {
-        if (Output.Mode != OutputMode.Human || !Output.ErrIsTerminal) return await runner.RunAsync(_paths, target, null, ct);
-
-        DownloadRunResult? run = null;
-
-        await Output.Err.Status().Spinner(Spinner.Known.Dots).StartAsync("Starting the download...", async status =>
-            run = await runner.RunAsync(_paths, target, progress => status.Status = Markup.Escape(Describe(progress)), ct));
-
-        return run!;
-    }
+    private Task<DownloadRunResult> TransferAsync(string target, CancellationToken ct) =>
+        CommandRun.WithStatusAsync<DownloadProgress, DownloadRunResult>(
+            Output, "Starting the download...", Describe, progress => runner.RunAsync(_paths, target, progress, ct));
 
     private static string Describe(DownloadProgress progress) =>
         $"Saved {progress.Saved}, {progress.Failed} failed" + (string.IsNullOrEmpty(progress.CurrentFile) ? string.Empty : $" — {progress.CurrentFile}");

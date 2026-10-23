@@ -73,9 +73,9 @@ internal sealed class FileUploadCommand(
     IStdinPaths stdin,
     UploadRunner runner) : DeviceCommand<FileUploadSettings>(output, engine, chooser, devices, storage, settingsService)
 {
-    private const string NotFoundMessage = "not found";
+    private const string UnsupportedMessage = "not a file type the TeensyROM takes";
 
-    private UploadPlan _plan = new([], [], []);
+    private UploadPlan _plan = new([], [], [], []);
 
     /// <exception cref="CliException">
     /// <see cref="CliExitCode.Usage"/> for a refused <c>--launch</c> or no names where nothing can be asked;
@@ -96,6 +96,11 @@ internal sealed class FileUploadCommand(
         }
         _plan = UploadSources.Resolve(named, current);
 
+        if (_plan.SkippedByType > 0)
+        {
+            Output.Notice($"{_plan.SkippedByType} {(_plan.SkippedByType == 1 ? "file was" : "files were")} left out: not a file type the TeensyROM takes.");
+        }
+
         if (ask && _plan.Files.Count > 0) ConfirmCurrentFolder(current, settings.To!);
 
         // With nothing to send there is nothing for the engine to do.
@@ -108,26 +113,7 @@ internal sealed class FileUploadCommand(
 
         var to = settings.To!;
 
-        using var cancel = new CancellationTokenSource();
-        ConsoleCancelEventHandler onCancel = (_, args) =>
-        {
-            args.Cancel = true;
-            cancel.Cancel();
-        };
-
-        Console.CancelKeyPress += onCancel;
-
-        UploadRunResult run;
-
-        try
-        {
-            run = await TransferAsync(to, cancel.Token);
-        }
-        finally
-        {
-            Console.CancelKeyPress -= onCancel;
-        }
-
+        var run = await CommandRun.CancellableAsync(token => TransferAsync(to, token));
         var job = run.Job;
         var report = BuildReport(to, run);
         var succeeded = report.Totals.Failed == 0 && job.State == TransferJobState.Completed;
@@ -138,7 +124,12 @@ internal sealed class FileUploadCommand(
 
         if (job.State is TransferJobState.Aborted or TransferJobState.Abandoned && !string.IsNullOrWhiteSpace(job.Error)) Output.Notice(job.Error);
 
-        var exitCode = BatchOutcome.Finish(Output, report.Totals.Copied + report.Totals.Failed, report.Totals.Failed, job.FilesFailed + run.Rejected.Count > 0, "files");
+        var exitCode = BatchOutcome.Finish(
+            Output,
+            report.Totals.Copied + report.Totals.Failed,
+            report.Totals.Failed,
+            job.FilesFailed + run.Rejected.Count + _plan.Unsupported.Count > 0,
+            "files");
 
         if (exitCode != 0 || job.State == TransferJobState.Completed) return exitCode;
 
@@ -183,41 +174,40 @@ internal sealed class FileUploadCommand(
         }
     }
 
-    /// <summary>Nothing is left to send: the named paths that don't exist are the results, or the folders were empty.</summary>
+    /// <summary>
+    /// Nothing is left to send: the named paths that don't exist and the named files of a type the TeensyROM doesn't take
+    /// are the results, or the folders held nothing it takes.
+    /// </summary>
     private int NothingToSend()
     {
-        if (_plan.NotFound.Count == 0)
+        if (_plan.NotFound.Count == 0 && _plan.Unsupported.Count == 0)
         {
-            throw new CliException(CliExitCode.NotFound, $"There's nothing to upload in {string.Join(", ", _plan.Folders)}.");
+            var where = string.Join(", ", _plan.Folders);
+
+            throw new CliException(
+                CliExitCode.NotFound,
+                _plan.SkippedByType > 0 ? $"There's nothing to upload in {where}: none of its files are a file type the TeensyROM takes." : $"There's nothing to upload in {where}.");
         }
-        var results = _plan.NotFound.Select(path => CopyResults.Failed(path, string.Empty, NotFoundMessage)).ToList();
+        var results = _plan.NotFound.Select(path => CopyResults.Failed(path, string.Empty, CopyResults.NotFoundMessage))
+            .Concat(_plan.Unsupported.Select(path => CopyResults.Failed(path, string.Empty, UnsupportedMessage)))
+            .ToList();
 
         CopyResults.Show(Output, new CopyReportJson(results, new CopyTotalsJson(0, results.Count)));
 
-        return BatchOutcome.Finish(Output, results.Count, results.Count, anyFailedForOtherReasons: false, "files");
+        return BatchOutcome.Finish(Output, results.Count, results.Count, anyFailedForOtherReasons: _plan.Unsupported.Count > 0, "files");
     }
 
     /// <summary>Runs the job, with a live progress line on stderr when a person is watching one.</summary>
-    private async Task<UploadRunResult> TransferAsync(string to, CancellationToken ct)
-    {
-        if (Output.Mode != OutputMode.Human || !Output.ErrIsTerminal)
-        {
-            return await runner.RunAsync(storage.StorageType, to, _plan.Files, null, ct);
-        }
-        UploadRunResult? run = null;
-
-        await Output.Err.Status().Spinner(Spinner.Known.Dots).StartAsync("Starting the transfer...", async status =>
-            run = await runner.RunAsync(storage.StorageType, to, _plan.Files, progress => status.Status = Markup.Escape(Describe(progress)), ct));
-
-        return run!;
-    }
+    private Task<UploadRunResult> TransferAsync(string to, CancellationToken ct) =>
+        CommandRun.WithStatusAsync<UploadProgress, UploadRunResult>(
+            Output, "Starting the transfer...", Describe, progress => runner.RunAsync(storage.StorageType, to, _plan.Files, progress, ct));
 
     private static string Describe(UploadProgress progress) =>
         $"Sending {progress.Sent}/{progress.Total}, {progress.Failed} failed" + (string.IsNullOrEmpty(progress.CurrentFile) ? string.Empty : $" — {progress.CurrentFile}");
 
     /// <summary>
     /// One result per local file, then one per failure the job recorded that matches none (a file inside an archive),
-    /// then one per named path that doesn't exist. A job failure is matched to a file by its path under the destination.
+    /// then one per named path that doesn't exist, then one per named file of an unsupported type. A job failure is matched to a file by its path under the destination.
     /// </summary>
     private CopyReportJson BuildReport(string to, UploadRunResult run)
     {
@@ -240,9 +230,10 @@ internal sealed class FileUploadCommand(
         {
             results.Add(CopyResults.Failed(ArchiveOf(failure), failure.TargetPath, FailureMessage(failure)));
         }
-        results.AddRange(_plan.NotFound.Select(path => CopyResults.Failed(path, string.Empty, NotFoundMessage)));
+        results.AddRange(_plan.NotFound.Select(path => CopyResults.Failed(path, string.Empty, CopyResults.NotFoundMessage)));
+        results.AddRange(_plan.Unsupported.Select(path => CopyResults.Failed(path, string.Empty, UnsupportedMessage)));
 
-        return new CopyReportJson(results, new CopyTotalsJson(job.FilesSent, job.FilesFailed + run.Rejected.Count + _plan.NotFound.Count));
+        return new CopyReportJson(results, new CopyTotalsJson(job.FilesSent, job.FilesFailed + run.Rejected.Count + _plan.NotFound.Count + _plan.Unsupported.Count));
     }
 
     private static string FailureMessage(TransferFileCompleted failure) =>
