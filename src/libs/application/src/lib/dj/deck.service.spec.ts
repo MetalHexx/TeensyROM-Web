@@ -1000,7 +1000,7 @@ describe('DeckService', () => {
         });
       });
 
-      it('mute, hold and clear-all reach the engine and are reflected in the store; clear-all leaves holds', async () => {
+      it('mute and hold reach the engine and are reflected in the store', async () => {
         await loadAndWait('A', register(makeFixture()));
 
         service.setVoiceMuted('A', 0, true);
@@ -1013,7 +1013,8 @@ describe('DeckService', () => {
         ]);
         expect(store.deck('A')().voices).toEqual(runtime.snapshot('A').voices);
 
-        service.clearVoiceMutes('A');
+        service.setVoiceMuted('A', 0, false);
+        service.setVoiceMuted('A', 1, false);
         expect(store.deck('A')().voices).toEqual([
           { muted: false, held: false },
           { muted: false, held: false },
@@ -1035,7 +1036,6 @@ describe('DeckService', () => {
         service.jumpSpeed('A', 'down');
         service.setVoiceMuted('A', 2, true);
         service.setVoiceHeld('A', 1, true);
-        service.clearVoiceMutes('A');
 
         expect(store.deck('B')().speed).toBe(bBefore.speed);
         expect(store.deck('B')().voices).toEqual(bBefore.voices);
@@ -1078,7 +1078,6 @@ describe('DeckService', () => {
         service.setVoiceMuted('A', 0, true);
         service.setVoiceHeld('A', 1, true);
         service.setVoiceHeld('A', 1, false);
-        service.clearVoiceMutes('A');
 
         expect(vi.mocked(logWarn)).not.toHaveBeenCalled();
       });
@@ -1091,7 +1090,6 @@ describe('DeckService', () => {
         ['setNudge', (target) => target.setNudge('A', 'up', true)],
         ['setVoiceMuted', (target) => target.setVoiceMuted('A', 0, true)],
         ['setVoiceHeld', (target) => target.setVoiceHeld('A', 0, true)],
-        ['clearVoiceMutes', (target) => target.clearVoiceMutes('A')],
       ];
 
       it.each(commands)('%s is refused on an empty deck with one warning naming the slot and command', (name, run) => {

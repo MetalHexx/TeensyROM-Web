@@ -22,6 +22,7 @@ const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const HOLD_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-hold' };
+const NUDGE_UP_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
 
 const style = (kind: MappingStyle['kind'], amount: number | null = null): MappingStyle => ({
   kind,
@@ -382,7 +383,7 @@ describe('MidiMappingEngine', () => {
     it('lets go when its source is bound to another control', () => {
       h.engine.handle(note(60, 100));
 
-      h.mappings.bind(noteSource(60), { owner: 'A', control: 'clear-voice-mutes' }, style('press'));
+      h.mappings.bind(noteSource(60), { owner: 'A', control: 'stop' }, style('press'));
 
       expect(held(0)).toBe(false);
     });
@@ -438,6 +439,37 @@ describe('MidiMappingEngine', () => {
 
       expect(held(0)).toBe(false);
       expect(held(1)).toBe(false);
+    });
+
+    describe('a nudge hold', () => {
+      beforeEach(() => {
+        map(noteSource(70), NUDGE_UP_A, style('hold', 0.1));
+      });
+
+      it('plays at the fader plus the mapping amount while the key is down, and releases to the fader', () => {
+        h.engine.handle(note(70, 100));
+        expect(speed()).toBeCloseTo(1.1, 10);
+
+        h.engine.handle(note(70, 0));
+        expect(speed()).toBe(1);
+      });
+
+      it.each([
+        ['the controller is lost', () => h.engine.releaseHolds(LAUNCH_CONTROL)],
+        ['the page is hidden', () => window.dispatchEvent(new Event('pagehide'))],
+        ['its mapping is removed', () => h.mappings.remove(nudgeId())],
+      ])('lets go when %s', (_when, release) => {
+        h.engine.handle(note(70, 100));
+        expect(speed()).toBeCloseTo(1.1, 10);
+
+        release();
+
+        expect(speed()).toBe(1);
+      });
+
+      function nudgeId(): string {
+        return h.mappingStore.mappingBySource(`${LAUNCH_CONTROL}|1|note|70`)()?.id as string;
+      }
     });
 
     it('lets go of a hold even when the deck stopped being shapeable under the key', () => {

@@ -268,10 +268,6 @@ export class DjDeckColumnComponent {
     this.deckService.setVoiceHeld(this.deck().slot, index, held);
   }
 
-  onClearVoiceMutes(): void {
-    this.deckService.clearVoiceMutes(this.deck().slot);
-  }
-
   onPortSelect(id: string): void {
     this.deckService.bindDevice(this.deck().slot, id || null);
   }

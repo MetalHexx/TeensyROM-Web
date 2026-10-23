@@ -189,10 +189,10 @@ export class MidiMappingEngine {
     const key = sourceKey(event);
     if (pressEdge) {
       this.holds.set(key, { mappingId: mapping.id, controllerId: event.controllerId, control });
-      control.set(true);
+      control.set(true, mapping.style.amount);
     } else if (releaseEdge) {
       this.holds.delete(key);
-      control.set(false);
+      control.set(false, null);
     }
   }
 
@@ -240,7 +240,7 @@ export class MidiMappingEngine {
   /** Releases a hold, logging rather than throwing so one failing release cannot strand the rest. */
   private letGo(hold: ActiveHold): void {
     try {
-      hold.control.set(false);
+      hold.control.set(false, null);
     } catch (error) {
       logWarn(
         `MidiMappingEngine: releasing ${controlKey(hold.control.identity)} failed — ${

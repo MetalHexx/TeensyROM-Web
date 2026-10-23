@@ -369,15 +369,6 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** Clears every latched voice mute. Refused while the deck has nothing shapeable loaded. */
-  clearVoiceMutes(slot: Slot): void {
-    if (!this.canShape(slot, 'clearVoiceMutes')) {
-      return;
-    }
-    this.runtime.clearVoiceMutes(slot);
-    this.reflectEngineControls(slot);
-  }
-
   /** Loads both slots' cartridge bindings from the saved MIDI settings, reconciles them against
    *  what is currently enumerated, and installs the effects that keep reconciling from then on.
    *  The constructor above builds the runtimes a bind can target; this is the separate call

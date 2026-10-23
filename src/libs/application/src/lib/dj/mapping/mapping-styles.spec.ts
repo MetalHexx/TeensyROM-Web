@@ -19,7 +19,20 @@ const toggle: MappableControl = {
   read: () => false,
   set: () => undefined,
 };
-const held: MappableControl = { identity, name: 'H', nature: 'hold', set: () => undefined };
+const held: MappableControl = {
+  identity,
+  name: 'H',
+  nature: 'hold',
+  amountDefault: null,
+  set: () => undefined,
+};
+const nudge: MappableControl = {
+  identity,
+  name: 'N',
+  nature: 'hold',
+  amountDefault: 0.05,
+  set: () => undefined,
+};
 
 function value(defaults: ValueDefaults): MappableControl {
   return {
@@ -81,7 +94,8 @@ describe('defaultStyle', () => {
   it.each([
     ['a trigger', trigger, 'cc', { kind: 'press', amount: null }],
     ['a state', toggle, 'note', { kind: 'latch', amount: null }],
-    ['a hold', held, 'note', { kind: 'hold', amount: null }],
+    ['a hold with no amount', held, 'note', { kind: 'hold', amount: null }],
+    ['a hold with an amount', nudge, 'note', { kind: 'hold', amount: 0.05 }],
     ['a value from a note', knob, 'note', { kind: 'step', amount: 0.05 }],
     [
       'a value that defaults to absolute from a CC',
@@ -107,6 +121,11 @@ describe('defaultAmountFor', () => {
     expect(defaultAmountFor(knob, 'absolute')).toBeNull();
     expect(defaultAmountFor(trigger, 'step')).toBeNull();
   });
+
+  it("is a hold control's own default for hold", () => {
+    expect(defaultAmountFor(nudge, 'hold')).toBe(0.05);
+    expect(defaultAmountFor(held, 'hold')).toBeNull();
+  });
 });
 
 describe('clampAmount', () => {
@@ -117,6 +136,16 @@ describe('clampAmount', () => {
     expect(clampAmount(knob, 'step', -3)).toBe(-1);
     expect(clampAmount(knob, 'step', 0)).not.toBe(0);
     expect(clampAmount(knob, 'step', -0.25)).toBe(-0.25);
+  });
+
+  it('keeps a nudge hold in [0.001, 1], falling back to its default, and a voice hold at null', () => {
+    expect(clampAmount(nudge, 'hold', 0.2)).toBe(0.2);
+    expect(clampAmount(nudge, 'hold', null)).toBe(0.05);
+    expect(clampAmount(nudge, 'hold', Number.NaN)).toBe(0.05);
+    expect(clampAmount(nudge, 'hold', 0)).toBe(0.001);
+    expect(clampAmount(nudge, 'hold', 5)).toBe(1);
+    expect(clampAmount(held, 'hold', 0.5)).toBeNull();
+    expect(clampAmount(held, 'hold', null)).toBeNull();
   });
 
   it('is null for a kind that takes no amount and falls back to the default for a missing one', () => {

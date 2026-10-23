@@ -319,7 +319,7 @@ public class SaveMidiSettingsRequestValidatorTests
 
     [Theory]
     [InlineData("A", "play-pause")]
-    [InlineData("B", "clear-voice-mutes")]
+    [InlineData("B", "speed-nudge-down")]
     [InlineData("B", "key")]
     [InlineData("A", "voice-2-coarse")]
     [InlineData("B", "voice-3-wave-pulse")]

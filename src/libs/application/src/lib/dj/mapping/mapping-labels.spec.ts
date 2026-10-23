@@ -25,6 +25,8 @@ describe('mapping labels', () => {
     expect(describeStyle({ kind: 'relative-signed', amount: 0.015 })).toBe('Relative ± · 1.5%');
     expect(describeStyle({ kind: 'step', amount: 0.05 })).toBe('Step +5%');
     expect(describeStyle({ kind: 'step', amount: -0.05 })).toBe('Step −5%');
+    expect(describeStyle({ kind: 'hold', amount: null })).toBe('Hold');
+    expect(describeStyle({ kind: 'hold', amount: 0.05 })).toBe('Hold · 5%');
   });
 
   it('labels the owner of a control', () => {

@@ -85,7 +85,6 @@ function createDeckServiceStub() {
     jumpSpeed: vi.fn(),
     setVoiceMuted: vi.fn(),
     setVoiceHeld: vi.fn(),
-    clearVoiceMutes: vi.fn(),
   };
 }
 
@@ -552,9 +551,6 @@ describe('DjDeckColumnComponent', () => {
 
       voicePanel(fixture).heldChange.emit({ index: 2, held: false });
       expect(deckService.setVoiceHeld).toHaveBeenCalledWith('B', 2, false);
-
-      voicePanel(fixture).clearMutes.emit();
-      expect(deckService.clearVoiceMutes).toHaveBeenCalledWith('B');
     });
 
     it('renders disabled on an empty deck and enabled once a tune is loaded', () => {
