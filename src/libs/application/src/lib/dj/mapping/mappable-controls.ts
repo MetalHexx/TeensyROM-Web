@@ -3,9 +3,18 @@ import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DeckService } from '../deck.service';
 import { DjStore } from '../dj-store';
-import { MixerService } from '../mixer.service';
+import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
+import { PANEL_RANGES } from '../mixer/panel-ranges';
 import { DECK_SLOTS, type Slot } from '../slot';
-import { controlKey, type ControlIdentity, type DeckControlId } from './mapping.models';
+import type { PanelFilterMode, PanelWaveform, VoiceSwitch } from '../dj-store';
+import {
+  VOICE_NUMBERS,
+  VOICE_STRIP_CONTROLS,
+  controlKey,
+  type ControlIdentity,
+  type DeckControlId,
+  type VoiceStripControl,
+} from './mapping.models';
 
 /** The defaults a value control offers when a CC source is mapped onto it. `sensitivity` is the
  *  fraction of the range one relative tick moves; `stepAmount` is the fraction one step press
@@ -46,11 +55,7 @@ interface ValueRange {
   readonly step: number | null;
 }
 
-const VOICES = [1, 2, 3] as const;
-
 const SPEED_RANGE: ValueRange = { min: 0.5, max: 1.5, home: 1, step: null };
-const UNIT_RANGE: ValueRange = { min: 0, max: 1, home: 0, step: null };
-const BIPOLAR_RANGE: ValueRange = { min: -1, max: 1, home: 0, step: null };
 const KEY_RANGE: ValueRange = { min: -12, max: 12, home: 0, step: 1 };
 
 const SEEK_DEFAULTS: ValueDefaults = {
@@ -63,17 +68,99 @@ const SPEED_DEFAULTS: ValueDefaults = {
   sensitivity: 0.01,
   stepAmount: 0.05,
 };
-const KNOB_DEFAULTS: ValueDefaults = {
-  ccStyle: 'relative-offset',
-  sensitivity: 0.01,
-  stepAmount: 0.1,
-};
-const FADER_DEFAULTS: ValueDefaults = { ccStyle: 'absolute', sensitivity: 0.01, stepAmount: 0.1 };
 const KEY_DEFAULTS: ValueDefaults = {
   ccStyle: 'relative-offset',
   sensitivity: 1 / 24,
   stepAmount: 1 / 24,
 };
+
+const STEP_DEFAULTS = (sensitivity: number, stepAmount: number): ValueDefaults => ({
+  ccStyle: 'relative-offset',
+  sensitivity,
+  stepAmount,
+});
+
+/** One panel control of a voice strip: how it is named, read and commanded. */
+type VoiceStripEntry =
+  | {
+      readonly kind: 'knob';
+      readonly knob: VoiceKnob;
+      readonly name: string;
+      readonly defaults: ValueDefaults;
+    }
+  | { readonly kind: 'waveform'; readonly waveform: PanelWaveform; readonly name: string }
+  | { readonly kind: 'switch'; readonly switch: VoiceSwitch; readonly name: string };
+
+const VOICE_STRIP: Record<VoiceStripControl, VoiceStripEntry> = {
+  'wave-triangle': { kind: 'waveform', waveform: 'triangle', name: 'triangle' },
+  'wave-sawtooth': { kind: 'waveform', waveform: 'sawtooth', name: 'sawtooth' },
+  'wave-pulse': { kind: 'waveform', waveform: 'pulse', name: 'pulse' },
+  'wave-noise': { kind: 'waveform', waveform: 'noise', name: 'noise' },
+  coarse: {
+    kind: 'knob',
+    knob: 'coarse',
+    name: 'coarse',
+    defaults: STEP_DEFAULTS(1 / 192, 1 / 192),
+  },
+  fine: { kind: 'knob', knob: 'fine', name: 'fine', defaults: STEP_DEFAULTS(0.01, 0.05) },
+  'pulse-width': {
+    kind: 'knob',
+    knob: 'pulseWidth',
+    name: 'pulse width',
+    defaults: STEP_DEFAULTS(0.005, 0.05),
+  },
+  attack: { kind: 'knob', knob: 'attack', name: 'attack', defaults: STEP_DEFAULTS(1 / 30, 1 / 30) },
+  decay: { kind: 'knob', knob: 'decay', name: 'decay', defaults: STEP_DEFAULTS(1 / 30, 1 / 30) },
+  sustain: {
+    kind: 'knob',
+    knob: 'sustain',
+    name: 'sustain',
+    defaults: STEP_DEFAULTS(1 / 30, 1 / 30),
+  },
+  release: {
+    kind: 'knob',
+    knob: 'release',
+    name: 'release',
+    defaults: STEP_DEFAULTS(1 / 30, 1 / 30),
+  },
+  ring: { kind: 'switch', switch: 'ring', name: 'ring' },
+  sync: { kind: 'switch', switch: 'sync', name: 'sync' },
+  filter: { kind: 'switch', switch: 'filter', name: 'filter' },
+};
+
+const FILTER_KNOBS: readonly {
+  readonly id: DeckControlId;
+  readonly knob: FilterKnob;
+  readonly name: string;
+  readonly defaults: ValueDefaults;
+}[] = [
+  {
+    id: 'filter-cutoff',
+    knob: 'cutoff',
+    name: 'Filter cutoff',
+    defaults: STEP_DEFAULTS(0.005, 0.05),
+  },
+  {
+    id: 'filter-resonance',
+    knob: 'resonance',
+    name: 'Filter resonance',
+    defaults: STEP_DEFAULTS(1 / 30, 1 / 30),
+  },
+];
+
+const FILTER_MODES: readonly {
+  readonly id: DeckControlId;
+  readonly mode: PanelFilterMode;
+  readonly name: string;
+}[] = [
+  { id: 'filter-low-pass', mode: 'low-pass', name: 'Filter low-pass' },
+  { id: 'filter-band-pass', mode: 'band-pass', name: 'Filter band-pass' },
+  { id: 'filter-high-pass', mode: 'high-pass', name: 'Filter high-pass' },
+];
+
+function voiceControlId(voice: number, control: VoiceStripControl): DeckControlId {
+  return `voice-${voice}-${control}` as DeckControlId;
+}
 
 function trigger(identity: ControlIdentity, name: string, fire: () => void): MappableControl {
   return { identity, name, nature: 'trigger', fire };
@@ -108,8 +195,8 @@ function value(
 }
 
 /**
- * Every control a MIDI source can drive, declared once: the 22 deck controls for each deck, then
- * the crossfader. Each entry reads from `DjStore` and commands through `DeckService` or
+ * Every control a MIDI source can drive, declared once: the transport, voice and SID panel
+ * controls for each deck. Each entry reads from `DjStore` and commands through `DeckService` or
  * `MixerService`, so a mapped control is gated exactly like its on-screen twin. The list holds no
  * component and no mapping.
  */
@@ -124,7 +211,7 @@ export class MappableControls {
   private readonly byKey: ReadonlyMap<string, MappableControl>;
 
   constructor() {
-    this.all = [...DECK_SLOTS.flatMap((slot) => this.deckControls(slot)), this.crossfader()];
+    this.all = DECK_SLOTS.flatMap((slot) => this.deckControls(slot));
     this.byKey = new Map(this.all.map((control) => [controlKey(control.identity), control]));
   }
 
@@ -137,7 +224,7 @@ export class MappableControls {
     const decks = this.deckService;
     const mixer = this.mixerService;
     const deck = this.djStore.deck(slot);
-    const mix = this.djStore.deckMix(slot);
+    const panel = this.djStore.deckPanel(slot);
     const transport = this.djStore.transportSummary(slot);
     const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
     const seek = this.coalescedSeek(slot);
@@ -172,7 +259,7 @@ export class MappableControls {
         () => deck().repeat,
         (on) => decks.setRepeat(slot, on)
       ),
-      ...VOICES.map((n) =>
+      ...VOICE_NUMBERS.map((n) =>
         state(
           id(`voice-${n}-mute`),
           `Voice ${n} mute`,
@@ -180,64 +267,91 @@ export class MappableControls {
           (on) => decks.setVoiceMuted(slot, n - 1, on)
         )
       ),
-      ...VOICES.map((n) =>
+      ...VOICE_NUMBERS.map((n) =>
         hold(id(`voice-${n}-hold`), `Voice ${n} kill / punch-in`, (held) =>
           decks.setVoiceHeld(slot, n - 1, held)
         )
       ),
       trigger(id('clear-voice-mutes'), 'Clear voice mutes', () => decks.clearVoiceMutes(slot)),
       value(
-        id('level'),
-        'Level',
-        { ...UNIT_RANGE, home: 1 },
-        FADER_DEFAULTS,
-        () => mix().level,
-        (level) => mixer.setLevel(slot, level)
-      ),
-      value(
-        id('cutoff'),
-        'Cutoff',
-        BIPOLAR_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().cutoff,
-        (position) => mixer.setKnob(slot, 'cutoff', position)
-      ),
-      value(
-        id('resonance'),
-        'Resonance',
-        UNIT_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().resonance,
-        (position) => mixer.setKnob(slot, 'resonance', position)
-      ),
-      value(
-        id('pulse-width'),
-        'Pulse width',
-        BIPOLAR_RANGE,
-        KNOB_DEFAULTS,
-        () => mix().pulseWidth,
-        (position) => mixer.setKnob(slot, 'pulseWidth', position)
-      ),
-      value(
         id('key'),
         'Key',
         KEY_RANGE,
         KEY_DEFAULTS,
-        () => mix().keySemitones,
+        () => panel().keySemitones,
         (semitones) => mixer.setKeySemitones(slot, semitones)
       ),
+      ...VOICE_NUMBERS.flatMap((n) =>
+        VOICE_STRIP_CONTROLS.map((control) => this.voiceStripControl(slot, n, control))
+      ),
+      ...this.deckPanelControls(slot),
     ];
   }
 
-  private crossfader(): MappableControl {
-    return value(
-      { owner: 'mixer', control: 'crossfader' },
-      'Crossfader',
-      BIPOLAR_RANGE,
-      FADER_DEFAULTS,
-      () => this.djStore.crossfader(),
-      (position) => this.mixerService.setCrossfader(position)
-    );
+  /** One control of voice `n`'s strip, commanded through the mixer on voice `n − 1`. */
+  private voiceStripControl(slot: Slot, n: number, control: VoiceStripControl): MappableControl {
+    const mixer = this.mixerService;
+    const panel = this.djStore.deckPanel(slot);
+    const identity: ControlIdentity = { owner: slot, control: voiceControlId(n, control) };
+    const entry = VOICE_STRIP[control];
+    const name = `Voice ${n} ${entry.name}`;
+
+    switch (entry.kind) {
+      case 'knob':
+        return value(
+          identity,
+          name,
+          PANEL_RANGES[entry.knob],
+          entry.defaults,
+          () => panel().voices[n - 1][entry.knob],
+          (offset) => mixer.setVoiceKnob(slot, n - 1, entry.knob, offset)
+        );
+      case 'waveform':
+        return state(
+          identity,
+          name,
+          () => panel().voices[n - 1].waveformLock === entry.waveform,
+          (on) => mixer.setWaveformLocked(slot, n - 1, entry.waveform, on)
+        );
+      case 'switch': {
+        const lock = `${entry.switch}Lock` as const;
+        return state(
+          identity,
+          name,
+          () => panel().voices[n - 1][lock] !== null,
+          (on) => mixer.setSwitchLocked(slot, n - 1, entry.switch, on)
+        );
+      }
+    }
+  }
+
+  /** The filter knobs and modes and the Panic button: the panel controls a deck has once. */
+  private deckPanelControls(slot: Slot): MappableControl[] {
+    const mixer = this.mixerService;
+    const panel = this.djStore.deckPanel(slot);
+    const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
+
+    return [
+      ...FILTER_KNOBS.map(({ id: control, knob, name, defaults }) =>
+        value(
+          id(control),
+          name,
+          PANEL_RANGES[knob],
+          defaults,
+          () => panel()[knob],
+          (offset) => mixer.setFilterKnob(slot, knob, offset)
+        )
+      ),
+      ...FILTER_MODES.map(({ id: control, mode, name }) =>
+        state(
+          id(control),
+          name,
+          () => panel().filterModeLock === mode,
+          (on) => mixer.setFilterModeLocked(slot, mode, on)
+        )
+      ),
+      trigger(id('panic'), 'Panic', () => mixer.panic(slot)),
+    ];
   }
 
   /** A seek command that never queues: while one is in flight only the latest requested value is

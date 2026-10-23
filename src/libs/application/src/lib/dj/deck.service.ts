@@ -4,6 +4,7 @@ import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { DeckSpeed } from './deck-speed';
 import { MixerApplier } from './mixer-applier';
+import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, type DeckDetectedKey, type DeckStatus, type DeckVoiceState } from './dj-store';
 import { DECK_SLOTS, type Slot } from './slot';
@@ -47,8 +48,8 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  * guard cannot see because it has already returned by then.
  *
  * It also fronts the speed and voice commands and reflects the engine's tempo and voice state into
- * the store. Every load and subtune switch returns the deck's tune-shaping controls to home before
- * anything else, so a new tune never inherits the last one's settings.
+ * the store. Every load and subtune switch returns the deck's SID panel, speed, mutes and holds to
+ * home before anything else, so a new tune never inherits the last one's settings.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -61,6 +62,7 @@ export class DeckService {
   private readonly bindings = inject(DeckBindings);
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly mixerApplier = inject(MixerApplier);
+  private readonly panelPainter = inject(SidPanelPainter);
 
   /** This service's own per-slot command counter — distinct from the loader's generation, which
    *  guards only the loader's own awaits. Bumped by `load` and `selectSubtune` on entry; every
@@ -444,11 +446,11 @@ export class DeckService {
     }
   }
 
-  /** Returns the deck's tune-shaping controls to home on both the store and the engine: the
-   *  mixer knobs, key and filter (via the applier), tempo and any open speed excursion, latched
-   *  mutes and holds. Level and the crossfader are re-applied by the applier, not reset. */
+  /** Returns the deck's tune-shaping controls to home on both the store and the engine: the SID
+   *  panel and detected key (via the applier), tempo and any open speed excursion, latched mutes
+   *  and holds. */
   private resetTuneShaping(slot: Slot): void {
-    this.mixerApplier.resetTuneShaping(slot);
+    this.mixerApplier.resetPanel(slot);
     this.deckSpeed.reset(slot);
     this.runtime.clearVoiceMutes(slot);
     for (const voice of VOICES) {
@@ -469,19 +471,21 @@ export class DeckService {
 
   /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` and paused
    *  while the document is hidden — the POC's `animationFrameSignal` bridge rule, generalised per
-   *  slot. Samples only when the polled frame actually moved; every other reason to sample runs
-   *  through the explicit calls each command already makes. */
+   *  slot. Samples and paints the SID panel only when the polled frame actually moved; every other
+   *  reason to sample runs through the explicit calls each command already makes. Reschedules
+   *  first, so a fault in either cannot end the loop. */
   private watchPosition(slot: Slot): void {
     let frameId: number | null = null;
     let lastFrame: number | null = null;
 
     const tick = (): void => {
+      frameId = requestAnimationFrame(tick);
       const position = this.runtime.position(slot);
       if (position !== lastFrame) {
         lastFrame = position;
         this.sample(slot);
+        this.panelPainter.paint(slot);
       }
-      frameId = requestAnimationFrame(tick);
     };
 
     const start = (): void => {

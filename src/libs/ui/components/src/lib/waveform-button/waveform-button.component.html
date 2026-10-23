@@ -1,0 +1,12 @@
+<button
+  type="button"
+  class="waveform-button"
+  [attr.aria-label]="accessibleName()"
+  [attr.aria-pressed]="locked()"
+  [disabled]="disabled()"
+  (click)="press.emit()"
+>
+  <svg viewBox="0 0 16 10" aria-hidden="true">
+    <path [attr.d]="glyphPaths[waveform()]" />
+  </svg>
+</button>

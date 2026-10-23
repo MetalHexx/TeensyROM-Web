@@ -16,8 +16,8 @@ const PORT = 'port-1';
 
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
 const PLAY_B: ControlIdentity = { owner: 'B', control: 'play-pause' };
-const LEVEL_A: ControlIdentity = { owner: 'A', control: 'level' };
-const CUTOFF_A: ControlIdentity = { owner: 'A', control: 'cutoff' };
+const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
+const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
 
 const SAVED_CONTROLLER = { id: LAUNCH_CONTROL, name: NAME, lastPortId: PORT, listening: true };
 
@@ -58,7 +58,7 @@ describe('MidiLearn', () => {
     values.forEach((value) => send('cc', number, value));
 
   const learned = () => h.mappingStore.mappings();
-  const level = () => h.djStore.deckMix('A')().level;
+  const speed = () => h.djStore.deck('A')().speed;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -96,14 +96,14 @@ describe('MidiLearn', () => {
       await start();
       h.learn.select(PLAY_A);
 
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
-      expect(h.mappingStore.learn()?.control).toEqual(LEVEL_A);
+      expect(h.mappingStore.learn()?.control).toEqual(SPEED_A);
     });
 
     it('cancel clears learn and ends a sampling window without binding', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
       sendAll(7, SWEEP);
       expect(h.mappingStore.learn()?.phase).toBe('sampling');
 
@@ -155,7 +155,7 @@ describe('MidiLearn', () => {
 
     it('binds a note on a value control as a step', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
       send('note', 40, 90);
 
@@ -201,7 +201,7 @@ describe('MidiLearn', () => {
   describe('sampling a CC on a value control', () => {
     it('keeps sampling for 1.5 s, then proposes absolute for a sweep', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
       sendAll(7, SWEEP);
       expect(h.mappingStore.learn()).toMatchObject({ phase: 'sampling' });
@@ -214,18 +214,18 @@ describe('MidiLearn', () => {
 
       expect(learned()[0]).toMatchObject({
         source: { kind: 'cc', number: 7 },
-        control: LEVEL_A,
+        control: SPEED_A,
         style: { kind: 'absolute', amount: null },
       });
       expect(h.mappingStore.learn()).toBeNull();
       expect(h.mappingStore.announcement()).toBe(
-        `Level, deck A, bound to ${NAME} · ch 1 · CC 7`
+        `Speed, deck A, bound to ${NAME} · ch 1 · CC 7`
       );
     });
 
     it('proposes relative-offset, at the control sensitivity, for a 64-centred encoder', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
       sendAll(7, OFFSET_TURNS);
       await vi.advanceTimersByTimeAsync(1500);
@@ -235,7 +235,7 @@ describe('MidiLearn', () => {
 
     it('proposes relative-signed for a signed-bit encoder', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
       sendAll(7, SIGNED_TURNS);
       await vi.advanceTimersByTimeAsync(1500);
@@ -245,7 +245,7 @@ describe('MidiLearn', () => {
 
     it('proposes absolute for a sweep even where the control defaults to relative', async () => {
       await start();
-      h.learn.select(CUTOFF_A);
+      h.learn.select(KEY_A);
 
       sendAll(7, SWEEP);
       await vi.advanceTimersByTimeAsync(1500);
@@ -255,20 +255,20 @@ describe('MidiLearn', () => {
 
     it('falls back to the control default when the samples say nothing', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
       send('cc', 7, 100);
       await vi.advanceTimersByTimeAsync(1500);
-      expect(learned()[0].style).toEqual({ kind: 'absolute', amount: null });
+      expect(learned()[0].style).toEqual({ kind: 'relative-offset', amount: 0.01 });
 
-      h.learn.select(CUTOFF_A);
+      h.learn.select(KEY_A);
       send('cc', 8, 100);
       await vi.advanceTimersByTimeAsync(1500);
-      expect(learned()[1].style).toEqual({ kind: 'relative-offset', amount: 0.01 });
+      expect(learned()[1].style).toEqual({ kind: 'relative-offset', amount: 1 / 24 });
     });
 
     it('stops at 24 samples without waiting for the window', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
 
       sendAll(7, Array.from({ length: 24 }, (_, i) => i * 5));
 
@@ -279,7 +279,7 @@ describe('MidiLearn', () => {
 
     it('consumes only the sampled source and lets other messages through', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
       send('cc', 7, 10);
       const message = (number: number, channel = 1): MidiInputMessage => ({
         portId: PORT,
@@ -298,7 +298,7 @@ describe('MidiLearn', () => {
 
     it('does not bind when mapping mode ends during the window', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
       sendAll(7, SWEEP);
 
       await h.controllers.setMappingMode(false);
@@ -310,14 +310,14 @@ describe('MidiLearn', () => {
 
     it('does not let a stale window bind after another control was selected', async () => {
       await start();
-      h.learn.select(LEVEL_A);
+      h.learn.select(SPEED_A);
       sendAll(7, SWEEP);
 
-      h.learn.select(CUTOFF_A);
+      h.learn.select(KEY_A);
       await vi.advanceTimersByTimeAsync(2000);
 
       expect(learned()).toHaveLength(0);
-      expect(h.mappingStore.learn()).toMatchObject({ control: CUTOFF_A, phase: 'waiting' });
+      expect(h.mappingStore.learn()).toMatchObject({ control: KEY_A, phase: 'waiting' });
     });
   });
 
@@ -352,17 +352,17 @@ describe('MidiLearn', () => {
           controllers: [SAVED_CONTROLLER],
           mappings: [
             {
-              id: 'level',
+              id: 'speed',
               source: ccSource(7),
               owner: 'A',
-              control: 'level',
+              control: 'speed',
               style: { kind: 'absolute', amount: null },
             },
             {
-              id: 'cross',
+              id: 'key',
               source: ccSource(8),
-              owner: 'mixer',
-              control: 'crossfader',
+              owner: 'A',
+              control: 'key',
               style: { kind: 'absolute', amount: null },
             },
           ],
@@ -370,21 +370,21 @@ describe('MidiLearn', () => {
         false
       );
 
-      await h.learn.relearn('level');
+      await h.learn.relearn('speed');
       expect(h.mappingStore.mappingMode()).toBe(true);
-      expect(h.mappingStore.learn()).toMatchObject({ control: LEVEL_A, replacing: 'level' });
+      expect(h.mappingStore.learn()).toMatchObject({ control: SPEED_A, replacing: 'speed' });
       sendAll(9, SWEEP);
       await vi.advanceTimersByTimeAsync(1500);
 
       expect(learned().map((mapping) => [mapping.id, mapping.source.number])).toEqual(
         expect.arrayContaining([
-          ['level', 9],
-          ['cross', 8],
+          ['speed', 9],
+          ['key', 8],
         ])
       );
       expect(learned()).toHaveLength(2);
       expect(h.mappingStore.learn()).toBeNull();
-      expect(h.mappingStore.announcement()).toBe(`Level, deck A, bound to ${NAME} · ch 1 · CC 9`);
+      expect(h.mappingStore.announcement()).toBe(`Speed, deck A, bound to ${NAME} · ch 1 · CC 9`);
     });
 
     it('a message from the old source no longer drives the control after a re-learn', async () => {
@@ -392,22 +392,22 @@ describe('MidiLearn', () => {
         controllers: [SAVED_CONTROLLER],
         mappings: [
           {
-            id: 'level',
+            id: 'speed',
             source: ccSource(7),
             owner: 'A',
-            control: 'level',
+            control: 'speed',
             style: { kind: 'absolute', amount: null },
           },
         ],
       });
 
-      await h.learn.relearn('level');
+      await h.learn.relearn('speed');
       sendAll(9, SWEEP);
       await vi.advanceTimersByTimeAsync(1500);
       send('cc', 7, 0);
-      expect(level()).toBe(1);
+      expect(speed()).toBe(1);
       send('cc', 9, 0);
-      expect(level()).toBe(0);
+      expect(speed()).toBe(0.5);
     });
   });
 });

@@ -68,10 +68,9 @@
   // `overflow: hidden`. Tracks the below-desktop padding tightening automatically.
   --vs-col: calc(4rem + 2 * var(--compact-card-padding, var(--spacing-card-padding-compact)));
 
-  // The wireframe's 172px mixer. Definite rather than `auto` because the mixer card derives both
-  // fader travels from this track less its own card padding (`dj-mixer-card.component.ts`), and an
-  // `auto` track would make that circular.
-  --mixer-col: 10.75rem;
+  // The SID panel's 620px column. Definite rather than `auto` so the panel's width budget (each
+  // voice strip's ~76px of content) is fixed by this track rather than by what the strips contain.
+  --mixer-col: 38.75rem;
 
   // Nothing forces the grid wider than the viewport; deeper overflow inside a deck's own lifted
   // panels is that panel's responsibility, not the view's.

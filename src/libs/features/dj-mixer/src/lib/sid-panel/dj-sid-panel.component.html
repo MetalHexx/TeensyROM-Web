@@ -1,0 +1,92 @@
+<lib-scaling-compact-card cardClass="compact-card--fill" animationEntry="from-bottom">
+  <lib-synth-panel class="faceplate">
+    <div class="panel">
+      <div #header class="panel-header">
+        @for (panel of panels(); track panel.deck.index) {
+        <span class="deck-label-cell">
+          <lib-deck-label
+            [label]="'Deck ' + panel.deck.letter"
+            [accentSide]="panel.deck.index === 0 ? 'start' : 'end'"
+          ></lib-deck-label>
+        </span>
+        @if ($first) {
+        <lib-icon-button
+          class="bindings-button"
+          icon="tune"
+          [color]="bindingsOpen() ? 'highlight' : 'normal'"
+          [ariaLabel]="bindingsOpen() ? 'Close bindings panel' : 'Open bindings panel'"
+          [ariaExpanded]="bindingsOpen()"
+          (buttonClick)="bindingsToggle.emit()"
+        ></lib-icon-button>
+        } }
+      </div>
+
+      <span class="divider" aria-hidden="true"></span>
+
+      @for (panel of panels(); track panel.deck.index) {
+      <div
+        class="deck"
+        [class.deck--end]="panel.deck.index > 0"
+        [attr.data-deck]="panel.deck.letter"
+        [style.--deck-column]="panel.deck.index === 0 ? 1 : 3"
+      >
+        <div class="voices">
+          @for (voice of panel.voices; track voice.number) {
+          <lib-sid-voice-strip
+            [attr.data-voice]="voice.number"
+            [model]="voice.model"
+            (knobChange)="onVoiceKnob(panel.deck.slot, voice.number - 1, $event)"
+            (waveformPress)="onWaveform(panel.deck.slot, voice.number - 1, $event)"
+            (switchPress)="onSwitch(panel.deck.slot, voice.number - 1, $event)"
+          ></lib-sid-voice-strip>
+          }
+        </div>
+        <div class="lower">
+          @for (part of panel.lowerOrder; track part) { @if (part === 'filter') {
+          <lib-sid-filter-section
+            class="lower-filter"
+            [model]="panel.filter"
+            (knobChange)="onFilterKnob(panel.deck.slot, $event)"
+            (modePress)="onFilterMode(panel.deck.slot, $event)"
+          ></lib-sid-filter-section>
+          } @else {
+          <lib-panel-section class="lower-key" title="Key">
+            <lib-rotary-knob
+              data-control="key"
+              appearance="panel"
+              size="large"
+              label=""
+              [accessibleName]="panel.key.accessibleName"
+              valueUnit="semitones"
+              [value]="panel.key.value"
+              [min]="keyRange.min"
+              [max]="keyRange.max"
+              [home]="keyRange.home"
+              [step]="keyRange.step"
+              [readout]="panel.key.readout"
+              [disabled]="panel.disabled"
+              (valueChange)="onKey(panel.deck.slot, $event)"
+            ></lib-rotary-knob>
+          </lib-panel-section>
+          } }
+        </div>
+        <lib-panic-button
+          class="panic"
+          data-control="panic"
+          [accessibleName]="panel.panicName"
+          (press)="onPanic(panel.deck.slot)"
+        ></lib-panic-button>
+      </div>
+      @if ($first) {
+      <lib-segmented-control
+        class="key-notation"
+        accessibleName="Key notation"
+        size="small"
+        [options]="keyFormatOptions"
+        [selectedId]="keyDisplayFormat()"
+        (optionSelect)="onKeyFormat($event)"
+      ></lib-segmented-control>
+      } }
+    </div>
+  </lib-synth-panel>
+</lib-scaling-compact-card>

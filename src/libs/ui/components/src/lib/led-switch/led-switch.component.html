@@ -1,0 +1,11 @@
+<button
+  type="button"
+  class="led-switch"
+  [attr.aria-label]="accessibleName()"
+  [attr.aria-pressed]="locked()"
+  [disabled]="disabled()"
+  (click)="press.emit()"
+>
+  <span class="dot" aria-hidden="true"></span>
+  <span class="text">{{ label() }}</span>
+</button>

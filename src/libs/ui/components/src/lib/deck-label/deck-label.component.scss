@@ -1,0 +1,26 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--synth-label);
+}
+
+:host([data-accent-side='end']) {
+  flex-direction: row-reverse;
+}
+
+.accent {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-primary-bright);
+  box-shadow: 0 0 6px rgba(var(--color-primary-bright-rgb), 0.8);
+}
+
+.text {
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

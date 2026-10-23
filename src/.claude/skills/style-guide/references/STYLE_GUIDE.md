@@ -45,6 +45,19 @@ Available color variables for semantic styling:
 
 **Best Practice:** Use these semantic color classes instead of hardcoded colors for consistency and proper theme support.
 
+#### Synth panel tokens
+
+Defined in both theme blocks of `styles.scss` for the SID synth panel and its parts (rotary knob `appearance="panel"`, panel buttons, LEDs). Use these rather than hardcoding panel colors.
+
+- `--color-highlight-rgb`, `--color-primary-bright-rgb`: RGB triplets of the cyan and magenta accents, for `rgba(var(--color-highlight-rgb), 0.12)` glows and tracks
+- `--synth-face`, `--synth-face-border`: panel body surface and its border
+- `--synth-section-border`: hairline between panel sections
+- `--synth-legend`, `--synth-label`: muted caption text and brighter label text
+- `--synth-control-face-top`, `--synth-control-face-bottom`, `--synth-control-border`, `--synth-control-text`, `--synth-control-text-off`: button/control gradient face, border and text (on / off)
+- `--synth-led-off`: unlit LED
+- `--synth-knob-skirt`, `--synth-knob-skirt-border`, `--synth-knob-cap`, `--synth-knob-track`, `--synth-pointer`: parts of the panel rotary knob
+- `--synth-panic-face-top`, `--synth-panic-face-bottom`, `--synth-panic-text`: the panic button's magenta-tinted face and text
+
 ---
 
 ## Design Tokens

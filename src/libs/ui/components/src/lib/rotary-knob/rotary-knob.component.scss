@@ -25,6 +25,29 @@
   --scale-knob-font: var(--font-size-md);
 }
 
+// The SID panel's dial. Typography is pinned from the mockup so a 36px knob's caption fits a
+// narrow voice strip.
+:host([data-appearance='panel']) {
+  --scale-knob-label-gap: 1px;
+
+  svg {
+    overflow: visible;
+  }
+
+  .scale-knob-label {
+    color: var(--synth-legend);
+    font-size: 0.53rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+
+  .scale-knob-readout {
+    font-size: 0.69rem;
+    font-weight: 500;
+  }
+}
+
 .scale-knob {
   display: flex;
   flex-direction: column;
@@ -86,6 +109,63 @@ svg {
 
 .hub {
   fill: var(--color-primary-bright);
+}
+
+.live-track,
+.live-ring,
+.inner-track,
+.offset-arc {
+  fill: none;
+}
+
+.live-track {
+  stroke: rgba(var(--color-highlight-rgb), 0.12);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+// `pathLength="100"` makes the dash offset a percentage; `setLiveLevel` writes it inline.
+.live-ring {
+  stroke: var(--color-highlight);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 3px rgba(var(--color-highlight-rgb), 0.85));
+}
+
+.inner-track {
+  stroke: var(--synth-knob-track);
+  stroke-width: 4;
+}
+
+.offset-arc {
+  stroke: var(--color-primary-bright);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.knob-skirt {
+  fill: var(--synth-knob-skirt);
+  stroke: var(--synth-knob-skirt-border);
+  stroke-width: 1.5;
+}
+
+.knob-cap {
+  fill: var(--synth-knob-cap);
+  stroke: rgba(var(--glassy-color), 0.1);
+}
+
+.panel-home-tick {
+  stroke: var(--color-primary-bright);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.panel-pointer {
+  stroke: var(--synth-pointer);
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 
 // Dims the dial and its caption together; the invisible range input beneath carries the cursor.

@@ -1,16 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import type { TuneReference } from '@sidablist/tunes';
 import { StorageType } from '@teensyrom-nx/domain';
+import { logInfo } from '@teensyrom-nx/utils';
 import {
   DjStore,
   DeckBindingState,
   DeckDetectedKey,
-  DeckMixState,
   DeckStatus,
+  HOME_DECK_PANEL,
+  HOME_VOICE_STRIP,
   MidiState,
 } from './dj-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
+
+vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
+  return { ...actual, logInfo: vi.fn(actual.logInfo) };
+});
 
 function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
   return {
@@ -70,19 +77,10 @@ describe('DjStore', () => {
       }
     });
 
-    it('starts both mix slots at home, the crossfader centred and the key format Camelot', () => {
-      const home: DeckMixState = {
-        level: 1,
-        cutoff: 0,
-        resonance: 0,
-        pulseWidth: 0,
-        keySemitones: 0,
-        filterMode: null,
-      };
-
-      expect(store.mix().A).toEqual(home);
-      expect(store.mix().B).toEqual(home);
-      expect(store.crossfader()).toBe(0);
+    it('starts both panels at home and the key format Camelot', () => {
+      expect(store.panel().A).toEqual(HOME_DECK_PANEL);
+      expect(store.panel().B).toEqual(HOME_DECK_PANEL);
+      expect(HOME_DECK_PANEL.voices).toEqual([HOME_VOICE_STRIP, HOME_VOICE_STRIP, HOME_VOICE_STRIP]);
       expect(store.keyDisplayFormat()).toBe('camelot');
     });
   });
@@ -199,42 +197,50 @@ describe('DjStore', () => {
       expect(store.seen()).toEqual({ [keyA]: refA, [keyB]: refB });
     });
 
-    it('setDeckMix merges the patch into one slot and leaves the other fields and slot alone', () => {
-      store.setDeckMix({ slot: 'A', patch: { level: 0.4, filterMode: 'bandPass' } });
-
-      expect(store.mix().A).toEqual({
-        level: 0.4,
-        cutoff: 0,
-        resonance: 0,
-        pulseWidth: 0,
-        keySemitones: 0,
-        filterMode: 'bandPass',
+    it('setVoiceStrip merges the patch into one voice and leaves the other voices, fields and slot alone', () => {
+      store.setVoiceStrip({
+        slot: 'A',
+        voice: 1,
+        patch: { coarse: 7, fine: 12.5, waveformLock: 'pulse', ringLock: false },
       });
-      expect(store.mix().B.level).toBe(1);
-      expect(store.mix().B.filterMode).toBeNull();
+
+      const panel = store.panel().A;
+      expect(panel.voices[1]).toEqual({
+        ...HOME_VOICE_STRIP,
+        coarse: 7,
+        fine: 12.5,
+        waveformLock: 'pulse',
+        ringLock: false,
+      });
+      expect(panel.voices[0]).toEqual(HOME_VOICE_STRIP);
+      expect(panel.voices[2]).toEqual(HOME_VOICE_STRIP);
+      expect(panel.cutoff).toBe(0);
+      expect(store.panel().B).toEqual(HOME_DECK_PANEL);
     });
 
-    it('setDeckMix stores positions at full resolution, without rounding', () => {
-      store.setDeckMix({ slot: 'A', patch: { cutoff: 0.123456789, level: 0.987654321 } });
+    it('setVoiceStrip changes nothing for a voice that is not 0…2', () => {
+      store.setVoiceStrip({ slot: 'A', voice: 3, patch: { coarse: 7 } });
+      store.setVoiceStrip({ slot: 'A', voice: -1, patch: { coarse: 7 } });
 
-      expect(store.mix().A.cutoff).toBe(0.123456789);
-      expect(store.mix().A.level).toBe(0.987654321);
+      expect(store.panel().A).toEqual(HOME_DECK_PANEL);
     });
 
-    it('setDeckMix rounds keySemitones to a whole semitone and bounds it to ±12', () => {
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3.6 } });
-      expect(store.mix().A.keySemitones).toBe(4);
+    it('setDeckPanel merges the patch and leaves the voice strips and the other slot alone', () => {
+      store.setVoiceStrip({ slot: 'A', voice: 0, patch: { attack: 4 } });
 
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: 40 } });
-      expect(store.mix().A.keySemitones).toBe(12);
+      store.setDeckPanel({
+        slot: 'A',
+        patch: { cutoff: -300, filterModeLock: 'band-pass', keySemitones: 5 },
+      });
 
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: -40 } });
-      expect(store.mix().A.keySemitones).toBe(-12);
-    });
-
-    it('setCrossfader sets the position at full resolution', () => {
-      store.setCrossfader({ position: -0.3141592 });
-      expect(store.crossfader()).toBe(-0.3141592);
+      expect(store.panel().A).toMatchObject({
+        cutoff: -300,
+        resonance: 0,
+        filterModeLock: 'band-pass',
+        keySemitones: 5,
+      });
+      expect(store.panel().A.voices[0].attack).toBe(4);
+      expect(store.panel().B).toEqual(HOME_DECK_PANEL);
     });
 
     it('setKeyDisplayFormat sets the format', () => {
@@ -242,40 +248,43 @@ describe('DjStore', () => {
       expect(store.keyDisplayFormat()).toBe('note');
     });
 
-    it('resetDeckTuneShaping homes shaping and the detected key, keeping level, crossfader and key format', () => {
-      store.setDeckMix({
-        slot: 'A',
-        patch: {
-          level: 0.5,
-          cutoff: 0.6,
-          resonance: -0.2,
-          pulseWidth: 0.9,
-          keySemitones: 5,
-          filterMode: 'highPass',
-        },
-      });
-      store.setDeckMix({ slot: 'B', patch: { cutoff: 0.3 } });
+    it('resetDeckPanel on a panic homes the whole panel and leaves the detected key and the rest alone', () => {
+      store.setVoiceStrip({ slot: 'A', voice: 2, patch: { coarse: 9, syncLock: true } });
+      store.setDeckPanel({ slot: 'A', patch: { cutoff: 600, keySemitones: 5 } });
+      store.setDeckPanel({ slot: 'B', patch: { cutoff: 300 } });
       store.setDeckDetectedKey({
         slot: 'A',
         detectedKey: { tonic: 1, mode: 'minor', camelot: '8A' },
       });
-      store.setCrossfader({ position: 0.7 });
+      store.setDeckEngineControls({ slot: 'A', speed: 1.2, voices: store.decks().A.voices });
       store.setKeyDisplayFormat({ format: 'note' });
+      vi.mocked(logInfo).mockClear();
 
-      store.resetDeckTuneShaping({ slot: 'A' });
+      store.resetDeckPanel({ slot: 'A', reason: 'panic' });
 
-      expect(store.mix().A).toEqual({
-        level: 0.5,
-        cutoff: 0,
-        resonance: 0,
-        pulseWidth: 0,
-        keySemitones: 0,
-        filterMode: null,
-      });
-      expect(store.decks().A.detectedKey).toBeNull();
-      expect(store.crossfader()).toBe(0.7);
+      expect(store.panel().A).toEqual(HOME_DECK_PANEL);
+      expect(store.panel().B.cutoff).toBe(300);
+      expect(store.decks().A.detectedKey).not.toBeNull();
+      expect(store.decks().A.speed).toBe(1.2);
       expect(store.keyDisplayFormat()).toBe('note');
-      expect(store.mix().B.cutoff).toBe(0.3);
+      expect(logInfo).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck A panel reset (panic)');
+    });
+
+    it('resetDeckPanel on a tune change also clears the detected key', () => {
+      store.setDeckPanel({ slot: 'B', patch: { keySemitones: -3 } });
+      store.setDeckDetectedKey({
+        slot: 'B',
+        detectedKey: { tonic: 1, mode: 'minor', camelot: '8A' },
+      });
+      vi.mocked(logInfo).mockClear();
+
+      store.resetDeckPanel({ slot: 'B', reason: 'tune-change' });
+
+      expect(store.panel().B).toEqual(HOME_DECK_PANEL);
+      expect(store.decks().B.detectedKey).toBeNull();
+      expect(logInfo).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck B panel reset (tune change)');
     });
 
     it('setDeckEngineControls sets speed and voices only, leaving the other slot untouched', () => {
@@ -316,15 +325,15 @@ describe('DjStore', () => {
     });
   });
 
-  describe('deckMix', () => {
+  describe('deckPanel', () => {
     beforeEach(() => setup());
 
-    it('reads the slot mix state', () => {
-      const mix = store.deckMix('B');
-      expect(mix().cutoff).toBe(0);
+    it('reads the slot panel', () => {
+      const panel = store.deckPanel('B');
+      expect(panel().cutoff).toBe(0);
 
-      store.setDeckMix({ slot: 'B', patch: { cutoff: -0.5 } });
-      expect(mix().cutoff).toBe(-0.5);
+      store.setDeckPanel({ slot: 'B', patch: { cutoff: -500 } });
+      expect(panel().cutoff).toBe(-500);
     });
   });
 
@@ -396,7 +405,7 @@ describe('DjStore', () => {
 
     it('shifts the detected key by keySemitones in both formats', () => {
       store.setDeckDetectedKey({ slot: 'A', detectedKey: cSharpMinor });
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3 } });
+      store.setDeckPanel({ slot: 'A', patch: { keySemitones: 3 } });
 
       expect(store.keyReadout('A')()).toBe('9A');
       store.setKeyDisplayFormat({ format: 'note' });
@@ -409,7 +418,7 @@ describe('DjStore', () => {
         detectedKey: { tonic: 11, mode: 'major', camelot: '1B' },
       });
       store.setKeyDisplayFormat({ format: 'note' });
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: 1 } });
+      store.setDeckPanel({ slot: 'A', patch: { keySemitones: 1 } });
 
       expect(store.keyReadout('A')()).toBe('C');
     });
@@ -417,10 +426,10 @@ describe('DjStore', () => {
     it('falls back to the signed offset with no detected key, using U+2212 for negatives', () => {
       expect(store.keyReadout('A')()).toBe('0');
 
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: 3 } });
+      store.setDeckPanel({ slot: 'A', patch: { keySemitones: 3 } });
       expect(store.keyReadout('A')()).toBe('+3');
 
-      store.setDeckMix({ slot: 'A', patch: { keySemitones: -5 } });
+      store.setDeckPanel({ slot: 'A', patch: { keySemitones: -5 } });
       expect(store.keyReadout('A')()).toBe('−5');
     });
   });

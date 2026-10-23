@@ -19,17 +19,17 @@ const controller = (overrides: Partial<KnownControllerRecord> = {}): KnownContro
   ...overrides,
 });
 
-const levelMapping = (controllerId = LAUNCH_CONTROL, number = 7) => ({
-  id: `level-${controllerId}-${number}`,
+const speedMapping = (controllerId = LAUNCH_CONTROL, number = 7) => ({
+  id: `speed-${controllerId}-${number}`,
   source: ccSource(number, 1, controllerId),
   owner: 'A' as const,
-  control: 'level',
+  control: 'speed',
   style: { kind: 'absolute' as const, amount: null },
 });
 
 const settings = (
   controllers: KnownControllerRecord[],
-  mappings: MidiSettingsRecord['mappings'] = controllers.map((known) => levelMapping(known.id))
+  mappings: MidiSettingsRecord['mappings'] = controllers.map((known) => speedMapping(known.id))
 ): MidiSettingsRecord => ({ controllers, mappings, deckBindings: [] });
 
 const MISSING_ALERT = `MIDI controller "${NAME}" is not connected. Its mappings are kept and work again when it returns.`;
@@ -88,7 +88,7 @@ describe('MidiControllers', () => {
             controller({ id: 'off', name: 'Off pad', lastPortId: 'port-2', listening: false }),
             controller({ id: 'idle', name: 'Idle pad', lastPortId: 'port-3' }),
           ],
-          [levelMapping(LAUNCH_CONTROL), levelMapping('off', 7)]
+          [speedMapping(LAUNCH_CONTROL), speedMapping('off', 7)]
         ),
         [
           ['port-1', NAME],
@@ -162,7 +162,7 @@ describe('MidiControllers', () => {
     it('removes the controllers without mappings on leaving mapping mode, and saves', async () => {
       await start(
         settings([controller(), controller({ id: 'stray', name: 'Stray', lastPortId: 'port-2' })], [
-          levelMapping(),
+          speedMapping(),
         ]),
         [
           ['port-1', NAME],
@@ -267,7 +267,7 @@ describe('MidiControllers', () => {
       await start(
         settings(
           [controller({ listening: false }), controller({ id: 'idle', name: 'Idle pad' })],
-          [levelMapping(LAUNCH_CONTROL)]
+          [speedMapping(LAUNCH_CONTROL)]
         )
       );
 

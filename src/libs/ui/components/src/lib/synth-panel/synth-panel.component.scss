@@ -1,0 +1,52 @@
+:host {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  padding: var(--spacing-xl);
+  background:
+    linear-gradient(180deg, rgba(var(--glassy-color), 0.05), transparent 30%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--glassy-color), 0.014) 0,
+      rgba(var(--glassy-color), 0.014) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    var(--synth-face);
+  border: 1px solid var(--synth-face-border);
+  border-radius: var(--border-radius-md);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--glassy-color), 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.screw {
+  position: absolute;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--synth-knob-cap), var(--synth-knob-skirt));
+  border: 1px solid var(--synth-knob-skirt-border);
+  box-shadow: inset 0 1px 0 rgba(var(--glassy-color), 0.12);
+
+  &--top-start {
+    top: var(--spacing-sm);
+    inset-inline-start: var(--spacing-sm);
+  }
+
+  &--top-end {
+    top: var(--spacing-sm);
+    inset-inline-end: var(--spacing-sm);
+  }
+
+  &--bottom-start {
+    bottom: var(--spacing-sm);
+    inset-inline-start: var(--spacing-sm);
+  }
+
+  &--bottom-end {
+    bottom: var(--spacing-sm);
+    inset-inline-end: var(--spacing-sm);
+  }
+}

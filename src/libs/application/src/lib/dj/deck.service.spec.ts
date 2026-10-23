@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { FakeClock, frames, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
@@ -18,10 +18,9 @@ import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
+import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
-import { DjStore } from './dj-store';
-import { linearCrossfaderGain } from './mixer/crossfader-curve';
-import { keyCoefficientFor, scaleCoefficientFor } from './mixer/scale-taper';
+import { DjStore, HOME_DECK_PANEL } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
@@ -806,13 +805,15 @@ describe('DeckService', () => {
       });
     }
 
-    /** Pushes every tune-shaping control, speed and voice state of `slot` off home. */
+    /** Pushes every panel control, speed and voice state of `slot` off home. */
     function shapeAway(slot: 'A' | 'B'): void {
-      mixer.setKnob(slot, 'cutoff', 0.6);
-      mixer.setKnob(slot, 'resonance', 0.4);
-      mixer.setKnob(slot, 'pulseWidth', 0.8);
+      mixer.setFilterKnob(slot, 'cutoff', 600);
+      mixer.setFilterKnob(slot, 'resonance', 4);
+      mixer.setVoiceKnob(slot, 0, 'pulseWidth', 800);
+      mixer.setVoiceKnob(slot, 1, 'coarse', 7);
+      mixer.pressWaveform(slot, 2, 'pulse');
       mixer.setKeySemitones(slot, 3);
-      mixer.setFilterMode(slot, 'lowPass');
+      mixer.pressFilterMode(slot, 'low-pass');
       service.setSpeed(slot, 1.3);
       service.setVoiceMuted(slot, 1, true);
       service.setVoiceHeld(slot, 2, true);
@@ -824,9 +825,7 @@ describe('DeckService', () => {
       expect(deck.voices).toEqual(HOME_VOICES);
       expect(runtime.snapshot(slot).tempo.multiplier).toBe(1);
       expect(runtime.snapshot(slot).voices).toEqual(HOME_VOICES);
-      expect(store.deckMix(slot)()).toEqual(
-        expect.objectContaining({ cutoff: 0, resonance: 0, pulseWidth: 0, keySemitones: 0, filterMode: null })
-      );
+      expect(store.deckPanel(slot)()).toEqual(HOME_DECK_PANEL);
     }
 
     beforeEach(() => {
@@ -1117,32 +1116,17 @@ describe('DeckService', () => {
     });
 
     describe('new-tune reset', () => {
-      it('a drop returns speed, voices, knobs, key and filter to home on store and engine, keeping level and crossfader', async () => {
+      it('a drop returns speed, voices, the panel and the detected key to home on store and engine', async () => {
         resolveKeyed();
         await loadAndWait('A', register(makeFixture()));
-        mixer.setLevel('A', 0.6);
-        mixer.setCrossfader(0.3);
         shapeAway('A');
-        const heldBefore = vi.spyOn(runtime, 'holdField');
-        // The deck is playing, so the sweep's switches wait behind a volume dip for the engine to
-        // build a frame; a position that moves every millisecond lets the dip finish.
-        const position = vi.spyOn(runtime, 'position').mockImplementation(() => frames(Date.now()));
         TestBed.inject(MixerApplier).applyDeck('A');
-        await vi.waitFor(() =>
-          expect(heldBefore.mock.calls.map(([, field]) => field.name)).toEqual(
-            expect.arrayContaining(['cutoff', 'filtered', 'resonance'])
-          )
-        );
-        position.mockRestore();
-        heldBefore.mockRestore();
         expect(store.deck('A')().speed).toBe(1.3);
         expect(store.deck('A')().voices[1].muted).toBe(true);
         expect(store.deck('A')().detectedKey).not.toBeNull();
 
-        const scaleSpy = vi.spyOn(runtime, 'setRegisterScale');
-        const keySpy = vi.spyOn(runtime, 'setKeyCoefficient');
-        const filterSpy = vi.spyOn(runtime, 'setFilterMode');
-        const gainSpy = vi.spyOn(runtime, 'setOutputGain');
+        const pitchSpy = vi.spyOn(runtime, 'setVoicePitch');
+        const offsetSpy = vi.spyOn(runtime, 'setFieldOffset');
         const releaseSpy = vi.spyOn(runtime, 'releaseField');
         const holdSpy = vi.spyOn(runtime, 'holdField');
         const playSpy = vi.spyOn(runtime, 'play');
@@ -1152,33 +1136,23 @@ describe('DeckService', () => {
 
         expectHome('A');
         expect(store.deck('A')().detectedKey).toBeNull();
+        for (const voice of [0, 1, 2]) {
+          expect(pitchSpy).toHaveBeenCalledWith('A', voice, 1);
+        }
+        expect(offsetSpy).toHaveBeenCalledWith('A', { name: 'cutoff' }, 0);
+        expect(offsetSpy).toHaveBeenCalledWith('A', { name: 'pulseWidth', voice: 0 }, 0);
         const released = releaseSpy.mock.calls.filter(([slot]) => slot === 'A').map(([, field]) => field);
         expect(released).toEqual(
-          expect.arrayContaining([
-            { name: 'cutoff' },
-            { name: 'filtered', voice: 0 },
-            { name: 'filtered', voice: 1 },
-            { name: 'filtered', voice: 2 },
-            { name: 'resonance' },
-          ])
+          expect.arrayContaining([{ name: 'waveform', voice: 2 }, { name: 'filterType' }])
         );
         expect(releaseSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
         expect(holdSpy).not.toHaveBeenCalled();
-        expect(scaleSpy.mock.calls.every(([, group]) => group === 'pulseWidth')).toBe(true);
-        expect(scaleSpy).toHaveBeenCalledWith('A', 'pulseWidth', scaleCoefficientFor(0));
-        expect(keySpy).toHaveBeenCalledWith('A', keyCoefficientFor(0));
-        expect(filterSpy).toHaveBeenCalledWith('A', null);
-        expect(filterSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
         expect(Math.max(...releaseSpy.mock.invocationCallOrder)).toBeLessThan(playSpy.mock.invocationCallOrder[0]);
-        expect(store.deckMix('A')().level).toBe(0.6);
-        expect(store.crossfader()).toBe(0.3);
-        expect(gainSpy).toHaveBeenLastCalledWith('A', 0.6 * linearCrossfaderGain(0.3, 'a'));
       });
 
       it('a subtune switch returns the same controls to home', async () => {
         resolveKeyed();
         await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
-        mixer.setLevel('A', 0.6);
         shapeAway('A');
         service.jumpSpeed('A', 'up');
 
@@ -1186,7 +1160,6 @@ describe('DeckService', () => {
 
         expectHome('A');
         expect(store.deck('A')().subtune).toBe(2);
-        expect(store.deckMix('A')().level).toBe(0.6);
 
         // The excursion the jump opened is gone with the reset: a fresh Home press is a plain 1.0x.
         service.setSpeed('A', 1.2);
@@ -1203,7 +1176,7 @@ describe('DeckService', () => {
         const tempoSpy = vi.spyOn(runtime, 'setTempo');
         const clearSpy = vi.spyOn(runtime, 'clearVoiceMutes');
         const heldSpy = vi.spyOn(runtime, 'setVoiceHeld');
-        const scaleSpy = vi.spyOn(runtime, 'setRegisterScale');
+        const pitchSpy = vi.spyOn(runtime, 'setVoicePitch');
         const loadSpy = vi.spyOn(runtime, 'load');
         const playSpy = vi.spyOn(runtime, 'play');
         resolveMock.mockClear();
@@ -1213,23 +1186,21 @@ describe('DeckService', () => {
         const first = (spy: { mock: { invocationCallOrder: number[] } }): number => spy.mock.invocationCallOrder[0];
         const resolveOrder = resolveMock.mock.invocationCallOrder[0];
         expect(first(stopSpy)).toBeLessThan(first(tempoSpy));
-        for (const reset of [tempoSpy, clearSpy, heldSpy, scaleSpy]) {
+        for (const reset of [tempoSpy, clearSpy, heldSpy, pitchSpy]) {
           expect(first(reset)).toBeLessThan(resolveOrder);
         }
         expect(resolveOrder).toBeLessThan(first(loadSpy));
         expect(first(loadSpy)).toBeLessThan(first(playSpy));
       });
 
-      it('a failed load still ends at home, with level kept', async () => {
+      it('a failed load still ends at home', async () => {
         await loadAndWait('A', register(makeFixture()));
-        mixer.setLevel('A', 0.6);
         shapeAway('A');
 
         await service.load('A', register(makeFixture({ invalidBytes: true })).source);
 
         expect(store.deck('A')().status).toBe('failed');
         expectHome('A');
-        expect(store.deckMix('A')().level).toBe(0.6);
       });
 
       it('a superseded load never resets the newer one once it has started', async () => {
@@ -1246,7 +1217,7 @@ describe('DeckService', () => {
           }
           return realPlay(slot);
         });
-        const resetSpy = vi.spyOn(TestBed.inject(MixerApplier), 'resetTuneShaping');
+        const resetSpy = vi.spyOn(TestBed.inject(MixerApplier), 'resetPanel');
 
         const first = service.load('A', fixtureA.source);
         await vi.waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
@@ -1268,10 +1239,9 @@ describe('DeckService', () => {
       it('leaves the other deck untouched', async () => {
         await loadAndWait('A', register(makeFixture()));
         await loadAndWait('B', register(makeFixture()));
-        mixer.setLevel('B', 0.4);
         shapeAway('B');
         const bDeck = store.deck('B')();
-        const bMix = store.deckMix('B')();
+        const bPanel = store.deckPanel('B')();
         const tempoSpy = vi.spyOn(runtime, 'setTempo');
 
         await loadAndWait('A', register(makeFixture()));
@@ -1279,9 +1249,162 @@ describe('DeckService', () => {
 
         expect(store.deck('B')().speed).toBe(bDeck.speed);
         expect(store.deck('B')().voices).toEqual(bDeck.voices);
-        expect(store.deckMix('B')()).toEqual(bMix);
+        expect(store.deckPanel('B')()).toEqual(bPanel);
         expect(runtime.snapshot('B').tempo.multiplier).toBe(1.3);
         expect(tempoSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      });
+    });
+  });
+
+  describe('animation-frame loop', () => {
+    let pending: Map<number, FrameRequestCallback>;
+    let nextFrameId: number;
+    let paintSpy: MockInstance<SidPanelPainter['paint']>;
+    let positionSpy: MockInstance<DeckRuntime['position']>;
+    let hidden = false;
+
+    /** Paints for the A deck only: B's idle still-paint also runs through the frame queue. */
+    function paintsOfA(): number {
+      return paintSpy.mock.calls.filter(([slot]) => slot === 'A').length;
+    }
+
+    function setPosition(position: number): void {
+      positionSpy.mockReturnValue(frames(position));
+    }
+
+    /** Runs the callbacks that are due now; any a callback schedules wait for the next call. */
+    function runFrame(): void {
+      const due = [...pending.values()];
+      pending.clear();
+      for (const callback of due) {
+        callback(0);
+      }
+    }
+
+    function setHidden(value: boolean): void {
+      hidden = value;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    beforeEach(async () => {
+      pending = new Map();
+      nextFrameId = 1;
+      hidden = false;
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
+        pending.set(nextFrameId, callback);
+        return nextFrameId++;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number): void => {
+        pending.delete(id);
+      });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+
+      paintSpy = vi.spyOn(TestBed.inject(SidPanelPainter), 'paint');
+      positionSpy = vi.spyOn(runtime, 'position');
+      await loadAndWait('A', register(makeFixture()));
+      TestBed.flushEffects();
+      paintSpy.mockClear();
+      setPosition(5);
+    });
+
+    afterEach(() => {
+      delete (document as { hidden?: boolean }).hidden;
+    });
+
+    it('paints only when the position moved, and always reschedules', () => {
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+
+      setPosition(6);
+      runFrame();
+      expect(paintsOfA()).toBe(2);
+    });
+
+    it('does not paint while paused', async () => {
+      await service.togglePlayPause('A');
+      TestBed.flushEffects();
+      expect(store.deck('A')().status).toBe('paused');
+      // The painter's own one-shot paint for the status change runs here; the loop's must not.
+      runFrame();
+      paintSpy.mockClear();
+
+      setPosition(9);
+      runFrame();
+
+      expect(paintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+    });
+
+    it('does not paint while the document is hidden, and resumes when it is shown', () => {
+      setHidden(true);
+      setPosition(9);
+      runFrame();
+      expect(paintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+
+      setHidden(false);
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+    });
+
+    describe('a fault while painting', () => {
+      function attachNoopTargets(): void {
+        const level = { setLiveLevel: vi.fn() };
+        const light = { setLiveLight: vi.fn() };
+        const strip = {
+          waveforms: [light, light, light, light],
+          coarse: level,
+          fine: level,
+          pulseWidth: level,
+          attack: level,
+          decay: level,
+          sustain: level,
+          release: level,
+          ring: light,
+          sync: light,
+          filter: light,
+        };
+        TestBed.inject(SidPanelPainter).attach('A', {
+          voices: [strip, strip, strip],
+          cutoff: level,
+          resonance: level,
+          filterModes: [light, light, light],
+        });
+      }
+
+      it('a failing register read keeps the loop running and warns once', () => {
+        vi.spyOn(runtime, 'readRegisters').mockImplementation(() => {
+          throw new Error('DeckRuntime: slot A has not been built');
+        });
+        paintSpy.mockRestore();
+        vi.mocked(logWarn).mockClear();
+        attachNoopTargets();
+
+        for (const position of [5, 6, 7]) {
+          setPosition(position);
+          runFrame();
+          expect(pending.size).toBe(1);
+        }
+
+        const warnings = vi.mocked(logWarn).mock.calls.filter(([message]) => message.startsWith('SidPanelPainter'));
+        expect(warnings).toHaveLength(1);
+      });
+
+      it('a paint that throws still leaves the next frame scheduled', () => {
+        paintSpy.mockImplementation((slot) => {
+          if (slot === 'A') {
+            throw new Error('boom');
+          }
+        });
+
+        expect(() => runFrame()).toThrow('boom');
+
+        expect(pending.size).toBe(1);
       });
     });
   });

@@ -34,7 +34,7 @@ import {
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
-import { DjMixerCardComponent } from '../mixer-card/dj-mixer-card.component';
+import { DjSidPanelComponent } from '../sid-panel/dj-sid-panel.component';
 import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
 import { buildOverlayTargets } from '../mapping/mapping-overlay-targets';
 import {
@@ -52,7 +52,7 @@ import type { DeckRef } from '../deck-ref';
     EmptyStateMessageComponent,
     ScalingCompactCardComponent,
     DjDeckColumnComponent,
-    DjMixerCardComponent,
+    DjSidPanelComponent,
     DjBrowseTreesComponent,
     DjDirectoryListingComponent,
     DjBindingsPanelComponent,
@@ -73,7 +73,7 @@ export class DjMixerViewComponent {
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
 
-  private readonly mixerCard = viewChild(DjMixerCardComponent);
+  private readonly sidPanel = viewChild(DjSidPanelComponent);
   private readonly bindingsPanel = viewChild(DjBindingsPanelComponent);
   private readonly panelSlot = viewChild<unknown, ElementRef<HTMLElement>>('panelSlot', {
     read: ElementRef,
@@ -88,7 +88,6 @@ export class DjMixerViewComponent {
     letter: slot,
     index,
   }));
-  readonly showCrossfader = computed(() => this.decks.length >= 2);
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);
@@ -219,7 +218,7 @@ export class DjMixerViewComponent {
     this.panelOpen.set(false);
     void this.midiControllers.setMappingMode(false);
     if (focusWasInPanel) {
-      this.mixerCard()?.focusBindingsButton();
+      this.sidPanel()?.focusBindingsButton();
     }
   }
 

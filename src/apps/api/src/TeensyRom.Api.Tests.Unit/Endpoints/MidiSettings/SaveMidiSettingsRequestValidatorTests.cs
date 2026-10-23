@@ -237,7 +237,7 @@ public class SaveMidiSettingsRequestValidatorTests
     public void Validate_TwoMappingsSharingASource_AreRejected()
     {
         var request = ValidRequest();
-        request.Mappings = [Mapping("m1", control: "speed"), Mapping("m2", control: "level", styleKind: "absolute", amount: null)];
+        request.Mappings = [Mapping("m1", control: "speed"), Mapping("m2", control: "voice-1-coarse", styleKind: "absolute", amount: null)];
 
         AssertRejectedAt(request, "Mappings[1].Source");
     }
@@ -321,7 +321,13 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("A", "play-pause")]
     [InlineData("B", "clear-voice-mutes")]
     [InlineData("B", "key")]
-    [InlineData("mixer", "crossfader")]
+    [InlineData("A", "voice-2-coarse")]
+    [InlineData("B", "voice-3-wave-pulse")]
+    [InlineData("A", "voice-1-filter")]
+    [InlineData("B", "filter-low-pass")]
+    [InlineData("A", "filter-cutoff")]
+    [InlineData("A", "panic")]
+    [InlineData("B", "panic")]
     public void Validate_ControlOnTheOwnersAllowList_Passes(string owner, string control)
     {
         var request = ValidRequest();
@@ -336,7 +342,14 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("A", "crossfader")]
     [InlineData("B", "volume")]
     [InlineData("A", "Speed")]
+    [InlineData("A", "level")]
+    [InlineData("B", "cutoff")]
+    [InlineData("A", "resonance")]
+    [InlineData("B", "pulse-width")]
+    [InlineData("A", "voice-4-coarse")]
+    [InlineData("A", "voice-1-level")]
     [InlineData("mixer", "speed")]
+    [InlineData("mixer", "crossfader")]
     [InlineData("mixer", "")]
     public void Validate_ControlOffTheOwnersAllowList_IsRejected(string owner, string control)
     {
@@ -345,6 +358,13 @@ public class SaveMidiSettingsRequestValidatorTests
         request.Mappings[0].Control = control;
 
         AssertRejectedAt(request, "Mappings[0].Control");
+    }
+
+    [Fact]
+    public void DeckControls_LoadedFromTheContractFile_HoldsSixtySixNames()
+    {
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(66);
+        MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }
 
     #endregion

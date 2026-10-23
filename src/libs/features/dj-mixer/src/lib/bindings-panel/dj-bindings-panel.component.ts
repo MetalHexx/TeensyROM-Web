@@ -174,7 +174,8 @@ export class DjBindingsPanelComponent {
     };
   });
 
-  /** Deck A, Deck B and Mixer, each with its mappings in control-list order, then source order. */
+  /** Each owner that has controls (Deck A and Deck B; the Mixer owns none today), with its
+   *  mappings in control-list order, then source order. */
   readonly groups = computed<readonly BindingGroupView[]>(() => {
     const controllers = this.store.controllers();
     const statuses = this.store.controllerStatus();
@@ -184,8 +185,9 @@ export class DjBindingsPanelComponent {
     );
     const controllerOrder = new Map(controllers.map((controller, index) => [controller.id, index]));
     const mappings = this.store.mappings();
+    const owners = new Set(this.controls.all.map((control) => control.identity.owner));
 
-    return GROUP_OWNERS.map((owner) => {
+    return GROUP_OWNERS.filter((owner) => owners.has(owner)).map((owner) => {
       const rows = mappings
         .filter((mapping) => mapping.control.owner === owner)
         .flatMap((mapping) => {

@@ -14,7 +14,7 @@ const SERVER_SET: MidiSettingsRecord = {
       id: 'm1',
       source: { controllerId: 'launchpad', channel: 1, kind: 'cc', number: 7 },
       owner: 'A',
-      control: 'level',
+      control: 'speed',
       style: { kind: 'absolute', amount: null },
     },
   ],
@@ -134,7 +134,7 @@ describe('MidiSettingsPersistence', () => {
           {
             id: 'm9',
             source,
-            control: { owner: 'mixer', control: 'crossfader' },
+            control: { owner: 'B', control: 'speed' },
             style: { kind: 'step', amount: 0.1 },
           },
         ],
@@ -144,7 +144,7 @@ describe('MidiSettingsPersistence', () => {
 
       expect(snapshot.controllers).toEqual([controller]);
       expect(snapshot.mappings).toEqual([
-        { id: 'm9', source, owner: 'mixer', control: 'crossfader', style: { kind: 'step', amount: 0.1 } },
+        { id: 'm9', source, owner: 'B', control: 'speed', style: { kind: 'step', amount: 0.1 } },
       ]);
     });
 

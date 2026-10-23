@@ -11,11 +11,14 @@ import {
   DeckService,
   DeviceStore,
   DjStore,
+  HOME_DECK_PANEL,
   MappableControls,
   MidiControllers,
   MidiLearn,
   MidiMappings,
   MidiMappingStore,
+  MixerService,
+  SidPanelPainter,
   StorageStore,
   controlKey,
   type ControlIdentity,
@@ -132,20 +135,28 @@ function createDjStoreStub() {
           { muted: false, held: false },
         ],
       }),
-    deckMix: () =>
-      signal({
-        level: 1,
-        cutoff: 0,
-        resonance: 0,
-        pulseWidth: 0,
-        keySemitones: 0,
-        filterMode: null,
-      }),
+    deckPanel: () => signal(HOME_DECK_PANEL),
     canShape: () => signal(false),
     keyReadout: () => signal('0'),
-    crossfader: signal(0),
     keyDisplayFormat: signal('camelot'),
   };
+}
+
+function createMixerServiceStub() {
+  return {
+    setVoiceKnob: vi.fn(),
+    setFilterKnob: vi.fn(),
+    setKeySemitones: vi.fn(),
+    pressWaveform: vi.fn(),
+    pressSwitch: vi.fn(),
+    pressFilterMode: vi.fn(),
+    panic: vi.fn(),
+    setKeyDisplayFormat: vi.fn(),
+  };
+}
+
+function createSidPanelPainterStub() {
+  return { attach: vi.fn(() => () => undefined) };
 }
 
 function createDeckServiceStub() {
@@ -219,6 +230,8 @@ function render(
       { provide: StorageStore, useValue: storageStore },
       { provide: DjStore, useValue: createDjStoreStub() },
       { provide: DeckService, useValue: createDeckServiceStub() },
+      { provide: MixerService, useValue: createMixerServiceStub() },
+      { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
       { provide: MidiControllers, useValue: midi.controllers },
       { provide: MidiLearn, useValue: midi.learn },
@@ -258,25 +271,23 @@ describe('DjMixerViewComponent', () => {
     // JIT-compiling this component and its deck columns' lifted panels. That cold compile can
     // exceed the project's tight 2000ms testTimeout under CI load; every later test here reuses
     // the compiled TestBed and stays fast, so only this test needs the extra headroom.
-    it('renders exactly two deck columns, lettered A and B, and one mixer card with no enabled devices', () => {
-      const { fixture, component } = render([]);
+    it('renders exactly two deck columns, lettered A and B, and one SID panel with no enabled devices', () => {
+      const { fixture } = render([]);
 
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
-      expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
-      expect(component.showCrossfader()).toBe(true);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-sid-panel').length).toBe(1);
     }, 10000);
 
     it('still renders exactly two deck columns with one enabled device', () => {
-      const { fixture, component } = render([device()]);
+      const { fixture } = render([device()]);
 
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
-      expect(component.showCrossfader()).toBe(true);
     });
 
     it('still renders exactly two deck columns with three enabled devices', () => {
-      const { fixture, component } = render([
+      const { fixture } = render([
         device({ deviceId: 'a' }),
         device({ deviceId: 'b' }),
         device({ deviceId: 'c' }),
@@ -284,7 +295,6 @@ describe('DjMixerViewComponent', () => {
 
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
-      expect(component.showCrossfader()).toBe(true);
     });
   });
 
@@ -478,7 +488,7 @@ describe('DjMixerViewComponent', () => {
   describe('the bindings panel', () => {
     function bindingsButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
       return fixture.nativeElement.querySelector(
-        'lib-dj-mixer-card button[aria-label$="bindings panel"]'
+        'lib-dj-sid-panel button[aria-label$="bindings panel"]'
       );
     }
 
@@ -501,7 +511,7 @@ describe('DjMixerViewComponent', () => {
       expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
     });
 
-    it('opens the panel from the mixer card and closes it from the same button', () => {
+    it('opens the panel from the SID panel and closes it from the same button', () => {
       const { fixture } = render([]);
 
       press(fixture);
@@ -589,12 +599,9 @@ describe('DjMixerViewComponent', () => {
   });
 
   describe('the control anchors', () => {
-    const ALL_IDENTITIES: readonly ControlIdentity[] = [
-      ...DECK_SLOTS.flatMap((owner) =>
-        DECK_CONTROL_IDS.map((control): ControlIdentity => ({ owner, control }))
-      ),
-      { owner: 'mixer', control: 'crossfader' },
-    ];
+    const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
+      DECK_CONTROL_IDS.map((control): ControlIdentity => ({ owner, control }))
+    );
 
     it('finds every mappable control as exactly one element in the rendered grid', () => {
       const { fixture } = render([]);
@@ -605,7 +612,7 @@ describe('DjMixerViewComponent', () => {
         matches: grid.querySelectorAll(anchorFor(identity)).length,
       })).filter(({ matches }) => matches !== 1);
 
-      expect(ALL_IDENTITIES).toHaveLength(45);
+      expect(ALL_IDENTITIES).toHaveLength(132);
       expect(mismatched).toEqual([]);
     });
   });

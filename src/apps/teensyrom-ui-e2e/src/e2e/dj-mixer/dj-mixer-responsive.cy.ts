@@ -13,6 +13,7 @@ import { interceptConnectDevice } from '../../support/interceptors/connectDevice
 const twoDevices: MockDeviceFixture = { devices: [generateDevice(), generateDevice()] };
 
 const STACKED_WIDTHS = [1279, VIEWPORT.TABLET.width] as const;
+const SID_PANEL_VIEWPORT = { width: 1920, height: 1080 } as const;
 const NO_OVERFLOW_WIDTHS = [1400, 1279, 1100, VIEWPORT.TABLET.width, 400] as const;
 
 /**
@@ -34,8 +35,8 @@ describe('DJ Mixer — responsive layout', () => {
       cy.visit(APP_ROUTES.djMixer);
     });
 
-    it('holds deck A, the mixer, and deck B side by side at desktop width', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+    it('holds deck A, the SID panel, and deck B side by side at desktop width', () => {
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
       cy.get('[aria-label="Transport deck A"]')
         .then(([transportA]) => transportA.getBoundingClientRect())
@@ -45,13 +46,13 @@ describe('DJ Mixer — responsive layout', () => {
             .then((bRect) => {
               expect(aRect.top, 'deck A and deck B share the same top').to.equal(bRect.top);
 
-              cy.get('lib-dj-mixer-card')
+              cy.get('lib-dj-sid-panel')
                 .then(([mixer]) => mixer.getBoundingClientRect())
                 .then((mixerRect) => {
-                  expect(aRect.left, 'deck A sits left of the mixer').to.be.lessThan(
+                  expect(aRect.left, 'deck A sits left of the panel').to.be.lessThan(
                     mixerRect.left
                   );
-                  expect(mixerRect.left, 'the mixer sits left of deck B').to.be.lessThan(
+                  expect(mixerRect.left, 'the panel sits left of deck B').to.be.lessThan(
                     bRect.left
                   );
                 });
@@ -60,49 +61,42 @@ describe('DJ Mixer — responsive layout', () => {
     });
 
     it('positions the bottom band below the grid content, Browse before Directory Listing', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
-      cy.get('lib-dj-mixer-card')
+      cy.get('lib-dj-sid-panel')
         .then(([mixer]) => mixer.getBoundingClientRect())
         .then((mixerRect) => {
           cy.get('.browse-card')
             .then(([browse]) => browse.getBoundingClientRect())
             .then((browseRect) => {
-              expect(mixerRect.bottom, 'the mixer sits above the bottom band').to.be.at.most(
+              expect(mixerRect.bottom, 'the panel sits above the bottom band').to.be.at.most(
                 browseRect.top
               );
 
               cy.get('.directory-listing-card')
                 .then(([directoryListing]) => directoryListing.getBoundingClientRect())
                 .then((directoryListingRect) => {
-                  expect(
-                    browseRect.left,
-                    'Browse sits left of Directory Listing'
-                  ).to.be.lessThan(directoryListingRect.left);
+                  expect(browseRect.left, 'Browse sits left of Directory Listing').to.be.lessThan(
+                    directoryListingRect.left
+                  );
                 });
             });
         });
     });
 
-    it('top-aligns the deck strips within the mixer card at desktop width', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+    it('keeps every voice strip inside the SID panel without horizontal overflow at 1920 wide', () => {
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
-      // The deck strip animates in (`animationEntry="from-bottom"` on the mixer's own
-      // `lib-scaling-compact-card`), so the assertion is wrapped in `.should()` — Cypress
-      // retries the whole callback until the entry animation settles, rather than reading a
-      // mid-animation position from a single unretried `.then()`.
-      cy.get('lib-deck-strip')
-        .first()
-        .should(([strip]) => {
-          const mixerCard = strip.ownerDocument.querySelector('lib-dj-mixer-card');
-          const stripRect = strip.getBoundingClientRect();
-          const mixerCardRect = mixerCard!.getBoundingClientRect();
-
-          expect(
-            stripRect.top - mixerCardRect.top,
-            "the deck strip sits within the mixer card's top quarter"
-          ).to.be.lessThan(mixerCardRect.height * 0.25);
+      // The panel animates in (`animationEntry="from-bottom"`), so the assertion is wrapped in
+      // `.should()` and Cypress retries it until the entry animation settles.
+      cy.get('lib-sid-voice-strip').should('have.length', 6);
+      cy.get('lib-sid-voice-strip').should(($strips) => {
+        $strips.each((_, strip) => {
+          expect(strip.scrollWidth, 'the strip does not overflow').to.be.at.most(
+            strip.clientWidth + 1
+          );
         });
+      });
     });
 
     it('stacks the bottom band into a single column at phone width', () => {
@@ -114,10 +108,9 @@ describe('DJ Mixer — responsive layout', () => {
           cy.get('.directory-listing-card')
             .then(([directoryListing]) => directoryListing.getBoundingClientRect())
             .then((directoryListingRect) => {
-              expect(
-                browseRect.left,
-                'Browse and Directory Listing share the same left'
-              ).to.equal(directoryListingRect.left);
+              expect(browseRect.left, 'Browse and Directory Listing share the same left').to.equal(
+                directoryListingRect.left
+              );
               expect(browseRect.top, 'Browse sits above Directory Listing').to.be.lessThan(
                 directoryListingRect.top
               );
@@ -128,21 +121,21 @@ describe('DJ Mixer — responsive layout', () => {
     STACKED_WIDTHS.forEach((width) => {
       const height = width === VIEWPORT.TABLET.width ? VIEWPORT.TABLET.height : 900;
 
-      it(`stacks deck A, then the mixer, then deck B at ${width}px wide`, () => {
+      it(`stacks deck A, then the SID panel, then deck B at ${width}px wide`, () => {
         cy.viewport(width, height);
 
         cy.get('[aria-label="Transport deck A"]')
           .then(([transportA]) => transportA.getBoundingClientRect().top)
           .then((deckATop) => {
-            cy.get('lib-dj-mixer-card')
+            cy.get('lib-dj-sid-panel')
               .then(([mixer]) => mixer.getBoundingClientRect().top)
               .then((mixerTop) => {
-                expect(deckATop, 'deck A sits above the mixer').to.be.lessThan(mixerTop);
+                expect(deckATop, 'deck A sits above the panel').to.be.lessThan(mixerTop);
 
                 cy.get('[aria-label="Transport deck B"]')
                   .then(([transportB]) => transportB.getBoundingClientRect().top)
                   .then((deckBTop) => {
-                    expect(mixerTop, 'the mixer sits above deck B').to.be.lessThan(deckBTop);
+                    expect(mixerTop, 'the panel sits above deck B').to.be.lessThan(deckBTop);
                   });
               });
           });
@@ -164,14 +157,14 @@ describe('DJ Mixer — responsive layout', () => {
     });
 
     it('keeps the speed fader and the +50% jump button visible and unclipped at desktop width', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
       cy.get('[aria-label="Speed multiplier deck A"]').should('be.visible');
       cy.get('[aria-label="Speed up 50% deck A"]').should('be.visible');
     });
 
     it('fits the whole grid in the viewport at desktop width — the page itself never scrolls', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
       // Retried via `.should()`: the cards animate in (`animationEntry="from-bottom"`), so a single
       // unretried read can catch a mid-animation height.
@@ -183,11 +176,14 @@ describe('DJ Mixer — responsive layout', () => {
       });
     });
 
-    it('shows a crossfader with two decks', () => {
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+    it('shows the SID panel with both decks, and no crossfader', () => {
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
 
-      cy.get('lib-deck-strip').should('have.length', 2);
-      cy.get('lib-crossfader').should('exist');
+      cy.get('lib-dj-sid-panel').should('have.length', 1);
+      cy.get('lib-dj-sid-panel [data-deck]').should('have.length', 2);
+      cy.get('[aria-label]')
+        .filter((_, el) => /crossfader/i.test(el.getAttribute('aria-label') ?? ''))
+        .should('have.length', 0);
     });
   });
 
@@ -196,12 +192,12 @@ describe('DJ Mixer — responsive layout', () => {
       interceptFindDevices(); // default fixture: singleDevice
       interceptConnectDevice();
       cy.visit(APP_ROUTES.djMixer);
-      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+      cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
     });
 
-    it('renders two deck strips and a crossfader — the decks are a fixed pair, not one per device', () => {
-      cy.get('lib-deck-strip').should('have.length', 2);
-      cy.get('lib-crossfader').should('exist');
+    it('renders both decks on the one SID panel — the decks are a fixed pair, not one per device', () => {
+      cy.get('lib-dj-sid-panel [data-deck]').should('have.length', 2);
+      cy.get('lib-sid-voice-strip').should('have.length', 6);
     });
 
     NO_OVERFLOW_WIDTHS.forEach((width) => {
