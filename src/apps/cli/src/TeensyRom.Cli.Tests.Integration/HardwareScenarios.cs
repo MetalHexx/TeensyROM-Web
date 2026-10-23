@@ -33,6 +33,27 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         AssertFullRecord(file);
     }
 
+    /// <summary>
+    /// Two device commands in a row both resolve the device with a plain listing, which the engine does not rate limit,
+    /// so neither waits on the other.
+    /// </summary>
+    [SkippableFact]
+    public async Task DevicePing_RunTwiceInARow_DoesNotWaitOnTheDeviceListingRateLimit()
+    {
+        var (device, _) = BenchDeviceOrSkip();
+        using var first = new CliHarness();
+        using var second = new CliHarness();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var firstExit = await first.RunAsync("device", "ping", "--device", device.DeviceId);
+        var secondExit = await second.RunAsync("device", "ping", "--device", device.DeviceId);
+
+        stopwatch.Stop();
+        firstExit.Should().Be(0, first.Error);
+        secondExit.Should().Be(0, second.Error);
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
+    }
+
     private static readonly string[] FullRecordFields =
         ["description", "links", "tags", "youTubeVideos", "competitions", "ratingCount", "images", "metadataSource", "meta1", "meta2", "parentPath", "type"];
 

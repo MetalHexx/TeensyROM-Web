@@ -15,7 +15,7 @@ internal interface IDeviceService
 
     /// <summary>
     /// Lists the devices tr-web knows; with <paramref name="fullScan"/> it first scans for ones it doesn't know yet.
-    /// <c>GetDevicesAsync</c> is <c>FindAsync(fullScan: false)</c>. tr-web answers one lookup per 5 seconds.
+    /// <c>GetDevicesAsync</c> is <c>FindAsync(fullScan: false)</c>. tr-web limits full scans to one per 5 seconds.
     /// </summary>
     /// <exception cref="TeensyApiException">tr-web could not list its devices.</exception>
     Task<IReadOnlyList<DeviceSummary>> FindAsync(bool fullScan, CancellationToken ct = default);
