@@ -7,6 +7,7 @@ The CLI talks to the tr-web engine through a client generated from the engine's 
 | `nswag.json` | Generator settings. Its input is the engine's spec, `src/apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`, which every engine build rewrites. |
 | `Generated/TeensyRomApiClient.g.cs` | Generated, committed. Never hand-edited. |
 | `TeensyRomApiClient.Json.cs` | Hand-written half of the client: enums as strings, response bodies kept for error messages. |
+| `TeensyRomApiClient.Upload.cs` | Hand-written half of the client: `UploadTransferFileContentAsync` streams a file's raw bytes into a transfer job. The generated `UploadTransferFileAsync` sends an empty JSON body, because the spec doesn't describe the raw one. |
 | `EngineAddress.cs` | Where the CLI finds the engine. |
 
 ## When the engine's API changes

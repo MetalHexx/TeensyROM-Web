@@ -86,6 +86,40 @@ public sealed class DeviceFreeScenarios
     }
 
     [Fact]
+    public async Task FileUpload_UsageErrors_AndANonexistentPath_StartNoEngine()
+    {
+        using var bound = TestEngine.Bounded();
+        await TestEngine.StopAsync(bound.Token);
+
+        var folder = Directory.CreateTempSubdirectory("trom-upload-usage-").FullName;
+        var original = Directory.GetCurrentDirectory();
+
+        try
+        {
+            Directory.SetCurrentDirectory(folder);
+            await File.WriteAllBytesAsync(Path.Combine(folder, "a.prg"), [1, 8, 0, 0], bound.Token);
+            using var cli = new CliHarness();
+
+            (await cli.RunAsync("file", "upload", "a.prg")).Should().Be(2, "--to is required");
+            (await cli.RunAsync("file", "upload", "--to", "/games")).Should().Be(2, "no paths outside a terminal needs --yes");
+            (await cli.RunAsync("file", "upload", "--launch", folder, "--to", "/games")).Should().Be(2, "--launch takes a file, not a folder");
+            (await cli.RunAsync("file", "upload", "--launch", "a.prg", "a.prg", "--to", "/games")).Should().Be(2, "--launch takes exactly one file");
+            (await cli.RunAsync("file", "upload", "missing.prg", "--to", "/games")).Should().Be(5, "nothing named exists");
+            (await cli.RunAsync("file", "launch", "a.prg")).Should().Be(2, "a local file is not on the TeensyROM");
+
+            cli.Error.Should().Contain("--to is required").And.Contain("pass --yes").And.Contain("upload --launch a.prg");
+            cli.Error.Should().NotContain("Starting the TeensyROM engine");
+            (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(original);
+            Directory.Delete(folder, recursive: true);
+            await TestEngine.EnsureAsync(bound.Token);
+        }
+    }
+
+    [Fact]
     public async Task ChipsynthGenerate_AndSettingsShow_RunWithoutAnEngine_AndStartNone()
     {
         using var bound = TestEngine.Bounded();

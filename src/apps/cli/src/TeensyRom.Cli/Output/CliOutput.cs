@@ -30,6 +30,8 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
 
     public bool CanPrompt => consoles.InIsTerminal && consoles.OutIsTerminal && consoles.ErrIsTerminal;
 
+    public bool ErrIsTerminal => consoles.ErrIsTerminal;
+
     public void SetRunMode(CliRunMode mode) => RunMode = mode;
 
     public void UseJson(bool json) => _json = json;
