@@ -124,6 +124,15 @@ public class LiftBanEndpointTests
     }
 
     [Fact]
+    public async Task Handle_FileEntryOfOnlySlashes_SendsValidationError()
+    {
+        var endpoint = await Lift("/", BanKind.File);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadRequest);
+        _saves.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Handle_NotBanned_AnswersNotLiftedAndSavesNothing()
     {
         var endpoint = await Lift("missing.sid");

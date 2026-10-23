@@ -40,7 +40,8 @@ public sealed class HardwareScenarios(SharedApiFixture api)
     [SkippableFact]
     public async Task DevicePing_RunTwiceInARow_DoesNotWaitOnTheDeviceListingRateLimit()
     {
-        var (device, _) = BenchDeviceOrSkip();
+        Skip.If(api.OnlineDevices.Count == 0, "no TeensyROM is online in the test API");
+        var device = api.OnlineDevices[0];
         using var first = new CliHarness();
         using var second = new CliHarness();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
