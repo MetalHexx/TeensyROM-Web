@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using System.Text.Json;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Errors;
@@ -55,7 +56,11 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
         table.AddColumn(new TableColumn(string.Empty));
         table.AddColumn(new TableColumn(string.Empty));
 
-        foreach (var (label, value) in fields) table.AddRow(new Text(label), new Text(value));
+        foreach (var (label, value) in fields)
+        {
+            IRenderable cell = Mode == OutputMode.Human && TerminalText.IsWebLink(value) ? TerminalText.Link(null, value) : new Text(value);
+            table.AddRow(new Text(label), cell);
+        }
 
         Out.Write(table);
     }
