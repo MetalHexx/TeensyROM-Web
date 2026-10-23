@@ -46,6 +46,15 @@ internal sealed class TransferService(ITeensyRomApiClient api, IDeviceService de
     public async Task<TransferJobDto> GetAsync(string jobId, CancellationToken ct) =>
         (await ApiErrors.Call(() => api.GetTransferJobAsync(jobId, ct))).Job;
 
+    public async Task DownloadAsync(TeensyStorageType storage, string devicePath, Stream destination, CancellationToken ct)
+    {
+        var deviceId = devices.RequireDeviceId();
+
+        using var response = await ApiErrors.Call(() => api.GetFileContentAsync(deviceId, storage.ToApi(), devicePath, ct));
+
+        await ApiErrors.Call(() => response.Stream.CopyToAsync(destination, FileBufferSize, ct));
+    }
+
     public async Task CancelAsync(string jobId)
     {
         using var timeout = new CancellationTokenSource(CancelTimeout);

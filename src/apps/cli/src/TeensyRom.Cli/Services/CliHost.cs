@@ -107,6 +107,7 @@ internal static class CliHost
             PublicVerb.Of<FilePauseCommand, FilePlaybackSettings>("pause", "Play/pause for music: pause or resume the song playing. Games and programs can't be paused, so they are stopped instead, which resets the TeensyROM; something stopped is launched again.", ["file", "pause"]),
             PublicVerb.Of<FileStopCommand, FilePlaybackSettings>("stop", "Stop whatever is running by resetting the TeensyROM, the same reset as `trom device reset`.", ["file", "stop"]),
             PublicVerb.Of<FileUploadCommand, FileUploadSettings>("upload", "Copy files and folders from this computer to the TeensyROM; with no paths, the current folder's contents (asks first unless --yes). Folders keep their layout; .zip, .7z and .rar are expanded on the TeensyROM. --launch launches one file once it lands.", ["file", "upload", "Commando.sid", "--to", "/music"]),
+            PublicVerb.Of<FileDownloadCommand, FileDownloadSettings>("download", "Copy files and folders from the TeensyROM to this computer, into the current folder unless --to names another. Folders keep their layout; files over 10 MB are skipped and reported.", ["file", "download", "/games", "--to", "backup"]),
             PublicVerb.Of<FileFavoriteCommand, FilePathsSettings>("favorite", "Tag files as favorites; give paths, or - to read them from stdin.", ["file", "favorite", "/music/Commando.sid", "/music/Delta.sid"]),
             PublicVerb.Of<FileUnfavoriteCommand, FilePathsSettings>("unfavorite", "Untag favorites; give paths, or - to read them from stdin.", ["file", "unfavorite", "/favorites/music/Commando.sid"]),
             PublicVerb.Of<FileBanCommand, FilePathsSettings>("ban", "Ban files so they no longer show up; give paths, or - to read them from stdin.", ["file", "ban", "/music/Commando.sid"])
@@ -231,6 +232,7 @@ internal static class CliHost
         services.AddSingleton<IPlayerService, PlayerService>();
         services.AddSingleton<ITransferService, TransferService>();
         services.AddSingleton<UploadRunner>();
+        services.AddSingleton<DownloadRunner>();
         services.AddSingleton<ITypeResolver, TypeResolver>();
         services.AddSingleton<IProgressTimer, ProgressTimer>();
         services.AddSingleton<ILaunchHistory, LaunchHistory>();

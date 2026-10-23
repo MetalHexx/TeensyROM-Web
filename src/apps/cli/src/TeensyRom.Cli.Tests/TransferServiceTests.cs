@@ -93,6 +93,33 @@ public sealed class TransferServiceTests : IDisposable
         received.Should().Equal(bytes);
     }
 
+    [Fact]
+    public async Task Download_CopiesTheFilesBytesIntoTheDestination_AndLeavesItOpen()
+    {
+        var bytes = Enumerable.Range(0, 300_000).Select(i => (byte)(i % 251)).ToArray();
+        var source = new MemoryStream(bytes);
+        _api.GetFileContentAsync(DeviceId, ApiStorageType.USB, "/games/big.prg", Arg.Any<CancellationToken>())
+            .Returns(new FileResponse(200, new Dictionary<string, IEnumerable<string>>(), source, null, null));
+        using var destination = new MemoryStream();
+
+        await _sut.DownloadAsync(TeensyStorageType.USB, "/games/big.prg", destination, CancellationToken.None);
+
+        destination.ToArray().Should().Equal(bytes);
+        destination.CanWrite.Should().BeTrue();
+        source.CanRead.Should().BeFalse("the response is disposed once copied");
+    }
+
+    [Fact]
+    public async Task Download_OfAFileOverTheLimit_IsATeensyApiExceptionWith413()
+    {
+        _api.GetFileContentAsync(default!, default, default, default)
+            .ThrowsAsyncForAnyArgs(ApiTestSupport.ApiFailure(413, """{"title":"File is too large."}"""));
+
+        var act = () => _sut.DownloadAsync(TeensyStorageType.SD, "/big.prg", new MemoryStream(), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<TeensyApiException>()).Which.StatusCode.Should().Be(413);
+    }
+
     [Theory]
     [InlineData("../evil.prg")]
     [InlineData("games/../../evil.prg")]

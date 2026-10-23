@@ -25,6 +25,10 @@ internal interface ITransferService
 
     Task<TransferJobDto> GetAsync(string jobId, CancellationToken ct);
 
+    /// <summary>Streams the file at <paramref name="devicePath"/> into <paramref name="destination"/>, which is left open.</summary>
+    /// <exception cref="Api.TeensyApiException">tr-web refused: 404 when the file is missing, 413 when it is over its 10 MB limit.</exception>
+    Task DownloadAsync(TeensyStorageType storage, string devicePath, Stream destination, CancellationToken ct);
+
     /// <summary>Cancels the job and releases the device. Idempotent: a finished or forgotten job is left as it is.</summary>
     Task CancelAsync(string jobId);
 }
