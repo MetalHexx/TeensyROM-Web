@@ -319,6 +319,121 @@ public sealed class FileUploadCommandTests : IDisposable
         }
     }
 
+    // ---- the file-type filter, the notice and the total ----------------------------------------------------------------
+
+    [Fact]
+    public async Task AFolder_SendsOnlySupportedTypes_IgnoringCase_AndSaysHowManyWereLeftOut()
+    {
+        Write("mixed/a.sid", 10);
+        Write("mixed/B.PRG", 10);
+        Write("mixed/notes.md", 10);
+        Write("mixed/deep/c.d64", 10);
+        Write("mixed/deep/readme.md", 10);
+        Write("mixed/deep/pack.ZIP", 10);
+        Write("mixed/hidden.sid", 10, hidden: true);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "mixed", "--to", "/x");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        Uploaded().Should().Equal("mixed/B.PRG", "mixed/a.sid", "mixed/deep/c.d64", "mixed/deep/pack.ZIP");
+        host.Consoles.StdErr.Should().Contain("2 files were left out");
+        host.Consoles.StdOut.Should().NotContain("left out");
+    }
+
+    [Fact]
+    public async Task TheLeftOutNotice_IsNotPartOfTheJsonDocument_AndASingleFileReadsInTheSingular()
+    {
+        Write("mixed/a.sid", 10);
+        Write("mixed/notes.md", 10);
+        Write("mixed/hidden.md", 10, hidden: true);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "mixed", "--to", "/x", "--json");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        Parse(host.Consoles.StdOut).GetProperty("totals").GetProperty("failed").GetInt32().Should().Be(0);
+        host.Consoles.StdOut.Should().NotContain("left out");
+        host.Consoles.StdErr.Should().Contain("1 file was left out");
+    }
+
+    [Fact]
+    public async Task AFolderHoldingNothingSupported_HasNothingToUpload_AndMentionsFileTypes()
+    {
+        Write("docs/notes.md", 10);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "docs", "--to", "/x");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        host.Consoles.StdErr.Should().Contain("nothing to upload").And.Contain("file type");
+        await AssertEngineNeverStarted(host);
+    }
+
+    [Fact]
+    public async Task ANamedFileOfAnUnsupportedType_IsAFailedRowWithItsOwnMessage_AndExitsOne()
+    {
+        Write("notes.md", 10);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "notes.md", "--to", "/x", "--json");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        var report = Parse(host.Consoles.StdOut);
+        var row = report.GetProperty("files")[0];
+        row.GetProperty("localPath").GetString().Should().Be("notes.md");
+        row.GetProperty("ok").GetBoolean().Should().BeFalse();
+        row.GetProperty("message").GetString().Should().Be("not a file type the TeensyROM takes");
+        report.GetProperty("totals").GetProperty("failed").GetInt32().Should().Be(1);
+        await AssertEngineNeverStarted(host);
+    }
+
+    [Fact]
+    public async Task ANamedUnsupportedFile_BesideASupportedOne_IsAFailedRow_ThatIsNotANotFound()
+    {
+        Write("notes.md", 10);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "loose.sid", "notes.md", "--to", "/x", "--json");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        Uploaded().Should().Equal("loose.sid");
+        var report = Parse(host.Consoles.StdOut);
+        report.GetProperty("files")[1].GetProperty("message").GetString().Should().Be("not a file type the TeensyROM takes");
+        report.GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(1);
+        report.GetProperty("totals").GetProperty("failed").GetInt32().Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(1, "Copied 1 file.")]
+    [InlineData(2, "Copied 2 files.")]
+    public async Task ACleanRun_EndsWithTheTotalOnStderr_AndNotInTheJsonDocument(int count, string expected)
+    {
+        string[] named = count == 1 ? ["loose.sid"] : ["loose.sid", "games/a.prg"];
+        var human = NewHost();
+        var json = NewHost();
+
+        await human.RunAsync(["file", "upload", .. named, "--to", "/x"]);
+        await json.RunAsync(["file", "upload", .. named, "--to", "/x", "--json"]);
+
+        human.Consoles.StdErr.Should().Contain(expected);
+        human.Consoles.StdOut.Should().NotContain("Copied ");
+        json.Consoles.StdErr.Should().NotContain("Copied ");
+        Parse(json.Consoles.StdOut).GetProperty("totals").GetProperty("copied").GetInt32().Should().Be(count);
+    }
+
+    [Fact]
+    public async Task AFailedRun_WritesNoTotal()
+    {
+        _failures.Add(Failure("loose.sid", "/x/loose.sid", "boom"));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "loose.sid", "--to", "/x");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        host.Consoles.StdErr.Should().Contain("1 of 1 files failed.").And.NotMatchRegex(@"Copied \d+ file");
+    }
+
     [Fact]
     public async Task Archives_AreSentAsTheyAre_AndCountedWhateverTheirCase()
     {
@@ -893,6 +1008,8 @@ public sealed class UploadRunnerTests
 
         public int Failed { get; set; }
 
+        public int Received { get; set; }
+
         public int Polls => Volatile.Read(ref _polls);
 
         public (TeensyStorageType Storage, string Folder, int Archives)? Created { get; private set; }
@@ -921,7 +1038,7 @@ public sealed class UploadRunnerTests
             lock (_lock) _calls.Add(call);
         }
 
-        private TransferJobDto Job() => new() { JobId = "job-1", DeviceId = DeviceId, State = _state, FilesSent = Sent, FilesFailed = Failed };
+        private TransferJobDto Job() => new() { JobId = "job-1", DeviceId = DeviceId, State = _state, FilesSent = Sent, FilesFailed = Failed, FilesReceived = Received };
 
         public Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, CancellationToken ct)
         {
@@ -1140,6 +1257,17 @@ public sealed class UploadRunnerTests
     {
         SeedPlaying();
         _transfers.Sent = 2;
+
+        await RunAsync(ThreeFiles);
+
+        _store.Load(DeviceId)!.PlayState.Should().Be(PlayState.Stopped);
+    }
+
+    [Fact]
+    public async Task Run_StopsTheLastLaunchRecord_WhenTheFirstFileHasOnlyBeenReceived()
+    {
+        SeedPlaying();
+        _transfers.Received = 1;
 
         await RunAsync(ThreeFiles);
 

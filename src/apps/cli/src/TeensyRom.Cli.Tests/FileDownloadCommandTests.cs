@@ -309,8 +309,82 @@ public sealed class FileDownloadCommandTests : IDisposable
         files.Where(file => !file.GetProperty("ok").GetBoolean()).Select(file => file.GetProperty("message").GetString())
             .Should().OnlyContain(message => message!.EndsWith("can't be saved on this computer under that name."))
             .And.HaveCount(4);
+        var rejected = files.Where(file => !file.GetProperty("ok").GetBoolean()).Select(file => file.GetProperty("localPath").GetString()).ToList();
+
+        rejected.Should().BeEquivalentTo(
+            [Path.Join(Target, "bad", ".."), Path.Join(Target, "bad", "C:evil.prg"), Path.Join(Target, "bad", "a:b.prg"), Path.Join(Target, "bad", "..")]);
         Saved().Should().Equal("target/bad/ok.prg");
         _downloaded.Should().Equal("/bad/ok.prg");
+    }
+
+    [Fact]
+    public async Task AnEmptyFolder_IsCreated_ThenReportedAsNothingToDownload()
+    {
+        Folder("/empty");
+        _folders["/"].Directories.Add(new DirectoryItem { Name = "empty", Path = "/empty" });
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "download", "/empty", "--to", Target);
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        host.Consoles.StdErr.Should().Contain("There's nothing to download in /empty.");
+        Directory.Exists(Path.Combine(Target, "empty")).Should().BeTrue();
+        _downloaded.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AFolderHoldingOnlyEmptySubfolders_KeepsItsLayout_AndIsReportedAsNothingToDownload()
+    {
+        Folder("/hollow", dirs: ["one", "two"]);
+        Folder("/hollow/one", dirs: ["inner"]);
+        Folder("/hollow/one/inner");
+        Folder("/hollow/two");
+        _folders["/"].Directories.Add(new DirectoryItem { Name = "hollow", Path = "/hollow" });
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "download", "/hollow", "--to", Target);
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        Directory.Exists(Path.Combine(Target, "hollow", "one", "inner")).Should().BeTrue();
+        Directory.Exists(Path.Combine(Target, "hollow", "two")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ACleanRun_EndsWithTheTotalOnStderr_AndAFailedRunDoesNot()
+    {
+        var clean = NewHost();
+        var cleanExit = await clean.RunAsync("file", "download", "/music", "--to", Target);
+
+        _failWith["/music/Commando.sid"] = new TeensyApiException("x", 413);
+        var failed = NewHost();
+        var failedExit = await failed.RunAsync("file", "download", "/music", "--to", Path.Combine(_root, "second"));
+
+        cleanExit.Should().Be(0, clean.Consoles.StdErr);
+        clean.Consoles.StdErr.Should().Contain("Copied 2 files.");
+        failedExit.Should().Be((int)CliExitCode.Failed);
+        failed.Consoles.StdErr.Should().NotMatchRegex(@"Copied \d+ file");
+    }
+
+    [Fact]
+    public async Task AFolderWhoseListingFails_IsReportedWithItsWouldBePathUnderTheTarget()
+    {
+        _folders["/"].Directories.Add(new DirectoryItem { Name = "ghost", Path = "/ghost" });
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "download", "/ghost", "--to", Target, "--json");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
+        Parse(host.Consoles.StdOut).GetProperty("files")[0].GetProperty("localPath").GetString().Should().Be(Path.Join(Target, "ghost"));
+    }
+
+    [Fact]
+    public async Task APathThatWasNeverClassified_CarriesAnEmptyLocalPath()
+    {
+        var host = NewHost();
+
+        await host.RunAsync("file", "download", "/music/missing.sid", "--to", Target, "--json");
+
+        Parse(host.Consoles.StdOut).GetProperty("files")[0].GetProperty("localPath").GetString().Should().BeEmpty();
     }
 
     // ---- output ------------------------------------------------------------------------------------------------------

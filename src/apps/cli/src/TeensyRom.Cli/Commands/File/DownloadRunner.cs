@@ -22,8 +22,6 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
 
     private const string TooLargeMessage = "larger than the 10 MB limit";
 
-    private const string NotFoundMessage = "not found";
-
     /// <summary>
     /// Saves each of <paramref name="devicePaths"/> under <paramref name="target"/>: a file as its name, a folder as a
     /// folder of its own name with its layout recreated, and <c>/</c> as its contents directly. A failure is that
@@ -31,6 +29,7 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
     /// </summary>
     /// <param name="progress">Told as each file starts and ends.</param>
     /// <exception cref="CliException"><see cref="CliExitCode.Failed"/> when <paramref name="ct"/> is cancelled; no half-written file is left.</exception>
+    /// <exception cref="CliException"><see cref="CliExitCode.NotFound"/> when the run produced no results at all, such as a folder with no files in it.</exception>
     public async Task<DownloadRunResult> RunAsync(IReadOnlyList<string> devicePaths, string target, Action<DownloadProgress>? progress, CancellationToken ct)
     {
         var run = new Run(storage, transfers, target, progress);
@@ -43,6 +42,10 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
         {
             // Cancelling surfaces as an OperationCanceledException or, through ApiErrors.Call, a TeensyApiException with no status: never a file's failure.
             throw new CliException(CliExitCode.Failed, "Cancelled; nothing more was saved.");
+        }
+        if (run.Results.Count == 0)
+        {
+            throw new CliException(CliExitCode.NotFound, $"There's nothing to download in {string.Join(", ", devicePaths)}.");
         }
         return new DownloadRunResult(run.Results, run.AnyFailedForOtherReasons);
     }
@@ -86,17 +89,18 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
             }
             else
             {
-                Fail(string.Empty, devicePath, new TeensyApiException(NotFoundMessage, 404));
+                Fail(string.Empty, devicePath, new TeensyApiException(CopyResults.NotFoundMessage, 404));
             }
         }
 
         private async Task FolderAsync(string devicePath, string[] segments, CancellationToken ct)
         {
-            var local = string.Join('/', segments);
+            var (folderPath, problem) = segments.Length > 0 ? LocalTargetPath.Resolve(target, segments) : (target, null);
+            var wouldBe = WouldBePath(segments);
 
-            if (segments.Length > 0 && LocalTargetPath.Resolve(target, segments).Problem is { } problem)
+            if (problem is not null)
             {
-                Fail(local, devicePath, problem, otherReason: true);
+                Fail(wouldBe, devicePath, problem, otherReason: true);
                 return;
             }
             DirectoryListing listing;
@@ -107,9 +111,23 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
             }
             catch (Exception error) when (!ct.IsCancellationRequested)
             {
-                Fail(local, devicePath, error);
+                Fail(wouldBe, devicePath, error);
                 return;
             }
+
+            if (segments.Length > 0)
+            {
+                try
+                {
+                    Directory.CreateDirectory(folderPath!);
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    Fail(folderPath!, devicePath, error);
+                    return;
+                }
+            }
+
             foreach (var file in listing.Files) await FileAsync(file.Path, [.. segments, file.Name], ct);
 
             foreach (var directory in listing.Directories) await FolderAsync(directory.Path, [.. segments, directory.Name], ct);
@@ -121,7 +139,7 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
 
             if (fullPath is null)
             {
-                Fail(string.Join('/', segments), devicePath, problem!, otherReason: true);
+                Fail(WouldBePath(segments), devicePath, problem!, otherReason: true);
                 return;
             }
             var temporary = Path.Combine(Path.GetDirectoryName(fullPath)!, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.partial");
@@ -177,6 +195,9 @@ internal sealed class DownloadRunner(IStorageService storage, ITransferService t
             AnyFailedForOtherReasons |= otherReason;
             Results.Add(CopyResults.Failed(localPath, devicePath, message));
         }
+
+        /// <summary>Where a name would have gone under the target. Never <c>Path.Combine</c>: on Windows it drops everything before a rooted segment such as <c>C:evil.prg</c>.</summary>
+        private string WouldBePath(string[] segments) => segments.Length == 0 ? target : Path.Join([target, .. segments]);
 
         private static bool SamePath(string left, string right) =>
             left.TrimEnd('/').Equals(right.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);

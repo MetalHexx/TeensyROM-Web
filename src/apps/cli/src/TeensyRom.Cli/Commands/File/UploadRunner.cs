@@ -25,7 +25,7 @@ internal sealed record UploadRunResult(TransferJobDto Job, IReadOnlyList<UploadR
 internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore lastLaunches)
 {
     /// <summary>How long the job waits between looks at it; also how often the live progress line updates.</summary>
-    public TimeSpan PollInterval { get; init; } = TimeSpan.FromMilliseconds(500);
+    internal TimeSpan PollInterval { get; init; } = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// Uploads <paramref name="files"/> in order and returns once the job has ended. A file tr-web refuses (a 400) or that
@@ -107,8 +107,10 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
 
     /// <summary>
     /// Cancels a job that didn't end on its own, best effort: this runs while another failure may be on its way out. The
-    /// engine resets the device when the job's first file is admitted, before any send succeeds or fails, so once the
-    /// job has sent or failed anything the last-launch record must stop saying the device is playing.
+    /// engine resets the device when the job's first file is admitted, which is after that file has finished staging and
+    /// before any send succeeds or fails. So once the last snapshot shows a file sent, failed or received (staged), the
+    /// last-launch record must stop saying the device is playing; a first file cancelled mid-send leaves only "received".
+    /// The snapshot's current file is not checked: the engine clears it again once a send finishes, so it is null while a file is on the wire.
     /// </summary>
     private async Task ReleaseAsync(string jobId, TransferJobDto last)
     {
@@ -123,7 +125,7 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
                 // The engine's sweeper abandons a job nobody is talking to; there is nothing more to do from here.
             }
         }
-        if (last.FilesSent + last.FilesFailed > 0) lastLaunches.MarkStopped(last.DeviceId);
+        if (last.FilesSent + last.FilesFailed > 0 || last.FilesReceived > 0) lastLaunches.MarkStopped(last.DeviceId);
     }
 
     private static bool IsFinished(TransferJobState state) =>
