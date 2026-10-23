@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { createSidPlayer, parseSidFile, frames, clamp } from '@sidablist/core';
+import { createSidPlayer, parseSidFile, frames, clamp, playCallIntervalUs } from '@sidablist/core';
 import type {
   SidPlayer,
   PlayerSnapshot,
@@ -185,6 +185,13 @@ export class DeckRuntime {
 
   snapshot(slot: Slot): PlayerSnapshot {
     return this.requireSlot(slot).player.getSnapshot();
+  }
+
+  /** Microseconds per play call for this slot's loaded tune — what converts a position in play
+   *  calls to time. */
+  playCallIntervalUs(slot: Slot): number {
+    const { nominalIntervalUs, rate } = this.snapshot(slot).tempo;
+    return playCallIntervalUs(nominalIntervalUs, rate);
   }
 
   position(slot: Slot): Frames {

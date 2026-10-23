@@ -459,6 +459,22 @@ describe('DeckService', () => {
     expect(store.deck('B')().loaded).toBeNull();
   });
 
+  describe('play-call timing', () => {
+    it('is unknown on an empty deck, lands from the engine on a load, and refreshes on a subtune switch', async () => {
+      expect(store.deck('A')().playCallIntervalUs).toBeNull();
+
+      await loadAndWait('A', register(makeFixture({ subtuneCount: 2 })));
+      const interval = runtime.playCallIntervalUs('A');
+      expect(interval).toBeGreaterThan(0);
+      expect(store.deck('A')().playCallIntervalUs).toBe(interval);
+      expect(store.deck('B')().playCallIntervalUs).toBeNull();
+
+      store.setDeckTiming({ slot: 'A', playCallIntervalUs: null });
+      await service.selectSubtune('A', 2);
+      expect(store.deck('A')().playCallIntervalUs).toBe(runtime.playCallIntervalUs('A'));
+    });
+  });
+
   describe('togglePlayPause', () => {
     it('pauses a playing deck', async () => {
       const fixture = register(makeFixture());
@@ -861,6 +877,129 @@ describe('DeckService', () => {
         expect(store.deck('A')().speed).toBe(1);
       });
 
+      describe('nudge', () => {
+        it('adds the amount over the fader value while held and releases onto it exactly', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 1.012);
+
+          service.setNudge('A', 'up', true);
+          expect(store.deck('A')().speed).toBeCloseTo(1.062, 10);
+          expect(store.deck('A')().faderSpeed).toBe(1.012);
+          expect(store.deck('A')().nudging).toBe(true);
+          expect(runtime.snapshot('A').tempo.multiplier).toBe(store.deck('A')().speed);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(1.012);
+          expect(store.deck('A')().faderSpeed).toBe(1.012);
+          expect(store.deck('A')().nudging).toBe(false);
+        });
+
+        it('follows the fader while held, and releases onto the moved fader', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setNudge('A', 'up', true);
+
+          service.setSpeed('A', 1.1);
+          expect(store.deck('A')().speed).toBeCloseTo(1.15, 10);
+          expect(store.deck('A')().faderSpeed).toBe(1.1);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(1.1);
+        });
+
+        it('plays the fader value with both pads held, and releasing down leaves the up amount applied', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 0.9);
+
+          service.setNudge('A', 'up', true);
+          service.setNudge('A', 'down', true);
+          expect(store.deck('A')().speed).toBe(0.9);
+          expect(store.deck('A')().nudging).toBe(true);
+
+          service.setNudge('A', 'down', false);
+          expect(store.deck('A')().speed).toBeCloseTo(0.95, 10);
+          expect(store.deck('A')().nudging).toBe(true);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(0.9);
+          expect(store.deck('A')().nudging).toBe(false);
+        });
+
+        it('uses the given amount, and the default for a non-finite or non-positive one', async () => {
+          await loadAndWait('A', register(makeFixture()));
+
+          service.setNudge('A', 'up', true, 0.1);
+          expect(store.deck('A')().speed).toBeCloseTo(1.1, 10);
+          service.setNudge('A', 'up', false);
+
+          for (const amount of [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.2]) {
+            service.setNudge('A', 'up', true, amount);
+            expect(store.deck('A')().speed).toBeCloseTo(1.05, 10);
+            service.setNudge('A', 'up', false);
+          }
+          expect(store.deck('A')().speed).toBe(1);
+        });
+
+        it('holds at the top of an excursion to 1.7 and releases exactly onto it', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 1.5);
+          service.jumpSpeed('A', 'up');
+          const limit = store.deck('A')().speed;
+          expect(limit).toBeCloseTo(1.7);
+
+          service.setNudge('A', 'up', true);
+          expect(store.deck('A')().speed).toBe(limit);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(limit);
+          expect(store.deck('A')().nudging).toBe(false);
+        });
+
+        it('opens a jump from the fader value, not the nudged tempo, and closes onto it with the nudge still applied', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 1.2);
+          service.setNudge('A', 'up', true);
+
+          service.jumpSpeed('A', 'down');
+          expect(store.deck('A')().speed).toBeCloseTo(0.75, 10);
+          expect(store.deck('A')().faderSpeed).toBeCloseTo(0.7, 10);
+          expect(store.deck('A')().nudging).toBe(true);
+
+          service.jumpSpeed('A', 'home');
+          expect(store.deck('A')().faderSpeed).toBe(1.2);
+          expect(store.deck('A')().speed).toBeCloseTo(1.25, 10);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(1.2);
+        });
+
+        it('keeps each deck its own nudges', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          await loadAndWait('B', register(makeFixture()));
+
+          service.setNudge('A', 'up', true);
+
+          expect(store.deck('B')().speed).toBe(1);
+          expect(store.deck('B')().nudging).toBe(false);
+          expect(runtime.snapshot('B').tempo.multiplier).toBe(1);
+        });
+
+        it('a release is honoured on a deck that has stopped being shapeable, while a press is refused', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setNudge('A', 'up', true);
+          store.setDeckSwitching({ slot: 'A', switching: true });
+          vi.mocked(logWarn).mockClear();
+
+          service.setNudge('A', 'down', true);
+          expect(store.deck('A')().speed).toBeCloseTo(1.05, 10);
+          expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+
+          service.setNudge('A', 'up', false);
+          expect(store.deck('A')().speed).toBe(1);
+          expect(store.deck('A')().nudging).toBe(false);
+          expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+        });
+      });
+
       it('mute, hold and clear-all reach the engine and are reflected in the store; clear-all leaves holds', async () => {
         await loadAndWait('A', register(makeFixture()));
 
@@ -949,6 +1088,7 @@ describe('DeckService', () => {
       const commands: readonly [string, (target: DeckService) => void][] = [
         ['setSpeed', (target) => target.setSpeed('A', 1.3)],
         ['jumpSpeed', (target) => target.jumpSpeed('A', 'up')],
+        ['setNudge', (target) => target.setNudge('A', 'up', true)],
         ['setVoiceMuted', (target) => target.setVoiceMuted('A', 0, true)],
         ['setVoiceHeld', (target) => target.setVoiceHeld('A', 0, true)],
         ['clearVoiceMutes', (target) => target.clearVoiceMutes('A')],
@@ -1148,6 +1288,35 @@ describe('DeckService', () => {
         expect(releaseSpy.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
         expect(holdSpy).not.toHaveBeenCalled();
         expect(Math.max(...releaseSpy.mock.invocationCallOrder)).toBeLessThan(playSpy.mock.invocationCallOrder[0]);
+      });
+
+      it('a drop releases both nudges', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        service.setSpeed('A', 1.2);
+        service.setNudge('A', 'up', true);
+        service.setNudge('A', 'down', true, 0.1);
+
+        await loadAndWait('A', fixture);
+
+        expect(store.deck('A')().nudging).toBe(false);
+        expect(store.deck('A')().faderSpeed).toBe(1);
+        expect(store.deck('A')().speed).toBe(1);
+
+        service.setNudge('A', 'up', false);
+        expect(store.deck('A')().speed).toBe(1);
+      });
+
+      it('a subtune switch releases both nudges', async () => {
+        await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+        service.setNudge('A', 'up', true);
+        service.setNudge('A', 'down', true, 0.1);
+
+        await service.selectSubtune('A', 2);
+
+        expect(store.deck('A')().nudging).toBe(false);
+        expect(store.deck('A')().speed).toBe(1);
+        expect(runtime.snapshot('A').tempo.multiplier).toBe(1);
       });
 
       it('a subtune switch returns the same controls to home', async () => {

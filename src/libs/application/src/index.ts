@@ -11,6 +11,7 @@ export * from './lib/dj/dj-file-key.util';
 export * from './lib/dj/slot';
 export * from './lib/dj/ports';
 export * from './lib/dj/selectors/transport-summary';
+export * from './lib/dj/selectors/transport-time';
 export * from './lib/dj/selectors/binding-summary';
 export * from './lib/dj/cartridge-options';
 export * from './lib/dj/load-source';

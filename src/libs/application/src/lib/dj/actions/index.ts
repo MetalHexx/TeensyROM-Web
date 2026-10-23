@@ -17,6 +17,7 @@ import { resetDeckPanel } from './reset-deck-panel';
 import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
+import { setDeckTiming } from './set-deck-timing';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -39,6 +40,7 @@ export function withDjActions() {
       ...setDeckEngineControls(writableStore),
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),
+      ...setDeckTiming(writableStore),
     };
   });
 }

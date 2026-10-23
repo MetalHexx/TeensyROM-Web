@@ -256,7 +256,13 @@ describe('DjStore', () => {
         slot: 'A',
         detectedKey: { tonic: 1, mode: 'minor', camelot: '8A' },
       });
-      store.setDeckEngineControls({ slot: 'A', speed: 1.2, voices: store.decks().A.voices });
+      store.setDeckEngineControls({
+        slot: 'A',
+        speed: 1.2,
+        faderSpeed: 1.2,
+        nudging: false,
+        voices: store.decks().A.voices,
+      });
       store.setKeyDisplayFormat({ format: 'note' });
       vi.mocked(logInfo).mockClear();
 
@@ -287,7 +293,7 @@ describe('DjStore', () => {
       expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck B panel reset (tune change)');
     });
 
-    it('setDeckEngineControls sets speed and voices only, leaving the other slot untouched', () => {
+    it('setDeckEngineControls sets speed, fader value, nudge flag and voices only, leaving the other slot untouched', () => {
       const voices = [
         { muted: true, held: false },
         { muted: false, held: true },
@@ -295,12 +301,23 @@ describe('DjStore', () => {
       ];
       store.setDeckStatus({ slot: 'A', status: 'playing' });
 
-      store.setDeckEngineControls({ slot: 'A', speed: 1.37, voices });
+      store.setDeckEngineControls({ slot: 'A', speed: 1.37, faderSpeed: 1.32, nudging: true, voices });
 
       expect(store.decks().A.speed).toBe(1.37);
+      expect(store.decks().A.faderSpeed).toBe(1.32);
+      expect(store.decks().A.nudging).toBe(true);
       expect(store.decks().A.voices).toEqual(voices);
       expect(store.decks().A.status).toBe('playing');
       expect(store.decks().B.speed).toBe(1);
+      expect(store.decks().B.faderSpeed).toBe(1);
+      expect(store.decks().B.nudging).toBe(false);
+    });
+
+    it('setDeckTiming sets the play-call interval only, leaving the other slot untouched', () => {
+      store.setDeckTiming({ slot: 'A', playCallIntervalUs: 19_950 });
+
+      expect(store.decks().A.playCallIntervalUs).toBe(19_950);
+      expect(store.decks().B.playCallIntervalUs).toBeNull();
     });
 
     it('setDeckSwitching sets switching, leaving busy and the other slot untouched', () => {
@@ -639,6 +656,72 @@ describe('DjStore', () => {
 
       store.setDeckBusy({ slot: 'A', busy: true });
       expect(store.transportSummary('A')().subtuneDisabled).toBe(true);
+    });
+
+    describe('title, author, time and compact subtune', () => {
+      const loadTune = (): void =>
+        store.setDeckLoaded({
+          slot: 'A',
+          reference: tuneReference({ title: 'Commando', author: 'Rob Hubbard', subtuneCount: 4 }),
+        });
+
+      it('reports nothing known for an empty deck', () => {
+        const summary = store.transportSummary('A')();
+
+        expect(summary.title).toBeNull();
+        expect(summary.author).toBeNull();
+        expect(summary.elapsedText).toBe('00:00.0');
+        expect(summary.totalText).toBe('--:--');
+        expect(summary.subtuneCompact).toBe('–/–');
+      });
+
+      it('reports title and author from the loaded tune, and the compact subtune', () => {
+        loadTune();
+        store.setDeckSubtune({ slot: 'A', subtune: 2 });
+
+        const summary = store.transportSummary('A')();
+        expect(summary.title).toBe('Commando');
+        expect(summary.author).toBe('Rob Hubbard');
+        expect(summary.subtuneCompact).toBe('2/4');
+      });
+
+      it('derives elapsed and total from the play-call interval, and follows the playhead', () => {
+        loadTune();
+        store.setDeckTiming({ slot: 'A', playCallIntervalUs: 20_000 });
+        store.setDeckStructure({
+          slot: 'A',
+          structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+          lengthFrames: 9_000,
+        });
+        store.samplePosition({ slot: 'A', positionFrames: 3_001 });
+
+        const summary = store.transportSummary('A')();
+        expect(summary.elapsedText).toBe('01:00.0');
+        expect(summary.totalText).toBe('03:00');
+
+        store.samplePosition({ slot: 'A', positionFrames: 2_999 });
+        expect(store.transportSummary('A')().elapsedText).toBe('00:59.9');
+      });
+
+      it('keeps the total unknown until both the length and the interval are known', () => {
+        loadTune();
+        store.setDeckStructure({
+          slot: 'A',
+          structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+          lengthFrames: 9_000,
+        });
+        expect(store.transportSummary('A')().totalText).toBe('--:--');
+
+        store.setDeckTiming({ slot: 'A', playCallIntervalUs: 20_000 });
+        expect(store.transportSummary('A')().totalText).toBe('03:00');
+      });
+
+      it('keeps the failure reason as the label of a failed deck', () => {
+        loadTune();
+        store.setDeckStatus({ slot: 'A', status: 'failed', error: 'Tune would not parse' });
+
+        expect(store.transportSummary('A')().label).toBe('Tune would not parse');
+      });
     });
 
     it('formats frameLabel and subtuneText', () => {

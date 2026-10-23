@@ -2,7 +2,8 @@ import { Injectable, effect, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
-import { DeckSpeed } from './deck-speed';
+import { DeckSpeed, type NudgeDirection } from './deck-speed';
+import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
@@ -47,9 +48,9 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  * `sequence` counter extends that protection through `runtime.play` itself, a span the loader's
  * guard cannot see because it has already returned by then.
  *
- * It also fronts the speed and voice commands and reflects the engine's tempo and voice state into
- * the store. Every load and subtune switch returns the deck's SID panel, speed, mutes and holds to
- * home before anything else, so a new tune never inherits the last one's settings.
+ * It also fronts the speed, nudge and voice commands and reflects the engine's tempo and voice state
+ * into the store. Every load and subtune switch returns the deck's SID panel, speed, nudges, mutes
+ * and holds to home before anything else, so a new tune never inherits the last one's settings.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -144,6 +145,7 @@ export class DeckService {
         },
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
+      this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
 
       await this.runtime.play(slot);
 
@@ -264,6 +266,7 @@ export class DeckService {
         },
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
+      this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
 
       // Restores the transport state the switch started from. A subtune shares no position with
       // its sibling, so "the position it was at" has no meaning here — a resumed pause holds the
@@ -327,6 +330,23 @@ export class DeckService {
       return;
     }
     this.deckSpeed.jump(slot, id);
+    this.reflectEngineControls(slot);
+  }
+
+  /** A nudge pad's press or release. A press is refused while the deck has nothing shapeable
+   *  loaded; a release is always honoured, so a nudge can never be left stuck. A non-finite or
+   *  non-positive `amount` falls back to the default. */
+  setNudge(
+    slot: Slot,
+    direction: NudgeDirection,
+    held: boolean,
+    amount: number = NUDGE_DEFAULT_AMOUNT
+  ): void {
+    if (held && !this.canShape(slot, 'setNudge')) {
+      return;
+    }
+    const usable = Number.isFinite(amount) && amount > 0 ? amount : NUDGE_DEFAULT_AMOUNT;
+    this.deckSpeed.setNudge(slot, direction, held, usable);
     this.reflectEngineControls(slot);
   }
 
@@ -436,19 +456,27 @@ export class DeckService {
     );
   }
 
-  /** Mirrors the engine's tempo and voice state onto the store, writing only on a difference —
-   *  every notification calls this, including those during a load's suspended window. */
+  /** Mirrors the engine's tempo and voice state, and the speed controls' fader value and nudge
+   *  state, onto the store, writing only on a difference — every notification calls this,
+   *  including those during a load's suspended window. */
   private reflectEngineControls(slot: Slot): void {
     const { tempo, voices } = this.runtime.snapshot(slot);
+    const faderSpeed = this.deckSpeed.faderValue(slot);
+    const nudging = this.deckSpeed.isNudging(slot);
     const deck = this.store.deck(slot)();
-    if (deck.speed !== tempo.multiplier || !sameVoices(deck.voices, voices)) {
-      this.store.setDeckEngineControls({ slot, speed: tempo.multiplier, voices });
+    if (
+      deck.speed !== tempo.multiplier ||
+      deck.faderSpeed !== faderSpeed ||
+      deck.nudging !== nudging ||
+      !sameVoices(deck.voices, voices)
+    ) {
+      this.store.setDeckEngineControls({ slot, speed: tempo.multiplier, faderSpeed, nudging, voices });
     }
   }
 
   /** Returns the deck's tune-shaping controls to home on both the store and the engine: the SID
-   *  panel and detected key (via the applier), tempo and any open speed excursion, latched mutes
-   *  and holds. */
+   *  panel and detected key (via the applier), tempo, held nudges and any open speed excursion,
+   *  latched mutes and holds. */
   private resetTuneShaping(slot: Slot): void {
     this.mixerApplier.resetPanel(slot);
     this.deckSpeed.reset(slot);

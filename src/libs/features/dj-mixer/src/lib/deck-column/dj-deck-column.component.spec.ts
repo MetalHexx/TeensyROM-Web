@@ -43,7 +43,12 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
     scrubPercent: 0,
     bar: { kind: 'unknown' },
     frameLabel: 'frame 0',
+    title: null,
+    author: null,
+    elapsedText: '00:00.0',
+    totalText: '--:--',
     subtuneText: 'Subtune 0 of 0',
+    subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
     errors: [],
@@ -406,7 +411,13 @@ describe('DjDeckColumnComponent', () => {
 
     it('shows the live multiplier and builds its names from the deck letter', () => {
       const { fixture, store } = renderLive(DECK_B);
-      store.setDeckEngineControls({ slot: 'B', speed: 0.75, voices: store.decks().B.voices });
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 0.75,
+        faderSpeed: 0.75,
+        nudging: false,
+        voices: store.decks().B.voices,
+      });
       fixture.detectChanges();
       const model = speedPanel(fixture).model();
 
@@ -427,12 +438,12 @@ describe('DjDeckColumnComponent', () => {
       const { fixture, store, deckService } = renderLive(DECK_B);
       const voices = store.decks().B.voices;
 
-      store.setDeckEngineControls({ slot: 'B', speed: 1.7, voices });
+      store.setDeckEngineControls({ slot: 'B', speed: 1.7, faderSpeed: 1.7, nudging: false, voices });
       fixture.detectChanges();
       expect(speedPanel(fixture).model().faderValue).toBe(1.5);
       expect(speedPanel(fixture).model().valueText).toBe('1.700x');
 
-      store.setDeckEngineControls({ slot: 'B', speed: 0.3, voices });
+      store.setDeckEngineControls({ slot: 'B', speed: 0.3, faderSpeed: 0.3, nudging: false, voices });
       fixture.detectChanges();
       expect(speedPanel(fixture).model().faderValue).toBe(0.5);
       expect(speedPanel(fixture).model().valueText).toBe('0.300x');
@@ -514,6 +525,8 @@ describe('DjDeckColumnComponent', () => {
       store.setDeckEngineControls({
         slot: 'B',
         speed: 1,
+        faderSpeed: 1,
+        nudging: false,
         voices: [
           { muted: true, held: false },
           { muted: false, held: false },
@@ -566,6 +579,8 @@ describe('DjDeckColumnComponent', () => {
       store.setDeckEngineControls({
         slot: 'A',
         speed: 1.2,
+        faderSpeed: 1.2,
+        nudging: false,
         voices: [
           { muted: true, held: false },
           { muted: true, held: false },
