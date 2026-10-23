@@ -4,8 +4,8 @@ namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
 /// The composability contract against the real engine: stdout carries only the result, stderr carries everything
-/// else, <c>--json</c> output and errors parse, and the exit code says what happened. Back-to-back device commands can
-/// wait up to about 5 seconds on tr-web's <c>/api/devices</c> rate limit; that is expected.
+/// else, <c>--json</c> output and errors parse, and the exit code says what happened. Back-to-back device commands do not
+/// wait: tr-web rate limits only full scans on <c>/api/devices</c>, not plain listings.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class ContractScenarios(SharedApiFixture api)

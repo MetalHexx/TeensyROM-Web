@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
-/// <c>trom device list</c> against the shared engine. The engine allows one device lookup per 5 seconds, so a run
-/// right after another can wait on it; that is expected.
+/// <c>trom device list</c> against the shared engine. The engine rate limits only full scans (one per 5 seconds), so
+/// a run right after another does not wait.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class DeviceScenarios(SharedApiFixture api)

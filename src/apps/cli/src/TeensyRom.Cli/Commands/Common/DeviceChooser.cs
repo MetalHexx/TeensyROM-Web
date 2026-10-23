@@ -34,9 +34,9 @@ internal interface IDeviceChooser
 
 /// <inheritdoc cref="IDeviceChooser"/>
 /// <remarks>
-/// Makes one <c>GetDevicesAsync</c> call per choice. tr-web's <c>/api/devices</c> answers one request per 5 seconds
-/// (a second waits in a queue of one, anything beyond is a 503), so back-to-back <c>trom</c> invocations can wait up to
-/// about 5 seconds on it. That is expected, not a bug. Keep device lookups to one per invocation.
+/// Makes one <c>GetDevicesAsync</c> call per choice. That is a plain listing, which tr-web does not rate limit, so
+/// back-to-back <c>trom</c> invocations do not wait on it. Only a full scan is limited, to one per 5 seconds (a second
+/// waits in a queue of one, anything beyond is a 503). Keep device lookups to one per invocation.
 /// </remarks>
 internal sealed class DeviceChooser(IDeviceService devices, ICliOutput output) : IDeviceChooser
 {
