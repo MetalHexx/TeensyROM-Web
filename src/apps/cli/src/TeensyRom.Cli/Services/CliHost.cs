@@ -25,6 +25,7 @@ using TeensyRom.Cli.Help;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.PathSetup;
+using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Services;
@@ -101,6 +102,10 @@ internal static class CliHost
             PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the files tr-web has cached for a storage. Until a full index is built (trom index build) results can be incomplete, and a notice on stderr says so.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
             PublicVerb.Of<FileLaunchOneShotCommand, FileLaunchOneShotSettings>("launch", "Launch one file; --player then opens the player on it.", ["file", "launch", "/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid"]),
             PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it. Picks from the files tr-web has cached, so a storage that is not fully indexed gets a notice on stderr.", ["file", "random", "--filter", "music", "--directory", "/music"]),
+            PublicVerb.Of<FileNextCommand, FilePlaybackSettings>("next", "Launch the next file after the one last launched on this TeensyROM: through its folder, its search results, or a new random pick.", ["file", "next"]),
+            PublicVerb.Of<FilePreviousCommand, FilePlaybackSettings>("previous", "Launch the file before the one last launched on this TeensyROM; after random picks, walk back through them.", ["file", "previous"]),
+            PublicVerb.Of<FilePauseCommand, FilePlaybackSettings>("pause", "Play/pause for music: pause or resume the song playing. Games and programs can't be paused, so they are stopped instead, which resets the TeensyROM; something stopped is launched again.", ["file", "pause"]),
+            PublicVerb.Of<FileStopCommand, FilePlaybackSettings>("stop", "Stop whatever is running by resetting the TeensyROM, the same reset as `trom device reset`.", ["file", "stop"]),
             PublicVerb.Of<FileFavoriteCommand, FilePathsSettings>("favorite", "Tag files as favorites; give paths, or - to read them from stdin.", ["file", "favorite", "/music/Commando.sid", "/music/Delta.sid"]),
             PublicVerb.Of<FileUnfavoriteCommand, FilePathsSettings>("unfavorite", "Untag favorites; give paths, or - to read them from stdin.", ["file", "unfavorite", "/favorites/music/Commando.sid"]),
             PublicVerb.Of<FileBanCommand, FilePathsSettings>("ban", "Ban files so they no longer show up; give paths, or - to read them from stdin.", ["file", "ban", "/music/Commando.sid"])
@@ -226,6 +231,7 @@ internal static class CliHost
         services.AddSingleton<ITypeResolver, TypeResolver>();
         services.AddSingleton<IProgressTimer, ProgressTimer>();
         services.AddSingleton<ILaunchHistory, LaunchHistory>();
+        services.AddSingleton<ILastLaunchStore, LastLaunchStore>();
 
         RegisterCommands(services);
 

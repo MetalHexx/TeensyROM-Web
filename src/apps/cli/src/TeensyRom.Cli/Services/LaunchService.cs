@@ -17,9 +17,11 @@ internal sealed class LaunchService(ITeensyRomApiClient api, IDeviceService devi
         {
             var response = await ApiErrors.Call(() => api.LaunchFileAsync(deviceId, storage.ToApi(), item.Path));
 
+            var launched = EnginesRecord(response) ?? item;
+
             return response.IsCompatible
-                ? new LaunchOutcome(LaunchStatus.Launched, item, response.Message)
-                : new LaunchOutcome(LaunchStatus.Incompatible, item, response.Message);
+                ? new LaunchOutcome(LaunchStatus.Launched, launched, response.Message)
+                : new LaunchOutcome(LaunchStatus.Incompatible, launched, response.Message);
         }
         catch (TeensyApiException ex) when (ex.StatusCode is not null)
         {
@@ -49,6 +51,15 @@ internal sealed class LaunchService(ITeensyRomApiClient api, IDeviceService devi
         {
             return Refused(ex);
         }
+    }
+
+    /// <summary>The file as the engine describes it, when its answer names one the CLI can launch.</summary>
+    private static ILaunchableItem? EnginesRecord(LaunchFileResponse response)
+    {
+        if (string.IsNullOrEmpty(response.LaunchedFile?.Path) || ApiMapper.ToLaunchable(response.LaunchedFile) is not { } record) return null;
+
+        record.IsCompatible = response.IsCompatible;
+        return record;
     }
 
     private static LaunchOutcome Refused(TeensyApiException ex) =>

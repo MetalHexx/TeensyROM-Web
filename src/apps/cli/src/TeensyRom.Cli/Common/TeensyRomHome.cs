@@ -41,6 +41,9 @@ internal static class TeensyRomHome
     /// <summary>Records which engine sources the engine this CLI started in source mode was built from.</summary>
     public static string SourceEngineRecordPath => Path.Combine(CliPath, "source-engine.json");
 
+    /// <summary>What each device last launched and how its player was set, so one <c>trom</c> run can carry on from the last.</summary>
+    public static string LastLaunchPath => Path.Combine(CliPath, "last-launch.json");
+
     /// <summary>
     /// Pins a relative <c>TEENSYROM_DATA_DIR</c> to its absolute path in this process, so an engine started from
     /// another working directory resolves the same home and lock. Does nothing when the variable is unset.

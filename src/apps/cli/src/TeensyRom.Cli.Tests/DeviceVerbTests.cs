@@ -5,6 +5,7 @@ using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Api;
+using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Services;
 
 namespace TeensyRom.Cli.Tests;
@@ -90,6 +91,44 @@ public sealed class DeviceVerbTests : IDisposable
         (await _host.RunAsync("device", "reset")).Should().Be(0);
 
         StdOut.Replace("\r\n", "\n").Should().Be("Pong.\nReset.\n");
+    }
+
+    private TestHost HostWith(ILastLaunchStore store)
+    {
+        var host = new TestHost(configure: services =>
+        {
+            services.AddSingleton<IDeviceChooser, DeviceChooser>();
+            services.AddSingleton(store);
+        });
+        host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
+        host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { Alpha, Charlie });
+        return host;
+    }
+
+    [Fact]
+    public async Task Reset_RecordsThatTheDevicesLastLaunchIsNoLongerPlaying()
+    {
+        var store = Substitute.For<ILastLaunchStore>();
+        using var host = HostWith(store);
+        host.Devices.ResetDeviceAsync("a-1", Arg.Any<CancellationToken>()).Returns("Reset.");
+
+        var exitCode = await host.RunAsync("device", "reset", "--device", "Alpha");
+
+        exitCode.Should().Be(0);
+        store.Received(1).MarkStopped("a-1");
+    }
+
+    [Fact]
+    public async Task Reset_WhenTheResetFails_LeavesTheRecordAlone()
+    {
+        var store = Substitute.For<ILastLaunchStore>();
+        using var host = HostWith(store);
+        host.Devices.ResetDeviceAsync("a-1", Arg.Any<CancellationToken>()).Returns(Task.FromException<string>(new TeensyApiException("The TeensyROM did not answer.", 502)));
+
+        var exitCode = await host.RunAsync("device", "reset", "--device", "Alpha");
+
+        exitCode.Should().NotBe(0);
+        store.DidNotReceiveWithAnyArgs().MarkStopped(default!);
     }
 
     [Fact]

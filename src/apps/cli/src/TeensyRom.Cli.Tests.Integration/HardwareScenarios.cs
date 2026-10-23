@@ -158,6 +158,125 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         JsonDocument.Parse(unfavorite.Output).RootElement[0].GetProperty("ok").GetBoolean().Should().BeTrue();
     }
 
+    /// <summary>
+    /// Runs one command line in a fresh CLI, as a separate <c>trom</c> invocation would: nothing but the CLI's home carries
+    /// over from the previous one.
+    /// </summary>
+    private static async Task<(int ExitCode, JsonElement Json, string Error)> RunJsonAsync(params string[] args)
+    {
+        using var cli = new CliHarness();
+
+        var exitCode = await cli.RunAsync(args);
+
+        return (exitCode, string.IsNullOrWhiteSpace(cli.Output) ? default : JsonDocument.Parse(cli.Output).RootElement, cli.Error);
+    }
+
+    private static string FilePath(JsonElement launch) => launch.GetProperty("file").GetProperty("path").GetString()!;
+
+    private static bool IsFileOfType(string path, params string[] extensions) =>
+        extensions.Any(extension => path.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// After launching the bench file from its folder, <c>file next</c> in another invocation launches a file of the
+    /// same folder and <c>file previous</c> comes back to the bench file.
+    /// </summary>
+    [SkippableFact]
+    public async Task FileNextThenPrevious_AfterALaunchFromAFolder_StayInThatFolder_AndComeBack()
+    {
+        var path = BenchFileOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+
+        var launch = await RunJsonAsync("file", "launch", path, "--device", device.DeviceId, "--storage", storage, "--json");
+        launch.ExitCode.Should().Be(0, launch.Error);
+        var next = await RunJsonAsync("file", "next", "--device", device.DeviceId, "--json");
+        var previous = await RunJsonAsync("file", "previous", "--device", device.DeviceId, "--json");
+
+        next.ExitCode.Should().Be(0, next.Error);
+        next.Json.GetProperty("status").GetString().Should().Be("launched");
+        Path.GetDirectoryName(FilePath(next.Json))!.Replace('\\', '/').Should().BeEquivalentTo(Path.GetDirectoryName(path)!.Replace('\\', '/'));
+        previous.ExitCode.Should().Be(0, previous.Error);
+        FilePath(previous.Json).Should().BeEquivalentTo(path);
+    }
+
+    /// <summary>After <c>file random</c>, <c>file next</c> picks again and <c>file previous</c> walks back to the first pick.</summary>
+    [SkippableFact]
+    public async Task FileNextThenPrevious_AfterFileRandom_WalkBackThroughThePicks()
+    {
+        BenchFileOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+
+        var random = await RunJsonAsync("file", "random", "--filter", "music", "--device", device.DeviceId, "--storage", storage, "--json");
+        Skip.If(random.ExitCode == (int)CliExitCode.NotFound, "the bench storage has no music files");
+        random.ExitCode.Should().Be(0, random.Error);
+        var next = await RunJsonAsync("file", "next", "--device", device.DeviceId, "--json");
+        var previous = await RunJsonAsync("file", "previous", "--device", device.DeviceId, "--json");
+
+        next.ExitCode.Should().Be(0, next.Error);
+        next.Json.GetProperty("file").GetProperty("fileType").GetString().Should().Be("sid", "the filter of the first pick carries over");
+        previous.ExitCode.Should().Be(0, previous.Error);
+        FilePath(previous.Json).Should().BeEquivalentTo(FilePath(random.Json));
+    }
+
+    /// <summary>Pauses the bench song, then resumes it, each from its own invocation. Needs CLI_BENCH_FILE to be a SID.</summary>
+    [SkippableFact]
+    public async Task FilePause_OnASong_PausesThenResumes()
+    {
+        var path = BenchFileOrSkip();
+        Skip.IfNot(IsFileOfType(path, ".sid"), "CLI_BENCH_FILE is not a SID");
+        var (device, storage) = BenchDeviceOrSkip();
+
+        (await RunJsonAsync("file", "launch", path, "--device", device.DeviceId, "--storage", storage, "--json")).ExitCode.Should().Be(0);
+        var pause = await RunJsonAsync("file", "pause", "--device", device.DeviceId, "--json");
+        var resume = await RunJsonAsync("file", "pause", "--device", device.DeviceId, "--json");
+        await RunJsonAsync("file", "stop", "--device", device.DeviceId, "--json");
+
+        pause.ExitCode.Should().Be(0, pause.Error);
+        pause.Json.GetProperty("action").GetString().Should().Be("paused");
+        resume.ExitCode.Should().Be(0, resume.Error);
+        resume.Json.GetProperty("action").GetString().Should().Be("resumed");
+    }
+
+    /// <summary>
+    /// A game can't be paused: <c>file pause</c> stops it by resetting the device, and the next one launches it again.
+    /// Needs CLI_BENCH_FILE to be a game or program.
+    /// </summary>
+    [SkippableFact]
+    public async Task FilePause_OnAGame_StopsIt_AndTheNextPauseLaunchesItAgain()
+    {
+        var path = BenchFileOrSkip();
+        Skip.IfNot(IsFileOfType(path, ".prg", ".crt", ".p00", ".d64"), "CLI_BENCH_FILE is not a game or program");
+        var (device, storage) = BenchDeviceOrSkip();
+
+        (await RunJsonAsync("file", "launch", path, "--device", device.DeviceId, "--storage", storage, "--json")).ExitCode.Should().Be(0);
+        var stop = await RunJsonAsync("file", "pause", "--device", device.DeviceId, "--json");
+        var again = await RunJsonAsync("file", "pause", "--device", device.DeviceId, "--json");
+        await RunJsonAsync("file", "stop", "--device", device.DeviceId, "--json");
+
+        stop.ExitCode.Should().Be(0, stop.Error);
+        stop.Json.GetProperty("action").GetString().Should().Be("stopped");
+        stop.Json.GetProperty("reason").GetString().Should().NotBeNullOrWhiteSpace();
+        again.ExitCode.Should().Be(0, again.Error);
+        again.Json.GetProperty("action").GetString().Should().Be("relaunched");
+    }
+
+    /// <summary>Stops the launched bench file by resetting the device; the stop is remembered, so the next pause launches it again.</summary>
+    [SkippableFact]
+    public async Task FileStop_ResetsTheDevice_AndLeavesTheLastLaunchStopped()
+    {
+        var path = BenchFileOrSkip();
+        var (device, storage) = BenchDeviceOrSkip();
+
+        (await RunJsonAsync("file", "launch", path, "--device", device.DeviceId, "--storage", storage, "--json")).ExitCode.Should().Be(0);
+        var stop = await RunJsonAsync("file", "stop", "--device", device.DeviceId, "--json");
+        var pause = await RunJsonAsync("file", "pause", "--device", device.DeviceId, "--json");
+        await RunJsonAsync("file", "stop", "--device", device.DeviceId, "--json");
+
+        stop.ExitCode.Should().Be(0, stop.Error);
+        stop.Json.GetProperty("action").GetString().Should().Be("stopped");
+        FilePath(stop.Json).Should().BeEquivalentTo(path);
+        pause.Json.GetProperty("action").GetString().Should().Be("relaunched");
+    }
+
     private static string BenchFileOrSkip()
     {
         var path = Environment.GetEnvironmentVariable("CLI_BENCH_FILE") ?? string.Empty;
