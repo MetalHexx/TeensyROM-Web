@@ -1,0 +1,154 @@
+:host {
+  --synth-fader-width: 28px;
+  --synth-fader-cap-height: 16px;
+  --synth-fader-slot-width: 6px;
+  display: block;
+  flex: 1 1 auto;
+  width: var(--synth-fader-width);
+  min-height: 80px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:host([data-disabled]) {
+  opacity: 0.45;
+
+  input[type='range'] {
+    cursor: not-allowed;
+  }
+}
+
+.fader {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+// Ticks and the home line are laid out against the cap's travel (the cap centre runs from half a
+// cap in from each end), so a mark lines up with the cap sitting on that value.
+.ticks {
+  position: absolute;
+  inset: calc(var(--synth-fader-cap-height) / 2) 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.28) 0,
+        rgba(255, 255, 255, 0.28) 1px,
+        transparent 1px,
+        transparent 12.5%
+      )
+      left / 5px 100% no-repeat,
+    repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.28) 0,
+        rgba(255, 255, 255, 0.28) 1px,
+        transparent 1px,
+        transparent 12.5%
+      )
+      right / 5px 100% no-repeat;
+}
+
+.home {
+  position: absolute;
+  right: 0;
+  left: 0;
+  bottom: calc(
+    var(--synth-fader-cap-height) / 2 + (100% - var(--synth-fader-cap-height)) *
+      var(--synth-fader-home)
+  );
+  height: 2px;
+  margin-bottom: -1px;
+  background: var(--color-primary-bright);
+  box-shadow: 0 0 6px rgba(var(--color-primary-bright-rgb), 0.8);
+  pointer-events: none;
+}
+
+input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl; // min at the bottom
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+
+  &::-webkit-slider-runnable-track {
+    width: var(--synth-fader-slot-width);
+    height: 100%;
+    background: var(--synth-display-face);
+    border: 1px solid var(--synth-display-border);
+    border-radius: 3px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  &::-moz-range-track {
+    width: var(--synth-fader-slot-width);
+    height: 100%;
+    background: var(--synth-display-face);
+    border: 1px solid var(--synth-display-border);
+    border-radius: 3px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    box-sizing: border-box;
+    width: var(--synth-fader-width);
+    height: var(--synth-fader-cap-height);
+    margin-left: calc((var(--synth-fader-slot-width) - var(--synth-fader-width)) / 2);
+    background:
+      linear-gradient(
+        180deg,
+        transparent calc(50% - 1px),
+        var(--synth-pointer) calc(50% - 1px),
+        var(--synth-pointer) calc(50% + 1px),
+        transparent calc(50% + 1px)
+      ),
+      linear-gradient(180deg, var(--synth-control-face-top), var(--synth-control-face-bottom));
+    border: 1px solid var(--synth-control-border);
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 2px 3px rgba(0, 0, 0, 0.7);
+  }
+
+  &::-moz-range-thumb {
+    box-sizing: border-box;
+    width: var(--synth-fader-width);
+    height: var(--synth-fader-cap-height);
+    background:
+      linear-gradient(
+        180deg,
+        transparent calc(50% - 1px),
+        var(--synth-pointer) calc(50% - 1px),
+        var(--synth-pointer) calc(50% + 1px),
+        transparent calc(50% + 1px)
+      ),
+      linear-gradient(180deg, var(--synth-control-face-top), var(--synth-control-face-bottom));
+    border: 1px solid var(--synth-control-border);
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 2px 3px rgba(0, 0, 0, 0.7);
+  }
+
+  &:focus-visible::-webkit-slider-thumb {
+    border-color: var(--color-highlight);
+  }
+
+  &:focus-visible::-moz-range-thumb {
+    border-color: var(--color-highlight);
+  }
+}

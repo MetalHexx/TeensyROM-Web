@@ -100,3 +100,5 @@ export * from './lib/synth-key/synth-key.component';
 export * from './lib/hold-pad/hold-pad.component';
 export * from './lib/position-strip/position-strip.component';
 export * from './lib/deck-transport/deck-transport.component';
+export * from './lib/synth-fader/synth-fader.component';
+export * from './lib/deck-channel-strip/deck-channel-strip.component';
