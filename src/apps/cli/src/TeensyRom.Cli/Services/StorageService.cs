@@ -114,6 +114,8 @@ internal sealed class StorageService(ITeensyRomApiClient api, IDeviceService dev
         await ApiErrors.Call(() => api.IndexAsync(deviceId, storage, startingPath));
     }
 
+    public async Task IndexAllAsync(CancellationToken ct = default) => await ApiErrors.Call(() => api.IndexAllAsync(ct));
+
     public async Task SaveFavorite(ILaunchableItem item)
     {
         var deviceId = devices.RequireDeviceId();

@@ -39,6 +39,42 @@ public class DeviceLogStreamTests
         DeviceLogStream.TryReadMessage(line, DeviceId, out _).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("(abc123) Internal: => Indexing (SD): /music", "abc123", "=> Indexing (SD): /music")]
+    [InlineData("(other-9) Internal Success: Indexing completed for USB storage.", "other-9", "Indexing completed for USB storage.")]
+    public void TryReadAnyMessage_GivesTheDeviceIdAndTheMessage(string line, string expectedDevice, string expectedMessage)
+    {
+        DeviceLogStream.TryReadAnyMessage(line, out var deviceId, out var message).Should().BeTrue();
+
+        deviceId.Should().Be(expectedDevice);
+        message.Should().Be(expectedMessage);
+    }
+
+    [Theory]
+    [InlineData("Log streaming faulted: boom")]
+    [InlineData("seen (abc123) Internal: not at the start")]
+    [InlineData("() Internal: no id")]
+    [InlineData("(abc123 Internal: unclosed")]
+    public void TryReadAnyMessage_IgnoresLinesWithoutADevicePrefix(string line)
+    {
+        DeviceLogStream.TryReadAnyMessage(line, out _, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task FollowEveryDeviceAsync_GivesEveryDevicesLines_AndUnsubscribesWhenDisposed()
+    {
+        await using var trWeb = await FakeTrWebLogs.StartAsync<FakeLogsHub>();
+        var stream = StreamTo(trWeb.Address);
+
+        var following = await stream.FollowEveryDeviceAsync((device, line) => trWeb.Events.Enqueue($"{device}: {line}"));
+        await trWeb.LogAsync("(abc123) Internal: => Indexing (SD): /music");
+        await trWeb.LogAsync("(other) Internal: => Indexing (USB): /games");
+        await trWeb.LogAsync("Log streaming faulted: boom");
+        await following.DisposeAsync();
+
+        trWeb.Events.Should().Equal("subscribe", "abc123: => Indexing (SD): /music", "other: => Indexing (USB): /games", "unsubscribe");
+    }
+
     [Fact]
     public async Task FollowAsync_SubscribesBeforeTheSelectedDevicesLinesArrive_AndUnsubscribesWhenDisposed()
     {

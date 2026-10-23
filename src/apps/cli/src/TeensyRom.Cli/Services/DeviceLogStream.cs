@@ -20,26 +20,37 @@ internal sealed class DeviceLogStream(IDeviceService devices, ILoggingService lo
     private const string SubscribeMethod = "Subscribe";
     private const string UnsubscribeMethod = "Unsubscribe";
 
-    public async Task<IAsyncDisposable> FollowAsync(Action<string> onLine, CancellationToken ct = default)
+    public Task<IAsyncDisposable> FollowAsync(Action<string> onLine, CancellationToken ct = default)
     {
         var deviceId = devices.RequireDeviceId();
+
+        return SubscribeAsync(line =>
+        {
+            if (TryReadMessage(line, deviceId, out var message)) onLine(message);
+        }, ct);
+    }
+
+    public Task<IAsyncDisposable> FollowEveryDeviceAsync(Action<string, string> onLine, CancellationToken ct = default) =>
+        SubscribeAsync(line =>
+        {
+            if (TryReadAnyMessage(line, out var deviceId, out var message)) onLine(deviceId, message);
+        }, ct);
+
+    private async Task<IAsyncDisposable> SubscribeAsync(Action<string> onRawLine, CancellationToken ct)
+    {
         var hub = new HubConnectionBuilder().WithUrl(new Uri(apiAddress, HubPath)).Build();
         var following = new Following(hub, log);
 
         hub.On<string>(LogProducedEvent, line =>
         {
             following.NoteLine();
-
-            if (TryReadMessage(line, deviceId, out var message))
-            {
-                onLine(message);
-            }
+            onRawLine(line);
         });
 
         try
         {
             await ApiErrors.Call(() => hub.StartAsync(ct));
-            await SubscribeAsync(hub, ct);
+            await InvokeSubscribeAsync(hub, ct);
         }
         catch
         {
@@ -51,7 +62,7 @@ internal sealed class DeviceLogStream(IDeviceService devices, ILoggingService lo
 
     // A tr-web without per-listener logs answers the invoke with a HubException (no such method); a connection that
     // dropped meanwhile throws InvalidOperationException. Neither is an API failure ApiErrors knows.
-    private static async Task SubscribeAsync(HubConnection hub, CancellationToken ct)
+    private static async Task InvokeSubscribeAsync(HubConnection hub, CancellationToken ct)
     {
         try
         {
@@ -70,13 +81,30 @@ internal sealed class DeviceLogStream(IDeviceService devices, ILoggingService lo
     public static bool TryReadMessage(string line, string deviceId, out string message)
     {
         message = string.Empty;
-        var prefix = $"({deviceId}) ";
 
-        if (!line.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        if (!TryReadAnyMessage(line, out var lineDeviceId, out var lineMessage) || lineDeviceId != deviceId) return false;
 
-        var withLevel = line[prefix.Length..];
+        message = lineMessage;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a line tr-web logged for any device, which arrives as "(deviceId) Level: message". Lines for no device
+    /// are not read.
+    /// </summary>
+    public static bool TryReadAnyMessage(string line, out string deviceId, out string message)
+    {
+        deviceId = message = string.Empty;
+
+        if (!line.StartsWith('(')) return false;
+
+        var idEnd = line.IndexOf(") ", StringComparison.Ordinal);
+        if (idEnd < 2) return false;
+
+        var withLevel = line[(idEnd + 2)..];
         var levelEnd = withLevel.IndexOf(": ", StringComparison.Ordinal);
 
+        deviceId = line[1..idEnd];
         message = levelEnd < 0 ? withLevel : withLevel[(levelEnd + 2)..];
         return true;
     }

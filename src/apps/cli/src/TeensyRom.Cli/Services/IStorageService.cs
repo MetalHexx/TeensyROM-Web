@@ -33,6 +33,10 @@ internal interface IStorageService
     /// <summary>Indexes a directory and everything below it; an empty path or "/" indexes the whole storage.</summary>
     Task Index(string path);
 
+    /// <summary>Indexes every storage on every connected TeensyROM. Needs no device.</summary>
+    /// <exception cref="TeensyApiException">tr-web answered 404 when no device is connected, or 500 when a storage failed to index.</exception>
+    Task IndexAllAsync(CancellationToken ct = default);
+
     /// <summary>Tags the file as a favorite and flips <see cref="IStorageItem.IsFavorite"/> on success.</summary>
     Task SaveFavorite(ILaunchableItem item);
 

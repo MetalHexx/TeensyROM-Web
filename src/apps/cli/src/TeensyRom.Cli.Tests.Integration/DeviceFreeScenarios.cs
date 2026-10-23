@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 
 namespace TeensyRom.Cli.Tests.Integration;
@@ -10,6 +11,28 @@ namespace TeensyRom.Cli.Tests.Integration;
 [Collection(RealApiCollection.Name)]
 public sealed class DeviceFreeScenarios
 {
+    [Fact]
+    public async Task EngineStatus_WithTheEngineStopped_ReportsTheLogFolder_AndNoLogFile()
+    {
+        using var bound = TestEngine.Bounded();
+        await TestEngine.StopAsync(bound.Token);
+
+        try
+        {
+            using var cli = new CliHarness();
+
+            (await cli.RunAsync("engine", "status", "--json")).Should().Be(3);
+
+            var status = JsonDocument.Parse(cli.Output).RootElement;
+            status.GetProperty("logFolder").GetString().Should().Be(TeensyRomHome.EngineLogsPath);
+            status.TryGetProperty("logFile", out _).Should().BeFalse();
+        }
+        finally
+        {
+            await TestEngine.EnsureAsync(bound.Token);
+        }
+    }
+
     [Fact]
     public async Task EngineStatus_HelpAndVersion_RunWithoutAnEngine_AndStartNone()
     {

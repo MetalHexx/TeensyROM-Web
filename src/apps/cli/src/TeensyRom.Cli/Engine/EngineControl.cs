@@ -105,7 +105,8 @@ internal sealed class EngineControl(
 
         return await probe.ProbeAsync(ct) switch
         {
-            EngineProbeResult.Engine running => new EngineStatus(true, running.Version, ownVersion, SameVersion(running.Version), address, null),
+            EngineProbeResult.Engine running => new EngineStatus(
+                true, running.Version, ownVersion, SameVersion(running.Version), address, null, TeensyRomHome.EngineLogsPath, NewestEngineLog()),
             EngineProbeResult.NotReady => NotRunning(address,
                 $"An engine is listening on {address} but isn't answering yet — run `trom engine status` again in a moment."),
             EngineProbeResult.Foreign foreign => NotRunning(address,
@@ -114,7 +115,26 @@ internal sealed class EngineControl(
         };
     }
 
-    private EngineStatus NotRunning(string address, string problem) => new(false, null, ownVersion, false, address, problem);
+    private EngineStatus NotRunning(string address, string problem) =>
+        new(false, null, ownVersion, false, address, problem, TeensyRomHome.EngineLogsPath);
+
+    /// <summary>
+    /// The newest <c>Logs-*.txt</c> in the engine's log folder. The engine names them <c>Logs-yyyy-MM-dd_HH-mm-ss.txt</c>,
+    /// so the highest name is the latest.
+    /// </summary>
+    private static string? NewestEngineLog()
+    {
+        try
+        {
+            return Directory.EnumerateFiles(TeensyRomHome.EngineLogsPath, "Logs-*.txt")
+                .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>Reuses the running engine when it is this CLI's version and build; otherwise replaces it.</summary>
     private async Task<EngineReady> EnsureCurrentAsync(EngineProbeResult.Engine running, Attempt attempt, CancellationToken ct)

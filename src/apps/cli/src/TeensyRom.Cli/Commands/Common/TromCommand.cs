@@ -65,10 +65,15 @@ internal abstract class DeviceCommand<T>(
     {
         await base.PrepareAsync(settings, ct);
 
+        if (!NeedsDevice(settings)) return;
+
         devices.Select(await chooser.ChooseAsync(settings.Device, DeviceScope.Online, ct));
 
         if (settings is StorageSettings withStorage) storage.UseStorage(ChooseStorage(withStorage));
     }
+
+    /// <summary>Whether this run works with one device; a command that acts on every device says no and none is chosen.</summary>
+    protected virtual bool NeedsDevice(T settings) => true;
 
     /// <summary>
     /// Warns, after the command's results, when tr-web holds no full index of the chosen storage: search and random only
