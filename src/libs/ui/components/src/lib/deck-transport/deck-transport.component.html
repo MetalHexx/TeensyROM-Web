@@ -1,0 +1,104 @@
+<lib-synth-panel class="plate">
+  <section class="transport" [attr.aria-label]="model().accessibleName">
+    @if (showsError()) {
+    <div class="lcd lcd--error">
+      @for (error of model().errors; track $index) {
+      <p class="error-line" role="alert">{{ error }}</p>
+      } @empty {
+      <p class="error-line">{{ model().stateLabel }}</p>
+      }
+    </div>
+    } @else {
+    <div class="lcd">
+      <div class="lcd-line lcd-line--tune">
+        <span class="state" [attr.data-state]="model().state">
+          <span class="state-light" aria-hidden="true"></span>
+          <span class="state-word">{{ model().stateLabel }}</span>
+        </span>
+        @if (model().title !== null) {
+        <span class="tune">
+          <span class="title">{{ model().title }}</span>
+          @if (model().author) {
+          <span class="author">{{ model().author }}</span>
+          }
+        </span>
+        } @else {
+        <span class="tune tune--empty">{{ model().emptyText }}</span>
+        }
+      </div>
+      <div class="lcd-line lcd-line--time">
+        <span class="elapsed">{{ elapsedText() }}</span>
+        <span class="total">/ {{ model().totalText }}</span>
+        <span class="frame">{{ frameLabel() }}</span>
+      </div>
+    </div>
+    }
+
+    <lib-position-strip
+      data-control="seek"
+      [barState]="model().bar"
+      [positionPercent]="positionPercent()"
+      [accessibleName]="model().scrubAccessibleName"
+      [valueText]="valueText()"
+      (scrubInput)="scrubInput.emit($event)"
+      (scrubCommit)="scrubCommit.emit($event)"
+    />
+
+    <div class="keys">
+      <lib-synth-key
+        class="play-key"
+        data-control="play-pause"
+        [label]="model().playPause.showing === 'play' ? 'Play' : 'Pause'"
+        [icon]="model().playPause.showing === 'play' ? 'play_arrow' : 'pause'"
+        [accessibleName]="
+          model().playPause.showing === 'play'
+            ? model().actionAccessibleNames.play
+            : model().actionAccessibleNames.pause
+        "
+        [stateLight]="playLight()"
+        [disabled]="model().playPause.disabled"
+        (press)="playPauseClick.emit()"
+      />
+      <lib-synth-key
+        class="stop-key"
+        data-control="stop"
+        label="Stop"
+        icon="stop"
+        [accessibleName]="model().actionAccessibleNames.stop"
+        [disabled]="!model().canStop"
+        (press)="stopClick.emit()"
+      />
+      <lib-synth-key
+        class="repeat-key"
+        data-control="repeat"
+        label="Repeat"
+        icon="repeat"
+        [accessibleName]="model().actionAccessibleNames.repeat"
+        [latched]="model().repeatTrack"
+        (press)="repeatTrackChange.emit(!model().repeatTrack)"
+      />
+      <div class="subtune" data-control="subtune" role="group" aria-label="Subtune">
+        <lib-synth-key
+          class="step-key"
+          data-part="previous"
+          icon="chevron_left"
+          [accessibleName]="model().subtune.previousAccessibleName"
+          [disabled]="model().subtune.disabled"
+          (press)="previousSubtune.emit()"
+        />
+        <span class="subtune-display" [attr.data-disabled]="model().subtune.disabled ? '' : null">
+          <span class="subtune-caption" aria-hidden="true">SUB</span>
+          <span class="subtune-text">{{ model().subtune.text }}</span>
+        </span>
+        <lib-synth-key
+          class="step-key"
+          data-part="next"
+          icon="chevron_right"
+          [accessibleName]="model().subtune.nextAccessibleName"
+          [disabled]="model().subtune.disabled"
+          (press)="nextSubtune.emit()"
+        />
+      </div>
+    </div>
+  </section>
+</lib-synth-panel>

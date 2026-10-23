@@ -98,3 +98,5 @@ export * from './lib/sid-filter-section/sid-filter-section.component';
 export * from './lib/hold-press/hold-press.directive';
 export * from './lib/synth-key/synth-key.component';
 export * from './lib/hold-pad/hold-pad.component';
+export * from './lib/position-strip/position-strip.component';
+export * from './lib/deck-transport/deck-transport.component';

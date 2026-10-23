@@ -1,0 +1,138 @@
+// The native range is the hit target and the keyboard slider; everything drawn sits beneath it and
+// ignores the pointer. The range is made see-through by styling, never `opacity: 0` or
+// `visibility: hidden` — a browser test reads those as not visible. The thumb is a 2px sliver so a
+// click lands where the drawn playhead will then be, and the strip draws its frame as an inset ring
+// so the range and the segments span exactly the same width.
+:host {
+  position: relative;
+  display: block;
+  height: var(--position-strip-height, 1.75rem);
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input[type='range'] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+
+  &::-webkit-slider-runnable-track {
+    height: 100%;
+    background: transparent;
+    border: 0;
+  }
+
+  &::-moz-range-track {
+    height: 100%;
+    background: transparent;
+    border: 0;
+  }
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 2px;
+    height: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  &::-moz-range-thumb {
+    width: 2px;
+    height: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+
+  &:focus-visible ~ .strip {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+}
+
+.strip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: var(--border-radius-sm);
+  background: var(--synth-display-face);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--synth-display-border);
+  }
+}
+
+.segments {
+  position: absolute;
+  inset: 5px 0;
+  display: flex;
+  gap: 1px;
+}
+
+.segment {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1px;
+  background: rgba(var(--glassy-color), 0.07);
+
+  &[data-lit][data-tone='intro'] {
+    background: var(--color-primary-bright);
+    box-shadow: 0 0 5px rgba(var(--color-primary-bright-rgb), 0.6);
+  }
+
+  &[data-lit][data-tone='music'] {
+    background: var(--color-highlight);
+    box-shadow: 0 0 5px rgba(var(--color-highlight-rgb), 0.5);
+  }
+
+  &[data-lit][data-tone='dim'] {
+    background: var(--color-dimmed);
+  }
+}
+
+// Nothing has been looked for yet: every segment sits dim, lit or not.
+.strip[data-state='analyzing'] .segment {
+  background: rgba(var(--glassy-color), 0.12);
+  box-shadow: none;
+}
+
+.loop-mark,
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.loop-mark {
+  background: var(--color-directory);
+  box-shadow: 0 0 6px rgba(245, 215, 110, 0.85);
+}
+
+.playhead {
+  background: var(--synth-pointer);
+  box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
+}

@@ -1,0 +1,258 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
+// The host is the size container: the layout below reacts to the width this component is given,
+// not the viewport's, so the same transport serves a wide deck column and a stacked phone one.
+:host {
+  display: block;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// The faceplate's default padding is 48px of a 300px column; trimmed to the scale's small step, as
+// the SID panel's faceplate does, so the narrow layout keeps its width. The clip is the backstop
+// for widths below any layout's reach: the transport clips, it never widens the page.
+.plate {
+  padding: var(--spacing-sm);
+  overflow: hidden;
+}
+
+.transport {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.lcd {
+  @include styles.synth-display;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  overflow: hidden;
+
+  &--error {
+    justify-content: center;
+    min-height: 3.5rem;
+    border-color: rgba(204, 102, 108, 0.5);
+    color: var(--color-error);
+  }
+}
+
+.error-line {
+  margin: 0;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.lcd-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.lcd-line--tune {
+  align-items: center;
+}
+
+.state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.state-light {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--synth-led-off);
+}
+
+.state[data-state='playing'] .state-light {
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+
+.state[data-state='paused'] .state-light {
+  background: var(--color-directory);
+  box-shadow: 0 0 6px var(--color-directory);
+  animation: state-blink 1s steps(1, end) infinite;
+}
+
+@keyframes state-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state[data-state='paused'] .state-light {
+    animation: none;
+  }
+}
+
+.tune {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &--empty {
+    color: var(--synth-display-dim);
+  }
+}
+
+.author {
+  margin-inline-start: var(--spacing-sm);
+  color: var(--synth-display-dim);
+}
+
+.elapsed {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.4rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.total {
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--synth-display-dim);
+  white-space: nowrap;
+}
+
+.frame {
+  min-width: 0;
+  margin-inline-start: auto;
+  overflow: hidden;
+  font-size: 0.65rem;
+  color: var(--synth-display-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// The keys fill their grid cells: a key's host is a column flex box so its button stretches across
+// the host. Wide layout: one row, Play widest, the stepper sized to its content. The area rules
+// are scoped under `.keys` so they outrank anything a key's own host styling sets.
+.keys {
+  display: grid;
+  grid-template-areas: 'play stop repeat sub';
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.1fr) auto;
+  gap: 6px;
+  min-width: 0;
+
+  lib-synth-key {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .play-key {
+    grid-area: play;
+  }
+
+  .stop-key {
+    grid-area: stop;
+  }
+
+  .repeat-key {
+    grid-area: repeat;
+  }
+
+  .subtune {
+    grid-area: sub;
+  }
+}
+
+.subtune {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+
+  .step-key {
+    flex: 0 0 auto;
+  }
+}
+
+.subtune-display {
+  @include styles.synth-display;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--spacing-sm);
+  overflow: hidden;
+  font-size: 0.7rem;
+  white-space: nowrap;
+
+  &[data-disabled] {
+    color: var(--synth-display-dim);
+  }
+}
+
+.subtune-caption {
+  display: none;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--synth-display-dim);
+}
+
+@container (min-width: 480px) {
+  .subtune-caption {
+    display: inline;
+  }
+}
+
+// About 320–420px: still one row, but only Play keeps its label.
+@container (min-width: 320px) and (max-width: 419.98px) {
+  .keys {
+    grid-template-columns: minmax(0, 1fr) 2.5rem 2.5rem auto;
+
+    .stop-key,
+    .repeat-key,
+    .step-key {
+      --synth-key-label-display: none;
+    }
+  }
+}
+
+// Below about 320px: Play across the full width, Stop beside Repeat, then the stepper. The frame
+// number gives way to the elapsed time.
+@container (max-width: 319.98px) {
+  .keys {
+    grid-template-areas:
+      'play play'
+      'stop repeat'
+      'sub sub';
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    .subtune .step-key {
+      flex: 0 0 3rem;
+    }
+  }
+
+  .frame {
+    display: none;
+  }
+}
