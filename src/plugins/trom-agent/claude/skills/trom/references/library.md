@@ -17,6 +17,8 @@ Copy between this computer and the TeensyROM with `trom file upload` and `trom f
 - Folders keep their layout. `.zip`, `.7z` and `.rar` are expanded on the TeensyROM. Files over 10 MB are skipped on download and reported.
 - Ask where files go when the user hasn't said: the device folder for an upload, the folder on the computer for a download. Your own working folder is wherever this session started, which is rarely where the user wants files.
 - Before any copy, confirm what goes where. A copy replaces a same-named file at the destination.
+- Never pass `--yes`. It sends the whole current folder, which is rarely what the user means; ask for the files instead.
+- An upload resets the TeensyROM, which stops whatever is playing. Say so when you confirm, and don't copy during a timed set unless the user wants the set to end.
 - Report the summary, and each failure in plain words.
 - A busy device means "try again when the other transfer finishes".
 - To copy and launch one file, see `dj.md` (Launching).
@@ -34,4 +36,4 @@ Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: 
 
 ## Not yet
 
-Deleting files, and copying or moving files on the TeensyROM itself, are not in trom yet. If `init`'s `capabilities` does not list a command for what the user asks, say plainly: "this version of trom can't do that yet".
+Deleting files, and copying or moving files on the TeensyROM itself, are not in trom yet. For a move, if `init`'s `capabilities` lists `file download` and `file upload`, offer to download the files and then upload them to the new folder, confirming each copy as under Copying. The originals stay on the TeensyROM, since deleting isn't in trom yet. If `init`'s `capabilities` does not list a command for what the user asks, say plainly: "this version of trom can't do that yet".
