@@ -21,32 +21,34 @@
 }
 
 .screw {
+  // Tucked 1px inside the border, so it spans 2px to 7px from the plate's outer edge and clears the
+  // content of a plate that pads by the scale's small step (1px border + 8px) by 2px.
   position: absolute;
   box-sizing: border-box;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--synth-knob-cap), var(--synth-knob-skirt));
   border: 1px solid var(--synth-knob-skirt-border);
   box-shadow: inset 0 1px 0 rgba(var(--glassy-color), 0.12);
 
   &--top-start {
-    top: var(--spacing-sm);
-    inset-inline-start: var(--spacing-sm);
+    top: 1px;
+    inset-inline-start: 1px;
   }
 
   &--top-end {
-    top: var(--spacing-sm);
-    inset-inline-end: var(--spacing-sm);
+    top: 1px;
+    inset-inline-end: 1px;
   }
 
   &--bottom-start {
-    bottom: var(--spacing-sm);
-    inset-inline-start: var(--spacing-sm);
+    bottom: 1px;
+    inset-inline-start: 1px;
   }
 
   &--bottom-end {
-    bottom: var(--spacing-sm);
-    inset-inline-end: var(--spacing-sm);
+    bottom: 1px;
+    inset-inline-end: 1px;
   }
 }
