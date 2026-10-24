@@ -9,10 +9,11 @@ const meta: Meta<PositionStripComponent> = {
     docs: {
       description: {
         component:
-          'One continuous bar, lit up to the position, with a loop mark and a playhead, over a native ' +
-          'range input that does the scrubbing — so a click anywhere, a drag, the arrow keys, Home and End all ' +
-          'work, and the drag is continuous. Purely presentational: it holds no drag-pin state, so `positionPercent` is ' +
-          'whatever the caller shows, and `scrubInput` (every drag tick, a preview) and ' +
+          'One continuous bar, lit up to the position, with a loop mark and a playhead, over a ' +
+          'native range input that does the scrubbing — so a click anywhere, a drag, the arrow ' +
+          'keys, Home and End all work, and the drag is continuous. Purely presentational: it ' +
+          'holds no drag-pin state, so `positionPercent` is whatever the caller shows, and ' +
+          '`scrubInput` (every drag tick, a preview) and ' +
           '`scrubCommit` (release only, the one that seeks) are how the caller hears what the ' +
           'operator did. The bar before the loop point is intro purple, after it music cyan, ' +
           'with an amber mark at the loop point; an ended tune goes dim after its music; an ' +
@@ -108,7 +109,7 @@ export const Interactive: Story = {
           [positionPercent]="positionPercent"
           [accessibleName]="accessibleName"
           [valueText]="valueText"
-            (scrubInput)="onScrubInput($event)"
+          (scrubInput)="onScrubInput($event)"
           (scrubCommit)="onScrubCommit($event)"
         />
       </div>

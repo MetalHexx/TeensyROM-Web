@@ -15,9 +15,8 @@ const meta: Meta<DeckTransportComponent> = {
           'not the viewport’s: three identical keys at the start of the row and the stepper at ' +
           'the end, labelled from about 420px and icon-only from about 320px; below that the ' +
           'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
-          'Every state story ' +
-          'below shows the transport at 560, 400 and 300px. An error replaces the display, and ' +
-          'each reason is a `role="alert"` line.',
+          'Every state story below shows the transport at 560, 400 and 300px. An error replaces ' +
+          'the display, and each reason is a `role="alert"` line.',
       },
     },
   },
