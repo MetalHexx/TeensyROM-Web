@@ -102,6 +102,28 @@ export const WithDisabledOption: Story = {
   render: Default.render,
 };
 
+/** Labels too long for their equal-width cell wrap onto further lines instead of being cut off. */
+export const LongLabels: Story = {
+  args: {
+    ...Default.args,
+    selectedId: 'relative-offset',
+    options: [
+      { id: 'absolute', label: 'Absolute' },
+      { id: 'relative-offset', label: 'Relative (binary offset)' },
+      { id: 'relative-signed', label: "Relative (two's complement)" },
+      { id: 'step', label: 'Step' },
+    ],
+  },
+  render: (args) => ({
+    props: args,
+    template: `
+      <div style="width: 300px;">
+        <lib-segmented-control [options]="options" [selectedId]="selectedId" [accessibleName]="accessibleName" />
+      </div>
+    `,
+  }),
+};
+
 /** All four `ControlSize` steps, each with the middle option selected. */
 export const Sizes: Story = {
   render: () => ({

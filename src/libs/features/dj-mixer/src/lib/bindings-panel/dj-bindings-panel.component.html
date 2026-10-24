@@ -35,6 +35,7 @@
           [model]="row.model"
           (editToggle)="onEditToggle(row.mapping.id)"
           (styleSelect)="onStyleSelect(row, $event)"
+          (triggerSelect)="onTriggerSelect(row, $event)"
           (amountChange)="onAmountChange(row, $event)"
           (relearn)="onRelearn(row.mapping.id)"
           (deleteBinding)="onDelete(row.mapping.id)"

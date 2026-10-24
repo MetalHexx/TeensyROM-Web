@@ -16,13 +16,16 @@ function modelWith(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
   return {
     name: 'Speed',
     sourceText: 'Launch Control XL · ch 1 · CC 21',
-    styleText: 'Relative · 1%',
+    styleText: 'Absolute · 1%',
     expanded: false,
+    styleLabel: 'Style',
     styleOptions: [
       { id: 'absolute', label: 'Absolute' },
-      { id: 'relative', label: 'Relative' },
+      { id: 'step', label: 'Step' },
     ],
-    selectedStyleId: 'relative',
+    selectedStyleId: 'step',
+    triggerOptions: null,
+    selectedTriggerId: null,
     amount: AMOUNT,
     statusText: null,
     editAccessibleName: 'Edit Speed binding',
@@ -37,6 +40,7 @@ describe('BindingRowComponent', () => {
 
   let editToggles: number;
   let styles: string[];
+  let triggers: string[];
   let amounts: number[];
   let relearns: number;
   let deletes: number;
@@ -52,9 +56,11 @@ describe('BindingRowComponent', () => {
 
     editToggles = relearns = deletes = 0;
     styles = [];
+    triggers = [];
     amounts = [];
     component.editToggle.subscribe(() => editToggles++);
     component.styleSelect.subscribe((id) => styles.push(id));
+    component.triggerSelect.subscribe((id) => triggers.push(id));
     component.amountChange.subscribe((value) => amounts.push(value));
     component.relearn.subscribe(() => relearns++);
     component.deleteBinding.subscribe(() => deletes++);
@@ -100,7 +106,7 @@ describe('BindingRowComponent', () => {
       const text = root().textContent ?? '';
 
       expect(text).toContain('Speed');
-      expect(text).toContain('Relative · 1%');
+      expect(text).toContain('Absolute · 1%');
       expect(text).toContain('Launch Control XL · ch 1 · CC 21');
     });
 
@@ -139,7 +145,7 @@ describe('BindingRowComponent', () => {
       const checked = group?.querySelector('[aria-checked="true"]');
 
       expect(group?.getAttribute('aria-label')).toBe('Style');
-      expect(checked?.textContent?.trim()).toBe('Relative');
+      expect(checked?.textContent?.trim()).toBe('Step');
       expect(root().querySelector('.binding-chip')).toBeNull();
     });
 
@@ -151,6 +157,21 @@ describe('BindingRowComponent', () => {
       absolute.click();
 
       expect(styles).toEqual(['absolute']);
+    });
+
+    it('names the first choice from styleLabel', () => {
+      setModel({ expanded: true, styleLabel: 'Action' });
+
+      expect(root().querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe(
+        'Action'
+      );
+      expect(root().querySelector('.edit-label')?.textContent?.trim()).toBe('Action');
+    });
+
+    it('hides the first choice when there are no style options', () => {
+      setModel({ expanded: true, styleOptions: [] });
+
+      expect(root().querySelector('[role="radiogroup"]')).toBeNull();
     });
 
     it('emits relearn from Re-learn source', () => {
@@ -171,6 +192,55 @@ describe('BindingRowComponent', () => {
       deleteButton.click();
 
       expect(deletes).toBe(1);
+    });
+  });
+
+  describe('trigger', () => {
+    const TRIGGER_OPTIONS = [
+      { id: 'press', label: 'Note On' },
+      { id: 'release', label: 'Note Off' },
+    ];
+
+    function triggerGroup(): HTMLElement | null {
+      return root().querySelector('[role="radiogroup"][aria-label="Trigger"]');
+    }
+
+    it('is not shown without trigger options', () => {
+      setModel({ expanded: true });
+
+      expect(triggerGroup()).toBeNull();
+    });
+
+    it('shows the current trigger and emits triggerSelect with the chosen id', () => {
+      setModel({
+        expanded: true,
+        triggerOptions: TRIGGER_OPTIONS,
+        selectedTriggerId: 'press',
+      });
+
+      expect(triggerGroup()?.querySelector('[aria-checked="true"]')?.textContent?.trim()).toBe(
+        'Note On'
+      );
+
+      const noteOff = Array.from(triggerGroup()?.querySelectorAll('[role="radio"]') ?? []).find(
+        (radio) => radio.textContent?.trim() === 'Note Off'
+      ) as HTMLButtonElement;
+      noteOff.click();
+
+      expect(triggers).toEqual(['release']);
+      expect(styles).toEqual([]);
+    });
+
+    it('stands alone when there are no style options', () => {
+      setModel({
+        expanded: true,
+        styleOptions: [],
+        triggerOptions: TRIGGER_OPTIONS,
+        selectedTriggerId: 'press',
+      });
+
+      expect(root().querySelectorAll('[role="radiogroup"]').length).toBe(1);
+      expect(triggerGroup()).not.toBeNull();
     });
   });
 

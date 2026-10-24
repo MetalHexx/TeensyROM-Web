@@ -40,10 +40,17 @@ export interface BindingRowModel {
   readonly styleText: string;
   /** Whether the row is expanded in place to edit the binding. */
   readonly expanded: boolean;
-  /** The styles the binding can take, shown as a segmented control when expanded. */
+  /** Label above the first choice: 'Action' for one-shot, on/off and note-step controls, 'Style' otherwise. */
+  readonly styleLabel: string;
+  /** The choices of the first segmented control (the Action or Style) when expanded. Empty when
+   *  there is nothing to choose, which hides the control. */
   readonly styleOptions: readonly SegmentedControlOption[];
-  /** The `id` of the binding's current style among `styleOptions`. */
+  /** The `id` of the binding's current choice among `styleOptions`. */
   readonly selectedStyleId: string;
+  /** The trigger choice, or `null` when the selected style has none. */
+  readonly triggerOptions: readonly SegmentedControlOption[] | null;
+  /** The `id` of the binding's current trigger among `triggerOptions`; `null` without a trigger. */
+  readonly selectedTriggerId: string | null;
   /** The style's amount, or `null` when the style takes none — the amount field is not shown. */
   readonly amount: BindingRowAmount | null;
   /** Why the binding is not live, e.g. 'Controller not connected'. Rendered as text under the
@@ -61,8 +68,8 @@ let nextRowId = 0;
 /**
  * One MIDI binding in a list: what it drives, where it listens and how it behaves. Collapsed, it
  * is two lines — the control's name, a style chip and the edit and delete buttons, then the source.
- * Expanded in place, it frames itself and offers the style, the amount where the style takes one,
- * and Re-learn source and Delete.
+ * Expanded in place, it frames itself and offers the style (or Action), the trigger where the
+ * style has one, the amount where the style takes one, and Re-learn source and Delete.
  *
  * Purely presentational — the caller owns the model and the `expanded` flag, and updates them from
  * the outputs. The amount is a native number input that emits on `change`, and only for a finite
@@ -74,6 +81,7 @@ let nextRowId = 0;
  *   [model]="row()"
  *   (editToggle)="onEditToggle()"
  *   (styleSelect)="onStyleSelect($event)"
+ *   (triggerSelect)="onTriggerSelect($event)"
  *   (amountChange)="onAmountChange($event)"
  *   (relearn)="onRelearn()"
  *   (deleteBinding)="onDelete()"
@@ -92,8 +100,10 @@ export class BindingRowComponent {
   readonly model = input.required<BindingRowModel>();
   /** Emits when the edit button is pressed — to expand a collapsed row or collapse an expanded one. */
   readonly editToggle = output<void>();
-  /** Emits the `id` of the style the user chose. */
+  /** Emits the `id` of the style (or Action) the user chose. */
   readonly styleSelect = output<string>();
+  /** Emits the `id` of the trigger the user chose. */
+  readonly triggerSelect = output<string>();
   /** Emits a new amount, only for a finite value within the amount's `min` and `max`. */
   readonly amountChange = output<number>();
   /** Emits when Re-learn source is pressed. */

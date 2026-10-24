@@ -34,18 +34,29 @@
   <span class="binding-status">{{ status }}</span>
   } @if (model().expanded) {
   <div class="binding-edit">
+    @if (model().styleOptions.length > 0) {
     <div class="edit-row edit-row--stacked">
-      <span class="edit-label" aria-hidden="true">Style</span>
+      <span class="edit-label" aria-hidden="true">{{ model().styleLabel }}</span>
       <lib-segmented-control
         class="edit-control"
-        accessibleName="Style"
+        [accessibleName]="model().styleLabel"
         [options]="model().styleOptions"
         [selectedId]="model().selectedStyleId"
         (optionSelect)="styleSelect.emit($event)"
       />
     </div>
-
-    @if (model().amount; as amount) {
+    } @if (model().triggerOptions; as triggerOptions) {
+    <div class="edit-row edit-row--stacked">
+      <span class="edit-label" aria-hidden="true">Trigger</span>
+      <lib-segmented-control
+        class="edit-control"
+        accessibleName="Trigger"
+        [options]="triggerOptions"
+        [selectedId]="model().selectedTriggerId"
+        (optionSelect)="triggerSelect.emit($event)"
+      />
+    </div>
+    } @if (model().amount; as amount) {
     <div class="edit-row">
       <label class="edit-label" [for]="amountInputId">{{ amount.label }}</label>
       <input

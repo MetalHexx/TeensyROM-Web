@@ -31,17 +31,14 @@ export function isStepKind(kind: MappingStyleKind): kind is 'step' | 'step-relea
   return kind === 'step' || kind === 'step-release';
 }
 
-/** The kinds of an action on the press edge and on the release edge. */
-const KINDS_BY_ACTION: Record<StyleAction, Record<StyleTrigger, MappingStyleKind>> = {
-  fire: { press: 'press', release: 'release' },
-  toggle: { press: 'latch', release: 'latch-release' },
-  on: { press: 'on', release: 'on-release' },
-  off: { press: 'off', release: 'off-release' },
-  step: { press: 'step', release: 'step-release' },
-  hold: { press: 'hold', release: 'hold' },
-  absolute: { press: 'absolute', release: 'absolute' },
-  'relative-offset': { press: 'relative-offset', release: 'relative-offset' },
-  'relative-signed': { press: 'relative-signed', release: 'relative-signed' },
+/** The kinds of the actions that have a release variant. Every other action's kind is the action
+ *  itself, except that a one-shot or toggle acts on the press edge as `press` or `latch`. */
+const RELEASE_KINDS: Partial<Record<StyleAction, MappingStyleKind>> = {
+  fire: 'release',
+  toggle: 'latch-release',
+  on: 'on-release',
+  off: 'off-release',
+  step: 'step-release',
 };
 
 export function actionOf(kind: MappingStyleKind): StyleAction {
@@ -94,23 +91,16 @@ export function triggerOf(kind: MappingStyleKind): StyleTrigger | null {
 
 /** The kind for an action at a trigger; the trigger is ignored for an action that has none. */
 export function kindFor(action: StyleAction, trigger: StyleTrigger): MappingStyleKind {
-  return KINDS_BY_ACTION[action][trigger];
+  const release = RELEASE_KINDS[action];
+  if (trigger === 'release' && release) {
+    return release;
+  }
+  return action === 'fire' ? 'press' : action === 'toggle' ? 'latch' : action;
 }
 
 /** The actions a control offers for a source, in menu order. */
 export function actionsFor(nature: ControlNature, sourceKind: MidiSourceKind): StyleAction[] {
-  switch (nature) {
-    case 'trigger':
-      return ['fire'];
-    case 'state':
-      return ['toggle', 'on', 'off'];
-    case 'hold':
-      return ['hold'];
-    case 'value':
-      return sourceKind === 'cc'
-        ? ['absolute', 'relative-offset', 'relative-signed', 'step']
-        : ['step'];
-  }
+  return [...new Set(stylesFor(nature, sourceKind).map(actionOf))];
 }
 
 /** The styles a control of this nature offers for a source of this kind, in menu order. */

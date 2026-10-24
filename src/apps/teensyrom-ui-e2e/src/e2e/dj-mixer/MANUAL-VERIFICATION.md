@@ -216,3 +216,18 @@ needs a real browser to confirm:
 - In the browser's site settings, revoke the MIDI permission for the origin, then reload. Enable
   MIDI is showing again on both decks, and no alert was raised for a merely-not-yet-granted
   origin.
+
+## Action and Trigger in the bindings panel (P05-T03)
+
+Bench check for an operator with a MIDI controller. Open the bindings panel, turn on mapping mode and
+map keys as below; expand a row to see its Action and Trigger choices, and read the collapsed chip
+(for example `Turn off · Note Off`).
+
+1. Map a note to Voice 1 mute and set it to Toggle with Trigger Note Off. Hold the note: nothing
+   happens. Release it: the mute flips.
+2. Map two keys to the same mute, one set to Turn on and one to Turn off, both on Note On. Each only
+   does its own job: the first never unmutes, the second never mutes.
+3. Map a note to a value control (Key or Speed) as Step and set Trigger Note Off. Pressing does
+   nothing; releasing steps the value. The Amount field is shown for it.
+4. Re-learn a mapping that has Turn off and Note Off set: after the new key is chosen, the row still
+   shows the same Action and Trigger.
