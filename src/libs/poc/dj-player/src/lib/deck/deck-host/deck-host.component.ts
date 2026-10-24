@@ -24,8 +24,8 @@ import {
   LoopsCuesPanelComponent,
   SpeedPanelComponent,
   TransportPanelComponent,
-  VoicePanelComponent,
 } from '@teensyrom-nx/ui/components';
+import { VoicePanelComponent } from '@teensyrom-nx/ui/components/dj';
 import type {
   BindingCardModel,
   BindingPortModel,
@@ -38,9 +38,8 @@ import type {
   SpeedPanelModel,
   StatusLedState,
   TransportPanelModel,
-  VoicePanelModel,
-  VoiceRowModel,
 } from '@teensyrom-nx/ui/components';
+import type { VoicePanelModel, VoiceRowModel } from '@teensyrom-nx/ui/components/dj';
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../../analysis/worker-analysis-scanner';

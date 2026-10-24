@@ -7,14 +7,14 @@ import { HoldPressDirective } from './hold-press.directive';
   imports: [HoldPressDirective],
   template: `
     @if (shown()) {
-      <button
-        type="button"
-        libHoldPress
-        [holdDisabled]="disabled()"
-        (holdChange)="emitted.push($event)"
-      >
-        Hold
-      </button>
+    <button
+      type="button"
+      libHoldPress
+      [holdDisabled]="disabled()"
+      (holdChange)="emitted.push($event)"
+    >
+      Hold
+    </button>
     }
   `,
 })

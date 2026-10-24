@@ -31,7 +31,8 @@ const meta: Meta<SynthKeyComponent> = {
     },
     lit: { description: 'Overrides the light of a latching key; null follows `latched`.' },
     stateLight: {
-      description: "Play/Pause bar along the top: 'playing' green, 'paused' amber blinking, 'off' dark.",
+      description:
+        "Play/Pause bar along the top: 'playing' green, 'paused' amber blinking, 'off' dark.",
     },
     press: { description: 'Emits on click, or Enter / Space.' },
   },
@@ -69,10 +70,16 @@ const base = {
 export const OneShot: Story = { args: base, render };
 
 /** A latching key that is off: pressed state false, no light. */
-export const LatchingOff: Story = { args: { ...base, label: 'Sync', accessibleName: 'Sync deck A', latched: false }, render };
+export const LatchingOff: Story = {
+  args: { ...base, label: 'Sync', accessibleName: 'Sync deck A', latched: false },
+  render,
+};
 
 /** A latching key that is on: `aria-pressed` true, lit cyan. */
-export const LatchingLit: Story = { args: { ...base, label: 'Sync', accessibleName: 'Sync deck A', latched: true }, render };
+export const LatchingLit: Story = {
+  args: { ...base, label: 'Sync', accessibleName: 'Sync deck A', latched: true },
+  render,
+};
 
 /** Pressed but not lit — the light means something other than the pressed state. */
 export const LitOverride: Story = {
@@ -82,19 +89,37 @@ export const LitOverride: Story = {
 
 /** Play/Pause with its state light: green while playing. */
 export const PlayPlaying: Story = {
-  args: { ...base, label: 'Play', icon: 'pause', accessibleName: 'Pause deck A', stateLight: 'playing' },
+  args: {
+    ...base,
+    label: 'Play',
+    icon: 'pause',
+    accessibleName: 'Pause deck A',
+    stateLight: 'playing',
+  },
   render,
 };
 
 /** Play/Pause with its state light: amber, blinking, while paused (steady under reduced motion). */
 export const PlayPaused: Story = {
-  args: { ...base, label: 'Play', icon: 'play_arrow', accessibleName: 'Play deck A', stateLight: 'paused' },
+  args: {
+    ...base,
+    label: 'Play',
+    icon: 'play_arrow',
+    accessibleName: 'Play deck A',
+    stateLight: 'paused',
+  },
   render,
 };
 
 /** Play/Pause with its state light dark. */
 export const PlayOff: Story = {
-  args: { ...base, label: 'Play', icon: 'play_arrow', accessibleName: 'Play deck A', stateLight: 'off' },
+  args: {
+    ...base,
+    label: 'Play',
+    icon: 'play_arrow',
+    accessibleName: 'Play deck A',
+    stateLight: 'off',
+  },
   render,
 };
 

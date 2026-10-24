@@ -9,12 +9,10 @@
   (click)="press.emit()"
 >
   @if (stateLight() !== null) {
-    <span class="state-light" aria-hidden="true"></span>
-  }
-  @if (icon(); as iconName) {
-    <mat-icon class="icon" aria-hidden="true">{{ iconName }}</mat-icon>
-  }
-  @if (label()) {
-    <span class="text">{{ label() }}</span>
+  <span class="state-light" aria-hidden="true"></span>
+  } @if (icon(); as iconName) {
+  <mat-icon class="icon" aria-hidden="true">{{ iconName }}</mat-icon>
+  } @if (label()) {
+  <span class="text">{{ label() }}</span>
   }
 </button>

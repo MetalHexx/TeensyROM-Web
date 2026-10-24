@@ -19,7 +19,9 @@ const meta: Meta<DeckChannelStripComponent> = {
   },
   argTypes: {
     model: { description: 'Everything the strip draws.' },
-    mutedChange: { description: 'A mute key was pressed; carries the voice index and the new mute.' },
+    mutedChange: {
+      description: 'A mute key was pressed; carries the voice index and the new mute.',
+    },
     heldChange: { description: 'A Kill/Punch pad was pressed or released.' },
     faderChange: { description: 'The fader moved; the raw value.' },
     nudgeChange: { description: 'A nudge pad was pressed or released.' },
@@ -28,7 +30,7 @@ const meta: Meta<DeckChannelStripComponent> = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 88px; height: 460px; display: flex; flex-direction: column">
+      <div style="width: 88px; height: 580px; display: flex; flex-direction: column">
         <lib-deck-channel-strip [model]="model" />
       </div>
     `,
@@ -75,7 +77,9 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
 const pressWithEnter = (canvasElement: HTMLElement, name: string): void => {
   canvasElement
     .querySelector(`[aria-label="${name}"]`)
-    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    ?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
 };
 
 export const AtRest: Story = { args: { model: baseModel() } };

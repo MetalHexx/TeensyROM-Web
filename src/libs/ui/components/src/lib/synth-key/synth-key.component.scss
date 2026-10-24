@@ -17,12 +17,14 @@
   padding: 0 var(--spacing-sm);
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(180deg, var(--synth-control-face-top), var(--synth-control-face-bottom));
+  background: linear-gradient(
+    180deg,
+    var(--synth-control-face-top),
+    var(--synth-control-face-bottom)
+  );
   border: 1px solid var(--synth-control-border);
   border-radius: var(--border-radius-sm);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 2px 0 rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 rgba(0, 0, 0, 0.6);
   color: var(--synth-control-text);
   font-family: 'Roboto Mono', monospace;
   font-size: 0.6rem;
@@ -32,9 +34,7 @@
 
   &:active:not(:disabled) {
     transform: translateY(1px);
-    box-shadow:
-      inset 0 2px 4px rgba(0, 0, 0, 0.6),
-      0 1px 0 rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(0, 0, 0, 0.6);
   }
 
   &:focus-visible {
@@ -49,9 +49,7 @@
 
   &[data-lit]:not(:disabled) {
     border-color: rgba(var(--color-highlight-rgb), 0.55);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 2px 0 rgba(0, 0, 0, 0.6),
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 rgba(0, 0, 0, 0.6),
       0 0 8px rgba(var(--color-highlight-rgb), 0.45);
     color: var(--color-highlight);
   }

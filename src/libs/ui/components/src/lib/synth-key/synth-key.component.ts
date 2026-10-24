@@ -53,6 +53,7 @@ export class SynthKeyComponent {
   /** Emits when the key is clicked, or pressed with Enter or Space. */
   readonly press = output<void>();
 
+  /** Whether the key's light is on: off for a non-latching key, else `lit` or the latch. */
   protected readonly isLit = computed(() => {
     const latched = this.latched();
     return latched !== null && (this.lit() ?? latched);

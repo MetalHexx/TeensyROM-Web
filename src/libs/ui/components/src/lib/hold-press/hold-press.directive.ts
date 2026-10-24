@@ -1,4 +1,13 @@
-import { Directive, OnDestroy, Signal, effect, input, output, signal, untracked } from '@angular/core';
+import {
+  Directive,
+  OnDestroy,
+  Signal,
+  effect,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 
 /**
  * Turns a native `<button>` into a momentary hold control whose press and release are both
@@ -33,6 +42,7 @@ export class HoldPressDirective implements OnDestroy {
   /** Emits `true` on press and `false` on release or cancel. Momentary; both are meaningful. */
   readonly holdChange = output<boolean>();
 
+  /** The writable source behind `held`. */
   private readonly heldState = signal(false);
 
   /** Whether a hold (pointer or keyboard) is in progress, for the host's styling. */
@@ -118,6 +128,7 @@ export class HoldPressDirective implements OnDestroy {
     this.endHold();
   }
 
+  /** Enters the held state and emits `holdChange(true)`. */
   private startHold(): void {
     this.heldState.set(true);
     this.holdChange.emit(true);

@@ -69,6 +69,7 @@
 }
 
 .speed-display {
+  flex: 0 0 auto;
   overflow: hidden;
   padding: 3px 0;
   @include styles.synth-display;

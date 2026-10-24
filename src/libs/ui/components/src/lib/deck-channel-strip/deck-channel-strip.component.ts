@@ -73,6 +73,7 @@ export interface DeckChannelStripModel {
   imports: [SynthPanelComponent, SynthKeyComponent, HoldPadComponent, SynthFaderComponent],
 })
 export class DeckChannelStripComponent {
+  /** Everything the strip draws; the caller builds it from the deck's store state. */
   readonly model = input.required<DeckChannelStripModel>();
   /** A mute key was pressed, carrying the voice's index and the mute it should now have. */
   readonly mutedChange = output<{ index: number; muted: boolean }>();

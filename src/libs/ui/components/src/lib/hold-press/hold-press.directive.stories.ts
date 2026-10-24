@@ -15,7 +15,7 @@ const meta: Meta<HoldPressDirective> = {
           'button if the press drags off it; key auto-repeat is ignored. Safety releases make sure ' +
           'a consumer never sees a press without its release: pointer cancel, blur ending a ' +
           'keyboard hold, the host becoming `holdDisabled` mid-hold, and the host being destroyed ' +
-          'mid-hold each emit `false` once. `held` is a signal for the host\'s own styling. The ' +
+          "mid-hold each emit `false` once. `held` is a signal for the host's own styling. The " +
           'directive adds no look of its own; `lib-hold-pad` and the voice row apply it.',
       },
     },

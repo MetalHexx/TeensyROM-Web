@@ -1,18 +1,17 @@
 import { Component, ChangeDetectionStrategy, computed, inject, input, signal } from '@angular/core';
+import { ScalingContainerComponent } from '@teensyrom-nx/ui/components';
+import type { BindingCardModel, BindingPortModel } from '@teensyrom-nx/ui/components';
 import {
   BindingPlateComponent,
   DeckChannelStripComponent,
   DeckTransportComponent,
   LoopsCuesPlateComponent,
-  ScalingContainerComponent,
-} from '@teensyrom-nx/ui/components';
+} from '@teensyrom-nx/ui/components/dj';
 import type {
-  BindingCardModel,
-  BindingPortModel,
   DeckChannelStripModel,
   DeckTransportModel,
   DeckTransportState,
-} from '@teensyrom-nx/ui/components';
+} from '@teensyrom-nx/ui/components/dj';
 import {
   DeckService,
   DeviceStore,

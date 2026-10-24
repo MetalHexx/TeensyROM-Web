@@ -116,7 +116,14 @@ function amountField(kind: MappingStyleKind, amount: number | null): BindingRowA
     };
   }
   if (kind === 'hold') {
-    return { label: 'Amount', value: toPercent(amount), min: 0.1, max: 100, step: 0.1, suffix: '%' };
+    return {
+      label: 'Amount',
+      value: toPercent(amount),
+      min: 0.1,
+      max: 100,
+      step: 0.1,
+      suffix: '%',
+    };
   }
   return kind === 'step'
     ? { label: 'Amount', value: toPercent(amount), min: -100, max: 100, step: 0.1, suffix: '%' }

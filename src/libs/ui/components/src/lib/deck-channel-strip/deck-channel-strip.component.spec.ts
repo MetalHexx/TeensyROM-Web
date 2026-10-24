@@ -23,7 +23,10 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
       home: 1,
       accessibleName: 'Speed multiplier deck A',
     },
-    nudge: { downAccessibleName: 'Nudge speed down deck A', upAccessibleName: 'Nudge speed up deck A' },
+    nudge: {
+      downAccessibleName: 'Nudge speed down deck A',
+      upAccessibleName: 'Nudge speed up deck A',
+    },
     jumpButtons: [
       { id: 'up', label: '+50%', accessibleName: 'Speed up 50% deck A' },
       { id: 'home', label: 'Home', accessibleName: 'Speed home deck A' },
@@ -43,7 +46,9 @@ describe('DeckChannelStripComponent', () => {
   let faders: number[];
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [DeckChannelStripComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [DeckChannelStripComponent],
+    }).compileComponents();
     fixture = TestBed.createComponent(DeckChannelStripComponent);
     fixture.componentRef.setInput('model', testModel());
     muted = [];
@@ -70,12 +75,16 @@ describe('DeckChannelStripComponent', () => {
   }
 
   function keydown(target: HTMLElement): void {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
     fixture.detectChanges();
   }
 
   function keyup(target: HTMLElement): void {
-    target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, cancelable: true }));
+    target.dispatchEvent(
+      new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, cancelable: true })
+    );
     fixture.detectChanges();
   }
 
@@ -148,7 +157,14 @@ describe('DeckChannelStripComponent', () => {
   });
 
   it('exposes the anchors by data-control', () => {
-    for (const control of ['speed', 'speed-nudge-up', 'speed-nudge-down', 'jump-up', 'jump-home', 'jump-down']) {
+    for (const control of [
+      'speed',
+      'speed-nudge-up',
+      'speed-nudge-down',
+      'jump-up',
+      'jump-home',
+      'jump-down',
+    ]) {
       expect(q(`[data-control="${control}"]`), control).not.toBeNull();
     }
   });

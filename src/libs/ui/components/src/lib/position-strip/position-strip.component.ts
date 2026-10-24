@@ -48,13 +48,16 @@ export class PositionStripComponent {
   /** Fires on release only. This is the one that should seek. */
   readonly scrubCommit = output<number>();
 
+  /** The playhead position as a percentage, held to 0–100; 0 when not finite. */
   protected readonly clampedPercent = computed<number>(() => {
     const percent = this.positionPercent();
     return Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
   });
 
+  /** `segments` rounded to a whole number, never below one. */
   private readonly segmentCount = computed<number>(() => Math.max(1, Math.round(this.segments())));
 
+  /** How many segments, from the left, are lit for the current position. */
   protected readonly litCount = computed<number>(() =>
     Math.round((this.clampedPercent() / 100) * this.segmentCount())
   );

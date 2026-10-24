@@ -98,8 +98,8 @@ input[type='range'] {
   background: rgba(var(--glassy-color), 0.07);
 
   &[data-lit][data-tone='intro'] {
-    background: var(--color-primary-bright);
-    box-shadow: 0 0 5px rgba(var(--color-primary-bright-rgb), 0.6);
+    background: var(--structure-intro, #7b2d8e);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--structure-intro, #7b2d8e) 60%, transparent);
   }
 
   &[data-lit][data-tone='music'] {
@@ -129,7 +129,7 @@ input[type='range'] {
 
 .loop-mark {
   background: var(--color-directory);
-  box-shadow: 0 0 6px rgba(245, 215, 110, 0.85);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-directory) 85%, transparent);
 }
 
 .playhead {

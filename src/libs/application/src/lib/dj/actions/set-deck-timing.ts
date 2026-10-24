@@ -7,7 +7,13 @@ import type { Slot } from '../slot';
  *  into time. Logs nothing; it runs once per load and subtune switch. */
 export function setDeckTiming(store: WritableStore<DjState>) {
   return {
-    setDeckTiming: ({ slot, playCallIntervalUs }: { slot: Slot; playCallIntervalUs: number | null }): void => {
+    setDeckTiming: ({
+      slot,
+      playCallIntervalUs,
+    }: {
+      slot: Slot;
+      playCallIntervalUs: number | null;
+    }): void => {
       const actionMessage = createAction('set-deck-timing');
 
       updateState(store, actionMessage, (state) => ({

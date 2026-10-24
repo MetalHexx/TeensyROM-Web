@@ -22,7 +22,9 @@ const meta: Meta<SynthFaderComponent> = {
     max: { description: 'Maximum of the range.' },
     step: { description: 'Granularity of the native range.' },
     home: { description: 'Draws the home line at this value; `null` draws none.' },
-    accessibleName: { description: "Accessible name of the range, e.g. 'Speed multiplier deck A'." },
+    accessibleName: {
+      description: "Accessible name of the range, e.g. 'Speed multiplier deck A'.",
+    },
     disabled: { description: 'Disables the range; it emits nothing.' },
     valueChange: { description: 'The raw, unrounded value read off the range.' },
   },

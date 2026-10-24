@@ -297,7 +297,12 @@ describe('DjBindingsPanelComponent', () => {
         [XL],
         [
           mapping('nudge', NUDGE_A, { kind: 'hold', amount: 0.05 }, { kind: 'note', number: 30 }),
-          mapping('voice', VOICE_HOLD_A, { kind: 'hold', amount: null }, { kind: 'note', number: 31 }),
+          mapping(
+            'voice',
+            VOICE_HOLD_A,
+            { kind: 'hold', amount: null },
+            { kind: 'note', number: 31 }
+          ),
         ]
       );
 

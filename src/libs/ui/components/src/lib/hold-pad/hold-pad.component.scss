@@ -14,7 +14,11 @@
   height: 22px;
   padding: 0;
   cursor: pointer;
-  background: linear-gradient(180deg, var(--synth-control-face-top), var(--synth-control-face-bottom));
+  background: linear-gradient(
+    180deg,
+    var(--synth-control-face-top),
+    var(--synth-control-face-bottom)
+  );
   border: 1px solid var(--synth-control-border);
   border-radius: 11px;
   color: var(--synth-control-text);
@@ -24,9 +28,7 @@
   text-transform: uppercase;
   white-space: nowrap;
   touch-action: manipulation;
-  transition:
-    box-shadow 0.12s ease-out,
-    border-color 0.12s ease-out;
+  transition: box-shadow 0.12s ease-out, border-color 0.12s ease-out;
 
   &:focus-visible {
     outline: 2px solid var(--color-highlight);
@@ -45,8 +47,7 @@
       rgba(var(--color-primary-bright-rgb), 0.3)
     );
     border-color: var(--color-primary-bright);
-    box-shadow:
-      0 0 10px rgba(var(--color-primary-bright-rgb), 0.8),
+    box-shadow: 0 0 10px rgba(var(--color-primary-bright-rgb), 0.8),
       inset 0 0 6px rgba(var(--color-primary-bright-rgb), 0.5);
     color: var(--synth-pointer);
   }

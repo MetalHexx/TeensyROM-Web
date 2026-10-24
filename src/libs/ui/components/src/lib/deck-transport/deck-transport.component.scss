@@ -39,7 +39,7 @@
   &--error {
     justify-content: center;
     min-height: 3.5rem;
-    border-color: rgba(204, 102, 108, 0.5);
+    border-color: color-mix(in srgb, var(--color-error) 50%, transparent);
     color: var(--color-error);
   }
 }

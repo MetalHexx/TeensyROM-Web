@@ -19,7 +19,7 @@ import {
   DeckChannelStripComponent,
   DeckTransportComponent,
   LoopsCuesPlateComponent,
-} from '@teensyrom-nx/ui/components';
+} from '@teensyrom-nx/ui/components/dj';
 import { DjDeckColumnComponent } from './dj-deck-column.component';
 import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';

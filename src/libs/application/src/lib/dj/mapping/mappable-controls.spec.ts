@@ -260,17 +260,20 @@ describe('MappableControls', () => {
     it.each([
       ['up', 0.05, 1.05],
       ['down', 0.05, 0.95],
-    ] as const)('nudge %s holds the speed by the amount and releases to the fader', (direction, amount, expected) => {
-      h.makeShapeable('A');
-      const nudge = pick('A', `speed-nudge-${direction}` as ControlId, 'hold');
-      expect(nudge.amountDefault).toBe(0.05);
+    ] as const)(
+      'nudge %s holds the speed by the amount and releases to the fader',
+      (direction, amount, expected) => {
+        h.makeShapeable('A');
+        const nudge = pick('A', `speed-nudge-${direction}` as ControlId, 'hold');
+        expect(nudge.amountDefault).toBe(0.05);
 
-      nudge.set(true, amount);
-      expect(h.djStore.deck('A')().speed).toBeCloseTo(expected, 10);
+        nudge.set(true, amount);
+        expect(h.djStore.deck('A')().speed).toBeCloseTo(expected, 10);
 
-      nudge.set(false, null);
-      expect(h.djStore.deck('A')().speed).toBe(1);
-    });
+        nudge.set(false, null);
+        expect(h.djStore.deck('A')().speed).toBe(1);
+      }
+    );
 
     it('a nudge uses the amount it is given, and the default when given none', () => {
       h.makeShapeable('A');

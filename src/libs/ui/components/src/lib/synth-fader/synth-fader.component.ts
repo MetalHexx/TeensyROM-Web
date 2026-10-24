@@ -56,6 +56,7 @@ export class SynthFaderComponent {
     return Math.min(1, Math.max(0, (home - this.min()) / span));
   });
 
+  /** Forwards the range input's new value as `valueChange`; ignored while disabled. */
   protected onInput(event: Event): void {
     if (this.disabled()) {
       return;

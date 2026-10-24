@@ -20,8 +20,14 @@ const meta: Meta<HoldPadComponent> = {
   },
   argTypes: {
     label: { description: "'Kill' / 'Punch', or '−' / '+'." },
-    accessibleName: { description: "Accessible name, e.g. 'Kill voice 1 deck A'; the caller composes it." },
-    shape: { description: "'pill' is 44×22, 'round' is 26×26.", control: 'inline-radio', options: ['pill', 'round'] },
+    accessibleName: {
+      description: "Accessible name, e.g. 'Kill voice 1 deck A'; the caller composes it.",
+    },
+    shape: {
+      description: "'pill' is 44×22, 'round' is 26×26.",
+      control: 'inline-radio',
+      options: ['pill', 'round'],
+    },
     disabled: { description: 'Disables the pad; releases a hold in progress once.' },
     heldChange: { description: 'Emits `true` on press and `false` on release or cancel.' },
   },
@@ -42,13 +48,25 @@ const render: Story['render'] = (args) => ({
   `,
 });
 
-const pill = { label: 'Kill', accessibleName: 'Kill voice 1 deck A', shape: 'pill', disabled: false } as const;
-const round = { label: '+', accessibleName: 'Speed up deck A', shape: 'round', disabled: false } as const;
+const pill = {
+  label: 'Kill',
+  accessibleName: 'Kill voice 1 deck A',
+  shape: 'pill',
+  disabled: false,
+} as const;
+const round = {
+  label: '+',
+  accessibleName: 'Speed up deck A',
+  shape: 'round',
+  disabled: false,
+} as const;
 
 const pressWithEnter = async ({ canvasElement }: { canvasElement: HTMLElement }): Promise<void> => {
   canvasElement
     .querySelector('button')
-    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    ?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
 };
 
 export const PillIdle: Story = { args: pill, render };

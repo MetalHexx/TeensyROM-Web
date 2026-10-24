@@ -30,5 +30,7 @@ export function formatTotal(frames: number | null, intervalUs: number | null): s
   if (frames === null || !usableInterval(intervalUs) || !Number.isFinite(frames)) {
     return '--:--';
   }
-  return clock(Math.floor((Math.max(frames, 0) * intervalUs) / (MICROSECONDS_PER_TENTH * TENTHS_PER_SECOND)));
+  return clock(
+    Math.floor((Math.max(frames, 0) * intervalUs) / (MICROSECONDS_PER_TENTH * TENTHS_PER_SECOND))
+  );
 }
