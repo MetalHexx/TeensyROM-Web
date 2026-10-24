@@ -1,0 +1,50 @@
+<lib-synth-panel class="plate">
+  <section class="binding" [attr.aria-label]="model().accessibleName">
+    <div class="row">
+      <span class="deck-label" aria-hidden="true">{{ model().heading }}</span>
+      <select
+        [class.absent]="selectedAbsent()"
+        [disabled]="!model().portsEnabled || model().ports.length === 0"
+        [attr.aria-label]="model().selectAccessibleName"
+        (change)="onSelectPort($event)"
+      >
+        @if (model().portsEnabled) {
+        <option value="" [selected]="model().selectedPortId === null">
+          {{ model().portPlaceholder }}
+        </option>
+        @for (port of model().ports; track port.id) {
+        <option
+          [value]="port.id"
+          [selected]="port.id === model().selectedPortId"
+          [disabled]="!!port.takenBy"
+        >
+          {{ port.takenBy ? port.label + ' — taken by Deck ' + port.takenBy + ' —' : port.label }}
+        </option>
+        } } @else {
+        <option value="" selected disabled>{{ model().portPlaceholder }}</option>
+        }
+      </select>
+      <lib-synth-key
+        data-control="identify"
+        label="Identify"
+        icon="search"
+        [accessibleName]="model().identifyAccessibleName"
+        [disabled]="model().identifyDisabled"
+        (press)="identify.emit()"
+      />
+      @if (model().enableVisible) {
+      <lib-synth-key
+        data-control="enable-midi"
+        label="Enable MIDI"
+        [accessibleName]="model().enableAccessibleName"
+        [disabled]="model().enableDisabled"
+        (press)="enableMidi.emit()"
+      />
+      }
+    </div>
+
+    @for (error of model().errors; track $index) {
+    <p class="error-text" role="alert">{{ error }}</p>
+    }
+  </section>
+</lib-synth-panel>

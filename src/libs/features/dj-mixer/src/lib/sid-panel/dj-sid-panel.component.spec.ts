@@ -120,6 +120,14 @@ function notationButton(
 }
 
 describe('DjSidPanelComponent', () => {
+  it('sits in a scaling container, not a compact card', () => {
+    const { fixture } = render();
+    const host: HTMLElement = fixture.nativeElement;
+
+    expect(host.querySelector('lib-scaling-compact-card')).toBeNull();
+    expect(host.querySelector('lib-scaling-container > lib-synth-panel.faceplate')).not.toBeNull();
+  });
+
   describe('the bindings button', () => {
     function bindingsButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
       return find(fixture, '.panel-header button');

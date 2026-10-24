@@ -1,0 +1,18 @@
+<button
+  type="button"
+  class="key"
+  [attr.aria-label]="accessibleName()"
+  [attr.aria-pressed]="latched()"
+  [attr.data-lit]="isLit() ? '' : null"
+  [attr.data-state-light]="stateLight()"
+  [disabled]="disabled()"
+  (click)="press.emit()"
+>
+  @if (stateLight() !== null) {
+  <span class="state-light" aria-hidden="true"></span>
+  } @if (icon(); as iconName) {
+  <mat-icon class="icon" aria-hidden="true">{{ iconName }}</mat-icon>
+  } @if (label()) {
+  <span class="text">{{ label() }}</span>
+  }
+</button>

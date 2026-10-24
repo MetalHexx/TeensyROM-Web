@@ -1,0 +1,77 @@
+<lib-synth-panel class="plate">
+  <div class="strip">
+    <section class="voices" [attr.aria-label]="model().voiceAccessibleName">
+      <span class="section-label" aria-hidden="true">Voice</span>
+      @for (voice of model().voices; track $index) {
+      <div class="pair" [attr.data-voice]="$index + 1">
+        <lib-synth-key
+          data-control="voice-mute"
+          [label]="voice.label"
+          [accessibleName]="voice.muteAccessibleName"
+          [latched]="voice.muted"
+          [lit]="!voice.muted"
+          [disabled]="model().disabled"
+          (press)="mutedChange.emit({ index: $index, muted: !voice.muted })"
+        />
+        <lib-hold-pad
+          data-control="voice-hold"
+          [label]="voice.holdLabel"
+          [accessibleName]="voice.holdAccessibleName"
+          [disabled]="model().disabled"
+          (heldChange)="heldChange.emit({ index: $index, held: $event })"
+        />
+      </div>
+      }
+    </section>
+
+    <section class="speed" [attr.aria-label]="model().speedAccessibleName">
+      <span class="section-label" aria-hidden="true">Speed</span>
+      <div class="speed-display" [attr.data-nudging]="model().nudging ? '' : null">
+        {{ model().speedText }}
+      </div>
+      <lib-synth-fader
+        data-control="speed"
+        [value]="model().fader.value"
+        [min]="model().fader.min"
+        [max]="model().fader.max"
+        [step]="model().fader.step"
+        [home]="model().fader.home"
+        [accessibleName]="model().fader.accessibleName"
+        [disabled]="model().disabled"
+        (valueChange)="faderChange.emit($event)"
+      />
+      <div class="nudge">
+        <span class="nudge-caption" aria-hidden="true">Nudge</span>
+        <div class="nudge-pads">
+          <lib-hold-pad
+            data-control="speed-nudge-down"
+            shape="round"
+            label="−"
+            [accessibleName]="model().nudge.downAccessibleName"
+            [disabled]="model().disabled"
+            (heldChange)="nudgeChange.emit({ direction: 'down', held: $event })"
+          />
+          <lib-hold-pad
+            data-control="speed-nudge-up"
+            shape="round"
+            label="+"
+            [accessibleName]="model().nudge.upAccessibleName"
+            [disabled]="model().disabled"
+            (heldChange)="nudgeChange.emit({ direction: 'up', held: $event })"
+          />
+        </div>
+      </div>
+      <div class="jumps">
+        @for (button of model().jumpButtons; track button.id) {
+        <lib-synth-key
+          [attr.data-control]="'jump-' + button.id"
+          [label]="button.label"
+          [accessibleName]="button.accessibleName"
+          [disabled]="model().disabled || (button.disabled ?? false)"
+          (press)="jump.emit(button.id)"
+        />
+        }
+      </div>
+    </section>
+  </div>
+</lib-synth-panel>

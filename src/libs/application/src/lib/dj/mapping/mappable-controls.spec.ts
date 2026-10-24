@@ -51,15 +51,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 66 controls per deck, 132 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(132);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(132);
+    it('holds 67 controls per deck, 134 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(134);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(134);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(66);
+        expect(ids).toHaveLength(67);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -116,6 +116,17 @@ describe('MappableControls', () => {
       h.deckService.jumpSpeed('A', 'up');
       expect(h.djStore.deck('A')().speed).toBeGreaterThan(1.5);
       expect(speed.read()).toBe(1.5);
+    });
+
+    it('speed reads the fader, not the nudged tempo', () => {
+      h.makeShapeable('A');
+      const speed = pick('A', 'speed', 'value');
+      speed.set(1.2);
+
+      h.deckService.setNudge('A', 'up', true, 0.1);
+
+      expect(h.djStore.deck('A')().speed).toBeCloseTo(1.3, 10);
+      expect(speed.read()).toBe(1.2);
     });
 
     it('seek reads the scrub position as a percentage', () => {
@@ -239,25 +250,45 @@ describe('MappableControls', () => {
       h.makeShapeable('A');
       const hold = pick('A', `voice-${voice + 1}-hold` as ControlId, 'hold');
 
-      hold.set(true);
+      hold.set(true, null);
       expect(h.djStore.deck('A')().voices[voice].held).toBe(true);
 
-      hold.set(false);
+      hold.set(false, null);
       expect(h.djStore.deck('A')().voices[voice].held).toBe(false);
     });
 
-    it('clear voice mutes clears every latched mute on its deck', () => {
+    it.each([
+      ['up', 0.05, 1.05],
+      ['down', 0.05, 0.95],
+    ] as const)(
+      'nudge %s holds the speed by the amount and releases to the fader',
+      (direction, amount, expected) => {
+        h.makeShapeable('A');
+        const nudge = pick('A', `speed-nudge-${direction}` as ControlId, 'hold');
+        expect(nudge.amountDefault).toBe(0.05);
+
+        nudge.set(true, amount);
+        expect(h.djStore.deck('A')().speed).toBeCloseTo(expected, 10);
+
+        nudge.set(false, null);
+        expect(h.djStore.deck('A')().speed).toBe(1);
+      }
+    );
+
+    it('a nudge uses the amount it is given, and the default when given none', () => {
       h.makeShapeable('A');
-      h.deckService.setVoiceMuted('A', 0, true);
-      h.deckService.setVoiceMuted('A', 2, true);
+      const nudge = pick('A', 'speed-nudge-up', 'hold');
 
-      pick('A', 'clear-voice-mutes', 'trigger').fire();
+      nudge.set(true, 0.2);
+      expect(h.djStore.deck('A')().speed).toBeCloseTo(1.2, 10);
+      nudge.set(false, null);
 
-      expect(
-        h.djStore
-          .deck('A')()
-          .voices.some((v) => v.muted)
-      ).toBe(false);
+      nudge.set(true, null);
+      expect(h.djStore.deck('A')().speed).toBeCloseTo(1.05, 10);
+    });
+
+    it('a voice hold takes no amount', () => {
+      expect(pick('A', 'voice-1-hold', 'hold').amountDefault).toBeNull();
     });
 
     it.each([

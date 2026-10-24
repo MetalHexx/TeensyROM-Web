@@ -101,3 +101,20 @@ $bp-desktop: 1600px; // At and above: full desktop layout (≥ 1280px)
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+// ─────────────────────────────────────────────
+//  Synth Display Mixin
+// ─────────────────────────────────────────────
+
+// A recessed, near-black readout face with an inset shadow, a hairline border and mono text —
+// shared by the transport and speed readouts. Colour the text per state with the lights
+// (--color-highlight, --color-success, ...) or `--synth-display-dim`.
+@mixin synth-display {
+  background: var(--synth-display-face);
+  border: 1px solid var(--synth-display-border);
+  border-radius: var(--border-radius-sm);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  color: var(--synth-display-text);
+  font-family: 'Roboto Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}

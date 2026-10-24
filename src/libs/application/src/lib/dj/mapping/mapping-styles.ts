@@ -37,8 +37,12 @@ export function isStyleAvailable(
 }
 
 /** The amount a fresh style of this kind starts with: the control's sensitivity for a relative
- *  kind, its step amount for `step`, and `null` for everything else. */
+ *  kind, its step amount for `step`, a hold's own default for `hold`, and `null` for everything
+ *  else. */
 export function defaultAmountFor(control: MappableControl, kind: MappingStyleKind): number | null {
+  if (control.nature === 'hold') {
+    return control.amountDefault;
+  }
   if (control.nature !== 'value') {
     return null;
   }
@@ -56,7 +60,7 @@ export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKin
     case 'state':
       return { kind: 'latch', amount: null };
     case 'hold':
-      return { kind: 'hold', amount: null };
+      return { kind: 'hold', amount: control.amountDefault };
     case 'value': {
       const kind = sourceKind === 'note' ? 'step' : control.defaults.ccStyle;
       return { kind, amount: defaultAmountFor(control, kind) };
@@ -64,14 +68,25 @@ export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKin
   }
 }
 
-/** Keeps an amount in what the server accepts for the kind: a relative amount in (0, 1], a step
- *  amount in [−1, 1] and never zero, and `null` for every other kind. A missing or non-finite
- *  amount falls back to the control's default. */
+/** Keeps an amount in what the server accepts for the kind: a relative amount in (0, 1], a hold's
+ *  amount in (0, 1] (`null` for a hold that takes none), a step amount in [−1, 1] and never zero,
+ *  and `null` for every other kind. A missing or non-finite amount falls back to the control's
+ *  default. */
 export function clampAmount(
   control: MappableControl,
   kind: MappingStyleKind,
   amount: number | null
 ): number | null {
+  if (kind === 'hold') {
+    if (control.nature !== 'hold' || control.amountDefault === null) {
+      return null;
+    }
+    return clamp(
+      amount !== null && Number.isFinite(amount) ? amount : control.amountDefault,
+      MIN_AMOUNT,
+      1
+    );
+  }
   if (!isRelativeKind(kind) && kind !== 'step') {
     return null;
   }

@@ -31,7 +31,7 @@ export function describeStyle(style: MappingStyle): string {
     case 'off':
       return 'Off key';
     case 'hold':
-      return 'Hold';
+      return amount === null ? 'Hold' : `Hold · ${percent(amount)}%`;
     case 'absolute':
       return 'Absolute';
     case 'relative-offset':

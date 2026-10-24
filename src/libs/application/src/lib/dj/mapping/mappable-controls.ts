@@ -5,6 +5,8 @@ import { DeckService } from '../deck.service';
 import { DjStore } from '../dj-store';
 import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
 import { PANEL_RANGES } from '../mixer/panel-ranges';
+import { NUDGE_DEFAULT_AMOUNT } from '../mixer/speed-excursion';
+import { SPEED_FADER_RANGE } from '../mixer/speed-range';
 import { DECK_SLOTS, type Slot } from '../slot';
 import type { PanelFilterMode, PanelWaveform, VoiceSwitch } from '../dj-store';
 import {
@@ -35,7 +37,14 @@ interface ControlBase {
 export type MappableControl =
   | (ControlBase & { readonly nature: 'trigger'; fire(): void })
   | (ControlBase & { readonly nature: 'state'; read(): boolean; set(on: boolean): void })
-  | (ControlBase & { readonly nature: 'hold'; set(held: boolean): void })
+  | (ControlBase & {
+      readonly nature: 'hold';
+      /** The amount a fresh mapping of this hold starts with, or null for a hold that takes none
+       *  (the voice holds). */
+      readonly amountDefault: number | null;
+      /** `amount` is the mapping's amount on a press, null on a release or for a hold with none. */
+      set(held: boolean, amount: number | null): void;
+    })
   | (ControlBase & {
       readonly nature: 'value';
       readonly min: number;
@@ -55,8 +64,8 @@ interface ValueRange {
   readonly step: number | null;
 }
 
-const SPEED_RANGE: ValueRange = { min: 0.5, max: 1.5, home: 1, step: null };
-const KEY_RANGE: ValueRange = { min: -12, max: 12, home: 0, step: 1 };
+const SPEED_RANGE: ValueRange = { ...SPEED_FADER_RANGE, step: null };
+const KEY_RANGE: ValueRange = PANEL_RANGES.key;
 
 const SEEK_DEFAULTS: ValueDefaults = {
   ccStyle: 'relative-offset',
@@ -178,9 +187,10 @@ function state(
 function hold(
   identity: ControlIdentity,
   name: string,
-  set: (held: boolean) => void
+  set: (held: boolean, amount: number | null) => void,
+  amountDefault: number | null = null
 ): MappableControl {
-  return { identity, name, nature: 'hold', set };
+  return { identity, name, nature: 'hold', amountDefault, set };
 }
 
 function value(
@@ -247,12 +257,24 @@ export class MappableControls {
         'Speed',
         SPEED_RANGE,
         SPEED_DEFAULTS,
-        () => clamp(deck().speed, SPEED_RANGE.min, SPEED_RANGE.max),
+        () => clamp(deck().faderSpeed, SPEED_RANGE.min, SPEED_RANGE.max),
         (speed) => decks.setSpeed(slot, speed)
       ),
       trigger(id('speed-jump-up'), 'Speed +50%', () => decks.jumpSpeed(slot, 'up')),
       trigger(id('speed-jump-home'), 'Speed home', () => decks.jumpSpeed(slot, 'home')),
       trigger(id('speed-jump-down'), 'Speed −50%', () => decks.jumpSpeed(slot, 'down')),
+      hold(
+        id('speed-nudge-up'),
+        'Nudge up',
+        (held, amount) => decks.setNudge(slot, 'up', held, amount ?? NUDGE_DEFAULT_AMOUNT),
+        NUDGE_DEFAULT_AMOUNT
+      ),
+      hold(
+        id('speed-nudge-down'),
+        'Nudge down',
+        (held, amount) => decks.setNudge(slot, 'down', held, amount ?? NUDGE_DEFAULT_AMOUNT),
+        NUDGE_DEFAULT_AMOUNT
+      ),
       state(
         id('repeat'),
         'Repeat track',
@@ -272,7 +294,6 @@ export class MappableControls {
           decks.setVoiceHeld(slot, n - 1, held)
         )
       ),
-      trigger(id('clear-voice-mutes'), 'Clear voice mutes', () => decks.clearVoiceMutes(slot)),
       value(
         id('key'),
         'Key',

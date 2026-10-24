@@ -11,6 +11,10 @@ export const SPEED_INPUT_SPAN = 0.5;
 /** What the jump buttons may reach: 0.3x–1.7x. */
 export const SPEED_HARD_SPAN = 0.7;
 
+/** The nudge pads' amount, and a fresh nudge mapping's default: 5 percentage points of multiplier,
+ *  added while held — the desktop app's ±5. */
+export const NUDGE_DEFAULT_AMOUNT = 0.05;
+
 /** A remembered-speed excursion the jump buttons drive. DJ apparatus, not timeline: the first press
  *  of either button opens an excursion by remembering the pre-jump multiplier, then moves the
  *  multiplier additively, clamped to [`slowest`, `fastest`]; a same-side press while open is a
@@ -19,9 +23,10 @@ export const SPEED_HARD_SPAN = 0.7;
  *  the excursion. `home()` is dual-purpose: 1.0 with no excursion open, or the same exact-restore-
  *  and-close an opposite jump takes.
  *
- *  Opening a fresh excursion seeds `remembered` from `getMultiplier()` — the live tempo — rather
- *  than trusting an internally tracked value, since a tempo change made outside `jumpUp`/`jumpDown`/
- *  `home` (the fader, or a tune load) never calls back into this module. Direction is tracked
+ *  Opening a fresh excursion seeds `remembered` from `getMultiplier()` — whatever value the caller
+ *  supplies — rather than trusting an internally tracked value, since a tempo change made outside
+ *  `jumpUp`/`jumpDown`/`home` (the fader, or a tune load) never calls back into this module.
+ *  `DeckSpeed` supplies the fader's value, deliberately excluding any held nudge. Direction is tracked
  *  separately from the multiplier because "same button again" versus "opposite button" cannot be
  *  told apart from the multiplier's value alone once a jump has clamped.
  */

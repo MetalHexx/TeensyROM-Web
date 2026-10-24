@@ -24,6 +24,8 @@ const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const STOP_A: ControlIdentity = { owner: 'A', control: 'stop' };
 const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
 const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
+const NUDGE_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
+const VOICE_HOLD_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
 
 const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
@@ -44,6 +46,20 @@ const CONTROLS: readonly MappableControl[] = [
   },
   { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
   keyControl(KEY_B),
+  {
+    identity: NUDGE_A,
+    name: 'Nudge up',
+    nature: 'hold',
+    amountDefault: 0.05,
+    set: () => undefined,
+  },
+  {
+    identity: VOICE_HOLD_A,
+    name: 'Voice 1 kill / punch-in',
+    nature: 'hold',
+    amountDefault: null,
+    set: () => undefined,
+  },
 ];
 
 function keyControl(identity: ControlIdentity): MappableControl {
@@ -273,6 +289,30 @@ describe('DjBindingsPanelComponent', () => {
         expect.objectContaining({ label: 'Amount', value: -10, min: -100, max: 100 })
       );
       expect(modelOf(fixture, 1).amount).toBeNull();
+    });
+
+    it('shows a nudge hold with an editable amount in percent, and a voice hold with none', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [
+          mapping('nudge', NUDGE_A, { kind: 'hold', amount: 0.05 }, { kind: 'note', number: 30 }),
+          mapping(
+            'voice',
+            VOICE_HOLD_A,
+            { kind: 'hold', amount: null },
+            { kind: 'note', number: 31 }
+          ),
+        ]
+      );
+
+      const nudge = [0, 1].map((i) => modelOf(fixture, i)).find((m) => m.amount !== null);
+      expect(nudge).toMatchObject({
+        styleText: 'Hold · 5%',
+        amount: { label: 'Amount', value: 5, min: 0.1, max: 100, step: 0.1, suffix: '%' },
+      });
+      const voice = [0, 1].map((i) => modelOf(fixture, i)).find((m) => m.amount === null);
+      expect(voice?.styleText).toBe('Hold');
     });
 
     it('names the edit and delete controls after the control and its owner', () => {

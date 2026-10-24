@@ -1,0 +1,69 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Trimmed to the scale's small step, as the channel strip's faceplate is, to fit the narrow column.
+.plate {
+  min-width: 0;
+  padding: var(--spacing-sm);
+  overflow: hidden;
+}
+
+.binding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+// The select is the only flexible child: the deck label and the two keys hold their own width, and
+// the select takes whatever the column leaves over, truncating its text rather than pushing out.
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.deck-label {
+  flex: 0 0 auto;
+  color: var(--synth-legend);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+select {
+  @include styles.synth-display;
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--perf-control-height, 2rem);
+  padding: 0 var(--spacing-xs);
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.absent {
+    color: var(--color-error);
+  }
+}
+
+lib-synth-key {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}

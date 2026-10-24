@@ -1,6 +1,7 @@
 import { computed } from '@angular/core';
 import { DeckState, DeckStatus, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
+import { formatElapsed, formatTotal } from './transport-time';
 
 /** The position bar's fixed dead-tail share for an ended tune — a SID that has ended sits in a
  *  static idle cycle forever, so the tail has no finite duration to derive a share from. Matches
@@ -26,7 +27,15 @@ export interface DeckTransportSummary {
   scrubPercent: number;
   bar: DeckBarState;
   frameLabel: string;
+  title: string | null;
+  author: string | null;
+  /** 'mm:ss.t' playhead time; '00:00.0' while the play-call interval is unknown. */
+  elapsedText: string;
+  /** 'mm:ss' tune length; '--:--' while the length or the play-call interval is unknown. */
+  totalText: string;
   subtuneText: string;
+  /** `subtune/subtuneCount`, '–/–' while nothing is loaded. */
+  subtuneCompact: string;
   subtuneDisabled: boolean;
   repeat: boolean;
   errors: readonly string[];
@@ -94,7 +103,12 @@ export function transportSummary(store: WritableStore<DjState>) {
               : clamp((deck.positionFrames / deck.lengthFrames) * 100, 0, 100),
           bar: barFor(deck),
           frameLabel: `frame ${deck.positionFrames}`,
+          title: deck.loaded?.title ?? null,
+          author: deck.loaded?.author ?? null,
+          elapsedText: formatElapsed(deck.positionFrames, deck.playCallIntervalUs),
+          totalText: formatTotal(deck.lengthFrames, deck.playCallIntervalUs),
           subtuneText: `Subtune ${deck.subtune} of ${deck.subtuneCount}`,
+          subtuneCompact: deck.subtuneCount === 0 ? '–/–' : `${deck.subtune}/${deck.subtuneCount}`,
           subtuneDisabled: controlsDisabled || deck.subtuneCount <= 1,
           repeat: deck.repeat,
           errors: [],

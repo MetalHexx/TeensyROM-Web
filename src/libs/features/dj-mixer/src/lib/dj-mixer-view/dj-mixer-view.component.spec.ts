@@ -98,7 +98,12 @@ function idleTransportSummary(): DeckTransportSummary {
     scrubPercent: 0,
     bar: { kind: 'unknown' },
     frameLabel: 'frame 0',
+    title: null,
+    author: null,
+    elapsedText: '00:00.0',
+    totalText: '--:--',
     subtuneText: 'Subtune 0 of 0',
+    subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
     errors: [],
@@ -610,9 +615,11 @@ describe('DjMixerViewComponent', () => {
       const mismatched = ALL_IDENTITIES.map((identity) => ({
         identity: controlKey(identity),
         matches: grid.querySelectorAll(anchorFor(identity)).length,
-      })).filter(({ matches }) => matches !== 1);
+      }))
+        .filter(({ matches }) => matches !== 1)
+        .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(132);
+      expect(ALL_IDENTITIES).toHaveLength(134);
       expect(mismatched).toEqual([]);
     });
   });

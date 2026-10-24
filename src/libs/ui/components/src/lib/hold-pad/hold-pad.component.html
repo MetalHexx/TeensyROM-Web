@@ -1,0 +1,14 @@
+<button
+  type="button"
+  class="pad"
+  libHoldPress
+  #hold="libHoldPress"
+  [holdDisabled]="disabled()"
+  [attr.aria-label]="accessibleName()"
+  [attr.aria-pressed]="hold.held()"
+  [attr.data-held]="hold.held() ? '' : null"
+  [disabled]="disabled()"
+  (holdChange)="heldChange.emit($event)"
+>
+  {{ label() }}
+</button>
