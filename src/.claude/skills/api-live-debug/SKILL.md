@@ -156,7 +156,7 @@ Endpoints a bench session actually drives, with their query-string parameters (e
 | `GET /api/devices/{deviceId}/storage/{SD\|USB}/directories?Path=` | |
 | `GET /api/devices/{deviceId}/ping` | user-triggered only — the API never sends this on its own |
 | `PUT /api/devices/{deviceId}/reset` | note the verb, `PUT` |
-| `GET /api/devices/?FullScan=` | rate-limited to one request per 5 s with a queue of one (`RateLimitHelper.FindDevicesRateLimiter`); lists offline units (`deviceState: ConnectionLost`) after the available ones either way |
+| `GET /api/devices/?FullScan=` | only `FullScan=true` is rate-limited, to one request per 5 s with a queue of one (`RateLimitHelper.FindDevicesRateLimiter`); a plain listing is never limited; lists offline units (`deviceState: ConnectionLost`) after the available ones either way |
 | `POST /api/devices/{deviceId}/reconnect` | saved addresses, preferred transport first, then one search for missing units if that misses |
 | `DELETE /api/devices/{deviceId}` | offline units only - an available device answers 409 |
 | `POST /api/devices/{deviceId}/toggle-music` | |

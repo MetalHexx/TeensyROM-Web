@@ -8,9 +8,32 @@ Guide the user through the library with `trom file ls "<dir>" --json`. It works 
 
 When a file is launched, tell a short story under the rules in `dj.md` (see its Stories section). Do not repeat them here.
 
+## Copying
+
+Copy between this computer and the TeensyROM with `trom file upload` and `trom file download`. Both take `--json`.
+
+- Upload: `trom file upload "<local path>" --to "<device folder>" --device <name> [--storage sd|usb] --json`. Always name the source.
+- Download: `trom file download "<device path>" --to "<local folder>" --device <name> --json`.
+- Folders keep their layout. `.zip`, `.7z` and `.rar` are expanded on the TeensyROM. Files over 10 MB are skipped on download and reported.
+- Upload sends only the types the TeensyROM takes: `.sid`, `.crt`, `.prg`, `.p00`, `.hex`, `.kla`, `.koa`, `.art`, `.aas`, `.hpi`, `.seq`, `.txt`, `.d64`, `.zip`, `.7z`, `.rar`. A folder upload leaves other files out, and a single file of another type is reported as not sent. Don't promise to copy other types.
+- An upload that leaves files out prints a notice on stderr with the count, in `--json` too. Read the count from it and say it in plain words, for example "Two files weren't sent: the TeensyROM doesn't take their file types."
+- An empty device folder is "nothing to download", exit 5, not success. Its folder is still created on the computer.
+- A saved file's `localPath` is a full path under the chosen folder.
+- `totals.copied` counts the files an archive expands to, so it can exceed the number of rows in `files`.
+- Ask where files go when the user hasn't said: the device folder for an upload, the folder on the computer for a download. Your own working folder is wherever this session started, which is rarely where the user wants files.
+- Before any copy, confirm what goes where. A copy replaces a same-named file at the destination.
+- Never pass `--yes`. It sends the whole current folder, which is rarely what the user means; ask for the files instead.
+- An upload resets the TeensyROM, which stops whatever is playing. Say so when you confirm, and don't copy during a timed set unless the user wants the set to end.
+- Report the summary, and each failure in plain words.
+- A busy device means "try again when the other transfer finishes".
+- To copy and launch one file, see `dj.md` (Launching).
+
 ## Curating
 
 Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: confirm before a ban.
+
+- List the bans: `trom file banned --json` returns `[{entry, kind}]`, where `kind` is `file` or `folder`. Takes no `--device`.
+- Lift a ban on request: `trom file unban "<entry>" --json`. Give the entry as `trom file banned` prints it, or a device file path. Takes no `--device`.
 
 ## Search and random
 
@@ -18,4 +41,4 @@ Favorite, unfavorite and ban work as in `dj.md` (Curating), with the same rule: 
 
 ## Not yet
 
-If `init`'s `capabilities` does not list a command for what the user asks (copy, delete, send), say plainly: "this version of trom can't do that yet".
+Deleting files, and copying or moving files on the TeensyROM itself, are not in trom yet. For a move, if `init`'s `capabilities` lists `file download` and `file upload`, offer to download the files and then upload them to the new folder, confirming each copy as under Copying. The originals stay on the TeensyROM, since deleting isn't in trom yet. If `init`'s `capabilities` does not list a command for what the user asks, say plainly: "this version of trom can't do that yet".

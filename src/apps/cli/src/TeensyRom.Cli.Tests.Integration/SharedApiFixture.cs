@@ -11,8 +11,8 @@ using TeensyRom.Cli.Api.Generated;
 namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
-/// Ensures the shared engine once per run and reads its device list once, so scenarios never
-/// race the <c>/api/devices</c> rate limit (one request per 5 s, one queued).
+/// Ensures the shared engine once per run and reads its device list once, so scenarios share one
+/// engine and one device snapshot. Only full scans on <c>/api/devices</c> are rate limited (one per 5 s, one queued).
 /// </summary>
 public sealed class SharedApiFixture : IAsyncLifetime
 {

@@ -179,7 +179,7 @@ Mock only at infrastructure boundaries — application and features tests should
 ## Backend Notes
 
 - CORS is configured for the Angular dev server via the `UiCors` extension.
-- Rate limiting is opt-in per endpoint via a named policy (currently used only by the device discovery endpoint).
+- Rate limiting is opt-in per endpoint via a named policy (currently used only by the device discovery endpoint, and only for full scans).
 - Assets are automatically unpacked on startup.
 - The API requires TeensyROM firmware that reports its boot state (the version reply's `Boot:` line —
   fork branch `boot-complete-flag`, pending upstream).

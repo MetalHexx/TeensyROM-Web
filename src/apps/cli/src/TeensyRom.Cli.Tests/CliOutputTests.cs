@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Spectre.Console.Testing;
 using System.Text.Json;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Errors;
@@ -96,6 +97,24 @@ public class CliOutputTests
         Output(outIsTerminal: true).Fields([("Status", "running")]);
 
         _consoles.StdOut.Should().Contain("Status").And.Contain("running").And.ContainAny("│", "|");
+    }
+
+    [Fact]
+    public void Fields_WithAnHttpUrl_AreALinkOnATerminal_AndPlainTextWhenRedirected()
+    {
+        _consoles.Out.EmitAnsiSequences();
+        const string url = "http://localhost:10213/";
+
+        Output(outIsTerminal: true).Fields([("Web UI address", url)]);
+        var human = _consoles.StdOut;
+
+        human.Should().Contain(url).And.Contain("\u001b]8;");
+
+        var plain = new TestConsoles();
+        plain.Out.EmitAnsiSequences();
+        new CliOutput(plain.With(false, false, false)).Fields([("Web UI address", url)]);
+
+        plain.StdOut.Should().Contain($"Web UI address: {url}").And.NotContain("\u001b");
     }
 
     [Fact]

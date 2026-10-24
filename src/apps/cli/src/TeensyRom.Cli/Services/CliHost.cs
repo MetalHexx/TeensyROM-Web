@@ -25,6 +25,7 @@ using TeensyRom.Cli.Help;
 using TeensyRom.Cli.Logging;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.PathSetup;
+using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Services;
@@ -101,13 +102,21 @@ internal static class CliHost
             PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the files tr-web has cached for a storage. Until a full index is built (trom index build) results can be incomplete, and a notice on stderr says so.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
             PublicVerb.Of<FileLaunchOneShotCommand, FileLaunchOneShotSettings>("launch", "Launch one file; --player then opens the player on it.", ["file", "launch", "/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid"]),
             PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it. Picks from the files tr-web has cached, so a storage that is not fully indexed gets a notice on stderr.", ["file", "random", "--filter", "music", "--directory", "/music"]),
+            PublicVerb.Of<FileNextCommand, FilePlaybackSettings>("next", "Launch the next file after the one last launched on this TeensyROM: through its folder, its search results, or a new random pick.", ["file", "next"]),
+            PublicVerb.Of<FilePreviousCommand, FilePlaybackSettings>("previous", "Launch the file before the one last launched on this TeensyROM; after random picks, walk back through them.", ["file", "previous"]),
+            PublicVerb.Of<FilePauseCommand, FilePlaybackSettings>("pause", "Play/pause for music: pause or resume the song playing. Games and programs can't be paused, so they are stopped instead, which resets the TeensyROM; something stopped is launched again.", ["file", "pause"]),
+            PublicVerb.Of<FileStopCommand, FilePlaybackSettings>("stop", "Stop whatever is running by resetting the TeensyROM, the same reset as `trom device reset`.", ["file", "stop"]),
+            PublicVerb.Of<FileUploadCommand, FileUploadSettings>("upload", "Copy files and folders from this computer to the TeensyROM; with no paths, the current folder's contents (asks first unless --yes). Folders keep their layout. Only the file types the TeensyROM takes are sent (.sid .crt .prg .p00 .hex .kla .koa .art .aas .hpi .seq .txt .d64 .zip .7z .rar); others are left out and counted on stderr, and links, hidden and system files are left out silently. .zip, .7z and .rar are expanded on the TeensyROM. --launch launches one file once it lands.", ["file", "upload", "Commando.sid", "--to", "/music"]),
+            PublicVerb.Of<FileDownloadCommand, FileDownloadSettings>("download", "Copy files and folders from the TeensyROM to this computer, into the current folder unless --to names another. Folders keep their layout; files over 10 MB are skipped and reported.", ["file", "download", "/games"]),
             PublicVerb.Of<FileFavoriteCommand, FilePathsSettings>("favorite", "Tag files as favorites; give paths, or - to read them from stdin.", ["file", "favorite", "/music/Commando.sid", "/music/Delta.sid"]),
             PublicVerb.Of<FileUnfavoriteCommand, FilePathsSettings>("unfavorite", "Untag favorites; give paths, or - to read them from stdin.", ["file", "unfavorite", "/favorites/music/Commando.sid"]),
-            PublicVerb.Of<FileBanCommand, FilePathsSettings>("ban", "Ban files so they no longer show up; give paths, or - to read them from stdin.", ["file", "ban", "/music/Commando.sid"])
+            PublicVerb.Of<FileBanCommand, FilePathsSettings>("ban", "Ban files so they no longer show up; give paths, or - to read them from stdin.", ["file", "ban", "/music/Commando.sid"]),
+            PublicVerb.Of<FileBannedCommand, FileBannedSettings>("banned", "List every ban: banned file names and banned folders. Needs no device; bans apply to every TeensyROM. Piped output is entries only, so `trom file banned | trom file unban -` works; --json and the table carry the kind.", ["file", "banned"]),
+            PublicVerb.Of<FileUnbanCommand, FileUnbanSettings>("unban", "Lift bans: file names or folders as `trom file banned` prints them, or device file paths; give entries, or - to read them from stdin. Needs no device.", ["file", "unban", "Commando.sid"])
         ]),
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [
-            PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one.", ["index", "build", "/music", "--storage", "sd"])
+            PublicVerb.Of<IndexBuildCommand, IndexBuildSettings>("build", "Index a directory and everything below it; every available storage unless --storage names one. --all indexes every storage on every connected TeensyROM instead.", ["index", "build", "/music", "--storage", "sd"])
         ]),
         new("path", "Put trom on your PATH, or take it off again.",
         [
@@ -130,7 +139,7 @@ internal static class CliHost
     internal static readonly PublicCommand[] PublicCommands =
     [
         PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"]),
-        PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents.", ["wait", "3m20s"])
+        PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])
     ];
 
     /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>
@@ -223,9 +232,13 @@ internal static class CliHost
         services.AddSingleton<IStorageService, StorageService>();
         services.AddSingleton<ILaunchService, LaunchService>();
         services.AddSingleton<IPlayerService, PlayerService>();
+        services.AddSingleton<ITransferService, TransferService>();
+        services.AddSingleton<UploadRunner>();
+        services.AddSingleton<DownloadRunner>();
         services.AddSingleton<ITypeResolver, TypeResolver>();
         services.AddSingleton<IProgressTimer, ProgressTimer>();
         services.AddSingleton<ILaunchHistory, LaunchHistory>();
+        services.AddSingleton<ILastLaunchStore, LastLaunchStore>();
 
         RegisterCommands(services);
 

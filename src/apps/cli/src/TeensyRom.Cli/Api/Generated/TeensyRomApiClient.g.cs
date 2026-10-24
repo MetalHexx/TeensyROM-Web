@@ -265,6 +265,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>
         /// <br/>- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.
         /// <br/>- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
+        /// <br/>- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.
         /// <br/>- Offline units are listed after the online ones, with deviceState ConnectionLost.
         /// </remarks>
         /// <returns>OK</returns>
@@ -367,6 +368,17 @@ namespace TeensyRom.Cli.Api.Generated
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<SearchResponse> SearchAsync(string deviceId, string searchText, int skip, int take, NullableOfTeensyFilterType? filterType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Lift Ban
+        /// </summary>
+        /// <remarks>
+        /// Removes one entry from the banned files or banned folders list. Bans are engine-wide, so no device is needed. Lifting an entry that is not banned changes nothing.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<LiftBanResponse> LiftBanAsync(string entry, BanKind kind, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -2081,6 +2093,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>
         /// <br/>- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.
         /// <br/>- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
+        /// <br/>- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.
         /// <br/>- Offline units are listed after the online ones, with deviceState ConnectionLost.
         /// </remarks>
         /// <returns>OK</returns>
@@ -2869,6 +2882,114 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Lift Ban
+        /// </summary>
+        /// <remarks>
+        /// Removes one entry from the banned files or banned folders list. Bans are engine-wide, so no device is needed. Lifting an entry that is not banned changes nothing.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<LiftBanResponse> LiftBanAsync(string entry, BanKind kind, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (entry == null)
+                throw new System.ArgumentNullException("entry");
+
+            if (kind == null)
+                throw new System.ArgumentNullException("kind");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Content = new System.Net.Http.StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json");
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/bans/lift"
+                    urlBuilder_.Append("api/bans/lift");
+                    urlBuilder_.Append('?');
+                    urlBuilder_.Append(System.Uri.EscapeDataString("Entry")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(entry, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    urlBuilder_.Append(System.Uri.EscapeDataString("Kind")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(kind, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<LiftBanResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 502)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Gateway", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -4143,6 +4264,18 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum BanKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"File")]
+        File = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Folder")]
+        Folder = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class CancelJobResponse
     {
 
@@ -5050,6 +5183,35 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("isCompatible")]
         public bool IsCompatible { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class LiftBanResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("message")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Message { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("entry")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Entry { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("kind")]
+        public BanKind Kind { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("lifted")]
+        public bool Lifted { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

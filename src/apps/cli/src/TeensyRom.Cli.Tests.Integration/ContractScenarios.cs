@@ -1,11 +1,12 @@
 using System.Text.Json;
+using TeensyRom.Cli.Common;
 
 namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
 /// The composability contract against the real engine: stdout carries only the result, stderr carries everything
-/// else, <c>--json</c> output and errors parse, and the exit code says what happened. Back-to-back device commands can
-/// wait up to about 5 seconds on tr-web's <c>/api/devices</c> rate limit; that is expected.
+/// else, <c>--json</c> output and errors parse, and the exit code says what happened. Back-to-back device commands do not
+/// wait: tr-web rate limits only full scans on <c>/api/devices</c>, not plain listings.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class ContractScenarios(SharedApiFixture api)
@@ -46,6 +47,20 @@ public sealed class ContractScenarios(SharedApiFixture api)
         exitCode.Should().Be(0);
         var parse = () => JsonDocument.Parse(cli.Output).Dispose();
         parse.Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task EngineStatus_Json_NamesTheEnginesLogFolder_AndAnExistingLogFile()
+    {
+        using var cli = new CliHarness();
+
+        (await cli.RunAsync("engine", "status", "--json")).Should().Be(0);
+
+        var status = JsonDocument.Parse(cli.Output).RootElement;
+        status.GetProperty("logFolder").GetString().Should().Be(TeensyRomHome.EngineLogsPath);
+        var logFile = status.GetProperty("logFile").GetString();
+        Path.GetFileName(logFile).Should().StartWith("Logs-").And.EndWith(".txt");
+        File.Exists(logFile).Should().BeTrue();
     }
 
     [Fact]

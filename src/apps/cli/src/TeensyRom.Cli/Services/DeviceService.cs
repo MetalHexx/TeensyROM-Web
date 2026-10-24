@@ -37,12 +37,6 @@ internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
         await ApiErrors.Call(() => api.ToggleMusicAsync(deviceId));
     }
 
-    public async Task ResetAsync()
-    {
-        var deviceId = RequireDeviceId();
-        await ApiErrors.Call(() => api.ResetDeviceAsync(deviceId));
-    }
-
     public async Task<DeviceSummary> ReconnectDeviceAsync(string deviceId, CancellationToken ct = default) =>
         ToSummary((await ApiErrors.Call(() => api.ReconnectDeviceAsync(deviceId, ct))).Device);
 

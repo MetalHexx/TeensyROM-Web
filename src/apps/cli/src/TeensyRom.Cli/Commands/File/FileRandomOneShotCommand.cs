@@ -70,10 +70,9 @@ internal sealed class FileRandomOneShotCommand(
     IDeviceService devices,
     IStorageService storage,
     ISettingsService settingsService,
-    ILaunchService launchService,
     IPlayerService player,
     ITypeResolver resolver,
-    IStdinPaths stdin) : FileLaunchingCommand<FileRandomOneShotSettings>(output, engine, chooser, devices, storage, settingsService, launchService, player, resolver)
+    IStdinPaths stdin) : FileLaunchingCommand<FileRandomOneShotSettings>(output, engine, chooser, devices, storage, settingsService, player, resolver)
 {
     protected override async Task<int> RunAsync(CommandContext context, FileRandomOneShotSettings settings, CancellationToken ct)
     {
@@ -82,30 +81,29 @@ internal sealed class FileRandomOneShotCommand(
         var filter = FileCommandOptions.ParseFilter(settings.Filter);
         var directory = settings.Directory is null ? "/" : FileCommandOptions.ReadPath(stdin, settings.Directory);
 
+        Player.UseStorage(storage.StorageType);
+
         if (playerCommand is null)
         {
-            var outcome = await Launches.LaunchRandom(storage.StorageType, FileCommandOptions.ParseScope(settings.Scope), directory, filter);
+            var outcome = await Player.RandomOnceAsync(FileCommandOptions.ParseScope(settings.Scope), directory, filter);
 
             NoticeWhenIndexIncomplete();
 
             return Report(outcome, storage.StorageType, LaunchOutcome.NoFilesFoundMessage);
         }
 
-        Player.UseStorage(storage.StorageType);
         Player.SetDirectoryScope(directory);
         Player.SetFilter(filter);
         Player.SetStreamTime(FileCommandOptions.ParseTimer(settings.Timer));
         Player.SetSidTimer(settings.Override ? SidTimer.TimerOverride : SidTimer.SongLength);
 
-        await Player.PlayRandom();
+        var picked = await Player.PlayRandom();
 
         NoticeWhenIndexIncomplete();
 
-        var state = Player.GetState();
+        if (picked is null or { Status: LaunchStatus.NotFound }) throw new CliException(CliExitCode.NotFound, LaunchOutcome.NoFilesFoundMessage);
 
-        if (state.CurrentItem is null) throw new CliException(CliExitCode.NotFound, LaunchOutcome.NoFilesFoundMessage);
-
-        if (!Player.IsPlaying()) throw new CliException(CliExitCode.Failed, "Couldn't play a random file.");
+        if (picked.Status is not LaunchStatus.Launched) throw new CliException(CliExitCode.Failed, "Couldn't play a random file.");
 
         return ShowPlayer(context, playerCommand);
     }

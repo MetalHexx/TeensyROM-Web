@@ -50,7 +50,8 @@ internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engin
 
 /// <summary>
 /// A command that works with one online TeensyROM: after the engine is ready the device is chosen and selected, and
-/// for <see cref="StorageSettings"/> the storage is chosen for this invocation without saving it.
+/// for <see cref="StorageSettings"/> the storage is chosen for this invocation without saving it, unless
+/// <c>NeedsDevice</c> says the run acts on every device.
 /// </summary>
 internal abstract class DeviceCommand<T>(
     ICliOutput output,
@@ -65,10 +66,15 @@ internal abstract class DeviceCommand<T>(
     {
         await base.PrepareAsync(settings, ct);
 
+        if (!NeedsDevice(settings)) return;
+
         devices.Select(await chooser.ChooseAsync(settings.Device, DeviceScope.Online, ct));
 
         if (settings is StorageSettings withStorage) storage.UseStorage(ChooseStorage(withStorage));
     }
+
+    /// <summary>Whether this run works with one device; a command that acts on every device says no and none is chosen.</summary>
+    protected virtual bool NeedsDevice(T settings) => true;
 
     /// <summary>
     /// Warns, after the command's results, when tr-web holds no full index of the chosen storage: search and random only

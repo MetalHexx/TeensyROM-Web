@@ -7,8 +7,8 @@ namespace TeensyRom.Cli.Tests.Integration;
 
 /// <summary>
 /// The CLI starting, replacing and stopping the real engine. Each scenario hands the shared engine back when it ends.
-/// An engine command here is <c>device list</c>; back-to-back runs can wait up to about 5 seconds on tr-web's
-/// <c>/api/devices</c> rate limit, which is expected.
+/// An engine command here is <c>device list</c>; back-to-back runs do not wait, because tr-web rate limits
+/// only full scans on <c>/api/devices</c>.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class EngineLifecycleScenarios

@@ -4,33 +4,38 @@ using System.Threading.RateLimiting;
 namespace TeensyRom.Api.Http
 {
     /// <summary>
-    /// 
-    /// These rate limiters help prevent fatal serial states should the user decide to spam their browser refresh.
-    /// 
+    /// Rate limiting for the device discovery endpoint. Only full scans are limited, to one per 5 seconds;
+    /// a plain listing of known devices is never limited.
     /// <remarks>
-    /// 
-    /// Originally, this was developed because if the api receives a cancellation in the middle of the serial discovery 
-    /// phaase, it was causing a bad state.  
-    /// 
-    /// Rather than create a complex solution on the backend, this hack is a much
-    /// simpler and elegant solution for this sort of edge case.
-    /// 
+    /// A full scan opens the serial ports, and a cancellation in the middle of that discovery phase leaves the
+    /// serial layer in a bad state. Limiting scans keeps a spammed browser refresh from causing that, and is a
+    /// simpler fix than making discovery cancellation-safe.
     /// </remarks>
     /// </summary>
     public static class RateLimitHelper
     {
         public const string FindDevicesRateLimiter = "FindDevicesRateLimiterPolicy";
+
+        /// <summary>
+        /// Puts requests with <c>fullScan=true</c> in one shared one-permit-per-5-seconds partition and
+        /// every other request in a partition with no limit.
+        /// </summary>
+        public static RateLimitPartition<string> FindDevicesPartition(HttpContext context) =>
+            bool.TryParse(context.Request.Query["fullScan"], out var fullScan) && fullScan
+                ? RateLimitPartition.GetFixedWindowLimiter("fullScan", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    Window = TimeSpan.FromSeconds(5),
+                    QueueProcessingOrder = QueueProcessingOrder.NewestFirst,
+                    QueueLimit = 1
+                })
+                : RateLimitPartition.GetNoLimiter("listing");
+
         public static IServiceCollection AddStrictRateLimiting(this IServiceCollection services)
         {
             services.AddRateLimiter(options =>
             {
-                options.AddFixedWindowLimiter(FindDevicesRateLimiter, config =>
-                {
-                    config.PermitLimit = 1;
-                    config.Window = TimeSpan.FromSeconds(5);
-                    config.QueueProcessingOrder = QueueProcessingOrder.NewestFirst;
-                    config.QueueLimit = 1;
-                });
+                options.AddPolicy(FindDevicesRateLimiter, FindDevicesPartition);
             });
             return services;
         }

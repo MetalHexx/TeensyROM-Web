@@ -773,7 +773,7 @@
           "Devices"
         ],
         "summary": "Find Devices",
-        "description": "Returns all available and connected TeensyROM devices, followed by every known offline unit.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.\n- Offline units are listed after the online ones, with deviceState ConnectionLost.",
+        "description": "Returns all available and connected TeensyROM devices, followed by every known offline unit.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.\n- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.\n- Offline units are listed after the online ones, with deviceState ConnectionLost.",
         "operationId": "FindDevices",
         "parameters": [
           {
@@ -1211,6 +1211,66 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bans/lift": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Lift Ban",
+        "description": "Removes one entry from the banned files or banned folders list. Bans are engine-wide, so no device is needed. Lifting an entry that is not banned changes nothing.",
+        "operationId": "LiftBan",
+        "parameters": [
+          {
+            "name": "Entry",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BanKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiftBanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1880,6 +1940,12 @@
             "type": "boolean"
           }
         }
+      },
+      "BanKind": {
+        "enum": [
+          "File",
+          "Folder"
+        ]
       },
       "CancelJobResponse": {
         "required": [
@@ -2614,6 +2680,29 @@
             "type": "string"
           },
           "isCompatible": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LiftBanResponse": {
+        "required": [
+          "message",
+          "entry",
+          "kind",
+          "lifted"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "entry": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BanKind"
+          },
+          "lifted": {
             "type": "boolean"
           }
         }

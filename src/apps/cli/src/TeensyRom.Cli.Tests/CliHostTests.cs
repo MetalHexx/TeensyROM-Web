@@ -146,6 +146,30 @@ public sealed class CliHostTests : IDisposable
     }
 
     [Fact]
+    public async Task EngineStatus_NamesTheLogFolderAndLogFile_InTheRowsAndUnderJson()
+    {
+        _host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(new EngineStatus(
+            true, "1.0.0", "1.0.0", true, "localhost:10213", null, "/home/logs", "/home/logs/Logs-2026-10-02.txt"));
+
+        await _host.RunAsync("engine", "status");
+
+        StdOut.Should().Contain("Log folder: /home/logs").And.Contain("Log file: /home/logs/Logs-2026-10-02.txt");
+    }
+
+    [Fact]
+    public async Task EngineStatus_JsonCarriesTheLogFolderAndLogFileFields()
+    {
+        _host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(new EngineStatus(
+            true, "1.0.0", "1.0.0", true, "localhost:10213", null, "/home/logs", "/home/logs/Logs-2026-10-02.txt"));
+
+        await _host.RunAsync("engine", "status", "--json");
+
+        var status = JsonDocument.Parse(StdOut).RootElement;
+        status.GetProperty("logFolder").GetString().Should().Be("/home/logs");
+        status.GetProperty("logFile").GetString().Should().Be("/home/logs/Logs-2026-10-02.txt");
+    }
+
+    [Fact]
     public async Task EngineStatus_WithAnEngineOfAnotherVersion_StillSucceeds_AndWarnsOnStderr()
     {
         EngineAnswers(version: "0.9.0");
