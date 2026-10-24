@@ -257,16 +257,20 @@ describe('DjBindingsPanelComponent', () => {
       );
 
       expect(modelOf(fixture, 0).styleOptions).toEqual([
-        { id: 'press', label: 'On press' },
-        { id: 'release', label: 'On release' },
+        { id: 'press', label: 'Note On' },
+        { id: 'release', label: 'Note Off' },
       ]);
       expect(modelOf(fixture, 1).styleOptions.map((o) => o.label)).toEqual([
         'Absolute',
-        'Relative',
-        'Relative ±',
-        'Step',
+        'Relative (binary offset)',
+        "Relative (two's complement)",
+        'Step · CC On',
+        'Step · CC Off',
       ]);
-      expect(modelOf(fixture, 2).styleOptions.map((o) => o.label)).toEqual(['Step']);
+      expect(modelOf(fixture, 2).styleOptions.map((o) => o.label)).toEqual([
+        'Step · Note On',
+        'Step · Note Off',
+      ]);
     });
 
     it('shows a relative style as a sensitivity in percent and a step style as a signed amount', () => {
@@ -282,7 +286,7 @@ describe('DjBindingsPanelComponent', () => {
 
       expect(modelOf(fixture, 0)).toMatchObject({
         selectedStyleId: 'relative-offset',
-        styleText: 'Relative · 1.5%',
+        styleText: 'Relative (binary offset) · 1.5%',
         amount: { label: 'Sensitivity', value: 1.5, min: 0.1, max: 100, suffix: '%' },
       });
       expect(modelOf(fixture, 2).amount).toEqual(

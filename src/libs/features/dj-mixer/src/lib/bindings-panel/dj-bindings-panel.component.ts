@@ -21,6 +21,7 @@ import {
   describeSource,
   describeStyle,
   isRelativeKind,
+  isStepKind,
   ownerLabel,
   stylesFor,
   type ControlMapping,
@@ -125,7 +126,7 @@ function amountField(kind: MappingStyleKind, amount: number | null): BindingRowA
       suffix: '%',
     };
   }
-  return kind === 'step'
+  return isStepKind(kind)
     ? { label: 'Amount', value: toPercent(amount), min: -100, max: 100, step: 0.1, suffix: '%' }
     : null;
 }
@@ -319,11 +320,11 @@ export class DjBindingsPanelComponent {
       model: {
         name: control.name,
         sourceText: describeSource(mapping.source, controllers),
-        styleText: describeStyle(mapping.style),
+        styleText: describeStyle(mapping.style, mapping.source.kind),
         expanded: expandedId === mapping.id,
         styleOptions: styleKinds.map((kind) => ({
           id: kind,
-          label: describeStyle({ kind, amount: null }),
+          label: describeStyle({ kind, amount: null }, mapping.source.kind),
         })),
         selectedStyleId: mapping.style.kind,
         amount: amountField(mapping.style.kind, mapping.style.amount),

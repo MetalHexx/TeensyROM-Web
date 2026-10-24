@@ -1,4 +1,11 @@
-import type { ControlOwner, KnownController, MappingStyle, MidiSource } from './mapping.models';
+import { actionOf, triggerOf, type StyleAction, type StyleTrigger } from './mapping-styles';
+import type {
+  ControlOwner,
+  KnownController,
+  MappingStyle,
+  MidiSource,
+  MidiSourceKind,
+} from './mapping.models';
 
 const UNKNOWN_CONTROLLER = 'Unknown controller';
 
@@ -17,30 +24,51 @@ function percent(amount: number): string {
   return String(Number((Math.abs(amount) * 100).toFixed(1)));
 }
 
-export function describeStyle(style: MappingStyle): string {
-  const { kind, amount } = style;
-  switch (kind) {
-    case 'press':
-      return 'On press';
-    case 'release':
-      return 'On release';
-    case 'latch':
-      return 'Latch';
+/** The wording of what a style does, apart from when; a one-shot button's `fire` has none. */
+export function describeAction(action: StyleAction): string {
+  switch (action) {
+    case 'fire':
+      return '';
+    case 'toggle':
+      return 'Toggle';
     case 'on':
-      return 'On key';
+      return 'Turn on';
     case 'off':
-      return 'Off key';
+      return 'Turn off';
+    case 'step':
+      return 'Step';
     case 'hold':
-      return amount === null ? 'Hold' : `Hold · ${percent(amount)}%`;
+      return 'Hold';
     case 'absolute':
       return 'Absolute';
     case 'relative-offset':
-      return amount === null ? 'Relative' : `Relative · ${percent(amount)}%`;
+      return 'Relative (binary offset)';
     case 'relative-signed':
-      return amount === null ? 'Relative ±' : `Relative ± · ${percent(amount)}%`;
-    case 'step':
-      return amount === null ? 'Step' : `Step ${amount < 0 ? '−' : '+'}${percent(amount)}%`;
+      return "Relative (two's complement)";
   }
+}
+
+/** The key edge in MIDI terms: a CC counts as pressed from value 64. */
+export function describeTrigger(trigger: StyleTrigger, sourceKind: MidiSourceKind): string {
+  const message = sourceKind === 'cc' ? 'CC' : 'Note';
+  return `${message} ${trigger === 'press' ? 'On' : 'Off'}`;
+}
+
+/** `Note On`, `Toggle · Note Off`, `Step +5% · CC On`, `Hold · 5%` or `Relative (binary offset) · 1%`:
+ *  the action, its amount, then the trigger when the style has one. */
+export function describeStyle(style: MappingStyle, sourceKind: MidiSourceKind): string {
+  const { kind, amount } = style;
+  const action = actionOf(kind);
+  const trigger = triggerOf(kind);
+  const name = describeAction(action);
+  let what = name;
+  if (action === 'step') {
+    what = amount === null ? name : `${name} ${amount < 0 ? '−' : '+'}${percent(amount)}%`;
+  } else if (amount !== null && (action === 'hold' || action.startsWith('relative'))) {
+    what = `${name} · ${percent(amount)}%`;
+  }
+  const when = trigger === null ? '' : describeTrigger(trigger, sourceKind);
+  return [what, when].filter((part) => part !== '').join(' · ');
 }
 
 /** `deck A`, `deck B` or `mixer`. */

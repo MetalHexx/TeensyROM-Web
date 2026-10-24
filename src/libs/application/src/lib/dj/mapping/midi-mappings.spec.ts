@@ -21,6 +21,7 @@ const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const SPEED_B: ControlIdentity = { owner: 'B', control: 'speed' };
 const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
+const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 
 const style = (kind: MappingStyle['kind'], amount: number | null = null): MappingStyle => ({
@@ -295,6 +296,30 @@ describe('MidiMappings', () => {
       expect(h.repository.save).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['latch-release', REPEAT_A, null],
+      ['on-release', REPEAT_A, null],
+      ['off-release', REPEAT_A, null],
+      ['step-release', KEY_B, 0.1],
+    ] as const)('accepts %s on a control that can take it', async (kind, control, amount) => {
+      await h.mappings.hydrate();
+      const { mapping } = h.mappings.bind(noteSource(36), control, style('release'));
+
+      h.mappings.setStyle(mapping.id, style(kind, amount));
+
+      expect(h.mappingStore.mappings()[0].style).toEqual(style(kind, amount));
+    });
+
+    it('refuses a release kind the control cannot take', async () => {
+      await h.mappings.hydrate();
+      const { mapping } = h.mappings.bind(noteSource(36), PLAY_A, style('press'));
+
+      h.mappings.setStyle(mapping.id, style('latch-release'));
+      h.mappings.setStyle(mapping.id, style('step-release', 0.1));
+
+      expect(h.mappingStore.mappings()[0].style).toEqual(style('press'));
+    });
+
     it('drops the amount of a style that takes none', async () => {
       await h.mappings.hydrate();
       const { mapping } = h.mappings.bind(ccSource(7), SPEED_A, style('relative-offset', 0.02));
@@ -316,6 +341,15 @@ describe('MidiMappings', () => {
       expect(h.mappingStore.mappings()).toEqual([
         { id: mapping.id, source: noteSource(36), control: KEY_B, style: style('step', 0.2) },
       ]);
+    });
+
+    it('keeps a release kind when the mapping is learned onto another source', async () => {
+      await h.mappings.hydrate();
+      const { mapping } = h.mappings.bind(noteSource(36), REPEAT_A, style('on-release'));
+
+      h.mappings.replaceSource(mapping.id, noteSource(37), style('latch'));
+
+      expect(h.mappingStore.mappings()[0].style).toEqual(style('on-release'));
     });
 
     it('uses the proposed style when the new source kind no longer offers the current one', async () => {

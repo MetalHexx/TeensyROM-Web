@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { logWarn } from '@teensyrom-nx/utils';
-import type { ControlIdentity, MappingStyle, MidiSource } from './mapping.models';
+import type { ControlIdentity, MappingStyle, MidiSource, SourceEvent } from './mapping.models';
 import {
   LAUNCH_CONTROL,
   cc,
@@ -20,6 +20,7 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
+const MUTE_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const HOLD_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-hold' };
 const NUDGE_UP_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
@@ -43,6 +44,7 @@ describe('MidiMappingEngine', () => {
     return h.mappings.bind(source, control, mappingStyle).mapping.id;
   }
 
+  const muted = (voice = 0): boolean => h.djStore.deck('A')().voices[voice].muted;
   const held = (voice: number): boolean => h.djStore.deck('A')().voices[voice].held;
   const speed = (): number => h.djStore.deck('A')().speed;
 
@@ -152,6 +154,111 @@ describe('MidiMappingEngine', () => {
 
       h.engine.handle(note(41, 100));
       expect(h.djStore.deck('A')().repeat).toBe(true);
+    });
+
+    it('a mute mapping keeps its style across a style change and a re-learn', () => {
+      const id = map(noteSource(40), MUTE_1_A, style('latch'));
+
+      h.engine.handle(note(40, 100));
+      h.engine.handle(note(40, 0));
+      expect(muted()).toBe(true);
+
+      h.mappings.setStyle(id, style('off'));
+      h.engine.handle(note(40, 100));
+      h.engine.handle(note(40, 0));
+      expect(muted()).toBe(false);
+      h.engine.handle(note(40, 100));
+      h.engine.handle(note(40, 0));
+      expect(muted()).toBe(false);
+
+      h.mappings.setStyle(id, style('latch'));
+      h.engine.handle(note(40, 100));
+      h.engine.handle(note(40, 0));
+      expect(muted()).toBe(true);
+      h.mappings.setStyle(id, style('off'));
+
+      h.mappings.replaceSource(id, noteSource(41), style('latch'));
+      expect(h.mappingStore.mappings()[0].style).toEqual(style('off'));
+      h.engine.handle(note(41, 100));
+      h.engine.handle(note(41, 0));
+      expect(muted()).toBe(false);
+      h.engine.handle(note(41, 100));
+      h.engine.handle(note(41, 0));
+      expect(muted()).toBe(false);
+    });
+
+    describe.each([
+      ['note', noteSource, note] as const,
+      ['CC', ccSource, cc] as const,
+    ])('release kinds from a %s', (_label, sourceOf, message) => {
+      const down = (n: number): SourceEvent => message(n, 127);
+      const up = (n: number): SourceEvent => message(n, 0);
+
+      it('latch-release flips the control on the release edge only', () => {
+        map(sourceOf(40), REPEAT_A, style('latch-release'));
+
+        h.engine.handle(down(40));
+        expect(h.djStore.deck('A')().repeat).toBe(true);
+        h.engine.handle(up(40));
+        expect(h.djStore.deck('A')().repeat).toBe(false);
+        h.engine.handle(up(40));
+        expect(h.djStore.deck('A')().repeat).toBe(false);
+
+        h.engine.handle(down(40));
+        h.engine.handle(up(40));
+        expect(h.djStore.deck('A')().repeat).toBe(true);
+      });
+
+      it('on-release only ever mutes and off-release only ever unmutes, on the release edge', () => {
+        map(sourceOf(40), MUTE_1_A, style('on-release'));
+        map(sourceOf(41), MUTE_1_A, style('off-release'));
+
+        h.engine.handle(down(41));
+        h.engine.handle(up(41));
+        expect(muted()).toBe(false);
+
+        h.engine.handle(down(40));
+        expect(muted()).toBe(false);
+        h.engine.handle(up(40));
+        expect(muted()).toBe(true);
+        h.engine.handle(down(40));
+        h.engine.handle(up(40));
+        expect(muted()).toBe(true);
+
+        h.engine.handle(down(41));
+        expect(muted()).toBe(true);
+        h.engine.handle(up(41));
+        expect(muted()).toBe(false);
+      });
+
+      it('step-release steps once on each release edge and not on the press', () => {
+        map(sourceOf(50), SPEED_A, style('step-release', 0.1));
+
+        h.engine.handle(down(50));
+        expect(speed()).toBe(1);
+        h.engine.handle(up(50));
+        expect(speed()).toBeCloseTo(1.1, 10);
+        h.engine.handle(up(50));
+        expect(speed()).toBeCloseTo(1.1, 10);
+
+        h.engine.handle(down(50));
+        h.engine.handle(up(50));
+        expect(speed()).toBeCloseTo(1.2, 10);
+      });
+
+      it('fires nothing for a release with no press the engine saw', () => {
+        map(sourceOf(40), REPEAT_A, style('latch-release'));
+        map(sourceOf(41), MUTE_1_A, style('on-release'));
+        map(sourceOf(50), SPEED_A, style('step-release', 0.1));
+
+        h.engine.handle(up(40));
+        h.engine.handle(up(41));
+        h.engine.handle(up(50));
+
+        expect(h.djStore.deck('A')().repeat).toBe(true);
+        expect(muted()).toBe(false);
+        expect(speed()).toBe(1);
+      });
     });
   });
 
