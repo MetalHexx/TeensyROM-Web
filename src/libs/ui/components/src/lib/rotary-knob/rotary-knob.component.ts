@@ -33,7 +33,7 @@ const END_ANGLE_DEG = HOME_ANGLE_DEG + TRAVEL_DEG;
 /** The live ring's resolution: the level is quantized to thousandths. */
 const LIVE_LEVEL_STEPS = 1000;
 /** Vertical pixels of drag for a full min→max sweep — DAW convention (Ableton etc.), not the
- * native range's own horizontal click-and-drag. Tunable by ear, same spirit as `scale-taper.ts`. */
+ * native range's own horizontal click-and-drag. Tunable by ear. */
 const PIXELS_PER_FULL_RANGE = 200;
 /** Shift held while dragging quarters the sensitivity for fine adjustment. */
 const FINE_ADJUST_MULTIPLIER = 4;

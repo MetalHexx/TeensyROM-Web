@@ -4,9 +4,8 @@ The SID panel (`lib-dj-sid-panel`) replaces the old mixer card in the DJ view. I
 (`--mixer-col: 38.75rem`) between the two decks' Voice/Speed columns, and it is laid out for a
 **1920 × 1080** viewport at minimum. The automated proof is in `dj-mixer-controls.cy.ts` and
 `dj-mixer-responsive.cy.ts` (outside CI; run against a live dev server). This file records the
-checks that need a real browser. The "Byte fidelity", "Hardware acceptance", "Permission
-auto-connect" and "Filter sweep listening session" sections below are separate records and are
-unchanged.
+checks that need a real browser. The "Byte fidelity", "Hardware acceptance" and "Permission
+auto-connect" sections below are separate records and are unchanged.
 
 ## How this was driven
 
@@ -70,6 +69,98 @@ resonance, pulse-width and Key controls changes their values (Key's readout chan
 `11A`), playback continues, and the console shows no errors — only the expected "no MIDI port
 selected" warnings. The library refactor and the knob extension left the POC's behaviour alone.
 
+## The restyled deck column: transport, voice and speed strip (P03-T02)
+
+Browser check of the deck column rebuilt on the shared metal components (position strip and
+transport, voice and speed channel strip, loops and binding plates) against
+`ASID-DJ-ROOT-WIREFRAME-TRANSPORT.html`. Driven as above: the dev server's `/dj-mixer` in a
+**1920 x 1080** same-origin `<iframe>`, no API and no device, with a bundled `.sid` served from a
+local CORS server and the page's `/files/content` fetch stubbed to return it. Both decks were loaded
+through `DeckService.load` (dev-mode `ng` debug API) and played for real; the output has no MIDI port
+bound, so the engine drops its bytes. Held keys were driven with synthetic `keydown`/`keyup` events,
+because a synthetic `pointerdown` throws in `setPointerCapture`.
+
+**Frame A, the view at 1920 x 1080.** Matches: the display with status LED, title, author, elapsed
+and total time and frame count; the position strip with its played fill, loop markers and white
+playhead; Play (Pause while playing), Stop, Repeat and the subtune pager; the Loops / Cues plate
+beneath; the binding plate at the foot with its Identify and Enable MIDI. A playing deck shows the
+green LED and a green line under Pause; a paused one shows the amber LED and line.
+
+**Frame B, the transport at three widths.** The deck's transport measured 474px at 1920 with the
+bindings panel closed, 404px at 1780, 364px at 1700, 314px at 1600, and 288px at 1920 with the
+bindings panel open. At 404px Stop and Repeat shrink to icon-only buttons and the pager to `1/1`,
+as the mockup's 400px frame draws them. At 288px Play takes a row, Stop and Repeat share the next,
+and the pager takes the last, as the 300px frame draws it; nothing overflows (client width equals
+scroll width) and the page does not scroll.
+
+**Frame C, the channel strip.** Matches: V1-V3 buttons with Kill beneath; a muted voice dims and its
+Kill reads Punch; a held Kill is a magenta pill; the speed display; the fader with its centre
+marker; the nudge pads; +50% / Home / -50%.
+
+- **Scrubbing.** Dragging the position bar with the mouse jumped deck A from 36% to 83% and kept it
+  playing. Focusing the bar and pressing the right arrow five times moved the playhead forward
+  (22% to 33%), and playback continued from the new position.
+- **Nudge on a playing deck.** Nudge up read 1.050x and nudge down 0.950x, in magenta, with the
+  fader still at 1.000. Both held read 1.000x (still magenta); releasing one left the other's
+  0.950x; releasing both returned the display to white 1.000x. Moving the fader to 1.100 mid-nudge
+  with nudge up held read 1.150x, kept the fader at 1.100, and the release landed on 1.100x.
+- **Empty decks.** Each reads "No tune - drop a SID here"; Play, Stop and the pager are disabled;
+  Repeat stays lit; the Loops / Cues plate is empty.
+- **Drop highlight.** With a SID drag in flight both transports show a cyan outline and "Drop to
+  load - Deck A/B" over the 474 x 151 display area; dragging over deck B's overlay marks only that
+  one hot. (The drag was simulated with a `dragenter` carrying the DJ drag type: there is no device
+  in this environment to list a file to pick up.)
+- **Learn-mode overlays.** With mapping mode on (set on the store, because the toggle's Web MIDI
+  permission prompt cannot be answered here) there are 134 overlays, 67 per deck, one on each
+  control including all three voice buttons and Kill, both nudge pads, the position bar, the speed
+  fader and jumps, Key, filter, and Panic, each aligned on its control. There is none for Clear.
+- **The POC page.** `/dev/dj-poc` still renders its original look: the plain Position slider and
+  Play/Stop row, the Voice panel with its checkboxes and Clear button, the Speed panel and the
+  mixer column.
+
+Not run here, for want of a MIDI controller: a mapped nudge note held and released, and the release
+when the controller is unplugged mid-hold. The sound itself is not judged in a browser either.
+
+### Bundle check
+
+`pnpm nx build teensyrom-ui` on this branch against `main` (ac25dc43, the ASID-DJ-8 merge), the
+initial chunks only, in bytes:
+
+| chunk | main | this branch |
+| --- | --- | --- |
+| shared ui / vendor chunk | 1,354,572 | 1,394,023 |
+| `main` | 419,031 | 419,031 |
+| shared application chunk | 166,982 | 169,153 |
+| other initial chunks and `polyfills` | 132,747 | 132,747 |
+| **initial JavaScript** | **2,073,332** | **2,114,954 (+41,622)** |
+| `styles` | 34,883 | 35,125 (+242) |
+
+The styles chunk grew by the `--synth-display-*` token lines, as designed. **The initial JavaScript
+did not hold: it grew by 41.6 kB.** The `dj-mixer` route is still lazy; the growth is the nine new
+shared components (about 39 kB) and the new DJ application code (about 2 kB), which the lazy route
+still has pulled into the initial chunks. The layout imports
+`@teensyrom-nx/ui/components` and the application stores through their barrels, and esbuild gives a
+file the entry points of everything that statically imports it, so any component the DJ view uses
+and the barrel exports lands in the initial chunk (on `main` already: 79 of the library's
+components, `lib-crossfader` and `lib-channel-fader` among them; now 87). Components nothing uses
+(`lib-menu-item`, `lib-thumbnail-image`) are tree-shaken out, so it is the use that places them.
+Separating them needs a second entry point for the DJ components (and the same for the DJ
+application code), not a smaller import; it is not done here.
+
+### Bench verdict (operator, real hardware)
+
+On your C64s with a real TeensyROM, say whether:
+
+1. Nudge beat-matches two decks by ear: hold nudge up or down on one playing deck and bring it
+   back into step with the other; release lands where the fader says.
+2. Scrubbing works: dragging the bar and the arrow keys move a playing tune without a glitch, and
+   a drop loads a tune onto the deck it lands on.
+3. The narrow transport is usable: with the bindings panel open (about 290-300px) Play, Stop,
+   Repeat and the pager are all easy to hit.
+4. The restyled deck plays as before: voices, Kill, speed and the pad hold behave as they did.
+5. A mapped nudge note held and released, and released by unplugging the controller, ends the
+   nudge.
+
 ## Byte fidelity (P03-T02)
 
 Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM
@@ -125,24 +216,3 @@ needs a real browser to confirm:
 - In the browser's site settings, revoke the MIDI permission for the origin, then reload. Enable
   MIDI is showing again on both decks, and no alert was raised for a merely-not-yet-granted
   origin.
-
-## Filter sweep listening session (operator, real hardware)
-
-Run these four checks on your C64s with a real TeensyROM. Nothing here was run in the sandbox,
-because sound is judged on hardware.
-
-1. On a tune that never uses the filter, turning cutoff audibly changes the sound, and centre plays
-   the tune exactly as before. On a tune that uses the filter, its own filtering returns the moment
-   the knob is back at centre.
-2. Resonance is audible while sweeping, on any tune.
-3. Give a verdict on the sweep's feel, including whether passing through centre sounds smooth and
-   whether anything needs retuning.
-4. Turn the knob out of centre, back into it, and across from one side to the other. Each time the
-   filter switches, the deck's volume fades out to silence, the switches change on a silent frame,
-   and the volume fades back in (`FILTER_SWEEP.dip` sets the number of frames each way). Say
-   whether the click is still audible, a gap is audible, or nothing is. If the click is still
-   there, lengthen the fades; if a gap is audible, shorten them.
-
-The verdict is recorded in the ASID-DJ portfolio's Decisions. The values to retune live in
-`FILTER_SWEEP` and `RESONANCE_SWEEP` in `libs/application/src/lib/dj/mixer/filter-sweep.ts`. The
-sweep is tuned for a 6581 (`FILTER_SWEEP.chip`) until a settings page lets the user pick their chip.
