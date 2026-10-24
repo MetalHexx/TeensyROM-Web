@@ -380,6 +380,9 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("on")]
     [InlineData("off")]
     [InlineData("absolute")]
+    [InlineData("latch-release")]
+    [InlineData("on-release")]
+    [InlineData("off-release")]
     public void Validate_StyleWithoutAmount_PassesAndRejectsAnAmount(string kind)
     {
         var request = ValidRequest();
@@ -409,6 +412,9 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("step", 1.0)]
     [InlineData("step", -1.0)]
     [InlineData("step", -0.25)]
+    [InlineData("step-release", 1.0)]
+    [InlineData("step-release", -1.0)]
+    [InlineData("step-release", -0.25)]
     public void Validate_AmountInRange_Passes(string kind, double amount)
     {
         var request = ValidRequest();
@@ -430,9 +436,14 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("step", 0.0)]
     [InlineData("step", 1.5)]
     [InlineData("step", -1.5)]
+    [InlineData("step-release", null)]
+    [InlineData("step-release", 0.0)]
+    [InlineData("step-release", 1.5)]
+    [InlineData("step-release", -1.5)]
     [InlineData("relative-offset", double.NaN)]
     [InlineData("relative-signed", double.PositiveInfinity)]
     [InlineData("step", double.NegativeInfinity)]
+    [InlineData("step-release", double.NegativeInfinity)]
     public void Validate_AmountMissingOutOfRangeOrNotFinite_IsRejected(string kind, double? amount)
     {
         var request = ValidRequest();

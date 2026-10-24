@@ -63,13 +63,14 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
     public record MidiMappingStyleDto
     {
         /// <summary>
-        /// Style kind: press, release, latch, on, off, hold, absolute, relative-offset, relative-signed or step.
+        /// Style kind: press, release, latch, on, off, hold, absolute, relative-offset, relative-signed, step,
+        /// latch-release, on-release, off-release or step-release.
         /// </summary>
         [Required] public string Kind { get; set; } = string.Empty;
 
         /// <summary>
-        /// Step size. Required for relative-offset and relative-signed (greater than 0, up to 1) and for step
-        /// (-1 to 1, not 0). Optional for hold (greater than 0, up to 1; null holds the voice). Must be null for every other kind.
+        /// Step size. Required for relative-offset and relative-signed (greater than 0, up to 1) and for step and
+        /// step-release (-1 to 1, not 0). Optional for hold (greater than 0, up to 1; null holds the voice). Must be null for every other kind.
         /// </summary>
         public double? Amount { get; set; }
     }
@@ -160,13 +161,16 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
         public static readonly IReadOnlySet<string> StyleKinds = new HashSet<string>(StringComparer.Ordinal)
         {
-            "press", "release", "latch", "on", "off", "hold", "absolute", "relative-offset", "relative-signed", StepStyleKind
+            "press", "release", "latch", "on", "off", "hold", "absolute", "relative-offset", "relative-signed", StepStyleKind,
+            "latch-release", "on-release", "off-release", "step-release"
         };
 
         public static readonly IReadOnlySet<string> PositiveAmountStyleKinds = new HashSet<string>(StringComparer.Ordinal)
         {
             "relative-offset", "relative-signed"
         };
+
+        public static readonly IReadOnlySet<string> StepStyleKinds = new HashSet<string>(StringComparer.Ordinal) { StepStyleKind, "step-release" };
 
         public static bool IsValidId(string? id) => id is not null && IdPattern.IsMatch(id);
 
@@ -238,11 +242,11 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
                             context.AddFailure($"Amount is required for style '{kind}' and must be greater than 0 and at most 1.");
                         }
                     }
-                    else if (kind == MidiSettingsAllowLists.StepStyleKind)
+                    else if (MidiSettingsAllowLists.StepStyleKinds.Contains(kind))
                     {
                         if (amount is not { } a || !double.IsFinite(a) || a < -1 || a > 1 || a == 0)
                         {
-                            context.AddFailure("Amount is required for style 'step' and must be between -1 and 1, and not 0.");
+                            context.AddFailure($"Amount is required for style '{kind}' and must be between -1 and 1, and not 0.");
                         }
                     }
                     else if (kind == MidiSettingsAllowLists.HoldStyleKind)
