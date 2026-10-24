@@ -64,6 +64,10 @@ html {
   --synth-panic-face-top: #341a36;
   --synth-panic-face-bottom: #1f0f20;
   --synth-panic-text: #f0b3f0;
+  --synth-display-face: #08060a;
+  --synth-display-border: #2b242e;
+  --synth-display-text: #e8dfec;
+  --synth-display-dim: #6e6573;
 
   // Design Tokens - Spacing (4px grid)
   --spacing-xs: 0.25rem; // 4px
@@ -155,6 +159,10 @@ html.dark-mode {
   --synth-panic-face-top: #341a36;
   --synth-panic-face-bottom: #1f0f20;
   --synth-panic-text: #f0b3f0;
+  --synth-display-face: #08060a;
+  --synth-display-border: #2b242e;
+  --synth-display-text: #e8dfec;
+  --synth-display-dim: #6e6573;
 
   // Design Tokens - Spacing (4px grid, inherited from light mode)
   --spacing-xs: 0.25rem;

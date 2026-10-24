@@ -29,18 +29,18 @@
 .segmented-control {
   display: flex;
   width: 100%;
-  height: var(--segment-height);
+  min-height: var(--segment-height);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-sm);
   overflow: hidden;
 }
 
-// Equal cells sharing the row's width, divided by 1px rules.
+// Equal cells sharing the row's width, divided by 1px rules. A label too long for its cell wraps
+// onto further lines and the whole row grows with it, so no label is ever cut off.
 .segment {
   flex: 1 1 0;
   min-width: 0;
-  height: 100%;
-  padding: 0 var(--spacing-sm);
+  padding: 2px var(--spacing-sm);
   border: none;
   border-right: 1px solid var(--color-dimmed);
   background: transparent;
@@ -48,9 +48,7 @@
   font-family: inherit;
   font-size: var(--segment-font);
   font-weight: var(--font-weight-normal);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   cursor: pointer;
 
   &:last-child {

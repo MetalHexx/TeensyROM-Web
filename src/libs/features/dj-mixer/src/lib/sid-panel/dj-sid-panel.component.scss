@@ -1,14 +1,24 @@
 :host {
   grid-area: mx;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-// The faceplate fills the card and keeps its screws in the corners; its inner padding is trimmed to
-// the scale's small steps so the voice strips get the width the 620px column was sized for.
+lib-scaling-container {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+// The scaling container projects the faceplate with no wrapper, so the faceplate fills it by
+// height rather than by flex growth. It keeps its screws in the corners; its inner padding is
+// trimmed to the scale's small steps so the voice strips get the width the 620px column was sized for.
 .faceplate {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   padding: var(--spacing-sm);
 }
 
@@ -95,6 +105,26 @@
 
 .lower-key {
   flex: 0 0 auto;
+}
+
+// The lower row's two panels pad tighter than a voice strip does, so the row takes only the height its
+// dials and switches need.
+.lower-filter,
+.lower-key {
+  --panel-section-padding-top: var(--spacing-xs);
+  --panel-section-padding-bottom: var(--spacing-sm);
+}
+
+// The key panel is the shorter one's match, not the taller: its bottom padding is the same small step
+// as its top, and its knob is a flex host, because a knob sitting bare in the panel is inline-level
+// and the line box around it adds a few pixels under the readout.
+.lower-key {
+  --panel-section-padding-bottom: var(--spacing-xs);
+}
+
+.lower-key lib-rotary-knob {
+  display: flex;
+  justify-content: center;
 }
 
 // Panic sits under its own half, clear of the notation switch that straddles the middle.

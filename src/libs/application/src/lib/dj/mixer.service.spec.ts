@@ -308,6 +308,8 @@ describe('MixerService', () => {
       store.setDeckEngineControls({
         slot: 'A',
         speed: 1.25,
+        faderSpeed: 1.25,
+        nudging: false,
         voices: [
           { muted: true, held: false },
           { muted: false, held: true },

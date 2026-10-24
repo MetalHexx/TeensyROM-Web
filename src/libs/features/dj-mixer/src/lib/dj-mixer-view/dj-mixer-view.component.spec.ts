@@ -98,7 +98,12 @@ function idleTransportSummary(): DeckTransportSummary {
     scrubPercent: 0,
     bar: { kind: 'unknown' },
     frameLabel: 'frame 0',
+    title: null,
+    author: null,
+    elapsedText: '00:00.0',
+    totalText: '--:--',
     subtuneText: 'Subtune 0 of 0',
+    subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
     errors: [],
@@ -556,6 +561,8 @@ describe('DjMixerViewComponent', () => {
       expect(midi.controllers.setMappingMode).toHaveBeenCalledWith(false);
     });
 
+    // Renders the whole view twice, once per motion setting, so it costs about double any other test
+    // here: under CI load that has run past the project's tight 2000ms testTimeout.
     it('slides the panel in at 22.5rem, and with no duration for reduced motion', () => {
       const panel = (fixture: ComponentFixture<DjMixerViewComponent>) =>
         fixture.debugElement.query(By.directive(DjBindingsPanelComponent))
@@ -572,7 +579,7 @@ describe('DjMixerViewComponent', () => {
       press(reduced.fixture);
       expect(slot(reduced.fixture).animationDuration()).toBe(0);
       expect(panel(reduced.fixture).animationDuration()).toBe(0);
-    });
+    }, 10000);
 
     it('moves focus to the mapping mode switch when the panel opens', () => {
       const { fixture } = render([]);
@@ -610,9 +617,11 @@ describe('DjMixerViewComponent', () => {
       const mismatched = ALL_IDENTITIES.map((identity) => ({
         identity: controlKey(identity),
         matches: grid.querySelectorAll(anchorFor(identity)).length,
-      })).filter(({ matches }) => matches !== 1);
+      }))
+        .filter(({ matches }) => matches !== 1)
+        .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(132);
+      expect(ALL_IDENTITIES).toHaveLength(134);
       expect(mismatched).toEqual([]);
     });
   });

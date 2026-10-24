@@ -1,0 +1,23 @@
+<input
+  type="range"
+  min="0"
+  max="100"
+  step="any"
+  [value]="clampedPercent()"
+  [disabled]="barState().kind === 'analyzing'"
+  [attr.aria-label]="accessibleName()"
+  [attr.aria-valuetext]="valueText()"
+  (input)="onInput($event)"
+  (change)="onChange($event)"
+/>
+<div class="strip" [attr.data-state]="barState().kind" aria-hidden="true">
+  <div class="track">
+    @if (barState().kind !== 'analyzing') {
+    <span class="fill" [style.width.%]="clampedPercent()" [style.--fill-split]="fillSplit()"></span>
+    } @if (loopMarkPercent() !== null) {
+    <span class="loop-mark" [style.left.%]="loopMarkPercent()"></span>
+    } @if (barState().kind !== 'analyzing') {
+    <span class="playhead" [style.left.%]="clampedPercent()"></span>
+    }
+  </div>
+</div>

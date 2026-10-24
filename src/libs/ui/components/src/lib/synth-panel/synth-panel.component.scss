@@ -21,32 +21,36 @@
 }
 
 .screw {
+  // A 6px screw 8px in from the plate's outer edge (1px border + 7px), so it spans 8px to 14px from each
+  // corner: whole inside the 10px corner's clip, and well off the border. A plate whose content reaches
+  // a corner clears the screw by padding that axis by the scale's large step (content starts 17px in);
+  // one axis is enough for a corner, so a plate pads the axis that costs it no size.
   position: absolute;
   box-sizing: border-box;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--synth-knob-cap), var(--synth-knob-skirt));
   border: 1px solid var(--synth-knob-skirt-border);
   box-shadow: inset 0 1px 0 rgba(var(--glassy-color), 0.12);
 
   &--top-start {
-    top: var(--spacing-sm);
-    inset-inline-start: var(--spacing-sm);
+    top: 7px;
+    inset-inline-start: 7px;
   }
 
   &--top-end {
-    top: var(--spacing-sm);
-    inset-inline-end: var(--spacing-sm);
+    top: 7px;
+    inset-inline-end: 7px;
   }
 
   &--bottom-start {
-    bottom: var(--spacing-sm);
-    inset-inline-start: var(--spacing-sm);
+    bottom: 7px;
+    inset-inline-start: 7px;
   }
 
   &--bottom-end {
-    bottom: var(--spacing-sm);
-    inset-inline-end: var(--spacing-sm);
+    bottom: 7px;
+    inset-inline-end: 7px;
   }
 }

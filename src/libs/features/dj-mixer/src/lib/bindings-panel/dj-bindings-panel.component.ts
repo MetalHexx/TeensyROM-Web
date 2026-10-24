@@ -16,19 +16,27 @@ import {
   MidiLearn,
   MidiMappings,
   MidiMappingStore,
+  actionOf,
+  actionsFor,
   controlKey,
   defaultAmountFor,
+  describeAction,
   describeSource,
   describeStyle,
+  describeTrigger,
   isRelativeKind,
+  isStepKind,
+  kindFor,
   ownerLabel,
-  stylesFor,
+  triggerOf,
   type ControlMapping,
   type ControlOwner,
   type ControllerStatus,
   type KnownController,
   type MappableControl,
   type MappingStyleKind,
+  type StyleAction,
+  type StyleTrigger,
 } from '@teensyrom-nx/application';
 import {
   BindingRowComponent,
@@ -69,11 +77,14 @@ const PERCENT = 100;
 /** The statuses whose controller has no port the app can use, and so offers a port to choose. */
 const PORTLESS_STATUSES: readonly ControllerStatus[] = ['missing', 'unmatched'];
 
+/** The key edges a style can act on, in the order the Trigger choice lists them. */
+const TRIGGERS: readonly StyleTrigger[] = ['press', 'release'];
+
 /** One mapping's row, with what its outputs need to act on it. */
 interface BindingRowView {
   readonly mapping: ControlMapping;
   readonly control: MappableControl;
-  readonly styleKinds: readonly MappingStyleKind[];
+  readonly actions: readonly StyleAction[];
   readonly model: BindingRowModel;
 }
 
@@ -115,7 +126,17 @@ function amountField(kind: MappingStyleKind, amount: number | null): BindingRowA
       suffix: '%',
     };
   }
-  return kind === 'step'
+  if (kind === 'hold') {
+    return {
+      label: 'Amount',
+      value: toPercent(amount),
+      min: 0.1,
+      max: 100,
+      step: 0.1,
+      suffix: '%',
+    };
+  }
+  return isStepKind(kind)
     ? { label: 'Amount', value: toPercent(amount), min: -100, max: 100, step: 0.1, suffix: '%' }
     : null;
 }
@@ -258,14 +279,28 @@ export class DjBindingsPanelComponent {
     this.expandedId.update((current) => (current === id ? null : id));
   }
 
-  onStyleSelect(row: BindingRowView, kind: string): void {
-    const chosen = row.styleKinds.find((styleKind) => styleKind === kind);
+  /** Changes the binding's Action, keeping its Trigger and taking the Action's default amount. */
+  onStyleSelect(row: BindingRowView, action: string): void {
+    const chosen = row.actions.find((offered) => offered === action);
     if (chosen === undefined) {
       return;
     }
+    const kind = kindFor(chosen, triggerOf(row.mapping.style.kind) ?? 'press');
     this.midiMappings.setStyle(row.mapping.id, {
-      kind: chosen,
-      amount: defaultAmountFor(row.control, chosen),
+      kind,
+      amount: defaultAmountFor(row.control, kind),
+    });
+  }
+
+  /** Changes the binding's Trigger, keeping its Action and amount. */
+  onTriggerSelect(row: BindingRowView, trigger: string): void {
+    const chosen = TRIGGERS.find((edge) => edge === trigger);
+    if (chosen === undefined || triggerOf(row.mapping.style.kind) === null) {
+      return;
+    }
+    this.midiMappings.setStyle(row.mapping.id, {
+      kind: kindFor(actionOf(row.mapping.style.kind), chosen),
+      amount: row.mapping.style.amount,
     });
   }
 
@@ -299,23 +334,32 @@ export class DjBindingsPanelComponent {
     statuses: Readonly<Record<string, ControllerStatus>>,
     expandedId: string | null
   ): BindingRowView {
-    const styleKinds = stylesFor(control.nature, mapping.source.kind);
+    const actions = actionsFor(control.nature, mapping.source.kind);
+    const trigger = triggerOf(mapping.style.kind);
     const owner = ownerLabel(mapping.control.owner);
 
     return {
       mapping,
       control,
-      styleKinds,
+      actions,
       model: {
         name: control.name,
         sourceText: describeSource(mapping.source, controllers),
-        styleText: describeStyle(mapping.style),
+        styleText: describeStyle(mapping.style, mapping.source.kind),
         expanded: expandedId === mapping.id,
-        styleOptions: styleKinds.map((kind) => ({
-          id: kind,
-          label: describeStyle({ kind, amount: null }),
-        })),
-        selectedStyleId: mapping.style.kind,
+        styleLabel: choosesAction(control, mapping) ? 'Action' : 'Style',
+        styleOptions: actions.includes('fire')
+          ? []
+          : actions.map((action) => ({ id: action, label: describeAction(action) })),
+        selectedStyleId: actionOf(mapping.style.kind),
+        triggerOptions:
+          trigger === null
+            ? null
+            : TRIGGERS.map((edge) => ({
+                id: edge,
+                label: describeTrigger(edge, mapping.source.kind),
+              })),
+        selectedTriggerId: trigger,
         amount: amountField(mapping.style.kind, mapping.style.amount),
         statusText: BINDING_STATUS_TEXT[statuses[mapping.source.controllerId] ?? 'missing'],
         editAccessibleName: `Edit ${control.name} binding, ${owner}`,
@@ -323,6 +367,16 @@ export class DjBindingsPanelComponent {
       },
     };
   }
+}
+
+/** Whether the first choice reads as an Action (what a key does) rather than a Style (how a
+ *  value is read): a one-shot, an on/off control, or a value stepped from a note. */
+function choosesAction(control: MappableControl, mapping: ControlMapping): boolean {
+  return (
+    control.nature === 'trigger' ||
+    control.nature === 'state' ||
+    (control.nature === 'value' && mapping.source.kind === 'note')
+  );
 }
 
 /** Orders two mappings on one control: by the controller's place in the list, then channel, kind

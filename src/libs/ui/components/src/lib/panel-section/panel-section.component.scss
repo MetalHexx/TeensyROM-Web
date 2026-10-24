@@ -7,9 +7,14 @@
 }
 
 .panel-section {
+  // A section in a slot of definite height fills it, so neighbours with different content end up the
+  // same height. In auto-height slots the percentage resolves to auto and changes nothing.
+  height: 100%;
   min-width: 0;
   margin: 0;
-  padding: var(--spacing-sm) var(--panel-section-padding-inline, var(--spacing-md)) var(--spacing-md);
+  padding: var(--panel-section-padding-top, var(--spacing-sm))
+    var(--panel-section-padding-inline, var(--spacing-md))
+    var(--panel-section-padding-bottom, var(--spacing-md));
   border: 1px solid var(--synth-section-border);
   border-radius: var(--border-radius-sm);
 }

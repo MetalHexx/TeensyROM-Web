@@ -1,0 +1,66 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
+:host {
+  // The host is exactly as big as its button. A block host would wrap the button in a line box, and
+  // for a button shorter than the line that adds space the layout cannot see.
+  display: inline-flex;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.pad {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  @include styles.synth-pill-pad;
+  cursor: pointer;
+  background: linear-gradient(
+    180deg,
+    var(--synth-control-face-top),
+    var(--synth-control-face-bottom)
+  );
+  border: 1px solid var(--synth-control-border);
+  color: var(--synth-control-text);
+  font-family: 'Roboto Mono', monospace;
+  text-transform: uppercase;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: box-shadow 0.12s ease-out, border-color 0.12s ease-out;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  &[data-held] {
+    background: linear-gradient(
+      180deg,
+      rgba(var(--color-primary-bright-rgb), 0.55),
+      rgba(var(--color-primary-bright-rgb), 0.3)
+    );
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 10px rgba(var(--color-primary-bright-rgb), 0.8),
+      inset 0 0 6px rgba(var(--color-primary-bright-rgb), 0.5);
+    color: var(--synth-pointer);
+  }
+}
+
+:host([data-shape='round']) .pad {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad {
+    transition: none;
+  }
+}

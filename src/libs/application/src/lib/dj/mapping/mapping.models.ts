@@ -45,10 +45,11 @@ export type DeckControlId =
   | 'speed-jump-up'
   | 'speed-jump-home'
   | 'speed-jump-down'
+  | 'speed-nudge-up'
+  | 'speed-nudge-down'
   | 'repeat'
   | `voice-${VoiceNumber}-mute`
   | `voice-${VoiceNumber}-hold`
-  | 'clear-voice-mutes'
   | 'key'
   | `voice-${VoiceNumber}-${VoiceStripControl}`
   | (typeof DECK_PANEL_CONTROLS)[number];
@@ -70,10 +71,11 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'speed-jump-up',
   'speed-jump-home',
   'speed-jump-down',
+  'speed-nudge-up',
+  'speed-nudge-down',
   'repeat',
   ...VOICE_NUMBERS.map((n) => `voice-${n}-mute` as const),
   ...VOICE_NUMBERS.map((n) => `voice-${n}-hold` as const),
-  'clear-voice-mutes',
   'key',
   ...VOICE_NUMBERS.flatMap((n) =>
     VOICE_STRIP_CONTROLS.map((control) => `voice-${n}-${control}` as const)

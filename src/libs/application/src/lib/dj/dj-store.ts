@@ -118,8 +118,16 @@ export interface DeckState {
   subtuneCount: number;
   repeat: boolean;
   error: string | null;
-  /** The engine-reported tempo multiplier, home 1. */
+  /** The engine-reported tempo multiplier, home 1. It is what the speed display shows. */
   speed: number;
+  /** The speed fader's own value, home 1. Jumps move it within 0.3–1.7; the screen pins its thumb
+   *  to the fader's 0.5–1.5 travel. A nudge never moves it. */
+  faderSpeed: number;
+  /** True while either nudge is held. The speed display tints magenta while this is set. */
+  nudging: boolean;
+  /** Microseconds per play call for the loaded tune, or null while nothing is loaded. Converts
+   *  `positionFrames` (play calls) to time. */
+  playCallIntervalUs: number | null;
   voices: readonly DeckVoiceState[];
   detectedKey: DeckDetectedKey | null;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
@@ -165,6 +173,9 @@ const initialDeckState: DeckState = {
   repeat: true,
   error: null,
   speed: 1,
+  faderSpeed: 1,
+  nudging: false,
+  playCallIntervalUs: null,
   voices: [
     { muted: false, held: false },
     { muted: false, held: false },

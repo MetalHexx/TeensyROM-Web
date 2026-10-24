@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import type { MappableControl, ValueDefaults } from './mappable-controls';
+import type { MappingStyleKind } from '../ports';
 import {
+  actionOf,
+  actionsFor,
   clampAmount,
   defaultAmountFor,
   defaultStyle,
   isStyleAvailable,
+  kindFor,
   relativeTicks,
   stylesFor,
+  triggerOf,
 } from './mapping-styles';
 
 const identity = { owner: 'A', control: 'speed' } as const;
@@ -19,7 +24,20 @@ const toggle: MappableControl = {
   read: () => false,
   set: () => undefined,
 };
-const held: MappableControl = { identity, name: 'H', nature: 'hold', set: () => undefined };
+const held: MappableControl = {
+  identity,
+  name: 'H',
+  nature: 'hold',
+  amountDefault: null,
+  set: () => undefined,
+};
+const nudge: MappableControl = {
+  identity,
+  name: 'N',
+  nature: 'hold',
+  amountDefault: 0.05,
+  set: () => undefined,
+};
 
 function value(defaults: ValueDefaults): MappableControl {
   return {
@@ -60,12 +78,12 @@ describe('stylesFor', () => {
   it.each([
     ['trigger', 'cc', ['press', 'release']],
     ['trigger', 'note', ['press', 'release']],
-    ['state', 'cc', ['latch', 'on', 'off']],
-    ['state', 'note', ['latch', 'on', 'off']],
+    ['state', 'cc', ['latch', 'latch-release', 'on', 'on-release', 'off', 'off-release']],
+    ['state', 'note', ['latch', 'latch-release', 'on', 'on-release', 'off', 'off-release']],
     ['hold', 'note', ['hold']],
     ['hold', 'cc', ['hold']],
-    ['value', 'cc', ['absolute', 'relative-offset', 'relative-signed', 'step']],
-    ['value', 'note', ['step']],
+    ['value', 'cc', ['absolute', 'relative-offset', 'relative-signed', 'step', 'step-release']],
+    ['value', 'note', ['step', 'step-release']],
   ] as const)('%s from a %s source offers %j', (nature, sourceKind, expected) => {
     expect(stylesFor(nature, sourceKind)).toEqual(expected);
   });
@@ -77,11 +95,61 @@ describe('stylesFor', () => {
   });
 });
 
+const ALL_KINDS: MappingStyleKind[] = [
+  'press',
+  'release',
+  'latch',
+  'latch-release',
+  'on',
+  'on-release',
+  'off',
+  'off-release',
+  'hold',
+  'absolute',
+  'relative-offset',
+  'relative-signed',
+  'step',
+  'step-release',
+];
+
+describe('action and trigger', () => {
+  it.each(ALL_KINDS)('splits %s into an action and a trigger that rebuild it', (kind) => {
+    expect(kindFor(actionOf(kind), triggerOf(kind) ?? 'press')).toBe(kind);
+  });
+
+  it('gives no trigger to hold, absolute and the relative kinds', () => {
+    for (const kind of ['hold', 'absolute', 'relative-offset', 'relative-signed'] as const) {
+      expect(triggerOf(kind)).toBeNull();
+      expect(kindFor(kind, 'release')).toBe(kind);
+    }
+  });
+
+  it('reads the release kinds as the release trigger of their press kind', () => {
+    expect(triggerOf('step-release')).toBe('release');
+    expect(actionOf('latch-release')).toBe('toggle');
+    expect(kindFor('fire', 'release')).toBe('release');
+    expect(kindFor('off', 'release')).toBe('off-release');
+  });
+
+  it.each([
+    ['trigger', 'note', ['fire']],
+    ['trigger', 'cc', ['fire']],
+    ['state', 'note', ['toggle', 'on', 'off']],
+    ['state', 'cc', ['toggle', 'on', 'off']],
+    ['hold', 'note', ['hold']],
+    ['value', 'note', ['step']],
+    ['value', 'cc', ['absolute', 'relative-offset', 'relative-signed', 'step']],
+  ] as const)('%s from a %s source offers the actions %j', (nature, sourceKind, expected) => {
+    expect(actionsFor(nature, sourceKind)).toEqual(expected);
+  });
+});
+
 describe('defaultStyle', () => {
   it.each([
     ['a trigger', trigger, 'cc', { kind: 'press', amount: null }],
     ['a state', toggle, 'note', { kind: 'latch', amount: null }],
-    ['a hold', held, 'note', { kind: 'hold', amount: null }],
+    ['a hold with no amount', held, 'note', { kind: 'hold', amount: null }],
+    ['a hold with an amount', nudge, 'note', { kind: 'hold', amount: 0.05 }],
     ['a value from a note', knob, 'note', { kind: 'step', amount: 0.05 }],
     [
       'a value that defaults to absolute from a CC',
@@ -104,8 +172,15 @@ describe('defaultAmountFor', () => {
   it('is the sensitivity for a relative kind, the step amount for step, and null otherwise', () => {
     expect(defaultAmountFor(knob, 'relative-signed')).toBe(0.02);
     expect(defaultAmountFor(knob, 'step')).toBe(0.05);
+    expect(defaultAmountFor(knob, 'step-release')).toBe(0.05);
+    expect(defaultAmountFor(toggle, 'on-release')).toBeNull();
     expect(defaultAmountFor(knob, 'absolute')).toBeNull();
     expect(defaultAmountFor(trigger, 'step')).toBeNull();
+  });
+
+  it("is a hold control's own default for hold", () => {
+    expect(defaultAmountFor(nudge, 'hold')).toBe(0.05);
+    expect(defaultAmountFor(held, 'hold')).toBeNull();
   });
 });
 
@@ -117,6 +192,20 @@ describe('clampAmount', () => {
     expect(clampAmount(knob, 'step', -3)).toBe(-1);
     expect(clampAmount(knob, 'step', 0)).not.toBe(0);
     expect(clampAmount(knob, 'step', -0.25)).toBe(-0.25);
+    expect(clampAmount(knob, 'step-release', -3)).toBe(-1);
+    expect(clampAmount(knob, 'step-release', 0)).not.toBe(0);
+    expect(clampAmount(knob, 'step-release', Number.NaN)).toBe(0.05);
+    expect(clampAmount(toggle, 'latch-release', 0.5)).toBeNull();
+  });
+
+  it('keeps a nudge hold in [0.001, 1], falling back to its default, and a voice hold at null', () => {
+    expect(clampAmount(nudge, 'hold', 0.2)).toBe(0.2);
+    expect(clampAmount(nudge, 'hold', null)).toBe(0.05);
+    expect(clampAmount(nudge, 'hold', Number.NaN)).toBe(0.05);
+    expect(clampAmount(nudge, 'hold', 0)).toBe(0.001);
+    expect(clampAmount(nudge, 'hold', 5)).toBe(1);
+    expect(clampAmount(held, 'hold', 0.5)).toBeNull();
+    expect(clampAmount(held, 'hold', null)).toBeNull();
   });
 
   it('is null for a kind that takes no amount and falls back to the default for a missing one', () => {

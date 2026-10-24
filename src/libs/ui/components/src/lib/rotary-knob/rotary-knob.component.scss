@@ -34,17 +34,22 @@
     overflow: visible;
   }
 
-  .scale-knob-label {
+  // A caption is a label or a value, and either reads the same: one face, one size, one gap. The
+  // dial is a gauge that opens at the bottom, so its lowest art sits about 16% above the dial box's
+  // edge; the caption rides up into that gap, by a share of the dial's own size, and keeps a line
+  // box as tall as its letters, so it sits close to its dial at any size.
+  .scale-knob-label,
+  .scale-knob-readout {
+    margin-top: calc(var(--scale-knob-size) / -8);
     color: var(--synth-legend);
+    font-family: inherit;
     font-size: 0.53rem;
+    font-variant-numeric: tabular-nums;
     font-weight: 600;
     letter-spacing: 0.12em;
+    line-height: 1;
+    text-transform: uppercase;
     white-space: nowrap;
-  }
-
-  .scale-knob-readout {
-    font-size: 0.69rem;
-    font-weight: 500;
   }
 }
 

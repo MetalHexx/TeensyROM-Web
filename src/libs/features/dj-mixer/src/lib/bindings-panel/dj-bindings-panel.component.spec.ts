@@ -24,6 +24,9 @@ const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const STOP_A: ControlIdentity = { owner: 'A', control: 'stop' };
 const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
 const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
+const NUDGE_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
+const MUTE_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
+const VOICE_HOLD_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
 
 const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
@@ -44,6 +47,27 @@ const CONTROLS: readonly MappableControl[] = [
   },
   { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
   keyControl(KEY_B),
+  {
+    identity: MUTE_A,
+    name: 'Voice 1 mute',
+    nature: 'state',
+    read: () => false,
+    set: () => undefined,
+  },
+  {
+    identity: NUDGE_A,
+    name: 'Nudge up',
+    nature: 'hold',
+    amountDefault: 0.05,
+    set: () => undefined,
+  },
+  {
+    identity: VOICE_HOLD_A,
+    name: 'Voice 1 kill / punch-in',
+    nature: 'hold',
+    amountDefault: null,
+    set: () => undefined,
+  },
 ];
 
 function keyControl(identity: ControlIdentity): MappableControl {
@@ -229,28 +253,86 @@ describe('DjBindingsPanelComponent', () => {
       return rows(fixture)[index].model();
     }
 
-    it('offers the styles the control and source allow, labelled as the chips are', () => {
+    it('offers an on/off control its Action and Trigger, naming the trigger for the source', () => {
       const { fixture, seed } = render();
       seed(
         [XL],
         [
-          mapping('trigger', STOP_A, { kind: 'press', amount: null }, { kind: 'note', number: 1 }),
-          mapping('value-cc', SPEED_A, { kind: 'absolute', amount: null }),
-          mapping('value-note', KEY_B, { kind: 'step', amount: 0.1 }, { kind: 'note', number: 2 }),
+          mapping(
+            'note',
+            MUTE_A,
+            { kind: 'off-release', amount: null },
+            { kind: 'note', number: 1 }
+          ),
+          mapping('cc', MUTE_A, { kind: 'latch', amount: null }, { number: 2 }),
         ]
       );
 
-      expect(modelOf(fixture, 0).styleOptions).toEqual([
-        { id: 'press', label: 'On press' },
-        { id: 'release', label: 'On release' },
-      ]);
-      expect(modelOf(fixture, 1).styleOptions.map((o) => o.label)).toEqual([
+      expect(modelOf(fixture, 1)).toMatchObject({
+        styleText: 'Turn off · Note Off',
+        styleLabel: 'Action',
+        styleOptions: [
+          { id: 'toggle', label: 'Toggle' },
+          { id: 'on', label: 'Turn on' },
+          { id: 'off', label: 'Turn off' },
+        ],
+        selectedStyleId: 'off',
+        triggerOptions: [
+          { id: 'press', label: 'Note On' },
+          { id: 'release', label: 'Note Off' },
+        ],
+        selectedTriggerId: 'release',
+      });
+      expect(modelOf(fixture, 0).triggerOptions?.map((o) => o.label)).toEqual(['CC On', 'CC Off']);
+    });
+
+    it('offers a one-shot only its Trigger', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [mapping('trigger', STOP_A, { kind: 'press', amount: null }, { kind: 'note', number: 1 })]
+      );
+
+      expect(modelOf(fixture)).toMatchObject({
+        styleLabel: 'Action',
+        styleOptions: [],
+        selectedTriggerId: 'press',
+      });
+      expect(modelOf(fixture).triggerOptions?.map((o) => o.id)).toEqual(['press', 'release']);
+    });
+
+    it('offers a CC encoder a Style with the two relative options and no Trigger', () => {
+      const { fixture, seed } = render();
+      seed([XL], [mapping('value-cc', SPEED_A, { kind: 'relative-signed', amount: 0.01 })]);
+
+      expect(modelOf(fixture)).toMatchObject({
+        styleLabel: 'Style',
+        selectedStyleId: 'relative-signed',
+        triggerOptions: null,
+        selectedTriggerId: null,
+      });
+      expect(modelOf(fixture).styleOptions.map((o) => o.label)).toEqual([
         'Absolute',
-        'Relative',
-        'Relative ±',
+        'Relative (binary offset)',
+        "Relative (two's complement)",
         'Step',
       ]);
-      expect(modelOf(fixture, 2).styleOptions.map((o) => o.label)).toEqual(['Step']);
+    });
+
+    it('offers a step key its Action, Trigger and Amount', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [mapping('key', KEY_B, { kind: 'step-release', amount: 0.1 }, { kind: 'note', number: 2 })]
+      );
+
+      expect(modelOf(fixture)).toMatchObject({
+        styleText: 'Step +10% · Note Off',
+        styleLabel: 'Action',
+        styleOptions: [{ id: 'step', label: 'Step' }],
+        selectedTriggerId: 'release',
+        amount: { label: 'Amount', value: 10 },
+      });
     });
 
     it('shows a relative style as a sensitivity in percent and a step style as a signed amount', () => {
@@ -266,13 +348,37 @@ describe('DjBindingsPanelComponent', () => {
 
       expect(modelOf(fixture, 0)).toMatchObject({
         selectedStyleId: 'relative-offset',
-        styleText: 'Relative · 1.5%',
+        styleText: 'Relative (binary offset) · 1.5%',
         amount: { label: 'Sensitivity', value: 1.5, min: 0.1, max: 100, suffix: '%' },
       });
       expect(modelOf(fixture, 2).amount).toEqual(
         expect.objectContaining({ label: 'Amount', value: -10, min: -100, max: 100 })
       );
       expect(modelOf(fixture, 1).amount).toBeNull();
+    });
+
+    it('shows a nudge hold with an editable amount in percent, and a voice hold with none', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [
+          mapping('nudge', NUDGE_A, { kind: 'hold', amount: 0.05 }, { kind: 'note', number: 30 }),
+          mapping(
+            'voice',
+            VOICE_HOLD_A,
+            { kind: 'hold', amount: null },
+            { kind: 'note', number: 31 }
+          ),
+        ]
+      );
+
+      const nudge = [0, 1].map((i) => modelOf(fixture, i)).find((m) => m.amount !== null);
+      expect(nudge).toMatchObject({
+        styleText: 'Hold · 5%',
+        amount: { label: 'Amount', value: 5, min: 0.1, max: 100, step: 0.1, suffix: '%' },
+      });
+      const voice = [0, 1].map((i) => modelOf(fixture, i)).find((m) => m.amount === null);
+      expect(voice?.styleText).toBe('Hold');
     });
 
     it('names the edit and delete controls after the control and its owner', () => {
@@ -333,11 +439,38 @@ describe('DjBindingsPanelComponent', () => {
 
       rows(fixture)[1].styleSelect.emit('step');
       rows(fixture)[1].styleSelect.emit('absolute');
-      rows(fixture)[1].styleSelect.emit('not-a-style');
+      rows(fixture)[1].styleSelect.emit('not-an-action');
 
       expect(mappings.setStyle.mock.calls).toEqual([
         ['relative', { kind: 'step', amount: DEFAULTS.stepAmount }],
         ['relative', { kind: 'absolute', amount: null }],
+      ]);
+    });
+
+    it('keeps the Trigger when the Action changes, and the Action and amount when the Trigger changes', () => {
+      const { fixture, seed, mappings } = render();
+      seed(
+        [XL],
+        [
+          mapping(
+            'mute',
+            MUTE_A,
+            { kind: 'off-release', amount: null },
+            { kind: 'note', number: 1 }
+          ),
+          mapping('key', KEY_B, { kind: 'step', amount: 0.2 }, { kind: 'note', number: 2 }),
+        ]
+      );
+
+      rows(fixture)[0].styleSelect.emit('toggle');
+      rows(fixture)[0].triggerSelect.emit('press');
+      rows(fixture)[1].triggerSelect.emit('release');
+      rows(fixture)[0].triggerSelect.emit('not-a-trigger');
+
+      expect(mappings.setStyle.mock.calls).toEqual([
+        ['mute', { kind: 'latch-release', amount: null }],
+        ['mute', { kind: 'off', amount: null }],
+        ['key', { kind: 'step-release', amount: 0.2 }],
       ]);
     });
 

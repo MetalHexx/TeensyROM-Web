@@ -1,32 +1,47 @@
 import { Component, ChangeDetectionStrategy, computed, inject, input, signal } from '@angular/core';
+import { ScalingContainerComponent } from '@teensyrom-nx/ui/components';
+import type { BindingCardModel, BindingPortModel } from '@teensyrom-nx/ui/components';
 import {
-  BindingCardComponent,
-  LoopsCuesPanelComponent,
-  ScalingCompactCardComponent,
-  SpeedPanelComponent,
-  TransportPanelComponent,
-  VoicePanelComponent,
-} from '@teensyrom-nx/ui/components';
+  BindingPlateComponent,
+  DeckChannelStripComponent,
+  DeckTransportComponent,
+  LoopsCuesPlateComponent,
+} from '@teensyrom-nx/ui/components/dj';
 import type {
-  BindingCardModel,
-  BindingPortModel,
-  SpeedPanelModel,
-  TransportPanelModel,
-  VoicePanelModel,
-} from '@teensyrom-nx/ui/components';
-import { DeckService, DeviceStore, DjStore, cartridgeOptions } from '@teensyrom-nx/application';
+  DeckChannelStripModel,
+  DeckTransportModel,
+  DeckTransportState,
+} from '@teensyrom-nx/ui/components/dj';
+import {
+  DeckService,
+  DeviceStore,
+  DjStore,
+  SPEED_FADER_RANGE,
+  type DeckTransportSummary,
+  cartridgeOptions,
+  formatElapsed,
+} from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
 import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
 
-/** The speed fader's travel. Display only: the live multiplier can sit outside it after a jump
- *  (0.3x–1.7x), and the thumb pins at the edge while the readout shows the true value. */
-const SPEED_FADER_MIN = 0.5;
-const SPEED_FADER_MAX = 1.5;
+const STATE_LABELS: Record<DeckTransportState, string> = {
+  playing: 'Play',
+  paused: 'Pause',
+  stopped: 'Stop',
+  analyzing: 'Analyzing…',
+  error: 'Error',
+  empty: 'Stop',
+};
+
+/** A tune that played to its end reads as stopped on the display. */
+function transportState(led: DeckTransportSummary['led']): DeckTransportState {
+  return led === 'ended' ? 'stopped' : led;
+}
 
 type SpeedJump = 'up' | 'home' | 'down';
 
-/** The speed panel's `jump` id is an opaque string; this is the one place it is narrowed. */
+/** The channel strip's `jump` id is an opaque string; this is the one place it is narrowed. */
 function isSpeedJump(id: string): id is SpeedJump {
   return id === 'up' || id === 'home' || id === 'down';
 }
@@ -36,12 +51,11 @@ function isSpeedJump(id: string): id is SpeedJump {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents', '[attr.data-deck]': 'deck().letter' },
   imports: [
-    ScalingCompactCardComponent,
-    TransportPanelComponent,
-    VoicePanelComponent,
-    SpeedPanelComponent,
-    LoopsCuesPanelComponent,
-    BindingCardComponent,
+    ScalingContainerComponent,
+    DeckTransportComponent,
+    LoopsCuesPlateComponent,
+    BindingPlateComponent,
+    DeckChannelStripComponent,
   ],
   templateUrl: './dj-deck-column.component.html',
   styleUrl: './dj-deck-column.component.scss',
@@ -69,19 +83,26 @@ export class DjDeckColumnComponent {
   // over verbatim (see `onScrubCommit`).
   private readonly scrubDragValue = signal<number | null>(null);
 
-  readonly transportModel = computed<TransportPanelModel>(() => {
+  readonly transportModel = computed<DeckTransportModel>(() => {
     const { letter } = this.deck();
     const summary = this.summary();
+    const state: DeckTransportState =
+      summary.status === 'empty' ? 'empty' : transportState(summary.led);
     return {
       accessibleName: `Transport deck ${letter}`,
+      state,
+      stateLabel: STATE_LABELS[state],
+      title: summary.title,
+      author: summary.author,
+      emptyText: 'No tune — drop a SID here',
+      totalText: summary.totalText,
       bar: summary.bar,
       scrubAccessibleName: `Position deck ${letter}`,
-      transport: { state: summary.led, label: summary.label },
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
       repeatTrack: summary.repeat,
       subtune: {
-        text: summary.subtuneText,
+        text: summary.subtuneCompact,
         disabled: summary.subtuneDisabled,
         previousAccessibleName: `Previous subtune deck ${letter}`,
         nextAccessibleName: `Next subtune deck ${letter}`,
@@ -92,51 +113,69 @@ export class DjDeckColumnComponent {
         stop: `Stop deck ${letter}`,
         repeat: `Repeat track deck ${letter}`,
       },
-      errors: summary.errors,
+      // A failed load's reason travels in `label`, not `errors`.
+      errors: summary.status === 'failed' && summary.label ? [summary.label] : summary.errors,
     };
   });
 
   /** The playhead as a percentage, or the drag pin while one is held. */
   readonly positionPercent = computed(() => this.scrubDragValue() ?? this.summary().scrubPercent);
-  readonly frameLabel = computed(() => this.summary().frameLabel);
 
-  readonly speedModel = computed<SpeedPanelModel>(() => {
-    const { letter } = this.deck();
-    const { speed } = this.deckState();
-    return {
-      accessibleName: `Speed deck ${letter}`,
-      valueText: `${speed.toFixed(3)}x`,
-      faderValue: Math.min(Math.max(speed, SPEED_FADER_MIN), SPEED_FADER_MAX),
-      faderAccessibleName: `Speed multiplier deck ${letter}`,
-      min: SPEED_FADER_MIN,
-      max: SPEED_FADER_MAX,
-      step: 0.001,
-      jumpButtons: [
-        { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${letter}` },
-        { id: 'home', label: 'Home', accessibleName: `Speed home deck ${letter}` },
-        { id: 'down', label: '−50%', accessibleName: `Speed down 50% deck ${letter}` },
-      ],
-      disabled: !this.canShape(),
-    };
+  /** The frame under the drag pin, or null when no drag or seek is in flight. */
+  private readonly pinFrames = computed<number | null>(() => {
+    const pin = this.scrubDragValue();
+    return pin === null ? null : (pin / 100) * (this.deckState().lengthFrames ?? 0);
   });
 
-  readonly voiceModel = computed<VoicePanelModel>(() => {
+  /** Follows the drag pin like the thumb does, so the display tracks the pointer. */
+  readonly elapsedText = computed(() => {
+    const frames = this.pinFrames();
+    return frames === null
+      ? this.summary().elapsedText
+      : formatElapsed(frames, this.deckState().playCallIntervalUs);
+  });
+
+  readonly frameLabel = computed(() => {
+    const frames = this.pinFrames();
+    return frames === null ? this.summary().frameLabel : `frame ${Math.round(frames)}`;
+  });
+
+  readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
+    const { speed, faderSpeed, nudging, voices } = this.deckState();
     return {
-      accessibleName: `Voice deck ${letter}`,
-      rows: this.deckState().voices.map(({ muted }, i) => {
+      voiceAccessibleName: `Voice deck ${letter}`,
+      speedAccessibleName: `Speed deck ${letter}`,
+      voices: voices.map(({ muted }, i) => {
         const n = i + 1;
         const holdLabel = muted ? 'Punch' : 'Kill';
         return {
           label: `V${n}`,
           muted,
           holdLabel,
-          checkboxId: `voice-${letter}-${n}`,
           muteAccessibleName: `Mute voice ${n} deck ${letter}`,
           holdAccessibleName: `${holdLabel} voice ${n} deck ${letter}`,
         };
       }),
-      clearAccessibleName: `Clear all voice mutes deck ${letter}`,
+      speedText: `${speed.toFixed(3)}×`,
+      nudging,
+      fader: {
+        value: Math.min(Math.max(faderSpeed, SPEED_FADER_RANGE.min), SPEED_FADER_RANGE.max),
+        min: SPEED_FADER_RANGE.min,
+        max: SPEED_FADER_RANGE.max,
+        step: 0.001,
+        home: SPEED_FADER_RANGE.home,
+        accessibleName: `Speed multiplier deck ${letter}`,
+      },
+      nudge: {
+        downAccessibleName: `Nudge down deck ${letter}`,
+        upAccessibleName: `Nudge up deck ${letter}`,
+      },
+      jumpButtons: [
+        { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${letter}` },
+        { id: 'home', label: 'Home', accessibleName: `Speed home deck ${letter}` },
+        { id: 'down', label: '−50%', accessibleName: `Speed down 50% deck ${letter}` },
+      ],
       disabled: !this.canShape(),
     };
   });
@@ -268,8 +307,8 @@ export class DjDeckColumnComponent {
     this.deckService.setVoiceHeld(this.deck().slot, index, held);
   }
 
-  onClearVoiceMutes(): void {
-    this.deckService.clearVoiceMutes(this.deck().slot);
+  onNudgeChange({ direction, held }: { direction: 'up' | 'down'; held: boolean }): void {
+    this.deckService.setNudge(this.deck().slot, direction, held);
   }
 
   onPortSelect(id: string): void {

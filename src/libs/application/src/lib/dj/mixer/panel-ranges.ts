@@ -1,3 +1,5 @@
+import { KEY_SEMITONE_RANGE } from './pitch';
+
 /** One panel knob's travel. A knob's position is its raw offset in the field's own units, so full
  *  travel each way spans the field's whole range. `step` is the snap for a stepped knob, `null` for
  *  a continuous one. */
@@ -20,5 +22,5 @@ export const PANEL_RANGES = {
   release: { min: -15, max: 15, home: 0, step: 1 },
   cutoff: { min: -2047, max: 2047, home: 0, step: 1 },
   resonance: { min: -15, max: 15, home: 0, step: 1 },
-  key: { min: -12, max: 12, home: 0, step: 1 },
+  key: { min: -KEY_SEMITONE_RANGE, max: KEY_SEMITONE_RANGE, home: 0, step: 1 },
 } as const satisfies Record<string, PanelRange>;

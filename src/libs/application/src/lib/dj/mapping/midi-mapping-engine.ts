@@ -39,9 +39,11 @@ function quantize(control: ValueControl, value: number): number {
  * activation style, through the control's own command. Nothing here persists or allocates beyond
  * a map lookup per message, so a stream of CC ticks costs no more than the command it drives.
  *
- * A key's press and release edges come from the last `pressed` seen per source. A hold must never
- * stay stuck, so it is let go by its release edge, by `releaseHolds` (a controller going away),
- * by `releaseMapping` (its mapping removed or moved) and by the page being hidden.
+ * A key's press and release edges come from the last `pressed` seen per source. The press kinds act
+ * on the key-down edge and the release kinds (`release`, `latch-release`, `on-release`,
+ * `off-release`, `step-release`) on the key-up edge; a release with no press seen is no edge. A
+ * hold must never stay stuck, so it is let go by its release edge, by `releaseHolds` (a controller
+ * going away), by `releaseMapping` (its mapping removed or moved) and by the page being hidden.
  */
 @Injectable({ providedIn: 'root' })
 export class MidiMappingEngine {
@@ -106,10 +108,21 @@ export class MidiMappingEngine {
           control.set(!control.read());
         }
         return;
+      case 'latch-release':
+        if (releaseEdge && control.nature === 'state') {
+          control.set(!control.read());
+        }
+        return;
       case 'on':
       case 'off':
         if (pressEdge && control.nature === 'state') {
           control.set(kind === 'on');
+        }
+        return;
+      case 'on-release':
+      case 'off-release':
+        if (releaseEdge && control.nature === 'state') {
+          control.set(kind === 'on-release');
         }
         return;
       case 'hold':
@@ -131,6 +144,11 @@ export class MidiMappingEngine {
         return;
       case 'step':
         if (pressEdge && control.nature === 'value' && amount !== null) {
+          this.applyStep(control, amount);
+        }
+        return;
+      case 'step-release':
+        if (releaseEdge && control.nature === 'value' && amount !== null) {
           this.applyStep(control, amount);
         }
         return;
@@ -189,10 +207,10 @@ export class MidiMappingEngine {
     const key = sourceKey(event);
     if (pressEdge) {
       this.holds.set(key, { mappingId: mapping.id, controllerId: event.controllerId, control });
-      control.set(true);
+      control.set(true, mapping.style.amount);
     } else if (releaseEdge) {
       this.holds.delete(key);
-      control.set(false);
+      control.set(false, null);
     }
   }
 
@@ -240,7 +258,7 @@ export class MidiMappingEngine {
   /** Releases a hold, logging rather than throwing so one failing release cannot strand the rest. */
   private letGo(hold: ActiveHold): void {
     try {
-      hold.control.set(false);
+      hold.control.set(false, null);
     } catch (error) {
       logWarn(
         `MidiMappingEngine: releasing ${controlKey(hold.control.identity)} failed — ${

@@ -1,5 +1,7 @@
 :host {
-  display: inline-block;
+  // The host is exactly as big as its button. A block host would wrap the button in a line box, and
+  // for a button shorter than the line that adds space the layout cannot see.
+  display: inline-flex;
   --ls-border: var(--synth-control-border);
   --ls-border-style: solid;
   --ls-text: var(--synth-control-text);

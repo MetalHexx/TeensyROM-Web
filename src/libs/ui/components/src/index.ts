@@ -71,8 +71,6 @@ export * from './lib/status-led/status-led.component';
 export * from './lib/stepper/stepper.component';
 export * from './lib/scrub-position-bar/scrub-position-bar.component';
 export * from './lib/transport-panel/transport-panel.component';
-export * from './lib/voice-row/voice-row.component';
-export * from './lib/voice-panel/voice-panel.component';
 export * from './lib/jump-button-group/jump-button-group.component';
 export * from './lib/speed-panel/speed-panel.component';
 export * from './lib/marker-slot/marker-slot.component';

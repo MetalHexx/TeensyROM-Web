@@ -19,12 +19,27 @@ describe('mapping labels', () => {
     ).toBe('Unknown controller · ch 1 · CC 1');
   });
 
-  it('describes a style, showing an amount as a percentage with at most one decimal', () => {
-    expect(describeStyle({ kind: 'press', amount: null })).toBe('On press');
-    expect(describeStyle({ kind: 'relative-offset', amount: 0.01 })).toBe('Relative · 1%');
-    expect(describeStyle({ kind: 'relative-signed', amount: 0.015 })).toBe('Relative ± · 1.5%');
-    expect(describeStyle({ kind: 'step', amount: 0.05 })).toBe('Step +5%');
-    expect(describeStyle({ kind: 'step', amount: -0.05 })).toBe('Step −5%');
+  it.each([
+    ['note', { kind: 'press', amount: null }, 'Note On'],
+    ['note', { kind: 'release', amount: null }, 'Note Off'],
+    ['cc', { kind: 'press', amount: null }, 'CC On'],
+    ['cc', { kind: 'release', amount: null }, 'CC Off'],
+    ['note', { kind: 'latch', amount: null }, 'Toggle · Note On'],
+    ['note', { kind: 'latch-release', amount: null }, 'Toggle · Note Off'],
+    ['note', { kind: 'on', amount: null }, 'Turn on · Note On'],
+    ['note', { kind: 'on-release', amount: null }, 'Turn on · Note Off'],
+    ['cc', { kind: 'off', amount: null }, 'Turn off · CC On'],
+    ['cc', { kind: 'off-release', amount: null }, 'Turn off · CC Off'],
+    ['note', { kind: 'step', amount: 0.05 }, 'Step +5% · Note On'],
+    ['note', { kind: 'step-release', amount: 0.05 }, 'Step +5% · Note Off'],
+    ['cc', { kind: 'step-release', amount: -0.05 }, 'Step −5% · CC Off'],
+    ['note', { kind: 'hold', amount: null }, 'Hold'],
+    ['note', { kind: 'hold', amount: 0.05 }, 'Hold · 5%'],
+    ['cc', { kind: 'absolute', amount: null }, 'Absolute'],
+    ['cc', { kind: 'relative-offset', amount: 0.01 }, 'Relative (binary offset) · 1%'],
+    ['cc', { kind: 'relative-signed', amount: 0.015 }, "Relative (two's complement) · 1.5%"],
+  ] as const)('describes a %s source style %j as %s', (sourceKind, style, expected) => {
+    expect(describeStyle(style, sourceKind)).toBe(expected);
   });
 
   it('labels the owner of a control', () => {

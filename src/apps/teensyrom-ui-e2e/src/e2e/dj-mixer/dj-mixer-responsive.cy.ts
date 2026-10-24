@@ -185,6 +185,45 @@ describe('DJ Mixer — responsive layout', () => {
         .filter((_, el) => /crossfader/i.test(el.getAttribute('aria-label') ?? ''))
         .should('have.length', 0);
     });
+
+    describe('transport layout by its own width', () => {
+      // The transport answers to the width of its container, not the viewport's, so the width is
+      // forced on the host of deck A's transport.
+      const LAYOUTS = [
+        { width: 440, rows: 1, labelledKeys: true, frameShown: true },
+        { width: 360, rows: 1, labelledKeys: false, frameShown: true },
+        { width: 300, rows: 2, labelledKeys: false, frameShown: false },
+      ] as const;
+
+      LAYOUTS.forEach(({ width, rows, labelledKeys, frameShown }) => {
+        it(`lays the keys out in ${rows} row(s) at ${width}px`, () => {
+          cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
+          cy.get('lib-deck-transport')
+            .first()
+            .then(($transport) => {
+              $transport[0].style.width = `${width}px`;
+            });
+
+          cy.get('lib-deck-transport')
+            .first()
+            .find('.keys lib-synth-key')
+            .should(($keys) => {
+              const tops = new Set(
+                $keys.toArray().map((key) => Math.round(key.getBoundingClientRect().top))
+              );
+              expect(tops.size, 'distinct key rows').to.equal(rows);
+            });
+          cy.get('lib-deck-transport')
+            .first()
+            .find('.stop-key .text')
+            .should(labelledKeys ? 'be.visible' : 'not.be.visible');
+          cy.get('lib-deck-transport')
+            .first()
+            .find('.frame')
+            .should(frameShown ? 'be.visible' : 'not.be.visible');
+        });
+      });
+    });
   });
 
   describe('one device still renders two decks', () => {

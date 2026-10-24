@@ -11,7 +11,11 @@ export type MappingStyleKind =
   | 'absolute'
   | 'relative-offset'
   | 'relative-signed'
-  | 'step';
+  | 'step'
+  | 'latch-release'
+  | 'on-release'
+  | 'off-release'
+  | 'step-release';
 
 export interface KnownControllerRecord {
   readonly id: string;

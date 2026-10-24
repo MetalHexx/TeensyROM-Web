@@ -19,8 +19,8 @@ const meta: Meta<BindingRowComponent> = {
           'One MIDI binding in a list: the control it drives, where it listens and how it ' +
           'behaves. Collapsed, it is two lines — the name, a style chip and the edit and delete ' +
           'buttons, then the source. Expanded in place, it frames itself in the highlight colour ' +
-          'and offers the style as a segmented control, the amount where the style takes one, and ' +
-          'Re-learn source and Delete. The amount is a native number input that emits on `change` ' +
+          'and offers the style (or Action) as a segmented control, a Trigger control where the ' +
+          'style has one, the amount where the style takes one, and Re-learn source and Delete. The amount is a native number input that emits on `change` ' +
           'only for a finite value within its range; anything else shows an inline error. A ' +
           '`statusText` — e.g. that the controller is not connected — dims the row and says why. ' +
           'Purely presentational: the caller owns the model, including `expanded`.',
@@ -31,13 +31,15 @@ const meta: Meta<BindingRowComponent> = {
     model: {
       description:
         "The binding's display state: `name`, `sourceText`, `styleText`, `expanded`, " +
-        '`styleOptions`, `selectedStyleId`, `amount` (or `null` when the style takes none), ' +
+        '`styleLabel`, `styleOptions`, `selectedStyleId`, `triggerOptions` and ' +
+        '`selectedTriggerId` (or `null` when the style has no trigger), `amount` (or `null` when the style takes none), ' +
         '`statusText` (or `null`) and the edit and delete accessible names.',
     },
     editToggle: {
       description: 'Emits when the edit button is pressed, to expand or collapse the row.',
     },
-    styleSelect: { description: 'Emits the id of the style the user chose.' },
+    styleSelect: { description: 'Emits the id of the style (or Action) the user chose.' },
+    triggerSelect: { description: 'Emits the id of the trigger the user chose.' },
     amountChange: {
       description:
         "Emits a new amount, only for a finite value within the amount's `min` and `max`.",
@@ -50,14 +52,26 @@ const meta: Meta<BindingRowComponent> = {
 export default meta;
 type Story = StoryObj<BindingRowComponent>;
 
-const styleOptions = [
+const ccStyleOptions = [
   { id: 'absolute', label: 'Absolute' },
-  { id: 'relative', label: 'Relative' },
+  { id: 'relative-offset', label: 'Relative (binary offset)' },
+  { id: 'relative-signed', label: "Relative (two's complement)" },
   { id: 'step', label: 'Step' },
 ];
 
+const actionOptions = [
+  { id: 'toggle', label: 'Toggle' },
+  { id: 'on', label: 'Turn on' },
+  { id: 'off', label: 'Turn off' },
+];
+
+const noteTriggerOptions = [
+  { id: 'press', label: 'Note On' },
+  { id: 'release', label: 'Note Off' },
+];
+
 const relativeAmount: BindingRowAmount = {
-  label: 'Amount',
+  label: 'Sensitivity',
   value: 1,
   min: 0.1,
   max: 10,
@@ -66,22 +80,25 @@ const relativeAmount: BindingRowAmount = {
 };
 
 const stepAmount: BindingRowAmount = {
-  label: 'Steps',
+  label: 'Amount',
   value: 5,
-  min: 1,
-  max: 32,
-  step: 1,
-  suffix: 'steps',
+  min: -100,
+  max: 100,
+  step: 0.1,
+  suffix: '%',
 };
 
 function baseModel(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
   return {
     name: 'Speed',
     sourceText: 'Launch Control XL · ch 1 · CC 21',
-    styleText: 'Relative · 1%',
+    styleText: 'Relative (binary offset) · 1%',
     expanded: false,
-    styleOptions,
-    selectedStyleId: 'relative',
+    styleLabel: 'Style',
+    styleOptions: ccStyleOptions,
+    selectedStyleId: 'relative-offset',
+    triggerOptions: null,
+    selectedTriggerId: null,
     amount: relativeAmount,
     statusText: null,
     editAccessibleName: 'Edit Speed binding',
@@ -111,37 +128,68 @@ export const ExpandedWithoutAmount: Story = {
   },
 };
 
-/** A fractional amount: a relative style's step size. */
-export const ExpandedRelativeAmount: Story = {
+/** A CC encoder: Style with the two relative options and no Trigger, plus a Sensitivity. */
+export const ExpandedCcEncoder: Story = {
   args: { model: baseModel({ expanded: true }) },
 };
 
-/** A whole-number amount: how many steps a step style takes. */
-export const ExpandedStepAmount: Story = {
+/** A note on a value control stepping on Note Off: Action, Trigger and Amount. */
+export const ExpandedStepKey: Story = {
   args: {
     model: baseModel({
       expanded: true,
-      styleText: 'Step · 5 steps',
+      sourceText: 'Launch Control XL · ch 1 · Note 36',
+      styleText: 'Step +5% · Note Off',
+      styleLabel: 'Action',
+      styleOptions: [{ id: 'step', label: 'Step' }],
       selectedStyleId: 'step',
+      triggerOptions: noteTriggerOptions,
+      selectedTriggerId: 'release',
       amount: stepAmount,
     }),
   },
 };
 
-/** A CC on a value control offers four styles: the longest label, "Relative ±", has to stay
- *  readable beside "Relative" in the control's full-width cells. */
-export const ExpandedFourStyles: Story = {
+/** An on/off binding: Action and Trigger. */
+export const ExpandedOnOff: Story = {
   args: {
     model: baseModel({
+      name: 'Voice 1 mute',
+      sourceText: 'Launch Control XL · ch 1 · Note 41',
+      styleText: 'Turn off · Note Off',
       expanded: true,
-      styleOptions: [
-        { id: 'absolute', label: 'Absolute' },
-        { id: 'relative', label: 'Relative' },
-        { id: 'relative-offset', label: 'Relative ±' },
-        { id: 'step', label: 'Step' },
-      ],
+      styleLabel: 'Action',
+      styleOptions: actionOptions,
+      selectedStyleId: 'off',
+      triggerOptions: noteTriggerOptions,
+      selectedTriggerId: 'release',
+      amount: null,
     }),
   },
+};
+
+/** A one-shot button has no Action to choose, so only the Trigger shows. */
+export const ExpandedOneShot: Story = {
+  args: {
+    model: baseModel({
+      name: 'Next track',
+      sourceText: 'Launch Control XL · ch 1 · Note 42',
+      styleText: 'Note On',
+      expanded: true,
+      styleLabel: 'Action',
+      styleOptions: [],
+      selectedStyleId: 'fire',
+      triggerOptions: noteTriggerOptions,
+      selectedTriggerId: 'press',
+      amount: null,
+    }),
+  },
+};
+
+/** A CC on a value control offers four styles; the long relative labels wrap rather than being
+ *  cut off in the control's equal-width cells. */
+export const ExpandedFourStyles: Story = {
+  args: { model: baseModel({ expanded: true }) },
 };
 
 /** Interactive: the story owns the model, as a caller would. Expand the row, change the style,

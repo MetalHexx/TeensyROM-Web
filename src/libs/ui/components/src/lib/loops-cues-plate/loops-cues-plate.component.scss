@@ -1,0 +1,67 @@
+// Fills the caller's slot: the scaling container gives it a `height: 100%` box, and the plate fills
+// that box rather than its own content's height.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Trimmed to the scale's small step, as the channel strip's faceplate is, to fit the narrow column.
+.plate {
+  flex: 1 1 auto;
+  min-height: 0;
+  // Pads by the scale's large step on every side, so the header's keys sit as far from the top and end
+  // edges as the caption does from the start edge, and the corner screws (see the synth panel) clear
+  // the content. The plate fills its slot, so the extra height comes out of the cue list, never out of
+  // the plate's size.
+  padding: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.loops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+}
+
+// The keys and the caption hang from the same top line: the caption's line box is as tall as its
+// letters, so their top sits level with the keys' top edge.
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.caption {
+  color: var(--synth-legend);
+  font-size: 0.56rem;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.keys {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// Rows stack from the top and become the scroll container once they outgrow the plate.
+.rows {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  overflow-y: auto;
+}
