@@ -131,6 +131,7 @@ public sealed class FileUploadCommandTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, new byte[size]);
 
+        // Hidden is an attribute on Windows but a leading dot elsewhere, so a hidden file is named with one too.
         if (hidden) File.SetAttributes(path, FileAttributes.Hidden);
         if (hiddenFolder is not null) new DirectoryInfo(Path.Combine(_root, hiddenFolder)).Attributes |= FileAttributes.Hidden;
     }
@@ -330,7 +331,7 @@ public sealed class FileUploadCommandTests : IDisposable
         Write("mixed/deep/c.d64", 10);
         Write("mixed/deep/readme.md", 10);
         Write("mixed/deep/pack.ZIP", 10);
-        Write("mixed/hidden.sid", 10, hidden: true);
+        Write("mixed/.hidden.sid", 10, hidden: true);
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "mixed", "--to", "/x");
@@ -346,7 +347,7 @@ public sealed class FileUploadCommandTests : IDisposable
     {
         Write("mixed/a.sid", 10);
         Write("mixed/notes.md", 10);
-        Write("mixed/hidden.md", 10, hidden: true);
+        Write("mixed/.hidden.md", 10, hidden: true);
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "mixed", "--to", "/x", "--json");
