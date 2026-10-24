@@ -12,7 +12,9 @@
 // Trimmed to the scale's small step, as the channel strip's faceplate is, to fit the narrow column.
 .plate {
   min-width: 0;
-  padding: var(--spacing-sm);
+  // Sides pad by the scale's large step so the corner screws (see the synth panel) clear the content;
+  // top and bottom stay at the small step, so the plate's height is unchanged.
+  padding: var(--spacing-sm) var(--spacing-lg);
   overflow: hidden;
 }
 

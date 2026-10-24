@@ -31,6 +31,9 @@ import { MatIconModule } from '@angular/material/icon';
   templateUrl: './synth-key.component.html',
   styleUrl: './synth-key.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-shape]': 'shape()',
+  },
 })
 export class SynthKeyComponent {
   /** Uppercase mono label. May be empty for an icon-only key. */
@@ -50,6 +53,9 @@ export class SynthKeyComponent {
   /** A state-light bar along the key's top (Play/Pause): green steady (`playing`), amber blinking
    *  (`paused`), or dark (`off`). `null` draws no bar. */
   readonly stateLight = input<'playing' | 'paused' | 'off' | null>(null);
+  /** `key` is the standard 26px key; `pill` is the 44×22 pill the hold pads use, for secondary
+   *  actions such as the speed jumps. Defaults to `key`. */
+  readonly shape = input<'key' | 'pill'>('key');
   /** Emits when the key is clicked, or pressed with Enter or Space. */
   readonly press = output<void>();
 

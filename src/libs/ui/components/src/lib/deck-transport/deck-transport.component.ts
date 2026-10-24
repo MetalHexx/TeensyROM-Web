@@ -64,8 +64,8 @@ export interface DeckTransportModel {
  * to the caller that builds the model.
  *
  * It lays itself out by its own width, not the viewport's. Play/Pause, Stop and Repeat are three
- * identical keys at the start of the row, the stepper at the end: labelled keys from about 420px,
- * icon-only keys from about 320px, and below that the same icon-only keys with the stepper on its
+ * identical keys at the start of the row, the stepper at the end: labelled keys from about 436px,
+ * icon-only keys from about 336px, and below that the same icon-only keys with the stepper on its
  * own row beneath them and the frame number hidden. It shrinks or clips rather than overflowing at
  * any width.
  *

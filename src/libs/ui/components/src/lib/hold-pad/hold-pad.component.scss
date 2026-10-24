@@ -1,5 +1,9 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
 :host {
-  display: inline-block;
+  // The host is exactly as big as its button. A block host would wrap the button in a line box, and
+  // for a button shorter than the line that adds space the layout cannot see.
+  display: inline-flex;
 }
 
 * {
@@ -10,9 +14,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 22px;
-  padding: 0;
+  @include styles.synth-pill-pad;
   cursor: pointer;
   background: linear-gradient(
     180deg,
@@ -20,11 +22,8 @@
     var(--synth-control-face-bottom)
   );
   border: 1px solid var(--synth-control-border);
-  border-radius: 11px;
   color: var(--synth-control-text);
   font-family: 'Roboto Mono', monospace;
-  font-size: 0.56rem;
-  letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
   touch-action: manipulation;

@@ -16,7 +16,9 @@
 // the SID panel's faceplate does, so the narrow layout keeps its width. The clip is the backstop
 // for widths below any layout's reach: the transport clips, it never widens the page.
 .plate {
-  padding: var(--spacing-sm);
+  // Sides pad by the scale's large step so the corner screws (see the synth panel) clear the content;
+  // top and bottom stay at the small step, so the plate's height is unchanged.
+  padding: var(--spacing-sm) var(--spacing-lg);
   overflow: hidden;
 }
 
@@ -216,14 +218,17 @@
   color: var(--synth-display-dim);
 }
 
-@container (min-width: 480px) {
+// The breakpoints below are the layout's own widths (480, 420 and 320px, tuned when the plate padded
+// its sides by 8px) plus the 16px that the large side padding now takes, so each tier sees the same
+// room inside the plate as before.
+@container (min-width: 496px) {
   .subtune-caption {
     display: inline;
   }
 }
 
-// About 320–420px: still one row, with icon-only keys.
-@container (min-width: 320px) and (max-width: 419.98px) {
+// About 336–436px: still one row, with icon-only keys.
+@container (min-width: 336px) and (max-width: 435.98px) {
   .keys {
     --transport-key-width: 2.5rem;
 
@@ -236,9 +241,9 @@
   }
 }
 
-// Below about 320px: the same icon-only keys, with the stepper on its own row below them. The
+// Below about 336px: the same icon-only keys, with the stepper on its own row below them. The
 // frame number gives way to the elapsed time.
-@container (max-width: 319.98px) {
+@container (max-width: 335.98px) {
   .keys {
     --transport-key-width: 2.5rem;
 

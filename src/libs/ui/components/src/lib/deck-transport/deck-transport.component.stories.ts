@@ -13,7 +13,7 @@ const meta: Meta<DeckTransportComponent> = {
           'is, the continuous position bar (still a working scrubber), and the Play/Pause, Stop, ' +
           'Repeat and subtune keys. Purely presentational. It lays itself out by its own width, ' +
           'not the viewport’s: three identical keys at the start of the row and the stepper at ' +
-          'the end, labelled from about 420px and icon-only from about 320px; below that the ' +
+          'the end, labelled from about 436px and icon-only from about 336px; below that the ' +
           'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
           'Every state story below shows the transport at 560, 400 and 300px. An error replaces ' +
           'the display, and each reason is a `role="alert"` line.',

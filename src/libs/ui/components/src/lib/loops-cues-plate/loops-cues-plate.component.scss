@@ -15,7 +15,11 @@
 .plate {
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--spacing-sm);
+  // Pads by the scale's large step on every side, so the header's keys sit as far from the top and end
+  // edges as the caption does from the start edge, and the corner screws (see the synth panel) clear
+  // the content. The plate fills its slot, so the extra height comes out of the cue list, never out of
+  // the plate's size.
+  padding: var(--spacing-lg);
   overflow: hidden;
 }
 
@@ -27,10 +31,12 @@
   min-height: 0;
 }
 
+// The keys and the caption hang from the same top line: the caption's line box is as tall as its
+// letters, so their top sits level with the keys' top edge.
 .header {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-sm);
 }
@@ -38,6 +44,7 @@
 .caption {
   color: var(--synth-legend);
   font-size: 0.56rem;
+  line-height: 1;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }

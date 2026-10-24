@@ -34,6 +34,10 @@ const meta: Meta<SynthKeyComponent> = {
       description:
         "Play/Pause bar along the top: 'playing' green, 'paused' amber blinking, 'off' dark.",
     },
+    shape: {
+      description:
+        "'key' is the standard 26px key; 'pill' is the 44×22 pill the hold pads use, for secondary actions.",
+    },
     press: { description: 'Emits on click, or Enter / Space.' },
   },
 };
@@ -52,6 +56,7 @@ const render: Story['render'] = (args) => ({
       [latched]="latched"
       [lit]="lit"
       [stateLight]="stateLight"
+      [shape]="shape"
     />
   `,
 });
@@ -64,10 +69,17 @@ const base = {
   latched: null,
   lit: null,
   stateLight: null,
+  shape: 'key' as const,
 };
 
 /** A one-shot key: no light. */
 export const OneShot: Story = { args: base, render };
+
+/** The pill: the hold pad's 44×22 size and shape, for secondary actions such as the speed jumps. */
+export const Pill: Story = {
+  args: { ...base, label: 'Home', accessibleName: 'Jump to the fader value', shape: 'pill' },
+  render,
+};
 
 /** A latching key that is off: pressed state false, no light. */
 export const LatchingOff: Story = {

@@ -3,6 +3,11 @@
   min-width: 0;
 }
 
+// The filter panel fills the slot it is given, so it stands as tall as the panel beside it.
+lib-panel-section {
+  height: 100%;
+}
+
 .filter {
   display: flex;
   align-items: center;
@@ -16,4 +21,9 @@
   align-items: stretch;
   gap: var(--spacing-xs);
   width: 38px;
+}
+
+// The column stretches each switch's host to its width; the pill sits on the column's centre line.
+.modes lib-led-switch {
+  justify-content: center;
 }

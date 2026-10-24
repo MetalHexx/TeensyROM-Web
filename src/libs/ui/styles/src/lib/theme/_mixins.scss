@@ -118,3 +118,18 @@ $bp-desktop: 1600px; // At and above: full desktop layout (≥ 1280px)
   font-family: 'Roboto Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
+
+// ─────────────────────────────────────────────
+//  Synth Pill Pad Mixin
+// ─────────────────────────────────────────────
+
+// The small pill the DJ panels use for secondary actions: Kill and Punch on a voice, and the speed
+// jumps. One size and one shape, so every such button reads as the same family whatever it does.
+@mixin synth-pill-pad {
+  width: 44px;
+  height: 22px;
+  padding: 0;
+  border-radius: 11px;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}

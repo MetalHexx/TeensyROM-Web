@@ -29,6 +29,12 @@ describe('SynthKeyComponent', () => {
     expect(button().getAttribute('aria-label')).toBe('Play deck A');
   });
 
+  it('is the standard key unless the pill is asked for', () => {
+    expect(fixture.nativeElement.getAttribute('data-shape')).toBe('key');
+    set('shape', 'pill');
+    expect(fixture.nativeElement.getAttribute('data-shape')).toBe('pill');
+  });
+
   it('emits press on click', () => {
     button().click();
     expect(presses).toBe(1);

@@ -1,5 +1,9 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
 :host {
-  display: inline-block;
+  // The host is exactly as big as its button. A block host would wrap the button in a line box, and
+  // for a button shorter than the line that adds space the layout cannot see.
+  display: inline-flex;
 }
 
 * {
@@ -52,6 +56,16 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 rgba(0, 0, 0, 0.6),
       0 0 8px rgba(var(--color-highlight-rgb), 0.45);
     color: var(--color-highlight);
+  }
+}
+
+// The pill is the hold pad's size and shape (see the pad), flat like the pad until it is lit.
+:host([data-shape='pill']) .key {
+  @include styles.synth-pill-pad;
+  min-width: 0;
+
+  &:not([data-lit]) {
+    box-shadow: none;
   }
 }
 

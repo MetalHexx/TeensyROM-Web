@@ -64,6 +64,7 @@
       <div class="jumps">
         @for (button of model().jumpButtons; track button.id) {
         <lib-synth-key
+          shape="pill"
           [attr.data-control]="'jump-' + button.id"
           [label]="button.label"
           [accessibleName]="button.accessibleName"
