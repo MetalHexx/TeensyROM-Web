@@ -95,7 +95,7 @@ scroll width) and the page does not scroll.
 
 **Frame C, the channel strip.** Matches: V1-V3 buttons with Kill beneath; a muted voice dims and its
 Kill reads Punch; a held Kill is a magenta pill; the speed display; the fader with its centre
-marker; the nudge pads; +50% / Home / -50%.
+marker; the Nudge caption over the two round pads side by side, under the fader; +50% / Home / -50%.
 
 - **Scrubbing.** Dragging the position bar with the mouse jumped deck A from 36% to 83% and kept it
   playing. Focusing the bar and pressing the right arrow five times moved the playhead forward

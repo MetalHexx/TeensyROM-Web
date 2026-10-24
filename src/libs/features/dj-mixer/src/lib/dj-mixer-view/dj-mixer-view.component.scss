@@ -62,9 +62,10 @@
   // together instead of drifting apart.
   --dj-card-gap: var(--spacing-md);
 
-  // Shared by every deck-count modifier below: the bare 64px voice/speed column, widened by the
-  // channel strip plate's own side padding — at a flat 4rem the strip's fader and keys would be
-  // clipped by the plate. Tracks the below-desktop padding tightening automatically.
+  // Shared by every deck-count modifier below: the bare 64px voice/speed column plus the
+  // compact-card side padding it has always carried, so the grid's columns are unchanged. The
+  // channel strip plate fits inside this width; its own padding does not drive it. Tracks the
+  // below-desktop padding tightening automatically.
   --vs-col: calc(4rem + 2 * var(--compact-card-padding, var(--spacing-card-padding-compact)));
 
   // The SID panel's 620px column. Definite rather than `auto` so the panel's width budget (each

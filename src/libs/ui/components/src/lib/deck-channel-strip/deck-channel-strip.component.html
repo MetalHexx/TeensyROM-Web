@@ -26,21 +26,23 @@
 
     <section class="speed" [attr.aria-label]="model().speedAccessibleName">
       <span class="section-label" aria-hidden="true">Speed</span>
-      <div class="speed-display" [attr.data-nudging]="model().nudging ? '' : null">{{ model().speedText }}</div>
-      <div class="speed-row">
-        <lib-synth-fader
-          data-control="speed"
-          [value]="model().fader.value"
-          [min]="model().fader.min"
-          [max]="model().fader.max"
-          [step]="model().fader.step"
-          [home]="model().fader.home"
-          [accessibleName]="model().fader.accessibleName"
-          [disabled]="model().disabled"
-          (valueChange)="faderChange.emit($event)"
-        />
-        <div class="nudge">
-          <span class="nudge-caption" aria-hidden="true">Nudge</span>
+      <div class="speed-display" [attr.data-nudging]="model().nudging ? '' : null">
+        {{ model().speedText }}
+      </div>
+      <lib-synth-fader
+        data-control="speed"
+        [value]="model().fader.value"
+        [min]="model().fader.min"
+        [max]="model().fader.max"
+        [step]="model().fader.step"
+        [home]="model().fader.home"
+        [accessibleName]="model().fader.accessibleName"
+        [disabled]="model().disabled"
+        (valueChange)="faderChange.emit($event)"
+      />
+      <div class="nudge">
+        <span class="nudge-caption" aria-hidden="true">Nudge</span>
+        <div class="nudge-pads">
           <lib-hold-pad
             data-control="speed-nudge-down"
             shape="round"

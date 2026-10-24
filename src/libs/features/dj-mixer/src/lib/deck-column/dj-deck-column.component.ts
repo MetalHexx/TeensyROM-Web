@@ -18,6 +18,7 @@ import {
   DeviceStore,
   DjStore,
   SPEED_FADER_RANGE,
+  type DeckTransportSummary,
   cartridgeOptions,
   formatElapsed,
 } from '@teensyrom-nx/application';
@@ -35,7 +36,7 @@ const STATE_LABELS: Record<DeckTransportState, string> = {
 };
 
 /** A tune that played to its end reads as stopped on the display. */
-function transportState(led: 'stopped' | 'playing' | 'paused' | 'ended' | 'error' | 'analyzing'): DeckTransportState {
+function transportState(led: DeckTransportSummary['led']): DeckTransportState {
   return led === 'ended' ? 'stopped' : led;
 }
 
@@ -86,7 +87,8 @@ export class DjDeckColumnComponent {
   readonly transportModel = computed<DeckTransportModel>(() => {
     const { letter } = this.deck();
     const summary = this.summary();
-    const state: DeckTransportState = summary.status === 'empty' ? 'empty' : transportState(summary.led);
+    const state: DeckTransportState =
+      summary.status === 'empty' ? 'empty' : transportState(summary.led);
     return {
       accessibleName: `Transport deck ${letter}`,
       state,
