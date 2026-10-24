@@ -1,17 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 
-/** What a segment is coloured as when lit. `dim` is both an ended tune's dead tail and every
- *  segment of a deck that is still analyzing. */
-type SegmentTone = 'intro' | 'music' | 'dim';
-
 /**
- * A row of lit segments with a loop mark and a playhead, over a native range input that does the
- * scrubbing. Same contract as `lib-scrub-position-bar`, new look: the range is stretched over the
- * whole strip and made see-through by styling, so a click anywhere, a drag, the arrow keys, Home
- * and End all work as they do on any slider. Purely presentational: it holds no drag-pin state, so
- * `positionPercent` is whatever the caller decides to show — the live playhead or a pinned drag
- * value.
+ * One continuous bar, lit from the start up to the position, with a loop mark and a playhead, over
+ * a native range input that does the scrubbing. Same contract as `lib-scrub-position-bar`, new
+ * look: the range is stretched over the whole strip and made see-through by styling, so a click
+ * anywhere, a drag, the arrow keys, Home and End all work as they do on any slider. The range is
+ * continuous (`step="any"`), so drag values are fractional percents and nothing rounds them on the
+ * way to the bar. Purely presentational: it holds no drag-pin state, so `positionPercent` is
+ * whatever the caller decides to show — the live playhead or a pinned drag value.
  *
  * @example
  * ```html
@@ -32,7 +29,7 @@ type SegmentTone = 'intro' | 'music' | 'dim';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PositionStripComponent {
-  /** What the strip draws: how the segments are coloured and whether a loop mark appears. */
+  /** What the strip draws: how the bar is coloured and whether a loop mark appears. */
   readonly barState = input.required<ScrubBarState>();
   /** 0–100. The caller decides whether this is the live playhead or a pinned drag value. */
   readonly positionPercent = input.required<number>();
@@ -41,8 +38,6 @@ export class PositionStripComponent {
   /** The range's `aria-valuetext`, e.g. '01:23.4 of 03:12' — caller-composed, so it says the
    *  position as time rather than as a percentage. */
   readonly valueText = input<string | null>(null);
-  /** How many segments the strip is divided into. */
-  readonly segments = input<number>(60);
   /** Fires on every drag tick — a live preview, never a seek. */
   readonly scrubInput = output<number>();
   /** Fires on release only. This is the one that should seek. */
@@ -54,37 +49,35 @@ export class PositionStripComponent {
     return Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
   });
 
-  /** `segments` rounded to a whole number, never below one. */
-  private readonly segmentCount = computed<number>(() => Math.max(1, Math.round(this.segments())));
-
-  /** How many segments, from the left, are lit for the current position. */
-  protected readonly litCount = computed<number>(() =>
-    Math.round((this.clampedPercent() / 100) * this.segmentCount())
-  );
-
   /** Where the loop mark sits, or `null` outside the 'loop' state. 0 means loop-from-top. */
   protected readonly loopMarkPercent = computed<number | null>(() => {
     const state = this.barState();
     return state.kind === 'loop' ? state.introPercent : null;
   });
 
-  /** Each segment's tone once lit, decided by where its centre falls against the state's split. */
-  protected readonly segmentTones = computed<readonly SegmentTone[]>(() => {
-    const count = this.segmentCount();
+  /** Where the lit bar changes colour, as a percentage of the whole strip, or `null` when it is
+   *  one colour throughout: the intro point of a loop, the end of the music of an ended tune. */
+  private readonly toneSplitPercent = computed<number | null>(() => {
     const state = this.barState();
-    return Array.from({ length: count }, (_, index): SegmentTone => {
-      const centre = ((index + 0.5) / count) * 100;
-      switch (state.kind) {
-        case 'loop':
-          return centre < state.introPercent ? 'intro' : 'music';
-        case 'ended':
-          return centre < state.musicPercent ? 'music' : 'dim';
-        case 'unknown':
-          return 'music';
-        case 'analyzing':
-          return 'dim';
-      }
-    });
+    switch (state.kind) {
+      case 'loop':
+        return state.introPercent;
+      case 'ended':
+        return state.musicPercent;
+      default:
+        return null;
+    }
+  });
+
+  /** The colour change as a percentage of the lit bar's own width (the bar is only as long as the
+   *  position), held to 0–100. 100 puts it past the end, so the bar is its first colour only. */
+  protected readonly fillSplit = computed<string>(() => {
+    const split = this.toneSplitPercent();
+    const position = this.clampedPercent();
+    if (split === null || position <= 0) {
+      return '100%';
+    }
+    return `${Math.min(100, Math.max(0, (split / position) * 100))}%`;
   });
 
   /** Forwards every drag tick as a live preview — never a seek. */

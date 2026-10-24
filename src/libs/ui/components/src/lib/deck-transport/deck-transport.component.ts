@@ -23,7 +23,7 @@ export interface DeckTransportModel {
   readonly emptyText: string;
   /** The tune's length, e.g. '03:12', or '--:--' when it has none. */
   readonly totalText: string;
-  /** What the position strip draws: how the segments are coloured and whether a loop mark appears. */
+  /** What the position strip draws: how the bar is coloured and whether a loop mark appears. */
   readonly bar: ScrubBarState;
   /** The position strip's accessible name, e.g. 'Position deck A'. */
   readonly scrubAccessibleName: string;
@@ -59,14 +59,15 @@ export interface DeckTransportModel {
 
 /**
  * One deck's transport on its own faceplate: a display showing what is loaded and where it is, the
- * segmented position strip (still a working scrubber), and the Play/Pause, Stop, Repeat and subtune
+ * continuous position bar (still a working scrubber), and the Play/Pause, Stop, Repeat and subtune
  * keys. Purely presentational — it holds no state and leaves every gate, label and accessible name
  * to the caller that builds the model.
  *
- * It lays itself out by its own width, not the viewport's: one labelled row from about 420px, one
- * row with icon-only keys (Play keeps its label) from about 320px, and below that Play full width,
- * then Stop beside Repeat, then the stepper, with the frame number hidden. It shrinks or clips
- * rather than overflowing at any width.
+ * It lays itself out by its own width, not the viewport's. Play/Pause, Stop and Repeat are three
+ * identical keys at the start of the row, the stepper at the end: labelled keys from about 420px,
+ * icon-only keys from about 320px, and below that the same icon-only keys with the stepper on its
+ * own row beneath them and the frame number hidden. It shrinks or clips rather than overflowing at
+ * any width.
  *
  * @example
  * ```html

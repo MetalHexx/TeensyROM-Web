@@ -35,14 +35,12 @@ describe('PositionStripComponent', () => {
     range().dispatchEvent(new Event(event, { bubbles: true }));
   }
 
-  /** Counts the lit segments, optionally of one tone. */
-  function lit(tone?: string): number {
-    const toneSelector = tone === undefined ? '' : `[data-tone="${tone}"]`;
-    return fixture.nativeElement.querySelectorAll(`.segment[data-lit]${toneSelector}`).length;
+  function fill(): HTMLElement | null {
+    return fixture.nativeElement.querySelector('.fill');
   }
 
-  function segmentCount(): number {
-    return fixture.nativeElement.querySelectorAll('.segment').length;
+  function fillSplit(): string {
+    return fill()?.style.getPropertyValue('--fill-split') ?? '';
   }
 
   function loopMark(): HTMLElement | null {
@@ -55,6 +53,16 @@ describe('PositionStripComponent', () => {
 
       expect(inputs).toEqual([37]);
       expect(commits).toEqual([]);
+    });
+
+    it('is continuous, and emits a fractional drag value as it is', () => {
+      expect(range().getAttribute('step')).toBe('any');
+
+      drag(42.5, 'input');
+      drag(42.5, 'change');
+
+      expect(inputs).toEqual([42.5]);
+      expect(commits).toEqual([42.5]);
     });
 
     it('maps change to scrubCommit and never to a preview', () => {
@@ -91,75 +99,72 @@ describe('PositionStripComponent', () => {
     });
   });
 
-  describe('lit segments', () => {
-    it('draws 60 segments by default and none lit at the start', () => {
-      expect(segmentCount()).toBe(60);
-      expect(lit()).toBe(0);
+  describe('lit bar', () => {
+    it('is empty at the start', () => {
+      expect(fill()?.style.width).toBe('0%');
     });
 
-    it('lights segments from the start up to the position', () => {
+    it('is as long as the position, including a fractional one', () => {
       set('positionPercent', 50);
-      expect(lit()).toBe(30);
+      expect(fill()?.style.width).toBe('50%');
 
-      set('positionPercent', 100);
-      expect(lit()).toBe(60);
-    });
-
-    it('follows the segment count it is given', () => {
-      set('segments', 20);
-      set('positionPercent', 50);
-
-      expect(segmentCount()).toBe(20);
-      expect(lit()).toBe(10);
+      set('positionPercent', 42.5);
+      expect(fill()?.style.width).toBe('42.5%');
     });
 
     it('clamps a position outside 0–100 and ignores one that is not a number', () => {
       set('positionPercent', 140);
-      expect(lit()).toBe(60);
+      expect(fill()?.style.width).toBe('100%');
 
       set('positionPercent', -5);
-      expect(lit()).toBe(0);
+      expect(fill()?.style.width).toBe('0%');
 
       set('positionPercent', Number.NaN);
-      expect(lit()).toBe(0);
+      expect(fill()?.style.width).toBe('0%');
+    });
+
+    it('is not drawn while analyzing', () => {
+      set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
+
+      expect(fill()).toBeNull();
     });
   });
 
   describe('colouring by state', () => {
     beforeEach(() => set('positionPercent', 100));
 
-    it('splits a loop into intro segments before the intro point and music after it', () => {
+    it('changes colour at the intro point of a loop', () => {
       set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
 
-      expect(lit('intro')).toBe(15);
-      expect(lit('music')).toBe(45);
+      expect(fillSplit()).toBe('25%');
     });
 
-    it('is all music for a loop from the top', () => {
-      set('barState', { kind: 'loop', introPercent: 0 } satisfies ScrubBarState);
-
-      expect(lit('intro')).toBe(0);
-      expect(lit('music')).toBe(60);
-    });
-
-    it('goes dim after the music of an ended tune', () => {
+    it('changes colour at the end of the music of an ended tune', () => {
       set('barState', { kind: 'ended', musicPercent: 70 } satisfies ScrubBarState);
 
-      expect(lit('music')).toBe(42);
-      expect(lit('dim')).toBe(18);
+      expect(fillSplit()).toBe('70%');
     });
 
-    it('is all music when the structure is unknown', () => {
+    it('measures the change against the lit bar, not the whole strip', () => {
+      set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
+      set('positionPercent', 50);
+
+      expect(fillSplit()).toBe('50%');
+    });
+
+    it('stays one colour while the position has not reached the change', () => {
+      set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
+      set('positionPercent', 0);
+      expect(fillSplit()).toBe('100%');
+
+      set('positionPercent', 20);
+      expect(fillSplit()).toBe('100%');
+    });
+
+    it('is one colour when the structure is unknown', () => {
       set('barState', { kind: 'unknown' } satisfies ScrubBarState);
 
-      expect(lit('music')).toBe(60);
-    });
-
-    it('is all dim while analyzing', () => {
-      set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
-
-      expect(lit('dim')).toBe(60);
-      expect(lit('music')).toBe(0);
+      expect(fillSplit()).toBe('100%');
     });
   });
 
@@ -188,9 +193,9 @@ describe('PositionStripComponent', () => {
       return fixture.nativeElement.querySelector('.playhead');
     }
 
-    it('sits at the position, and is not drawn while analyzing', () => {
-      set('positionPercent', 64);
-      expect(playhead()?.style.left).toBe('64%');
+    it('sits at a fractional position as it is, and is not drawn while analyzing', () => {
+      set('positionPercent', 64.25);
+      expect(playhead()?.style.left).toBe('64.25%');
 
       set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
       expect(playhead()).toBeNull();

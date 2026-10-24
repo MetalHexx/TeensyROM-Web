@@ -2,6 +2,7 @@
   type="range"
   min="0"
   max="100"
+  step="any"
   [value]="clampedPercent()"
   [disabled]="barState().kind === 'analyzing'"
   [attr.aria-label]="accessibleName()"
@@ -10,18 +11,13 @@
   (change)="onChange($event)"
 />
 <div class="strip" [attr.data-state]="barState().kind" aria-hidden="true">
-  <div class="segments">
-    @for (tone of segmentTones(); track $index) {
-    <span
-      class="segment"
-      [attr.data-tone]="tone"
-      [attr.data-lit]="$index < litCount() ? '' : null"
-    ></span>
+  <div class="track">
+    @if (barState().kind !== 'analyzing') {
+    <span class="fill" [style.width.%]="clampedPercent()" [style.--fill-split]="fillSplit()"></span>
+    } @if (loopMarkPercent() !== null) {
+    <span class="loop-mark" [style.left.%]="loopMarkPercent()"></span>
+    } @if (barState().kind !== 'analyzing') {
+    <span class="playhead" [style.left.%]="clampedPercent()"></span>
     }
   </div>
-  @if (loopMarkPercent() !== null) {
-  <span class="loop-mark" [style.left.%]="loopMarkPercent()"></span>
-  } @if (barState().kind !== 'analyzing') {
-  <span class="playhead" [style.left.%]="clampedPercent()"></span>
-  }
 </div>

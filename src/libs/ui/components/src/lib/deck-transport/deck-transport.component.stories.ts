@@ -10,11 +10,12 @@ const meta: Meta<DeckTransportComponent> = {
       description: {
         component:
           "One deck's transport on its own faceplate: a display of what is loaded and where it " +
-          'is, the segmented position strip (still a working scrubber), and the Play/Pause, Stop, ' +
+          'is, the continuous position bar (still a working scrubber), and the Play/Pause, Stop, ' +
           'Repeat and subtune keys. Purely presentational. It lays itself out by its own width, ' +
-          'not the viewport’s: one labelled row from about 420px; one row with icon-only keys ' +
-          '(Play keeps its label) from about 320px; below that Play across the full width, then ' +
-          'Stop beside Repeat, then the stepper, with the frame number hidden. Every state story ' +
+          'not the viewport’s: three identical keys at the start of the row and the stepper at ' +
+          'the end, labelled from about 420px and icon-only from about 320px; below that the ' +
+          'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
+          'Every state story ' +
           'below shows the transport at 560, 400 and 300px. An error replaces the display, and ' +
           'each reason is a `role="alert"` line.',
       },
@@ -209,7 +210,7 @@ function elapsedFor(percent: number): string {
   return `${pad(minutes)}:${pad(seconds)}.${tenths % 10}`;
 }
 
-/** A working scrubber: click or drag the strip and the position, the lit segments and the elapsed
+/** A working scrubber: click or drag the strip and the position, the lit bar and the elapsed
  *  time follow; the arrow keys, Home and End work once it has focus. */
 export const MidScrub: Story = {
   args: {

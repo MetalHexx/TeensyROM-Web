@@ -192,7 +192,7 @@ describe('DJ Mixer — responsive layout', () => {
       const LAYOUTS = [
         { width: 440, rows: 1, labelledKeys: true, frameShown: true },
         { width: 360, rows: 1, labelledKeys: false, frameShown: true },
-        { width: 300, rows: 3, labelledKeys: false, frameShown: false },
+        { width: 300, rows: 2, labelledKeys: false, frameShown: false },
       ] as const;
 
       LAYOUTS.forEach(({ width, rows, labelledKeys, frameShown }) => {

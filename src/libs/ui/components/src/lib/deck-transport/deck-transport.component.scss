@@ -148,13 +148,15 @@
   white-space: nowrap;
 }
 
-// The keys fill their grid cells: a key's host is a column flex box so its button stretches across
-// the host. Wide layout: one row, Play widest, the stepper sized to its content. The area rules
-// are scoped under `.keys` so they outrank anything a key's own host styling sets.
+// Play/Pause, Stop and Repeat are three identical fixed-width keys at the start of the row, the
+// subtune stepper at the end. A key's host is a column flex box so its button fills the host's
+// width; the width is set on the host, so Play's label changing never moves it. Wide layout: the
+// keys are labelled and the stepper shares the row.
 .keys {
-  display: grid;
-  grid-template-areas: 'play stop repeat sub';
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.1fr) auto;
+  --transport-key-width: 5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   min-width: 0;
 
@@ -164,20 +166,16 @@
     min-width: 0;
   }
 
-  .play-key {
-    grid-area: play;
-  }
-
-  .stop-key {
-    grid-area: stop;
-  }
-
+  .play-key,
+  .stop-key,
   .repeat-key {
-    grid-area: repeat;
+    flex: 0 0 var(--transport-key-width);
+    width: var(--transport-key-width);
   }
 
   .subtune {
-    grid-area: sub;
+    flex: 1 1 0;
+    justify-content: flex-end;
   }
 }
 
@@ -224,11 +222,12 @@
   }
 }
 
-// About 320–420px: still one row, but only Play keeps its label.
+// About 320–420px: still one row, with icon-only keys.
 @container (min-width: 320px) and (max-width: 419.98px) {
   .keys {
-    grid-template-columns: minmax(0, 1fr) 2.5rem 2.5rem auto;
+    --transport-key-width: 2.5rem;
 
+    .play-key,
     .stop-key,
     .repeat-key,
     .step-key {
@@ -237,15 +236,22 @@
   }
 }
 
-// Below about 320px: Play across the full width, Stop beside Repeat, then the stepper. The frame
-// number gives way to the elapsed time.
+// Below about 320px: the same icon-only keys, with the stepper on its own row below them. The
+// frame number gives way to the elapsed time.
 @container (max-width: 319.98px) {
   .keys {
-    grid-template-areas:
-      'play play'
-      'stop repeat'
-      'sub sub';
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --transport-key-width: 2.5rem;
+
+    .play-key,
+    .stop-key,
+    .repeat-key,
+    .step-key {
+      --synth-key-label-display: none;
+    }
+
+    .subtune {
+      flex: 1 0 100%;
+    }
 
     .subtune .step-key {
       flex: 0 0 3rem;

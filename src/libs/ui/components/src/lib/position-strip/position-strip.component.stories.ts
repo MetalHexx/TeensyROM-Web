@@ -9,23 +9,22 @@ const meta: Meta<PositionStripComponent> = {
     docs: {
       description: {
         component:
-          'A row of 60 lit segments with a loop mark and a playhead, over a native range input ' +
-          'that does the scrubbing — so a click anywhere, a drag, the arrow keys, Home and End all ' +
-          'work. Purely presentational: it holds no drag-pin state, so `positionPercent` is ' +
+          'One continuous bar, lit up to the position, with a loop mark and a playhead, over a native ' +
+          'range input that does the scrubbing — so a click anywhere, a drag, the arrow keys, Home and End all ' +
+          'work, and the drag is continuous. Purely presentational: it holds no drag-pin state, so `positionPercent` is ' +
           'whatever the caller shows, and `scrubInput` (every drag tick, a preview) and ' +
           '`scrubCommit` (release only, the one that seeks) are how the caller hears what the ' +
-          'operator did. Segments before the loop point are intro purple, after it music cyan, ' +
+          'operator did. The bar before the loop point is intro purple, after it music cyan, ' +
           'with an amber mark at the loop point; an ended tune goes dim after its music; an ' +
           'unknown structure is all cyan; analyzing is dim and disabled.',
       },
     },
   },
   argTypes: {
-    barState: { description: 'How the segments are coloured and whether a loop mark appears.' },
+    barState: { description: 'How the bar is coloured and whether a loop mark appears.' },
     positionPercent: { description: '0–100: the live playhead, or the caller’s drag pin.' },
     accessibleName: { description: "The range's accessible name, e.g. 'Position deck A'." },
     valueText: { description: "The range's aria-valuetext, e.g. '01:23.4 of 03:12'." },
-    segments: { description: 'How many segments the strip is divided into.' },
     scrubInput: { description: 'Every drag tick — a preview, never a seek.' },
     scrubCommit: { description: 'Release only — the one that seeks.' },
   },
@@ -37,7 +36,6 @@ type Story = StoryObj<PositionStripComponent>;
 const base = {
   accessibleName: 'Position deck A',
   valueText: '01:23.4 of 03:12',
-  segments: 60,
 };
 
 const wrapped: Story['render'] = (args) => ({
@@ -49,7 +47,6 @@ const wrapped: Story['render'] = (args) => ({
         [positionPercent]="positionPercent"
         [accessibleName]="accessibleName"
         [valueText]="valueText"
-        [segments]="segments"
       />
     </div>
   `,
@@ -111,8 +108,7 @@ export const Interactive: Story = {
           [positionPercent]="positionPercent"
           [accessibleName]="accessibleName"
           [valueText]="valueText"
-          [segments]="segments"
-          (scrubInput)="onScrubInput($event)"
+            (scrubInput)="onScrubInput($event)"
           (scrubCommit)="onScrubCommit($event)"
         />
       </div>
