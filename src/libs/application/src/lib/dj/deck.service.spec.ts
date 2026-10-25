@@ -1847,6 +1847,23 @@ describe('DeckService', () => {
       expect(store.loopsSummary('A')().canStop).toBe(false);
     });
 
+    it('drops a marker still waiting for its start to be ready when the transport stops', async () => {
+      await loadPlayable('A');
+      // The nudge moves the start to a frame the engine has yet to prepare, and its audition waits.
+      service.nudgeMarker('A', 'start', 5);
+      expect(loopsOf('A').markers[0].ready).toBe(false);
+      expect(loopsOf('A').queuedId).toBe('a');
+
+      service.stop('A');
+      const stoppedAt = runtime.position('A');
+      await vi.waitFor(() => expect(loopsOf('A').markers.every((marker) => marker.ready)).toBe(true));
+
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(loopsOf('A').runningId).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(runtime.position('A')).toBe(stoppedAt);
+    });
+
     it('disengages the marker loop on a scrub and leaves repeat alone', async () => {
       await loadPlayable('A');
       await service.toggleMarker('A', 'a');

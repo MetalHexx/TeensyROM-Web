@@ -217,6 +217,8 @@ export class DeckService {
     if (deck.busy || (deck.status !== 'playing' && deck.status !== 'paused')) {
       return;
     }
+    // The engine disarms its loop on a stop, but not a marker still waiting for readiness.
+    this.releaseMarkers(slot);
     this.runtime.stop(slot);
     this.sample(slot);
   }
@@ -226,11 +228,8 @@ export class DeckService {
     if (deck.busy || !RESUMABLE_STATUSES.includes(deck.status)) {
       return;
     }
-    const { runningId, queuedId } = this.store.loops()[slot];
-    if (runningId !== null || queuedId !== null) {
-      // A scrub is a gesture of its own: a marker loop would pull it straight back.
-      this.loops.disengage(slot);
-    }
+    // A scrub is a gesture of its own: a marker loop would pull it straight back.
+    this.releaseMarkers(slot);
     await this.runtime.seekToPercent(slot, percent);
     this.sample(slot);
   }
@@ -603,6 +602,15 @@ export class DeckService {
       this.runtime.setVoiceHeld(slot, voice, false);
     }
     this.reflectEngineControls(slot);
+  }
+
+  /** Drops the marker loop and anything queued behind it or waiting for readiness; a no-op while
+   *  neither is set, so the repeat setting and the engine are left alone. */
+  private releaseMarkers(slot: Slot): void {
+    const { runningId, queuedId } = this.store.loops()[slot];
+    if (runningId !== null || queuedId !== null) {
+      this.loops.disengage(slot);
+    }
   }
 
   /** The gate for the speed, voice and marker commands: true when the deck's controls are live,

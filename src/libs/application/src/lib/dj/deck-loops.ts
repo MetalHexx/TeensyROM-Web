@@ -175,7 +175,8 @@ export class DeckLoops {
    * - a rising `handOffs` is a queued jump landing — the one thing read as a landing, since a
    *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change;
    * - no loop at all while a marker is running, with no hand-off, is the engine disarming (a
-   *   transport stop, a load), which ends the marker and anything queued;
+   *   transport stop, a load), which ends the marker and anything queued. A marker only waiting for
+   *   readiness is not seen here — `DeckService` drops it through `disengage` on a stop;
    * - a marker waiting for readiness engages once its start is ready;
    * - a running marker's changed start applies once that start is ready.
    */
@@ -240,8 +241,9 @@ export class DeckLoops {
     this.runtime.setActiveLoop(slot, null);
   }
 
-  /** A manual scrub: the marker loop and the queue are dropped, so the scrub is not pulled back
-   *  into a loop. The repeat-track setting is untouched. */
+  /** A manual scrub or a transport stop: the marker loop, the queue and a wait for readiness are
+   *  dropped, so the scrub is not pulled back into a loop and a stopped deck is not re-armed when a
+   *  start becomes ready. The repeat-track setting is untouched. */
   disengage(slot: Slot): void {
     this.stop(slot);
   }

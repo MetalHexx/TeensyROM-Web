@@ -477,9 +477,9 @@ describe('DeckHostComponent', () => {
       fixture.detectChanges();
 
       function playPauseButton(): HTMLButtonElement | undefined {
-        return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
-          (button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? '')
-        );
+        return Array.from(
+          fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
+        ).find((button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? ''));
       }
 
       playPauseButton()?.click();

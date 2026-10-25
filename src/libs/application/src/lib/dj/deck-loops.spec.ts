@@ -1096,6 +1096,20 @@ describe('DeckLoops', () => {
         expect(engineLoop('A')).toBeNull();
       });
 
+      it('drops the wait when disengaged, and never engages once the start is ready', async () => {
+        await notReady('a');
+        loops.toggle('A', 'a');
+        const at = runtime.position('A');
+
+        loops.disengage('A');
+        await settle();
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBe(at);
+      });
+
       it('drops the wait when the marker is deleted', async () => {
         await notReady('a');
         loops.toggle('A', 'a');
