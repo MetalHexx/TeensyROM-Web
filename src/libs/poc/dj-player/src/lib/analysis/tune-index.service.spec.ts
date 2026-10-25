@@ -40,7 +40,14 @@ function trackStructureOf(record: TuneIndexRecord | null) {
 function setSubtune(player: FakeDeckPlayer, subtune: number): void {
   player.snapshot.update((snapshot) => ({
     ...snapshot,
-    tune: { subtune, subtuneCount: 4, lengthFrames: null },
+    tune: {
+      subtune,
+      subtuneCount: 4,
+      lengthFrames: null,
+      preparedFrames: [],
+      queuedJump: null,
+      handOffs: 0,
+    },
   }));
 }
 
@@ -58,7 +65,14 @@ function makePlayer(): FakeDeckPlayer {
   const fake = createFakeDeckPlayer();
   fake.snapshot.update((snapshot) => ({
     ...snapshot,
-    tune: { subtune: 1, subtuneCount: 4, lengthFrames: null },
+    tune: {
+      subtune: 1,
+      subtuneCount: 4,
+      lengthFrames: null,
+      preparedFrames: [],
+      queuedJump: null,
+      handOffs: 0,
+    },
     tempo: {
       ...snapshot.tempo,
       nominalIntervalUs: microseconds(19_950),

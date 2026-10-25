@@ -1,11 +1,16 @@
 import { inject, Provider } from '@angular/core';
 import { createWorkerReplayRunner } from '@sidablist/core';
 import type { FrameClock, ReplayRunner } from '@sidablist/core';
-import { createTuneInserter, createTuneResolver } from '@sidablist/tunes';
+import {
+  createTuneInserter,
+  createTuneResolver,
+  InMemoryLoopPositionsStore,
+} from '@sidablist/tunes';
 import { API_CONFIG, type IApiConfig } from '@teensyrom-nx/domain';
 import { Configuration, MidiSettingsApiService } from '@teensyrom-nx/data-access/api-client';
 import {
   FRAME_CLOCK_FACTORY,
+  LOOP_POSITIONS_STORE,
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
@@ -47,14 +52,15 @@ export const DJ_STORAGE_PROVIDERS: Provider[] = [
 
 /**
  * Provider configuration for the DJ engine's browser adapters: Web MIDI access, and the two
- * per-deck-slot factories a deck builds its own clock and its own replay thread from. Two frame
- * clocks, two replay workers is the design, not something to hoist "for efficiency" — each
- * factory call gives a deck slot its own audio graph and its own worker thread, never shared with
- * another slot.
+ * per-deck-slot factories a deck builds its own clock and its own replay threads from. Two frame
+ * clocks and four replay workers is the design, not something to hoist "for efficiency" — a deck
+ * slot calls the replay factory twice, one worker for jumps and one for prepared builds, and
+ * builds its own audio graph, none of it shared with another slot.
  *
  * Also composes the two tunes ports the application injects, over `IndexedDbTuneStore` and a
  * worker-backed `TuneIndexer` — `analysis` is reachable only through `WorkerTuneIndexer`, never
- * from application code.
+ * from application code — and provides the session loop-positions store, which a permanent one
+ * replaces behind the same port.
  */
 export const DJ_ENGINE_PROVIDERS: Provider[] = [
   { provide: MIDI_ACCESS, useExisting: MidiAccessService },
@@ -70,6 +76,7 @@ export const DJ_ENGINE_PROVIDERS: Provider[] = [
           })
       ),
   },
+  { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
   { provide: TUNE_INSERTER, useFactory: () => createTuneInserter(inject(IndexedDbTuneStore)) },
   {
     provide: TUNE_RESOLVER,

@@ -34,3 +34,13 @@ export function formatTotal(frames: number | null, intervalUs: number | null): s
     Math.floor((Math.max(frames, 0) * intervalUs) / (MICROSECONDS_PER_TENTH * TENTHS_PER_SECOND))
   );
 }
+
+/** 's' time for `frames` play calls at `intervalUs` each, to the tenth — '7.8s'. Tenths are
+ *  truncated, like `formatElapsed`; '0.0s' when the interval is null. */
+export function formatSeconds(frames: number, intervalUs: number | null): string {
+  if (!usableInterval(intervalUs) || !Number.isFinite(frames) || frames <= 0) {
+    return '0.0s';
+  }
+  const totalTenths = Math.floor((frames * intervalUs) / MICROSECONDS_PER_TENTH);
+  return `${Math.floor(totalTenths / TENTHS_PER_SECOND)}.${totalTenths % TENTHS_PER_SECOND}s`;
+}

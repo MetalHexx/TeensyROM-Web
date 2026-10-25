@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
 import type { ReplayRunner } from '@sidablist/core';
+import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
 import type { TuneReference } from '@sidablist/tunes';
 import { ALERT_SERVICE, FILE_CONTENT_SERVICE } from '@teensyrom-nx/domain';
 import { DeckBindings } from '../../deck-bindings';
@@ -15,6 +16,7 @@ import {
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
+  LOOP_POSITIONS_STORE,
   REPLAY_RUNNER_FACTORY,
   TUNE_INSERTER,
   TUNE_RESOLVER,
@@ -119,6 +121,7 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
       { provide: FILE_CONTENT_SERVICE, useValue: { getFileContent: vi.fn() } },
       { provide: TUNE_INSERTER, useValue: { insert: vi.fn() } },
       { provide: TUNE_RESOLVER, useValue: { resolve: vi.fn() } },
+      { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
     ],
   });
 

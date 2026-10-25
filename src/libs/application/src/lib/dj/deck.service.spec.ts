@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { FakeClock, frames, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
+import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
 import type { TuneIndexRecord } from '@sidablist/analysis';
 import {
@@ -21,7 +22,14 @@ import { MixerService } from './mixer.service';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, HOME_DECK_PANEL } from './dj-store';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  MIDI_ACCESS,
+  TUNE_INSERTER,
+  TUNE_RESOLVER,
+  LOOP_POSITIONS_STORE,
+} from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
 import { logWarn } from '@teensyrom-nx/utils';
@@ -41,7 +49,13 @@ class FakeReplayRunner implements ReplayRunner {
       return Promise.resolve({
         id: request.id,
         ok: true,
-        result: replayToFrame(request.file, request.subtune, request.targetFrame, request.mutes),
+        result: replayToFrame(
+          request.file,
+          request.subtune,
+          request.targetFrame,
+          request.mutes,
+          request.start
+        ),
       });
     } catch (error) {
       return Promise.resolve({
@@ -60,7 +74,7 @@ class FakeReplayRunner implements ReplayRunner {
  *  fixture builder, trimmed to the fields these specs vary. */
 function buildSidFileBytes(options: { name: string; songs?: number; startSong?: number }): Uint8Array {
   const headerSize = 0x7c;
-  const payload = [0xa9, 0x00, 0x60]; // LDA #0; RTS
+  const payload = [0xa9, 0x00, 0x60, 0x60]; // init: LDA #0; RTS — play: RTS
   const buffer = new Uint8Array(headerSize + payload.length);
   const view = new DataView(buffer.buffer);
   writeAscii(buffer, 0x00, 'PSID');
@@ -245,6 +259,7 @@ describe('DeckService', () => {
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService },
         { provide: TUNE_INSERTER, useValue: { insert: insertMock } },
         { provide: TUNE_RESOLVER, useValue: { resolve: resolveMock } },
+        { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
       ],
     });
 
@@ -1573,6 +1588,106 @@ describe('DeckService', () => {
 
         expect(pending.size).toBe(1);
       });
+    });
+  });
+
+  describe('loop markers', () => {
+    const markersOf = (slot: 'A' | 'B') => store.loops()[slot].markers;
+
+    /** Moves the playhead of a loaded deck and marks it. */
+    async function markAt(slot: 'A' | 'B', frame: number): Promise<void> {
+      await runtime.seekToFrame(slot, frame);
+      service.addMarker(slot);
+    }
+
+    it("brings a tune's markers back when it is loaded again after another", async () => {
+      const first = register(makeFixture());
+      const second = register(makeFixture());
+      await loadAndWait('A', first);
+      await markAt('A', 100);
+      const saved = markersOf('A');
+      expect(saved).toHaveLength(1);
+
+      await loadAndWait('A', second);
+      expect(markersOf('A')).toEqual([]);
+
+      await loadAndWait('A', first);
+      expect(markersOf('A').map((marker) => marker.id)).toEqual(saved.map((marker) => marker.id));
+      expect(store.loops().A.selectedId).toBe(saved[0].id);
+    });
+
+    it("shows each subtune's own list when the subtune changes", async () => {
+      const fixture = register(makeFixture({ subtuneCount: 2 }));
+      await loadAndWait('A', fixture);
+      await markAt('A', 100);
+
+      await service.selectSubtune('A', 2);
+      expect(markersOf('A')).toEqual([]);
+      await markAt('A', 200);
+
+      await service.selectSubtune('A', 1);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([100]);
+      await service.selectSubtune('A', 2);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([200]);
+    });
+
+    it('shows an edit made on either deck on both when they hold the same tune', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await loadAndWait('B', fixture);
+
+      await markAt('A', 100);
+      expect(markersOf('B').map((marker) => marker.start.frame)).toEqual([100]);
+
+      await markAt('B', 200);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([100, 200]);
+    });
+
+    it("turns a loaded tune's markers ready as the engine builds them", async () => {
+      const fixture = register(makeFixture());
+      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        { id: 'saved', start: { frame: 60, offsetFrames: 0 }, end: null, voices: [0, 1, 2] },
+      ]);
+
+      await loadAndWait('A', fixture);
+
+      await vi.waitFor(() => expect(markersOf('A').map((marker) => marker.ready)).toEqual([true]));
+    });
+
+    it('refuses every marker command while the deck has nothing shapeable loaded', () => {
+      service.addMarker('A');
+      service.selectMarker('A', 'x');
+      service.moveMarkerSelection('A', 1);
+      service.selectMarkerAt('A', 0);
+      service.setMarkerEnd('A');
+      service.clearMarkerEnd('A');
+      service.deleteMarker('A');
+      service.nudgeMarker('A', 'start', 5);
+      service.snapMarker('A', 'start', 'next');
+
+      const refusals = vi
+        .mocked(logWarn)
+        .mock.calls.filter(([message]) => message.startsWith('DeckService'));
+      expect(refusals).toHaveLength(9);
+      expect(markersOf('A')).toEqual([]);
+    });
+
+    it('edits through the commands once a tune is loaded', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await markAt('A', 100);
+      await markAt('A', 300);
+
+      service.selectMarkerAt('A', 0);
+      await runtime.seekToFrame('A', 180);
+      service.setMarkerEnd('A');
+      service.nudgeMarker('A', 'start', 7);
+      service.moveMarkerSelection('A', 1);
+      service.deleteMarker('A');
+
+      expect(markersOf('A')).toHaveLength(1);
+      expect(markersOf('A')[0]).toMatchObject({ end: { frame: 180 }, start: { offsetFrames: 7 } });
+      expect(store.loops().A.selectedId).toBe(markersOf('A')[0].id);
     });
   });
 

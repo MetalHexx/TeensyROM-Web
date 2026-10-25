@@ -477,9 +477,9 @@ describe('DeckHostComponent', () => {
       fixture.detectChanges();
 
       function playPauseButton(): HTMLButtonElement | undefined {
-        return Array.from(
-          fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
-        ).find((button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? ''));
+        return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
+          (button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? '')
+        );
       }
 
       playPauseButton()?.click();
@@ -542,7 +542,14 @@ describe('DeckHostComponent', () => {
       tuneLoader.currentTune.set(fakeSidFile());
       player.snapshot.update((snapshot) => ({
         ...snapshot,
-        tune: { subtune: 1, subtuneCount: 1, lengthFrames: null },
+        tune: {
+          subtune: 1,
+          subtuneCount: 1,
+          lengthFrames: null,
+          preparedFrames: [],
+          queuedJump: null,
+          handOffs: 0,
+        },
       }));
       fixture.detectChanges();
 
@@ -557,7 +564,14 @@ describe('DeckHostComponent', () => {
 
       player.snapshot.update((snapshot) => ({
         ...snapshot,
-        tune: { subtune: 1, subtuneCount: 3, lengthFrames: null },
+        tune: {
+          subtune: 1,
+          subtuneCount: 3,
+          lengthFrames: null,
+          preparedFrames: [],
+          queuedJump: null,
+          handOffs: 0,
+        },
       }));
       fixture.detectChanges();
 

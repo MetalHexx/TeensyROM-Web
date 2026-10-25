@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatElapsed, formatTotal } from './transport-time';
+import { formatElapsed, formatSeconds, formatTotal } from './transport-time';
 
 /** A 50 Hz tune's play-call interval, in whole microseconds. */
 const INTERVAL_US = 20_000;
@@ -49,5 +49,24 @@ describe('formatTotal', () => {
   it('truncates the seconds and does not cap minutes', () => {
     expect(formatTotal(59_950, 1_000)).toBe('00:59');
     expect(formatTotal(300_000, INTERVAL_US)).toBe('100:00');
+  });
+});
+
+describe('formatSeconds', () => {
+  it('reads 0.0s while the interval is unknown or the count is not usable', () => {
+    expect(formatSeconds(390, null)).toBe('0.0s');
+    expect(formatSeconds(0, INTERVAL_US)).toBe('0.0s');
+    expect(formatSeconds(-5, INTERVAL_US)).toBe('0.0s');
+    expect(formatSeconds(Number.NaN, INTERVAL_US)).toBe('0.0s');
+  });
+
+  it('shows seconds to the tenth', () => {
+    expect(formatSeconds(390, INTERVAL_US)).toBe('7.8s');
+    expect(formatSeconds(50, INTERVAL_US)).toBe('1.0s');
+  });
+
+  it('truncates the tenths and does not roll into minutes', () => {
+    expect(formatSeconds(1_999, 1_000)).toBe('1.9s');
+    expect(formatSeconds(75_000, 1_000)).toBe('75.0s');
   });
 });

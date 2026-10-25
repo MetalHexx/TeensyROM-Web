@@ -2,6 +2,7 @@ import { Injectable, effect, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { DeckLoops } from './deck-loops';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
 import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
@@ -10,6 +11,7 @@ import { TuneLoader } from './tune-loader';
 import { DjStore, type DeckDetectedKey, type DeckStatus, type DeckVoiceState } from './dj-store';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
+import type { LoopBoundaryName, LoopSnapDirection } from './selectors/loops-summary';
 
 /** `error instanceof Error ? error.message : String(error)` — a local helper, not core's
  *  `describeError`. This file imports nothing from `@sidablist/*`; every type it touches flows in
@@ -48,9 +50,10 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  * `sequence` counter extends that protection through `runtime.play` itself, a span the loader's
  * guard cannot see because it has already returned by then.
  *
- * It also fronts the speed, nudge and voice commands and reflects the engine's tempo and voice state
- * into the store. Every load and subtune switch returns the deck's SID panel, speed, nudges, mutes
- * and holds to home before anything else, so a new tune never inherits the last one's settings.
+ * It also fronts the speed, nudge, voice and loop-marker commands and reflects the engine's tempo,
+ * voice and prepared-frame state into the store. Every load and subtune switch returns the deck's
+ * SID panel, speed, nudges, mutes and holds to home before anything else, so a new tune never
+ * inherits the last one's settings, and attaches the incoming tune's markers before it plays.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -62,6 +65,7 @@ export class DeckService {
   private readonly store = inject(DjStore);
   private readonly bindings = inject(DeckBindings);
   private readonly deckSpeed = inject(DeckSpeed);
+  private readonly loops = inject(DeckLoops);
   private readonly mixerApplier = inject(MixerApplier);
   private readonly panelPainter = inject(SidPanelPainter);
 
@@ -90,6 +94,7 @@ export class DeckService {
       this.runtime.build(slot);
       this.runtime.subscribe(slot, () => {
         this.reflectEngineControls(slot);
+        this.loops.reflect(slot);
         if (!this.suspended[slot] && this.transitioned(slot)) {
           this.applySnapshot(slot);
         }
@@ -111,6 +116,7 @@ export class DeckService {
     // Synchronous, before the first await: it always lands ahead of the new tune's `play`, a failed
     // load still ends at home, and a superseded load can never reset after a newer one has started.
     this.resetTuneShaping(slot);
+    this.loops.detach(slot);
     this.sample(slot);
 
     let failure: string | null = null;
@@ -146,7 +152,15 @@ export class DeckService {
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
       this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
+      await this.loops.attach(
+        slot,
+        playable.reference.identity,
+        playable.index.detectedMoments.map((moment) => moment.frame)
+      );
 
+      if (this.sequence[slot] !== mySeq) {
+        return;
+      }
       await this.runtime.play(slot);
 
       if (this.sequence[slot] !== mySeq) {
@@ -232,6 +246,7 @@ export class DeckService {
     this.suspended[slot] = true;
     this.runtime.stop(slot);
     this.resetTuneShaping(slot);
+    this.loops.detach(slot);
     this.sample(slot);
 
     let failure: string | null = null;
@@ -267,6 +282,15 @@ export class DeckService {
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
       this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
+      await this.loops.attach(
+        slot,
+        playable.reference.identity,
+        playable.index.detectedMoments.map((moment) => moment.frame)
+      );
+
+      if (this.sequence[slot] !== mySeq) {
+        return;
+      }
 
       // Restores the transport state the switch started from. A subtune shares no position with
       // its sibling, so "the position it was at" has no meaning here — a resumed pause holds the
@@ -367,6 +391,66 @@ export class DeckService {
     }
     this.runtime.setVoiceHeld(slot, voice, held);
     this.reflectEngineControls(slot);
+  }
+
+  /** Marks the playhead as a new cue and selects it. */
+  addMarker(slot: Slot): void {
+    if (this.canShape(slot, 'addMarker')) {
+      this.loops.add(slot);
+    }
+  }
+
+  selectMarker(slot: Slot, id: string): void {
+    if (this.canShape(slot, 'selectMarker')) {
+      this.loops.select(slot, id);
+    }
+  }
+
+  /** Moves the marker selection by `delta` places, stopping at the ends. */
+  moveMarkerSelection(slot: Slot, delta: number): void {
+    if (this.canShape(slot, 'moveMarkerSelection')) {
+      this.loops.move(slot, delta);
+    }
+  }
+
+  /** Selects the marker at `index`, rounded and clamped into the list. */
+  selectMarkerAt(slot: Slot, index: number): void {
+    if (this.canShape(slot, 'selectMarkerAt')) {
+      this.loops.selectAt(slot, index);
+    }
+  }
+
+  /** Ends the selected marker at the playhead, making it a loop. */
+  setMarkerEnd(slot: Slot): void {
+    if (this.canShape(slot, 'setMarkerEnd')) {
+      this.loops.setEnd(slot);
+    }
+  }
+
+  clearMarkerEnd(slot: Slot): void {
+    if (this.canShape(slot, 'clearMarkerEnd')) {
+      this.loops.clearEnd(slot);
+    }
+  }
+
+  deleteMarker(slot: Slot): void {
+    if (this.canShape(slot, 'deleteMarker')) {
+      this.loops.remove(slot);
+    }
+  }
+
+  /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured. */
+  nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): void {
+    if (this.canShape(slot, 'nudgeMarker')) {
+      this.loops.nudge(slot, boundary, offsetFrames);
+    }
+  }
+
+  /** Nudges a boundary of the selected marker onto the next detected moment in `direction`. */
+  snapMarker(slot: Slot, boundary: LoopBoundaryName, direction: LoopSnapDirection): void {
+    if (this.canShape(slot, 'snapMarker')) {
+      this.loops.snap(slot, boundary, direction);
+    }
   }
 
   /** Loads both slots' cartridge bindings from the saved MIDI settings, reconciles them against
@@ -478,8 +562,8 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** The gate for the speed and voice commands: true when the deck's controls are live, otherwise
-   *  warns once naming the slot and command, and returns false. */
+  /** The gate for the speed, voice and marker commands: true when the deck's controls are live,
+   *  otherwise warns once naming the slot and command, and returns false. */
   private canShape(slot: Slot, command: string): boolean {
     if (this.store.canShape(slot)()) {
       return true;

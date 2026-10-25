@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import { DeckPanelState, DeckStatus, DjState, WritableStore } from '../dj-store';
+import { DeckPanelState, DeckState, DeckStatus, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
 import { keyDisplayFor } from '../mixer/key-display';
 
@@ -13,16 +13,18 @@ export function deckPanel(store: WritableStore<DjState>) {
   };
 }
 
+/** The rule behind `canShape`, over just the fields it reads so a caller can feed it from
+ *  fine-grained signals. */
+export function isShapeable(deck: Pick<DeckState, 'loaded' | 'switching' | 'status'>): boolean {
+  return deck.loaded !== null && !deck.switching && SHAPEABLE_STATUSES.includes(deck.status);
+}
+
 /** Whether a deck's tune-shaping controls are live: a tune is loaded, no load or subtune switch is
  *  running, and the deck sits at a settled transport status. Deliberately not `busy`, which also
  *  spans the `await` in a play toggle and would dim the controls on every Play press. */
 export function canShape(store: WritableStore<DjState>) {
   return {
-    canShape: (slot: Slot) =>
-      computed<boolean>(() => {
-        const deck = store.decks()[slot];
-        return deck.loaded !== null && !deck.switching && SHAPEABLE_STATUSES.includes(deck.status);
-      }),
+    canShape: (slot: Slot) => computed<boolean>(() => isShapeable(store.decks()[slot])),
   };
 }
 
