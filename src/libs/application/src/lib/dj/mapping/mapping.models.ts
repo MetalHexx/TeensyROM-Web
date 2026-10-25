@@ -47,6 +47,16 @@ export type DeckControlId =
   | 'speed-jump-down'
   | 'speed-nudge-up'
   | 'speed-nudge-down'
+  | 'loop-select'
+  | 'loop-toggle'
+  | 'loop-add'
+  | 'loop-stop'
+  | 'loop-set-end'
+  | 'loop-clear-end'
+  | 'loop-start-snap-previous'
+  | 'loop-start-snap-next'
+  | 'loop-end-snap-previous'
+  | 'loop-end-snap-next'
   | 'repeat'
   | `voice-${VoiceNumber}-mute`
   | `voice-${VoiceNumber}-hold`
@@ -73,6 +83,16 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'speed-jump-down',
   'speed-nudge-up',
   'speed-nudge-down',
+  'loop-select',
+  'loop-toggle',
+  'loop-add',
+  'loop-stop',
+  'loop-set-end',
+  'loop-clear-end',
+  'loop-start-snap-previous',
+  'loop-start-snap-next',
+  'loop-end-snap-previous',
+  'loop-end-snap-next',
   'repeat',
   ...VOICE_NUMBERS.map((n) => `voice-${n}-mute` as const),
   ...VOICE_NUMBERS.map((n) => `voice-${n}-hold` as const),

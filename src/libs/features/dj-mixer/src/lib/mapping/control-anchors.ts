@@ -24,6 +24,10 @@ const ANCHOR_OVERRIDES: Partial<Record<DeckControlId, string>> = {
   'speed-jump-up': '[data-control="jump-up"]',
   'speed-jump-home': '[data-control="jump-home"]',
   'speed-jump-down': '[data-control="jump-down"]',
+  'loop-start-snap-previous': '[data-control="loop-start"] [data-part="snap-previous"]',
+  'loop-start-snap-next': '[data-control="loop-start"] [data-part="snap-next"]',
+  'loop-end-snap-previous': '[data-control="loop-end"] [data-part="snap-previous"]',
+  'loop-end-snap-next': '[data-control="loop-end"] [data-part="snap-next"]',
   ...VOICE_SWITCH_ANCHORS,
 };
 

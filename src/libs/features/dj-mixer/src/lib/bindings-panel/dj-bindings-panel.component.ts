@@ -17,7 +17,7 @@ import {
   MidiMappings,
   MidiMappingStore,
   actionOf,
-  actionsFor,
+  actionsForControl,
   controlKey,
   defaultAmountFor,
   describeAction,
@@ -111,9 +111,13 @@ function toPercent(amount: number): number {
 }
 
 /** The amount field for a style that takes one, or `null`. The field works in percent, and the
- *  mapping keeps a fraction. */
-function amountField(kind: MappingStyleKind, amount: number | null): BindingRowAmount | null {
-  if (amount === null) {
+ *  mapping keeps a fraction. A whole-step control has none: its amount changes nothing. */
+function amountField(
+  control: MappableControl,
+  kind: MappingStyleKind,
+  amount: number | null
+): BindingRowAmount | null {
+  if (amount === null || (control.nature === 'value' && control.wholeSteps)) {
     return null;
   }
   if (isRelativeKind(kind)) {
@@ -334,7 +338,7 @@ export class DjBindingsPanelComponent {
     statuses: Readonly<Record<string, ControllerStatus>>,
     expandedId: string | null
   ): BindingRowView {
-    const actions = actionsFor(control.nature, mapping.source.kind);
+    const actions = actionsForControl(control, mapping.source.kind);
     const trigger = triggerOf(mapping.style.kind);
     const owner = ownerLabel(mapping.control.owner);
 
@@ -360,7 +364,7 @@ export class DjBindingsPanelComponent {
                 label: describeTrigger(edge, mapping.source.kind),
               })),
         selectedTriggerId: trigger,
-        amount: amountField(mapping.style.kind, mapping.style.amount),
+        amount: amountField(control, mapping.style.kind, mapping.style.amount),
         statusText: BINDING_STATUS_TEXT[statuses[mapping.source.controllerId] ?? 'missing'],
         editAccessibleName: `Edit ${control.name} binding, ${owner}`,
         deleteAccessibleName: `Delete ${control.name} binding, ${owner}`,

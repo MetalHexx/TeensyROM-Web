@@ -8,7 +8,7 @@ import type { TuneReference } from '@sidablist/tunes';
 import { ALERT_SERVICE, FILE_CONTENT_SERVICE } from '@teensyrom-nx/domain';
 import { DeckBindings } from '../../deck-bindings';
 import { DeckService } from '../../deck.service';
-import { DjStore } from '../../dj-store';
+import { DjStore, EMPTY_DECK_LOOPS } from '../../dj-store';
 import { MidiSettingsPersistence } from '../../midi-settings-persistence';
 import { MixerService } from '../../mixer.service';
 import {
@@ -73,6 +73,10 @@ export interface MappingHarness {
   readonly repository: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   /** Puts a tune on the slot at a settled status, which is what makes its controls live. */
   makeShapeable(slot: Slot): void;
+  /** Gives the slot `count` cue markers (ids `marker-0`…), with the one at `selectedIndex`
+   *  selected, or none when it is null. The harness loads no tune into the engine, so a marker
+   *  cannot be captured through `addMarker`. */
+  seedMarkers(slot: Slot, count: number, selectedIndex?: number | null): void;
 }
 
 /**
@@ -146,6 +150,23 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     makeShapeable: (slot) => {
       djStore.setDeckLoaded({ slot, reference: TUNE });
       djStore.setDeckStatus({ slot, status: 'paused' });
+    },
+    seedMarkers: (slot, count, selectedIndex = 0) => {
+      const markers = Array.from({ length: count }, (_, index) => ({
+        id: `marker-${index}`,
+        start: { frame: index * 100, offsetFrames: 0 },
+        end: null,
+        voices: [],
+        ready: true,
+      }));
+      djStore.setDeckLoops({
+        slot,
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers,
+          selectedId: markers[selectedIndex ?? -1]?.id ?? null,
+        },
+      });
     },
   };
 }

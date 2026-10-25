@@ -23,6 +23,7 @@ const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
 const MUTE_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const HOLD_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-hold' };
+const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
 const NUDGE_UP_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
 
 const style = (kind: MappingStyle['kind'], amount: number | null = null): MappingStyle => ({
@@ -450,6 +451,92 @@ describe('MidiMappingEngine', () => {
       h.engine.handle(note(50, 100));
 
       expect(speed()).toBe(1.5);
+    });
+  });
+
+  describe('a whole-step selection', () => {
+    const selected = (): string | null => h.djStore.deckLoops('A')().selectedId;
+
+    beforeEach(() => h.seedMarkers('A', 5, 0));
+
+    it('moves one marker per relative tick, whatever the sensitivity, and clamps at the ends', () => {
+      map(ccSource(20), LOOP_SELECT_A, style('relative-offset', 0.01));
+
+      h.engine.handle(cc(20, 65));
+      expect(selected()).toBe('marker-1');
+
+      h.engine.handle(cc(20, 66));
+      expect(selected()).toBe('marker-3');
+
+      h.engine.handle(cc(20, 100));
+      expect(selected()).toBe('marker-4');
+
+      h.engine.handle(cc(20, 63));
+      h.engine.handle(cc(20, 63));
+      expect(selected()).toBe('marker-2');
+
+      h.engine.handle(cc(20, 0));
+      expect(selected()).toBe('marker-0');
+    });
+
+    it('counts a signed encoder the same way', () => {
+      map(ccSource(20), LOOP_SELECT_A, style('relative-signed', 1));
+
+      h.engine.handle(cc(20, 2));
+      expect(selected()).toBe('marker-2');
+
+      h.engine.handle(cc(20, 127));
+      expect(selected()).toBe('marker-1');
+    });
+
+    it('moves one marker per step press whatever its amount, down for a negative one', () => {
+      map(noteSource(50), LOOP_SELECT_A, style('step', 0.05));
+      map(noteSource(51), LOOP_SELECT_A, style('step-release', -1));
+
+      h.engine.handle(note(50, 100));
+      h.engine.handle(note(50, 0));
+      h.engine.handle(note(50, 100));
+      expect(selected()).toBe('marker-2');
+
+      h.engine.handle(note(51, 100));
+      expect(selected()).toBe('marker-2');
+      h.engine.handle(note(51, 0));
+      expect(selected()).toBe('marker-1');
+    });
+
+    it('steps from the first marker when none is selected', () => {
+      h.seedMarkers('A', 3, null);
+      map(noteSource(50), LOOP_SELECT_A, style('step', 1));
+
+      h.engine.handle(note(50, 100));
+
+      expect(selected()).toBe('marker-1');
+    });
+
+    it('never applies an absolute style', () => {
+      h.mappingStore.upsertMapping({
+        mapping: {
+          id: 'stale',
+          source: ccSource(21),
+          control: LOOP_SELECT_A,
+          style: style('absolute'),
+        },
+      });
+
+      h.engine.handle(cc(21, 127));
+
+      expect(selected()).toBe('marker-0');
+    });
+
+    it('does nothing with no markers', () => {
+      h.seedMarkers('A', 0);
+      map(ccSource(20), LOOP_SELECT_A, style('relative-offset', 1));
+      map(noteSource(50), LOOP_SELECT_A, style('step', 1));
+
+      h.engine.handle(cc(20, 70));
+      h.engine.handle(note(50, 100));
+
+      expect(selected()).toBeNull();
     });
   });
 

@@ -119,6 +119,33 @@ export function stylesFor(nature: ControlNature, sourceKind: MidiSourceKind): Ma
   }
 }
 
+/** The styles this control offers for a source of this kind: its nature's, narrowed to the
+ *  control's own `styles` when it declares them. */
+export function stylesForControl(
+  control: MappableControl,
+  sourceKind: MidiSourceKind
+): MappingStyleKind[] {
+  const styles = stylesFor(control.nature, sourceKind);
+  const allowed = control.nature === 'value' ? control.styles : undefined;
+  return allowed === undefined ? styles : styles.filter((kind) => allowed.includes(kind));
+}
+
+/** The actions this control offers for a source, in menu order. */
+export function actionsForControl(
+  control: MappableControl,
+  sourceKind: MidiSourceKind
+): StyleAction[] {
+  return [...new Set(stylesForControl(control, sourceKind).map(actionOf))];
+}
+
+export function isStyleAvailableFor(
+  control: MappableControl,
+  sourceKind: MidiSourceKind,
+  kind: MappingStyleKind
+): boolean {
+  return stylesForControl(control, sourceKind).includes(kind);
+}
+
 export function isStyleAvailable(
   nature: ControlNature,
   sourceKind: MidiSourceKind,
@@ -143,7 +170,7 @@ export function defaultAmountFor(control: MappableControl, kind: MappingStyleKin
   return isStepKind(kind) ? control.defaults.stepAmount : null;
 }
 
-/** The style a source gets when first mapped onto a control. */
+/** The style a source gets when first mapped onto a control, from the styles it allows. */
 export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKind): MappingStyle {
   switch (control.nature) {
     case 'trigger':
@@ -153,7 +180,10 @@ export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKin
     case 'hold':
       return { kind: 'hold', amount: control.amountDefault };
     case 'value': {
-      const kind = sourceKind === 'note' ? 'step' : control.defaults.ccStyle;
+      const preferred = sourceKind === 'note' ? 'step' : control.defaults.ccStyle;
+      const kind = isStyleAvailableFor(control, sourceKind, preferred)
+        ? preferred
+        : stylesForControl(control, sourceKind)[0];
       return { kind, amount: defaultAmountFor(control, kind) };
     }
   }

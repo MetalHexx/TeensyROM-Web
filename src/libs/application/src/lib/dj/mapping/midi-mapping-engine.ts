@@ -131,7 +131,7 @@ export class MidiMappingEngine {
         }
         return;
       case 'absolute':
-        if (event.kind === 'cc' && control.nature === 'value') {
+        if (event.kind === 'cc' && control.nature === 'value' && !control.wholeSteps) {
           const fraction = event.value / 127;
           control.set(quantize(control, control.min + fraction * (control.max - control.min)));
         }
@@ -225,6 +225,10 @@ export class MidiMappingEngine {
     if (ticks === 0) {
       return;
     }
+    if (control.wholeSteps) {
+      this.moveWholeSteps(control, ticks);
+      return;
+    }
     const delta = ticks * amount * (control.max - control.min);
     if (control.step === null) {
       control.set(clamp(control.read() + delta, control.min, control.max));
@@ -248,11 +252,24 @@ export class MidiMappingEngine {
   }
 
   private applyStep(control: ValueControl, amount: number): void {
+    if (control.wholeSteps) {
+      this.moveWholeSteps(control, Math.sign(amount));
+      return;
+    }
     let delta = amount * (control.max - control.min);
     if (control.step !== null && Math.abs(delta) < control.step) {
       delta = Math.sign(delta) * control.step;
     }
     control.set(quantize(control, control.read() + delta));
+  }
+
+  /** Moves a whole-step selection by exactly `places`, stopping at its ends. With nothing to
+   *  select it does nothing. */
+  private moveWholeSteps(control: ValueControl, places: number): void {
+    if (control.max <= control.min) {
+      return;
+    }
+    control.set(clamp(control.read() + places, control.min, control.max));
   }
 
   /** Releases a hold, logging rather than throwing so one failing release cannot strand the rest. */

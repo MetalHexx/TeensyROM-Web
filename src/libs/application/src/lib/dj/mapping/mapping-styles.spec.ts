@@ -4,13 +4,16 @@ import type { MappingStyleKind } from '../ports';
 import {
   actionOf,
   actionsFor,
+  actionsForControl,
   clampAmount,
   defaultAmountFor,
   defaultStyle,
   isStyleAvailable,
+  isStyleAvailableFor,
   kindFor,
   relativeTicks,
   stylesFor,
+  stylesForControl,
   triggerOf,
 } from './mapping-styles';
 
@@ -141,6 +144,56 @@ describe('action and trigger', () => {
     ['value', 'cc', ['absolute', 'relative-offset', 'relative-signed', 'step']],
   ] as const)('%s from a %s source offers the actions %j', (nature, sourceKind, expected) => {
     expect(actionsFor(nature, sourceKind)).toEqual(expected);
+  });
+});
+
+const selector = {
+  ...value({ ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 }),
+  styles: ['relative-offset', 'relative-signed', 'step', 'step-release'],
+  wholeSteps: true,
+} as MappableControl;
+
+describe('the control-aware styles', () => {
+  it('offer a control with no style list what its nature offers', () => {
+    expect(stylesForControl(knob, 'cc')).toEqual(stylesFor('value', 'cc'));
+    expect(stylesForControl(trigger, 'note')).toEqual(stylesFor('trigger', 'note'));
+    expect(actionsForControl(knob, 'cc')).toEqual(actionsFor('value', 'cc'));
+  });
+
+  it('narrow a whole-step selection to the relative and step styles', () => {
+    expect(stylesForControl(selector, 'cc')).toEqual([
+      'relative-offset',
+      'relative-signed',
+      'step',
+      'step-release',
+    ]);
+    expect(stylesForControl(selector, 'note')).toEqual(['step', 'step-release']);
+    expect(actionsForControl(selector, 'cc')).toEqual([
+      'relative-offset',
+      'relative-signed',
+      'step',
+    ]);
+    expect(actionsForControl(selector, 'note')).toEqual(['step']);
+  });
+
+  it('refuse absolute on a whole-step selection and keep it on an ordinary value', () => {
+    expect(isStyleAvailableFor(selector, 'cc', 'absolute')).toBe(false);
+    expect(isStyleAvailableFor(selector, 'cc', 'relative-signed')).toBe(true);
+    expect(isStyleAvailableFor(knob, 'cc', 'absolute')).toBe(true);
+  });
+
+  it('default a whole-step selection to a relative encoder from a CC and a step from a note', () => {
+    expect(defaultStyle(selector, 'cc')).toEqual({ kind: 'relative-offset', amount: 1 });
+    expect(defaultStyle(selector, 'note')).toEqual({ kind: 'step', amount: 1 });
+  });
+
+  it('fall back to an allowed style when the preferred default is not allowed', () => {
+    const absoluteFirst = {
+      ...selector,
+      defaults: { ccStyle: 'absolute', sensitivity: 1, stepAmount: 1 },
+    } as MappableControl;
+
+    expect(defaultStyle(absoluteFirst, 'cc').kind).toBe('relative-offset');
   });
 });
 
