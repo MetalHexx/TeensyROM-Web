@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { FakeClock, replayToFrame } from '@sidablist/core';
+import { FakeClock, milliseconds, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
@@ -164,18 +164,29 @@ describe('DeckLoops', () => {
   let positions: InMemoryLoopPositionsStore;
   let gates: Record<Slot, Gate>;
   let prepareRunners: FakeReplayRunner[];
+  let clockOf: Record<Slot, FakeClock>;
+  let tickCount: number;
 
   beforeEach(() => {
     vi.mocked(logWarn).mockClear();
     vi.mocked(logError).mockClear();
     gates = { A: { holding: false }, B: { holding: false } };
     prepareRunners = [];
+    const clocks: FakeClock[] = [];
+    tickCount = 0;
     positions = new InMemoryLoopPositionsStore();
     let created = 0;
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
+        {
+          provide: FRAME_CLOCK_FACTORY,
+          useValue: (): FakeClock => {
+            const clock = new FakeClock();
+            clocks.push(clock);
+            return clock;
+          },
+        },
         {
           provide: REPLAY_RUNNER_FACTORY,
           useValue: (): ReplayRunner => {
@@ -201,6 +212,7 @@ describe('DeckLoops', () => {
       // What `DeckService` does for every engine notification.
       runtime.subscribe(slot, () => loops.reflect(slot));
     }
+    clockOf = { A: clocks[0], B: clocks[1] };
   });
 
   /** Replays what `DeckService.load` does around the markers: detach, hand the tune to the engine,
@@ -239,6 +251,38 @@ describe('DeckLoops', () => {
   const startsOf = (slot: Slot) => stateOf(slot).markers.map((marker) => marker.start.frame);
   const readyOf = (slot: Slot) => stateOf(slot).markers.map((marker) => marker.ready);
   const preparedOn = (slot: Slot) => runtime.snapshot(slot).tune?.preparedFrames;
+  const engineLoop = (slot: Slot) => runtime.snapshot(slot).loop;
+  const engineQueue = (slot: Slot) => runtime.snapshot(slot).tune?.queuedJump ?? null;
+  const handOffsOf = (slot: Slot) => runtime.snapshot(slot).tune?.handOffs;
+
+  /** Fires `count` frames of the deck's clock. */
+  function tick(slot: Slot, count = 1): void {
+    for (let i = 0; i < count; i++) {
+      clockOf[slot].tick(milliseconds(++tickCount));
+    }
+  }
+
+  /** Fires frames one at a time until `done`, so an outcome is seen on the very frame it happens. */
+  function tickUntil(slot: Slot, done: () => boolean, limit = 800): void {
+    for (let i = 0; i < limit && !done(); i++) {
+      tick(slot);
+    }
+    expect(done()).toBe(true);
+  }
+
+  /** Plays until the playhead wraps back, and returns the furthest it got first. */
+  function peakBeforeWrap(slot: Slot): number {
+    let peak = runtime.position(slot);
+    tickUntil(slot, () => {
+      const position = runtime.position(slot);
+      if (position < peak) {
+        return true;
+      }
+      peak = position;
+      return false;
+    });
+    return peak;
+  }
 
   describe('restoring a tune', () => {
     it("brings back a tune's markers when it is loaded again, with the first selected", async () => {
@@ -783,6 +827,600 @@ describe('DeckLoops', () => {
       await loadOn('B', { ...TUNE_X, subtune: 2 });
       await placeMarker('A', 200);
       expect(stateOf('B').markers).toEqual([]);
+    });
+  });
+
+  describe('performing markers', () => {
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [
+        loopOf('a', 100, 120),
+        loopOf('b', 300, 320),
+        cue('c', 500),
+        loopOf('wide', 600, 800),
+      ]);
+      await loadOn('A', TUNE_X);
+      await settle();
+      await runtime.play('A');
+    });
+
+    /** Engages `id` and lets its jump land. */
+    async function engage(id: string): Promise<void> {
+      loops.toggle('A', id);
+      await flush();
+    }
+
+    describe('toggling', () => {
+      it('engages an idle loop now when nothing is looping', async () => {
+        await engage('a');
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(runtime.position('A')).toBe(100);
+      });
+
+      it('engages an idle cue now with no loop running', async () => {
+        await engage('c');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBe(500);
+      });
+
+      it('keeps one loop per deck, queuing a second behind the first', async () => {
+        await engage('a');
+
+        loops.toggle('A', 'b');
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').queuedId).toBe('b');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+      });
+
+      it('replaces the queued marker when another is pressed', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.toggle('A', 'c');
+
+        expect(stateOf('A').queuedId).toBe('c');
+        expect(engineQueue('A')).toEqual({ startFrame: 500, endFrame: null });
+      });
+
+      it('cancels a queued marker when it is pressed again, leaving the running loop', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.toggle('A', 'b');
+        tick('A', 120);
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').runningId).toBe('a');
+        expect(engineQueue('A')).toBeNull();
+        expect(handOffsOf('A')).toBe(0);
+      });
+
+      it('lets a running marker go when it is pressed, leaving the playhead where it was', async () => {
+        await engage('a');
+        tick('A', 5);
+        const position = runtime.position('A');
+
+        loops.toggle('A', 'a');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBe(position);
+      });
+
+      it('stops the running loop and everything queued behind it without moving the playhead', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        tick('A', 5);
+        const position = runtime.position('A');
+
+        loops.stop('A');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(runtime.position('A')).toBe(position);
+      });
+
+      it('refuses a marker the deck does not hold', async () => {
+        loops.toggle('A', 'missing');
+
+        expect(refusals()).toHaveLength(1);
+        expect(stateOf('A').runningId).toBeNull();
+      });
+    });
+
+    describe('landing', () => {
+      it('hands off to the queued loop at the end of the lap', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        expect(stateOf('A').runningId).toBe('a');
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineQueue('A')).toBeNull();
+        expect(runtime.position('A')).toBeGreaterThanOrEqual(300);
+        expect(runtime.position('A')).toBeLessThan(320);
+      });
+
+      it('hands off to a queued cue, which leaves nothing looping', async () => {
+        await engage('a');
+        loops.toggle('A', 'c');
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBeGreaterThanOrEqual(500);
+      });
+
+      it('waits for a queued marker that is not ready, and lands it once it is', async () => {
+        gates.A.holding = true;
+        loops.select('A', 'b');
+        loops.nudge('A', 'start', 5);
+        loops.select('A', 'a');
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        tick('A', 120);
+        expect(handOffsOf('A')).toBe(0);
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').queuedId).toBe('b');
+
+        await settle();
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+      });
+
+      it('moves the selection to the landed marker', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        expect(stateOf('A').selectedId).toBe('a');
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').selectedId).toBe('b');
+      });
+
+      it('leaves the selection where the performer moved it while the jump waited', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'c');
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').selectedId).toBe('c');
+        expect(stateOf('A').selectionMovedWhileQueued).toBe(false);
+      });
+
+      it('never reads a stop as a landing', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.stop('A');
+        tick('A', 120);
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').selectedId).toBe('a');
+        expect(handOffsOf('A')).toBe(0);
+      });
+
+      it('clears a running and a queued marker when the transport stops, without a landing', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        runtime.stop('A');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').selectedId).toBe('a');
+        expect(engineLoop('A')).toBeNull();
+      });
+    });
+
+    describe('waiting for readiness', () => {
+      async function notReady(id: string): Promise<void> {
+        gates.A.holding = true;
+        loops.select('A', id);
+        loops.nudge('A', 'start', 5);
+        expect(stateOf('A').markers.find((marker) => marker.id === id)?.ready).toBe(false);
+      }
+
+      it('holds a marker with nothing looping until its start is ready, then engages it', async () => {
+        await notReady('a');
+
+        loops.toggle('A', 'a');
+        await flush();
+
+        expect(stateOf('A').queuedId).toBe('a');
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+
+        await settle();
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').runningId).toBe('a');
+        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120 });
+        expect(runtime.position('A')).toBe(105);
+      });
+
+      it('follows the waiting marker with the selection unless it moved', async () => {
+        await notReady('b');
+        loops.select('A', 'a');
+
+        loops.toggle('A', 'b');
+        await settle();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').selectedId).toBe('b');
+      });
+
+      it('leaves the selection where it was moved while the marker waited', async () => {
+        await notReady('b');
+        loops.select('A', 'a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'c');
+
+        await settle();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').selectedId).toBe('c');
+        expect(stateOf('A').selectionMovedWhileQueued).toBe(false);
+      });
+
+      it('drops the wait when the marker is pressed again', async () => {
+        await notReady('a');
+        loops.toggle('A', 'a');
+
+        loops.toggle('A', 'a');
+        await settle();
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('drops the wait when the marker is deleted', async () => {
+        await notReady('a');
+        loops.toggle('A', 'a');
+
+        loops.remove('A');
+        await settle();
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').runningId).toBeNull();
+      });
+    });
+
+    describe('editing a running marker', () => {
+      it('applies a new end at once, with no seek', async () => {
+        await engage('a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.nudge('A', 'end', 10);
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(stateOf('A').runningId).toBe('a');
+        expect(seek).not.toHaveBeenCalled();
+      });
+
+      it('lets the lap in progress run on to the new end before it wraps', async () => {
+        await engage('a');
+        loops.nudge('A', 'end', 10);
+
+        expect(peakBeforeWrap('A')).toBeGreaterThanOrEqual(125);
+      });
+
+      it('holds a new start on the old bounds until it is ready, then applies it with no seek', async () => {
+        await engage('a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        gates.A.holding = true;
+
+        loops.nudge('A', 'start', 10);
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        await settle();
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
+        expect(stateOf('A').runningId).toBe('a');
+        expect(seek).not.toHaveBeenCalled();
+      });
+
+      it('re-enters at the new start on the next lap', async () => {
+        await engage('a');
+        gates.A.holding = true;
+        loops.nudge('A', 'start', 10);
+        await settle();
+
+        peakBeforeWrap('A');
+
+        expect(runtime.position('A')).toBeGreaterThanOrEqual(110);
+      });
+
+      it('keeps a marker queued through the engine when the running loop is edited', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.nudge('A', 'end', 10);
+
+        expect(stateOf('A').queuedId).toBe('b');
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        tickUntil('A', () => handOffsOf('A') === 1);
+        expect(stateOf('A').runningId).toBe('b');
+      });
+
+      it('keeps the queued marker when a start change is applied once ready', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        gates.A.holding = true;
+        loops.nudge('A', 'start', 10);
+
+        await settle();
+
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+      });
+
+      it('lets a loop go as a stop when its end is cleared', async () => {
+        await engage('a');
+        tick('A', 5);
+        const position = runtime.position('A');
+
+        loops.clearEnd('A');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBe(position);
+      });
+
+      it('lets a loop go as a stop when it is deleted', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.remove('A');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+      });
+    });
+
+    describe('editing a queued marker', () => {
+      it('queues the new target when its start or end changes', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+
+        loops.nudge('A', 'start', 5);
+        expect(engineQueue('A')).toEqual({ startFrame: 305, endFrame: 320 });
+
+        loops.nudge('A', 'end', 10);
+        expect(engineQueue('A')).toEqual({ startFrame: 305, endFrame: 330 });
+        expect(stateOf('A').queuedId).toBe('b');
+      });
+
+      it('queues a cue when the queued loop loses its end, and lands it as one', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+
+        loops.clearEnd('A');
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: null });
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('cancels the queue when the queued marker is deleted, leaving the running loop', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+
+        loops.remove('A');
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(stateOf('A').runningId).toBe('a');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      });
+    });
+
+    describe('auditioning', () => {
+      it('engages the selected marker from its start, taking over from the running one', async () => {
+        await engage('a');
+        loops.toggle('A', 'c');
+        loops.select('A', 'b');
+
+        loops.audition('A', 'start');
+        await flush();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(runtime.position('A')).toBe(300);
+      });
+
+      it('waits for a start that is not ready, then engages it', async () => {
+        gates.A.holding = true;
+        loops.select('A', 'b');
+        loops.nudge('A', 'start', 5);
+
+        loops.audition('A', 'start');
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBe('b');
+
+        await settle();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+      });
+
+      it('drops a marker queued in the engine when it waits instead for a start', async () => {
+        await engage('a');
+        loops.toggle('A', 'c');
+        gates.A.holding = true;
+        loops.select('A', 'b');
+        loops.nudge('A', 'start', 5);
+
+        loops.audition('A', 'start');
+
+        expect(engineQueue('A')).toBeNull();
+        tick('A', 120);
+        expect(handOffsOf('A')).toBe(0);
+        await settle();
+        expect(stateOf('A').runningId).toBe('b');
+      });
+
+      it('arms a loop and lands two seconds before its end', async () => {
+        loops.select('A', 'wide');
+
+        loops.audition('A', 'end');
+        await flush();
+
+        expect(stateOf('A').runningId).toBe('wide');
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+        expect(runtime.position('A')).toBe(800 - 2 * SECOND);
+      });
+
+      it('lands no earlier than the loop start', async () => {
+        loops.select('A', 'a');
+
+        loops.audition('A', 'end');
+        await flush();
+
+        expect(runtime.position('A')).toBe(100);
+      });
+
+      it('does nothing for the end of a cue', async () => {
+        loops.select('A', 'c');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.audition('A', 'end');
+        await flush();
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(seek).not.toHaveBeenCalled();
+      });
+
+      it('does not start playback', async () => {
+        runtime.pause('A');
+        loops.select('A', 'b');
+
+        loops.audition('A', 'start');
+        await flush();
+
+        expect(runtime.snapshot('A').transport).toBe('paused');
+        expect(stateOf('A').runningId).toBe('b');
+      });
+    });
+
+    describe('the same tune on the other deck', () => {
+      beforeEach(async () => {
+        await loadOn('B', TUNE_X);
+        await settle();
+        await runtime.play('B');
+        loops.toggle('B', 'a');
+        await flush();
+      });
+
+      const canStopB = () => store.loopsSummary('B')().canStop;
+
+      it("carries an end changed on one deck to the other deck's engine", () => {
+        loops.select('A', 'a');
+
+        loops.nudge('A', 'end', 10);
+
+        expect(stateOf('B').runningId).toBe('a');
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('applies a start changed on one deck once it is ready on the other', async () => {
+        gates.B.holding = true;
+        loops.select('A', 'a');
+
+        loops.nudge('A', 'start', 10);
+
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120 });
+        await settle();
+        expect(engineLoop('B')).toEqual({ startFrame: 110, endFrame: 120 });
+      });
+
+      it("re-issues the other deck's queue after the edit", () => {
+        loops.toggle('B', 'b');
+        loops.select('A', 'a');
+
+        loops.nudge('A', 'end', 10);
+
+        expect(stateOf('B').queuedId).toBe('b');
+        expect(engineQueue('B')).toEqual({ startFrame: 300, endFrame: 320 });
+      });
+
+      it('lets the other deck go when the marker it runs loses its end', () => {
+        expect(canStopB()).toBe(true);
+        loops.select('A', 'a');
+
+        loops.clearEnd('A');
+
+        expect(stateOf('B').runningId).toBeNull();
+        expect(engineLoop('B')).toBeNull();
+        expect(canStopB()).toBe(false);
+      });
+
+      it('lets the other deck go when the marker it runs is deleted', () => {
+        loops.select('A', 'a');
+
+        loops.remove('A');
+
+        expect(stateOf('B').runningId).toBeNull();
+        expect(engineLoop('B')).toBeNull();
+        expect(canStopB()).toBe(false);
+      });
+
+      it("cancels the other deck's queue when the queued marker is deleted", () => {
+        loops.toggle('B', 'b');
+        loops.select('A', 'b');
+
+        loops.remove('A');
+
+        expect(stateOf('B').queuedId).toBeNull();
+        expect(engineQueue('B')).toBeNull();
+        expect(stateOf('B').runningId).toBe('a');
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120 });
+      });
+    });
+
+    it('leaves the tempo alone through a toggle, a landing and a stop', async () => {
+      runtime.setTempo('A', 1.25);
+      const multiplier = runtime.snapshot('A').tempo.multiplier;
+
+      await engage('a');
+      loops.toggle('A', 'b');
+      tickUntil('A', () => handOffsOf('A') === 1);
+      loops.stop('A');
+
+      expect(multiplier).toBe(1.25);
+      expect(runtime.snapshot('A').tempo.multiplier).toBe(multiplier);
     });
   });
 

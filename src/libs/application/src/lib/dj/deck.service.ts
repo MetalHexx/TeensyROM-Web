@@ -226,6 +226,11 @@ export class DeckService {
     if (deck.busy || !RESUMABLE_STATUSES.includes(deck.status)) {
       return;
     }
+    const { runningId, queuedId } = this.store.loops()[slot];
+    if (runningId !== null || queuedId !== null) {
+      // A scrub is a gesture of its own: a marker loop would pull it straight back.
+      this.loops.disengage(slot);
+    }
     await this.runtime.seekToPercent(slot, percent);
     this.sample(slot);
   }
@@ -439,10 +444,48 @@ export class DeckService {
     }
   }
 
-  /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured. */
+  /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
+   *  auditions it. A running marker is not auditioned: the nudge already reaches the engine. */
   nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): void {
-    if (this.canShape(slot, 'nudgeMarker')) {
-      this.loops.nudge(slot, boundary, offsetFrames);
+    if (!this.canShape(slot, 'nudgeMarker')) {
+      return;
+    }
+    this.loops.nudge(slot, boundary, offsetFrames);
+    const { selectedId, runningId } = this.store.loops()[slot];
+    if (selectedId !== null && selectedId !== runningId) {
+      this.loops.audition(slot, boundary);
+    }
+  }
+
+  /**
+   * Presses a marker — the selected one when `id` is omitted, and nothing when none is. Idle, it
+   * starts looping, or queues behind the loop running; queued, it cancels; running, it lets go. A
+   * press that starts a marker on a deck that is not playing starts playback first, through the
+   * same path as Play.
+   */
+  async toggleMarker(slot: Slot, id?: string): Promise<void> {
+    if (!this.canShape(slot, 'toggleMarker')) {
+      return;
+    }
+    const { selectedId, runningId, queuedId } = this.store.loops()[slot];
+    const target = id ?? selectedId;
+    if (target === null) {
+      return;
+    }
+    const starts = target !== runningId && target !== queuedId;
+    if (starts && this.store.deck(slot)().status !== 'playing') {
+      await this.togglePlayPause(slot);
+      if (this.store.deck(slot)().status !== 'playing') {
+        return;
+      }
+    }
+    this.loops.toggle(slot, target);
+  }
+
+  /** Lets the running marker loop go and drops whatever is queued. The playhead never moves. */
+  stopMarkerLoop(slot: Slot): void {
+    if (this.canShape(slot, 'stopMarkerLoop')) {
+      this.loops.stop(slot);
     }
   }
 

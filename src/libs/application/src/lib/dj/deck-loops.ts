@@ -13,6 +13,7 @@ import { LOOP_POSITIONS_STORE } from './ports';
 import { otherSlot, type Slot } from './slot';
 import {
   clamp,
+  markerKind,
   nudgeLimits,
   oneSecondFrames,
   resolvedFrame,
@@ -25,6 +26,31 @@ const ALL_VOICES: readonly number[] = [0, 1, 2];
 
 function sameTune(a: TuneIdentity, b: TuneIdentity): boolean {
   return a.sidHash === b.sidHash && a.subtune === b.subtune;
+}
+
+/** A loop's bounds in the engine's terms: the resolved start and end frames. */
+interface LoopBounds {
+  readonly startFrame: number;
+  readonly endFrame: number;
+}
+
+/** Where a queued marker waits: in the engine, for the end of the running loop's lap, or here, for
+ *  its start to be ready. */
+type QueuedVia = 'engine' | 'ready';
+
+/** What the engine runs for a marker: its bounds as a loop, or null for a cue. */
+function loopBoundsOf(marker: DeckLoopMarker): LoopBounds | null {
+  return marker.end !== null && markerKind(marker) === 'loop'
+    ? { startFrame: resolvedFrame(marker.start), endFrame: resolvedFrame(marker.end) }
+    : null;
+}
+
+/** The jump the engine queues for a marker: a loop when it has an end, else a cue. */
+function jumpOf(marker: DeckLoopMarker): { startFrame: number; endFrame: number | null } {
+  return {
+    startFrame: resolvedFrame(marker.start),
+    endFrame: loopBoundsOf(marker)?.endFrame ?? null,
+  };
 }
 
 /** What a marker list is stored as: the marker without its readiness. */
@@ -59,9 +85,15 @@ function reselect(
  * same tune — through the one `land` routine a local edit uses, so the other deck's readiness always
  * comes from its own engine.
  *
- * The engine notifies synchronously inside calls such as `capturePosition` and `setJumpTargets`,
- * and `reflect` runs in that notification. Every path here therefore writes the store before it
- * calls the engine, so `reflect` never reads a half-updated list.
+ * It also performs the markers: toggling one idle, queued or running, queuing through the engine so
+ * the hand-off lands at the end of the lap, following a landing with the selection, keeping a
+ * running or queued marker true to its edits, and auditioning a boundary after a nudge. A marker
+ * loop is looping when `runningId` is set; the track's own repeat loop counts as nothing looping.
+ *
+ * The engine notifies synchronously inside calls such as `capturePosition`, `setJumpTargets`,
+ * `setActiveLoop` and `queueJump`, and `reflect` runs in that notification. Every path here
+ * therefore writes the store and its own bookkeeping before it calls the engine, so `reflect`
+ * never reads a half-updated state.
  */
 @Injectable({ providedIn: 'root' })
 export class DeckLoops {
@@ -75,6 +107,17 @@ export class DeckLoops {
   /** Bumped by every `attach` and `detach`: an attach whose load resolves after a newer one has
    *  started drops its result instead of writing over it. */
   private readonly attachTokens: Record<Slot, number> = { A: 0, B: 0 };
+
+  /** Where the deck's queued marker waits; null while nothing is queued. */
+  private readonly queuedVia: Record<Slot, QueuedVia | null> = { A: null, B: null };
+
+  /** The bounds the engine is enforcing for the running marker, which trail its list entry while a
+   *  changed start waits for readiness. */
+  private readonly engaged: Record<Slot, LoopBounds | null> = { A: null, B: null };
+
+  /** The last `tune.handOffs` `reflect` saw. A landing is only ever this rising: the engine drops
+   *  its queue for other reasons too, and this collaborator's own edits are among them. */
+  private readonly seenHandOffs: Record<Slot, number> = { A: 0, B: 0 };
 
   /** Loads the tune's saved markers into the deck, selects the first, and declares their start
    *  frames to the engine. A store that fails to load is logged and leaves the deck with no
@@ -98,6 +141,9 @@ export class DeckLoops {
     }
 
     this.attached[slot] = identity;
+    this.resetActivity(slot);
+    // The engine resets its hand-off counter on a load and on a subtune change.
+    this.seenHandOffs[slot] = this.runtime.snapshot(slot).tune?.handOffs ?? 0;
     const markers = saved.map((marker): DeckLoopMarker => ({ ...marker, ready: false }));
     this.store.setDeckLoops({
       slot,
@@ -117,17 +163,31 @@ export class DeckLoops {
   detach(slot: Slot): void {
     this.attachTokens[slot]++;
     this.attached[slot] = null;
+    this.resetActivity(slot);
     if (this.loopsOf(slot) !== EMPTY_DECK_LOOPS) {
       this.store.setDeckLoops({ slot, loops: EMPTY_DECK_LOOPS });
     }
   }
 
-  /** Mirrors the engine's prepared frames onto the deck's markers' readiness, writing only when a
-   *  flag changed. */
+  /**
+   * Follows the engine. Mirrors its prepared frames onto the markers' readiness, writing only when
+   * a flag changed, then brings the performance state in line with what it did:
+   * - a rising `handOffs` is a queued jump landing — the one thing read as a landing, since a
+   *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change;
+   * - no loop at all while a marker is running, with no hand-off, is the engine disarming (a
+   *   transport stop, a load), which ends the marker and anything queued;
+   * - a marker waiting for readiness engages once its start is ready;
+   * - a running marker's changed start applies once that start is ready.
+   */
   reflect(slot: Slot): void {
     if (this.attached[slot] === null) {
       return;
     }
+    const snapshot = this.runtime.snapshot(slot);
+    const handOffs = snapshot.tune?.handOffs ?? 0;
+    const handedOff = handOffs > this.seenHandOffs[slot];
+    this.seenHandOffs[slot] = handOffs;
+
     const prepared = this.preparedOf(slot);
     const { markers } = this.loopsOf(slot);
     const next = markers.map((marker) => {
@@ -136,6 +196,74 @@ export class DeckLoops {
     });
     if (next.some((marker, i) => marker !== markers[i])) {
       this.store.setLoopMarkers({ slot, markers: next });
+    }
+
+    if (handedOff) {
+      this.landQueued(slot);
+    } else if (snapshot.loop === null && this.loopsOf(slot).runningId !== null) {
+      this.resetActivity(slot);
+    }
+    this.engageWhenReady(slot);
+    this.syncRunning(slot);
+  }
+
+  /**
+   * Presses a marker. Idle with nothing looping, it engages now, or once its start is ready; idle
+   * with a marker looping, it queues in the engine to land at the end of the lap; queued, it
+   * cancels; running, it is let go as `stop` does. A deck that is not playing is started by the
+   * caller first.
+   */
+  toggle(slot: Slot, id: string): void {
+    if (this.identityOf(slot, 'toggle') === null) {
+      return;
+    }
+    const { markers, runningId, queuedId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (marker === undefined) {
+      this.refuse(slot, 'toggle', `has no marker ${id}`);
+      return;
+    }
+    if (runningId === id) {
+      this.stop(slot);
+    } else if (queuedId === id) {
+      this.cancelQueue(slot);
+    } else if (runningId !== null) {
+      this.queueThroughEngine(slot, marker);
+    } else {
+      this.engageOrWait(slot, marker);
+    }
+  }
+
+  /** Lets the running marker go and drops whatever is queued. The playhead never moves. */
+  stop(slot: Slot): void {
+    this.resetActivity(slot);
+    this.runtime.setActiveLoop(slot, null);
+  }
+
+  /** A manual scrub: the marker loop and the queue are dropped, so the scrub is not pulled back
+   *  into a loop. The repeat-track setting is untouched. */
+  disengage(slot: Slot): void {
+    this.stop(slot);
+  }
+
+  /**
+   * Plays the selected marker's boundary after a nudge. A start engages now, through the readiness
+   * wait when not ready, taking over from any marker running or queued. An end, on a loop only,
+   * arms the loop and lands two seconds before it so the wrap is heard. Never starts playback.
+   */
+  audition(slot: Slot, boundary: LoopBoundaryName): void {
+    const marker = this.selectedMarker(slot, 'audition');
+    if (marker === null) {
+      return;
+    }
+    if (boundary === 'start') {
+      this.engageOrWait(slot, marker);
+      return;
+    }
+    const bounds = loopBoundsOf(marker);
+    if (bounds !== null) {
+      this.arm(slot, marker, false);
+      this.jump(slot, Math.max(bounds.startFrame, bounds.endFrame - 2 * this.oneSecond(slot)));
     }
   }
 
@@ -302,8 +430,180 @@ export class DeckLoops {
       })),
     });
     this.selectId(slot, selectedId);
+    this.syncActivity(slot);
     this.declare(slot);
     this.reflect(slot);
+  }
+
+  /** Brings the engine in line with a changed list for the marker the deck is running and the one
+   *  it has queued. */
+  private syncActivity(slot: Slot): void {
+    this.syncRunning(slot);
+    this.syncQueued(slot);
+  }
+
+  /**
+   * Keeps the engine on the running marker's bounds as its entry changes. A changed end applies at
+   * once, taking effect at the next wrap; a changed start is held until its frame is ready and
+   * takes effect at the next re-entry. Neither seeks. A marker that is gone, or no longer a loop,
+   * is let go.
+   */
+  private syncRunning(slot: Slot): void {
+    const { markers, runningId } = this.loopsOf(slot);
+    const engaged = this.engaged[slot];
+    if (runningId === null || engaged === null) {
+      return;
+    }
+    const marker = markers.find((candidate) => candidate.id === runningId);
+    const desired = marker === undefined ? null : loopBoundsOf(marker);
+    if (marker === undefined || desired === null) {
+      this.stop(slot);
+      return;
+    }
+    const next = {
+      startFrame: marker.ready ? desired.startFrame : engaged.startFrame,
+      endFrame: desired.endFrame,
+    };
+    const unchanged = next.startFrame === engaged.startFrame && next.endFrame === engaged.endFrame;
+    if (!unchanged && next.endFrame > next.startFrame) {
+      this.engaged[slot] = next;
+      this.runtime.setActiveLoop(slot, next);
+      // `setActiveLoop` drops the engine's queue.
+      this.syncQueued(slot);
+    }
+  }
+
+  /** Keeps the engine's queue on the queued marker's current target, and drops a queue whose
+   *  marker is gone. */
+  private syncQueued(slot: Slot): void {
+    const { markers, queuedId } = this.loopsOf(slot);
+    if (queuedId === null) {
+      return;
+    }
+    const marker = markers.find((candidate) => candidate.id === queuedId);
+    if (marker === undefined) {
+      this.cancelQueue(slot);
+      return;
+    }
+    if (this.queuedVia[slot] !== 'engine') {
+      return;
+    }
+    const target = jumpOf(marker);
+    const queued = this.runtime.snapshot(slot).tune?.queuedJump ?? null;
+    if (queued?.startFrame !== target.startFrame || queued.endFrame !== target.endFrame) {
+      this.runtime.queueJump(slot, target);
+    }
+  }
+
+  /** The engine handed off to the marker queued in it: that marker is running now (a cue runs
+   *  nothing), and the selection follows it unless it moved while the jump waited. */
+  private landQueued(slot: Slot): void {
+    const { markers, queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
+    if (this.queuedVia[slot] !== 'engine' || queuedId === null) {
+      return;
+    }
+    const marker = markers.find((candidate) => candidate.id === queuedId);
+    if (marker === undefined) {
+      this.stop(slot);
+      return;
+    }
+    const bounds = loopBoundsOf(marker);
+    this.queuedVia[slot] = null;
+    this.engaged[slot] = bounds;
+    this.setActivity(slot, bounds === null ? null : marker.id, null, false);
+    if (!selectionMovedWhileQueued) {
+      this.selectId(slot, marker.id);
+    }
+  }
+
+  /** Engages the marker waiting for readiness once its start is ready. */
+  private engageWhenReady(slot: Slot): void {
+    const { markers, queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
+    if (this.queuedVia[slot] !== 'ready') {
+      return;
+    }
+    const marker = markers.find((candidate) => candidate.id === queuedId);
+    if (marker?.ready) {
+      this.arm(slot, marker, !selectionMovedWhileQueued);
+      this.jump(slot, resolvedFrame(marker.start));
+    }
+  }
+
+  /** Engages the marker now when its start is ready, else waits for it to be. */
+  private engageOrWait(slot: Slot, marker: DeckLoopMarker): void {
+    if (marker.ready) {
+      this.arm(slot, marker, false);
+      this.jump(slot, resolvedFrame(marker.start));
+      return;
+    }
+    const via = this.queuedVia[slot];
+    this.queuedVia[slot] = 'ready';
+    this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
+    if (via === 'engine') {
+      this.runtime.queueJump(slot, null);
+    }
+  }
+
+  /** Queues the marker in the engine to land at the end of the running loop's lap. */
+  private queueThroughEngine(slot: Slot, marker: DeckLoopMarker): void {
+    this.queuedVia[slot] = 'engine';
+    this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
+    this.runtime.queueJump(slot, jumpOf(marker));
+  }
+
+  /** Drops the queued marker, and the engine's queue when that is where it waits. */
+  private cancelQueue(slot: Slot): void {
+    const via = this.queuedVia[slot];
+    this.queuedVia[slot] = null;
+    this.setActivity(slot, this.loopsOf(slot).runningId, null, false);
+    if (via === 'engine') {
+      this.runtime.queueJump(slot, null);
+    }
+  }
+
+  /**
+   * Makes `marker` what the engine runs: its loop, or no loop for a cue, with the queue cleared.
+   * The caller moves the playhead. The selection follows when `follow` is set.
+   */
+  private arm(slot: Slot, marker: DeckLoopMarker, follow: boolean): void {
+    const bounds = loopBoundsOf(marker);
+    this.queuedVia[slot] = null;
+    this.engaged[slot] = bounds;
+    this.setActivity(slot, bounds === null ? null : marker.id, null, false);
+    if (follow) {
+      this.selectId(slot, marker.id);
+    }
+    this.runtime.setActiveLoop(slot, bounds);
+  }
+
+  private jump(slot: Slot, frame: number): void {
+    this.runtime
+      .seekToFrame(slot, frame)
+      .catch((error: unknown) => logError(`DeckLoops: deck ${slot}'s jump failed`, error));
+  }
+
+  /** Forgets the running and queued markers and the bounds the engine was enforcing. Touches
+   *  nothing in the engine. */
+  private resetActivity(slot: Slot): void {
+    this.queuedVia[slot] = null;
+    this.engaged[slot] = null;
+    this.setActivity(slot, null, null, false);
+  }
+
+  private setActivity(
+    slot: Slot,
+    runningId: string | null,
+    queuedId: string | null,
+    selectionMovedWhileQueued: boolean
+  ): void {
+    const current = this.loopsOf(slot);
+    if (
+      current.runningId !== runningId ||
+      current.queuedId !== queuedId ||
+      current.selectionMovedWhileQueued !== selectionMovedWhileQueued
+    ) {
+      this.store.setLoopActivity({ slot, runningId, queuedId, selectionMovedWhileQueued });
+    }
   }
 
   /** Declares the sorted, unique resolved start frames of the deck's markers. Ends are never
