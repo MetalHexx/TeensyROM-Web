@@ -234,6 +234,31 @@ application dj-mixer`, `pnpm nx build teensyrom-ui` and the five DJ end-to-end s
 (`dj-mixer-*.cy.ts`, 43 tests, run against `serve-static` with `--excludeTaskDependencies` because
 Cypress gave up waiting for the production build the dependent task starts) pass.
 
+### Audition on every edit
+
+Driven as above against the running dev server: `/dj-mixer` in a 1920 x 1080 same-origin iframe,
+`InSID3_Out.sid` (161 s at 100 play calls a second, so a second is 100 frames) from a local CORS
+server with the iframe's `fetch` stubbed, deck A loaded through `DeckService.load`. The nudge strips
+were released with `input` then `change` events and the snap keys pressed with DOM clicks, with every
+`seekToFrame` logged against the time of the release. The MIDI snap path was not driven (no
+controller here); it reaches the same `snapMarker` and is covered by the specs.
+
+Deck A playing, a loop at 2394-3481 running: a start nudge of +30 held the old bounds for about 120
+ms, then made one seek to 2424; start snaps next and previous sought to 2427 and 2311 after 125 and
+94 ms; an end nudge of -50 sought at once to 3231 (the end less two seconds), and end snaps to
+3259 and 3263 likewise. The same on the loop after Stop loop (idle) re-engaged it each time (start
+nudge +20 to 2414 after about 100 ms, end nudge +40 to 3321, start snap to 2463). With the deck paused
+a nudge resumed playback and then sought (end +10 to 3291, start +50 to 2444 on the running loop); with
+it stopped, a start snap restarted it from the top and then landed at 2311. An end snap key that was
+disabled (no moment in reach) was not pressed.
+
+Deep marker, on a fresh page with only the one cue, at frame 13108 (131 s): start nudges to 13138,
+13068 and 13168 landed 438, 579 and 576 ms after the release, against 92-162 ms for marks at 10-154
+s that had another prepared mark nearer. About half a second is noticeable. A start edit withdraws
+the old start's prepared image and a live-captured marker's image is never a chain source, so the new
+start is replayed from the nearest prepared mark. Follow-up for the engine's prepared builds;
+`sidablist` is unchanged here.
+
 ### Bundle check (loops and cues)
 
 `pnpm nx build teensyrom-ui` on this branch against `main` (3899450b, after ASID-DJ-9 and
@@ -262,6 +287,9 @@ final commit of the phase corrective, after the loop controls were mapped.
   controller.
 - [ ] A loop is added and its end set mid-set from the controller, then corrected with snap.
 - [ ] A long tune reloaded has its loops ready within about a second.
+- [ ] A running loop dialed in by slider, mouse snap and controller snap: each edit is heard at
+  once, a start from the start of the loop and an end two seconds before the wrap.
+- [ ] A start edit on a marker deep in a long tune lands without a noticeable wait.
 - [ ] The speed controls work inside a loop, and the speed is kept on leaving it.
 - [ ] The other deck's timing is unaffected while one deck loads or rebuilds.
 

@@ -451,7 +451,7 @@ export class DjDeckColumnComponent {
   }
 
   onSnap({ boundary, direction }: LoopBoundarySnap): void {
-    this.deckService.snapMarker(this.deck().slot, boundary, direction);
+    void this.deckService.snapMarker(this.deck().slot, boundary, direction);
   }
 
   onNudgeInput({ boundary, offsetFrames }: LoopBoundaryNudge): void {
@@ -459,7 +459,7 @@ export class DjDeckColumnComponent {
   }
 
   onNudgeCommit({ boundary, offsetFrames }: LoopBoundaryNudge): void {
-    this.deckService.nudgeMarker(this.deck().slot, boundary, offsetFrames);
+    void this.deckService.nudgeMarker(this.deck().slot, boundary, offsetFrames);
     (boundary === 'start' ? this.startDragOffset : this.endDragOffset).set(null);
   }
 

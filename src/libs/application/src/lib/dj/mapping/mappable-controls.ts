@@ -271,6 +271,14 @@ export class MappableControls {
     const transport = this.djStore.transportSummary(slot);
     const loops = this.djStore.deckLoops(slot);
     const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
+    const warnOnFailure = (what: string, command: Promise<void>): Promise<void> =>
+      command.catch((error: unknown) =>
+        logWarn(
+          `MappableControls: ${what} on deck ${slot} failed — ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      );
     const seek = this.coalescedSeek(slot);
 
     return [
@@ -321,31 +329,23 @@ export class MappableControls {
         (index) => decks.selectMarkerAt(slot, index)
       ),
       trigger(id('loop-toggle'), 'Loop toggle', () =>
-        decks
-          .toggleMarker(slot)
-          .catch((error: unknown) =>
-            logWarn(
-              `MappableControls: loop toggle on deck ${slot} failed — ${
-                error instanceof Error ? error.message : String(error)
-              }`
-            )
-          )
+        warnOnFailure('loop toggle', decks.toggleMarker(slot))
       ),
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
       trigger(id('loop-set-end'), 'Set loop end', () => decks.setMarkerEnd(slot)),
       trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
       trigger(id('loop-start-snap-previous'), 'Snap loop start back', () =>
-        decks.snapMarker(slot, 'start', 'previous')
+        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'previous'))
       ),
       trigger(id('loop-start-snap-next'), 'Snap loop start forward', () =>
-        decks.snapMarker(slot, 'start', 'next')
+        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'next'))
       ),
       trigger(id('loop-end-snap-previous'), 'Snap loop end back', () =>
-        decks.snapMarker(slot, 'end', 'previous')
+        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'previous'))
       ),
       trigger(id('loop-end-snap-next'), 'Snap loop end forward', () =>
-        decks.snapMarker(slot, 'end', 'next')
+        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'next'))
       ),
       state(
         id('repeat'),

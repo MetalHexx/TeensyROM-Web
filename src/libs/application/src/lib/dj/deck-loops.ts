@@ -87,8 +87,9 @@ function reselect(
  *
  * It also performs the markers: toggling one idle, queued or running, queuing through the engine so
  * the hand-off lands at the end of the lap, following a landing with the selection, keeping a
- * running or queued marker true to its edits, and auditioning a boundary after a nudge. A marker
- * loop is looping when `runningId` is set; the track's own repeat loop counts as nothing looping.
+ * running or queued marker true to its edits, and auditioning a boundary after any boundary edit. A
+ * marker loop is looping when `runningId` is set; the track's own repeat loop counts as nothing
+ * looping.
  *
  * The engine notifies synchronously inside calls such as `capturePosition`, `setJumpTargets`,
  * `setActiveLoop` and `queueJump`, and `reflect` runs in that notification. Every path here
@@ -114,6 +115,10 @@ export class DeckLoops {
   /** The bounds the engine is enforcing for the running marker, which trail its list entry while a
    *  changed start waits for readiness. */
   private readonly engaged: Record<Slot, LoopBounds | null> = { A: null, B: null };
+
+  /** The running marker whose audition is waiting for its changed start to be ready: `reflect` seeks
+   *  to that start once it applies. Held only while that marker runs and nothing else is queued. */
+  private readonly pendingStart: Record<Slot, string | null> = { A: null, B: null };
 
   /** The last `tune.handOffs` `reflect` saw. A landing is only ever this rising: the engine drops
    *  its queue for other reasons too, and this collaborator's own edits are among them. */
@@ -178,7 +183,8 @@ export class DeckLoops {
    *   transport stop, a load), which ends the marker and anything queued. A marker only waiting for
    *   readiness is not seen here — `DeckService` drops it through `disengage` on a stop;
    * - a marker waiting for readiness engages once its start is ready;
-   * - a running marker's changed start applies once that start is ready.
+   * - a running marker's changed start applies once that start is ready, and an audition waiting
+   *   on it seeks there.
    */
   reflect(slot: Slot): void {
     if (this.attached[slot] === null) {
@@ -206,6 +212,7 @@ export class DeckLoops {
     }
     this.engageWhenReady(slot);
     this.syncRunning(slot);
+    this.seekToPendingStart(slot);
   }
 
   /**
@@ -249,23 +256,32 @@ export class DeckLoops {
   }
 
   /**
-   * Plays the selected marker's boundary after a nudge. A start engages now, through the readiness
-   * wait when not ready, taking over from any marker running or queued. An end, on a loop only,
-   * arms the loop and lands two seconds before it so the wrap is heard. Never starts playback.
+   * Plays marker `id`'s boundary after an edit to it, taking over from any marker running or
+   * queued. A start lands on the new start; an end, on a loop only, arms the loop and lands two
+   * seconds before it so the wrap is heard. Skipped unless `id` is still the selected marker, as
+   * the caller may have waited for playback to start. The caller starts playback first; this
+   * never does.
+   *
+   * An idle or queued marker engages now, through the readiness wait when its start is not ready.
+   * A running marker is already on the right bounds, so it only seeks — a start not yet ready
+   * seeks once `reflect` has applied it, the marker staying the running one meanwhile.
    */
-  audition(slot: Slot, boundary: LoopBoundaryName): void {
-    const marker = this.selectedMarker(slot, 'audition');
-    if (marker === null) {
+  audition(slot: Slot, boundary: LoopBoundaryName, id: string): void {
+    const { markers, selectedId, runningId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (marker === undefined || selectedId !== id) {
       return;
     }
-    if (boundary === 'start') {
+    if (runningId === id) {
+      this.auditionRunning(slot, marker, boundary);
+    } else if (boundary === 'start') {
       this.engageOrWait(slot, marker);
-      return;
-    }
-    const bounds = loopBoundsOf(marker);
-    if (bounds !== null) {
-      this.arm(slot, marker, false);
-      this.jump(slot, Math.max(bounds.startFrame, bounds.endFrame - 2 * this.oneSecond(slot)));
+    } else {
+      const bounds = loopBoundsOf(marker);
+      if (bounds !== null) {
+        this.arm(slot, marker, false);
+        this.jump(slot, Math.max(bounds.startFrame, bounds.endFrame - 2 * this.oneSecond(slot)));
+      }
     }
   }
 
@@ -354,38 +370,42 @@ export class DeckLoops {
   }
 
   /** Sets a boundary's nudge to `offsetFrames`, held within one second either way and so the loop's
-   *  end stays after its start. */
-  nudge(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): void {
+   *  end stays after its start. Returns the edited marker's id for the caller to `audition`, even
+   *  when the boundary did not move; null when the edit was refused. */
+  nudge(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): string | null {
     const marker = this.selectedMarker(slot, 'nudge');
     if (marker === null || !Number.isFinite(offsetFrames)) {
-      return;
+      return null;
     }
     const target = this.boundaryOf(slot, marker, boundary, 'nudge');
     if (target === null) {
-      return;
+      return null;
     }
+    // The caller's audition replaces any seek still waiting on an earlier start edit.
+    this.pendingStart[slot] = null;
     const { min, max } = nudgeLimits(marker, boundary, this.oneSecond(slot));
     const offset = clamp(Math.round(offsetFrames), min, max);
-    if (offset === target.offsetFrames) {
-      return;
+    if (offset !== target.offsetFrames) {
+      const moved = { ...target, offsetFrames: offset };
+      this.replaceSelected(
+        slot,
+        boundary === 'start' ? { ...marker, start: moved } : { ...marker, end: moved }
+      );
     }
-    const moved = { ...target, offsetFrames: offset };
-    this.replaceSelected(
-      slot,
-      boundary === 'start' ? { ...marker, start: moved } : { ...marker, end: moved }
-    );
+    return marker.id;
   }
 
   /** Nudges a boundary to the next detected moment in `direction` within a second of where it was
-   *  captured; does nothing when there is none. Never auditions. */
-  snap(slot: Slot, boundary: LoopBoundaryName, direction: LoopSnapDirection): void {
+   *  captured. Returns the edited marker's id for the caller to `audition`, even when no moment is
+   *  in reach and the boundary stays put; null when the edit was refused. */
+  snap(slot: Slot, boundary: LoopBoundaryName, direction: LoopSnapDirection): string | null {
     const marker = this.selectedMarker(slot, 'snap');
     if (marker === null) {
-      return;
+      return null;
     }
     const target = this.boundaryOf(slot, marker, boundary, 'snap');
     if (target === null) {
-      return;
+      return null;
     }
     const offset = nextOffset(
       this.loopsOf(slot).detectedMoments,
@@ -394,9 +414,7 @@ export class DeckLoops {
       this.oneSecond(slot),
       direction
     );
-    if (offset !== null) {
-      this.nudge(slot, boundary, offset);
-    }
+    return offset === null ? marker.id : this.nudge(slot, boundary, offset);
   }
 
   /** Lands a changed list on the slot, saves it, and gives it to the other deck when that deck
@@ -413,6 +431,8 @@ export class DeckLoops {
     const otherIdentity = this.attached[other];
     if (otherIdentity !== null && sameTune(identity, otherIdentity)) {
       const { markers: before, selectedId: beforeId } = this.loopsOf(other);
+      // An edit from this deck never moves the other deck's playhead.
+      this.pendingStart[other] = null;
       this.land(other, markers, reselect(before, beforeId, markers));
     }
   }
@@ -518,6 +538,40 @@ export class DeckLoops {
     }
   }
 
+  /** Seeks the running marker to its changed start once `syncRunning` has applied it, then lets go
+   *  of the wait. */
+  private seekToPendingStart(slot: Slot): void {
+    const id = this.pendingStart[slot];
+    const engaged = this.engaged[slot];
+    const marker = this.loopsOf(slot).markers.find((candidate) => candidate.id === id);
+    if (marker?.ready && engaged?.startFrame === resolvedFrame(marker.start)) {
+      this.pendingStart[slot] = null;
+      this.jump(slot, engaged.startFrame);
+    }
+  }
+
+  /** Auditions a boundary of the marker the deck is already running. Anything queued is dropped, but
+   *  the engine is left on the bounds `syncRunning` holds: re-arming would replace the entry image
+   *  the tracker keeps for the loop. */
+  private auditionRunning(slot: Slot, marker: DeckLoopMarker, boundary: LoopBoundaryName): void {
+    const engaged = this.engaged[slot];
+    this.cancelQueue(slot);
+    if (boundary === 'end') {
+      this.pendingStart[slot] = null;
+      if (marker.end !== null && engaged !== null) {
+        this.jump(
+          slot,
+          Math.max(engaged.startFrame, resolvedFrame(marker.end) - 2 * this.oneSecond(slot))
+        );
+      }
+    } else if (marker.ready) {
+      this.pendingStart[slot] = null;
+      this.jump(slot, resolvedFrame(marker.start));
+    } else {
+      this.pendingStart[slot] = marker.id;
+    }
+  }
+
   /** Engages the marker waiting for readiness once its start is ready. */
   private engageWhenReady(slot: Slot): void {
     const { markers, queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
@@ -598,6 +652,10 @@ export class DeckLoops {
     queuedId: string | null,
     selectionMovedWhileQueued: boolean
   ): void {
+    // The wait for a changed start ends with the marker's run, or as soon as another is queued.
+    if (this.pendingStart[slot] !== runningId || queuedId !== null) {
+      this.pendingStart[slot] = null;
+    }
     const current = this.loopsOf(slot);
     if (
       current.runningId !== runningId ||

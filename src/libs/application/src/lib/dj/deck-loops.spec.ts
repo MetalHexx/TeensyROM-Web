@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { FakeClock, milliseconds, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
@@ -683,7 +683,7 @@ describe('DeckLoops', () => {
     });
 
     it('refuses an end nudge on a cue', () => {
-      loops.nudge('A', 'end', 5);
+      expect(loops.nudge('A', 'end', 5)).toBeNull();
 
       expect(refusals()).toHaveLength(1);
       expect(stateOf('A').markers[0]).toMatchObject({ end: null });
@@ -692,7 +692,16 @@ describe('DeckLoops', () => {
     it('ignores a value that is not a number', () => {
       const before = stateOf('A').markers;
 
-      loops.nudge('A', 'start', Number.NaN);
+      expect(loops.nudge('A', 'start', Number.NaN)).toBeNull();
+
+      expect(stateOf('A').markers).toBe(before);
+    });
+
+    it('returns the edited marker, also when the boundary stays where it was', () => {
+      expect(loops.nudge('A', 'start', 5)).toBe('cue');
+      const before = stateOf('A').markers;
+
+      expect(loops.nudge('A', 'start', 5)).toBe('cue');
 
       expect(stateOf('A').markers).toBe(before);
     });
@@ -734,17 +743,21 @@ describe('DeckLoops', () => {
       expect(stateOf('A').markers[1].end?.offsetFrames).toBe(-14);
     });
 
-    it('does nothing when no moment is in reach', () => {
+    it('leaves the boundary alone when no moment is in reach, and still returns the marker', () => {
       loops.select('A', 'loop');
       const before = stateOf('A').markers;
 
-      loops.snap('A', 'start', 'previous');
+      expect(loops.snap('A', 'start', 'previous')).toBe('loop');
 
       expect(stateOf('A').markers).toBe(before);
     });
 
+    it('returns the snapped marker', () => {
+      expect(loops.snap('A', 'start', 'next')).toBe('cue');
+    });
+
     it('refuses an end snap on a cue', () => {
-      loops.snap('A', 'end', 'next');
+      expect(loops.snap('A', 'end', 'next')).toBeNull();
 
       expect(refusals()).toHaveLength(1);
     });
@@ -1257,12 +1270,12 @@ describe('DeckLoops', () => {
     });
 
     describe('auditioning', () => {
-      it('engages the selected marker from its start, taking over from the running one', async () => {
+      it('engages the edited marker from its start, taking over from the running one', async () => {
         await engage('a');
         loops.toggle('A', 'c');
         loops.select('A', 'b');
 
-        loops.audition('A', 'start');
+        loops.audition('A', 'start', 'b');
         await flush();
 
         expect(stateOf('A').runningId).toBe('b');
@@ -1277,7 +1290,7 @@ describe('DeckLoops', () => {
         loops.select('A', 'b');
         loops.nudge('A', 'start', 5);
 
-        loops.audition('A', 'start');
+        loops.audition('A', 'start', 'b');
         expect(stateOf('A').runningId).toBeNull();
         expect(stateOf('A').queuedId).toBe('b');
 
@@ -1294,7 +1307,7 @@ describe('DeckLoops', () => {
         loops.select('A', 'b');
         loops.nudge('A', 'start', 5);
 
-        loops.audition('A', 'start');
+        loops.audition('A', 'start', 'b');
 
         expect(engineQueue('A')).toBeNull();
         tick('A', 120);
@@ -1306,7 +1319,7 @@ describe('DeckLoops', () => {
       it('arms a loop and lands two seconds before its end', async () => {
         loops.select('A', 'wide');
 
-        loops.audition('A', 'end');
+        loops.audition('A', 'end', 'wide');
         await flush();
 
         expect(stateOf('A').runningId).toBe('wide');
@@ -1317,7 +1330,7 @@ describe('DeckLoops', () => {
       it('lands no earlier than the loop start', async () => {
         loops.select('A', 'a');
 
-        loops.audition('A', 'end');
+        loops.audition('A', 'end', 'a');
         await flush();
 
         expect(runtime.position('A')).toBe(100);
@@ -1327,7 +1340,7 @@ describe('DeckLoops', () => {
         loops.select('A', 'c');
         const seek = vi.spyOn(runtime, 'seekToFrame');
 
-        loops.audition('A', 'end');
+        loops.audition('A', 'end', 'c');
         await flush();
 
         expect(stateOf('A').runningId).toBeNull();
@@ -1339,11 +1352,251 @@ describe('DeckLoops', () => {
         runtime.pause('A');
         loops.select('A', 'b');
 
-        loops.audition('A', 'start');
+        loops.audition('A', 'start', 'b');
         await flush();
 
         expect(runtime.snapshot('A').transport).toBe('paused');
         expect(stateOf('A').runningId).toBe('b');
+      });
+
+      it('skips a marker that is no longer the selected one, or is gone', async () => {
+        loops.select('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.audition('A', 'start', 'b');
+        loops.audition('A', 'start', 'missing');
+        await flush();
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(seek).not.toHaveBeenCalled();
+      });
+
+      describe('a queued marker', () => {
+        beforeEach(async () => {
+          await engage('a');
+          loops.toggle('A', 'wide');
+          loops.select('A', 'wide');
+        });
+
+        it('lands at once for an end edit, with nothing left in the engine queue', async () => {
+          loops.nudge('A', 'end', 10);
+          loops.audition('A', 'end', 'wide');
+          await flush();
+
+          expect(stateOf('A').runningId).toBe('wide');
+          expect(stateOf('A').queuedId).toBeNull();
+          expect(engineQueue('A')).toBeNull();
+          expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810 });
+          expect(runtime.position('A')).toBe(810 - 2 * SECOND);
+        });
+
+        it('drops the engine queue for a start edit and lands once the start is ready', async () => {
+          gates.A.holding = true;
+          loops.nudge('A', 'start', 10);
+          loops.audition('A', 'start', 'wide');
+
+          expect(engineQueue('A')).toBeNull();
+          expect(stateOf('A').runningId).toBe('a');
+          expect(stateOf('A').queuedId).toBe('wide');
+          tick('A', 120);
+          expect(handOffsOf('A')).toBe(0);
+
+          await settle();
+
+          expect(stateOf('A').runningId).toBe('wide');
+          expect(stateOf('A').queuedId).toBeNull();
+          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+          expect(runtime.position('A')).toBe(610);
+        });
+      });
+    });
+
+    describe('auditioning a running marker', () => {
+      beforeEach(async () => {
+        await engage('wide');
+        loops.select('A', 'wide');
+      });
+
+      function editStart(offsetFrames: number): void {
+        loops.nudge('A', 'start', offsetFrames);
+        loops.audition('A', 'start', 'wide');
+      }
+
+      function editEnd(offsetFrames: number): void {
+        loops.nudge('A', 'end', offsetFrames);
+        loops.audition('A', 'end', 'wide');
+      }
+
+      it('seeks to two seconds before a new end, leaving the engine on the bounds it holds', async () => {
+        loops.nudge('A', 'end', 10);
+        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
+
+        loops.audition('A', 'end', 'wide');
+        await flush();
+
+        expect(setActiveLoop).not.toHaveBeenCalled();
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810 });
+        expect(stateOf('A').runningId).toBe('wide');
+        expect(runtime.position('A')).toBe(810 - 2 * SECOND);
+      });
+
+      it('drops what is queued, and the loop plays on without handing off', async () => {
+        loops.toggle('A', 'b');
+
+        editEnd(10);
+        await flush();
+        tick('A', 400);
+
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(stateOf('A').runningId).toBe('wide');
+        expect(handOffsOf('A')).toBe(0);
+      });
+
+      it('seeks to a new start at once when it is already ready', async () => {
+        await placeMarker('A', 610);
+        await settle();
+        loops.select('A', 'wide');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        editStart(10);
+        await flush();
+
+        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+        expect(seek).toHaveBeenCalledTimes(1);
+        expect(seek).toHaveBeenCalledWith('A', 610);
+        expect(stateOf('A').queuedId).toBeNull();
+      });
+
+      describe('while a new start is not ready', () => {
+        let seek: MockInstance<DeckRuntime['seekToFrame']>;
+
+        beforeEach(() => {
+          seek = vi.spyOn(runtime, 'seekToFrame');
+          gates.A.holding = true;
+        });
+
+        it('keeps the old bounds and the running marker, then seeks once to the new start', async () => {
+          const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
+
+          editStart(10);
+          await flush();
+
+          expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+          expect(stateOf('A').runningId).toBe('wide');
+          expect(stateOf('A').queuedId).toBeNull();
+          expect(setActiveLoop).not.toHaveBeenCalled();
+          expect(seek).not.toHaveBeenCalled();
+
+          await settle();
+
+          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+          expect(setActiveLoop).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenCalledWith('A', 610);
+          expect(runtime.position('A')).toBe(610);
+        });
+
+        it('goes to the newest start when the start is edited again', async () => {
+          editStart(10);
+          editStart(20);
+
+          await settle();
+
+          expect(engineLoop('A')).toEqual({ startFrame: 620, endFrame: 800 });
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenCalledWith('A', 620);
+        });
+
+        it('auditions an end edit at once and never jumps back to the start', async () => {
+          editStart(10);
+
+          editEnd(-10);
+          await flush();
+
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenLastCalledWith('A', 790 - 2 * SECOND);
+
+          await settle();
+
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 790 });
+        });
+
+        it('is dropped by a Stop', async () => {
+          editStart(10);
+
+          loops.stop('A');
+          await settle();
+
+          expect(seek).not.toHaveBeenCalled();
+          expect(stateOf('A').runningId).toBeNull();
+          expect(engineLoop('A')).toBeNull();
+
+          loops.toggle('A', 'wide');
+          await flush();
+
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenCalledWith('A', 610);
+        });
+
+        it('is dropped by a transport stop', async () => {
+          editStart(10);
+
+          runtime.stop('A');
+          await settle();
+
+          expect(seek).not.toHaveBeenCalled();
+          expect(stateOf('A').runningId).toBeNull();
+        });
+
+        it('is dropped by a queued marker landing', async () => {
+          editStart(10);
+          loops.toggle('A', 'b');
+
+          tickUntil('A', () => handOffsOf('A') === 1);
+          await settle();
+
+          expect(stateOf('A').runningId).toBe('b');
+          expect(seek).not.toHaveBeenCalled();
+        });
+
+        it('is dropped by another marker being queued', async () => {
+          editStart(10);
+          loops.toggle('A', 'c');
+
+          await settle();
+
+          expect(stateOf('A').runningId).toBe('wide');
+          expect(stateOf('A').queuedId).toBe('c');
+          expect(seek).not.toHaveBeenCalled();
+        });
+
+        it('is dropped by another marker being engaged', async () => {
+          editStart(10);
+
+          loops.select('A', 'b');
+          loops.audition('A', 'start', 'b');
+          await settle();
+
+          expect(stateOf('A').runningId).toBe('b');
+          expect(seek).toHaveBeenCalledTimes(1);
+          expect(seek).toHaveBeenCalledWith('A', 300);
+        });
+
+        it("is dropped by an edit arriving from the other deck, which never moves this deck's playhead", async () => {
+          await loadOn('B', TUNE_X);
+          editStart(10);
+          seek.mockClear();
+
+          loops.select('B', 'wide');
+          loops.nudge('B', 'end', -10);
+          await settle();
+
+          expect(seek).not.toHaveBeenCalled();
+          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 790 });
+        });
       });
     });
 

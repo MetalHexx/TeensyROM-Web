@@ -341,6 +341,21 @@ describe('MappableControls', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
     });
 
+    it.each([
+      ['loop-start-snap-previous'],
+      ['loop-start-snap-next'],
+      ['loop-end-snap-previous'],
+      ['loop-end-snap-next'],
+    ] as const)('%s logs a rejected snap instead of leaving it unhandled', async (id) => {
+      vi.spyOn(h.deckService, 'snapMarker').mockRejectedValue(new Error('boom'));
+      vi.mocked(logWarn).mockClear();
+
+      pick('A', id, 'trigger').fire();
+      await flush();
+
+      expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
+    });
+
     describe('loop-select', () => {
       it('counts its range from the markers and reads the selected index, 0 when none', () => {
         const select = pick('A', 'loop-select', 'value');

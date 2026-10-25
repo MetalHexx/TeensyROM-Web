@@ -444,15 +444,11 @@ export class DeckService {
   }
 
   /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
-   *  auditions it. A running marker is not auditioned: the nudge already reaches the engine. */
-  nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): void {
-    if (!this.canShape(slot, 'nudgeMarker')) {
-      return;
-    }
-    this.loops.nudge(slot, boundary, offsetFrames);
-    const { selectedId, runningId } = this.store.loops()[slot];
-    if (selectedId !== null && selectedId !== runningId) {
-      this.loops.audition(slot, boundary);
+   *  auditions it on this deck, whatever is running or queued. The edit lands before the first
+   *  await; a deck that is not playing is started first, as `toggleMarker` does. */
+  async nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): Promise<void> {
+    if (this.canShape(slot, 'nudgeMarker')) {
+      await this.auditionEdit(slot, boundary, this.loops.nudge(slot, boundary, offsetFrames));
     }
   }
 
@@ -488,10 +484,15 @@ export class DeckService {
     }
   }
 
-  /** Nudges a boundary of the selected marker onto the next detected moment in `direction`. */
-  snapMarker(slot: Slot, boundary: LoopBoundaryName, direction: LoopSnapDirection): void {
+  /** Nudges a boundary of the selected marker onto the next detected moment in `direction`, then
+   *  auditions it as `nudgeMarker` does — also when no moment is in reach. */
+  async snapMarker(
+    slot: Slot,
+    boundary: LoopBoundaryName,
+    direction: LoopSnapDirection
+  ): Promise<void> {
     if (this.canShape(slot, 'snapMarker')) {
-      this.loops.snap(slot, boundary, direction);
+      await this.auditionEdit(slot, boundary, this.loops.snap(slot, boundary, direction));
     }
   }
 
@@ -602,6 +603,27 @@ export class DeckService {
       this.runtime.setVoiceHeld(slot, voice, false);
     }
     this.reflectEngineControls(slot);
+  }
+
+  /** Auditions the boundary of marker `edited` — the marker an accepted edit just changed; null for
+   *  a refused one, which starts nothing. A deck that is not playing is started first, which
+   *  resumes a pause and restarts a stop from the top. The marker is fixed up front, since a
+   *  selection change can land during that wait, and `DeckLoops` skips it then. */
+  private async auditionEdit(
+    slot: Slot,
+    boundary: LoopBoundaryName,
+    edited: string | null
+  ): Promise<void> {
+    if (edited === null) {
+      return;
+    }
+    if (this.store.deck(slot)().status !== 'playing') {
+      await this.togglePlayPause(slot);
+      if (this.store.deck(slot)().status !== 'playing') {
+        return;
+      }
+    }
+    this.loops.audition(slot, boundary, edited);
   }
 
   /** Drops the marker loop and anything queued behind it or waiting for readiness; a no-op while
