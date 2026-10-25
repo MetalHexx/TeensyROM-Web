@@ -111,14 +111,27 @@ function toPercent(amount: number): number {
 }
 
 /** The amount field for a style that takes one, or `null`. The field works in percent, and the
- *  mapping keeps a fraction. A whole-step control has none: its amount changes nothing. */
+ *  mapping keeps a fraction. A whole-step control moves one place whatever the amount, so a
+ *  relative style has none and a step style shows the amount only for its sign: the direction. */
 function amountField(
   control: MappableControl,
   kind: MappingStyleKind,
   amount: number | null
 ): BindingRowAmount | null {
-  if (amount === null || (control.nature === 'value' && control.wholeSteps)) {
+  if (amount === null) {
     return null;
+  }
+  if (control.nature === 'value' && control.wholeSteps) {
+    return isStepKind(kind)
+      ? {
+          label: 'Direction (+ next, − previous)',
+          value: toPercent(amount),
+          min: -100,
+          max: 100,
+          step: 0.1,
+          suffix: '%',
+        }
+      : null;
   }
   if (isRelativeKind(kind)) {
     return {

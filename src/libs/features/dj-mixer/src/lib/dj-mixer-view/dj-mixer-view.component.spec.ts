@@ -126,7 +126,8 @@ function createDjStoreStub() {
   return {
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
-    loopsSummary: () => signal({ hasTune: false, canAdd: false, canStop: false, items: [], selected: null }),
+    loopsSummary: () =>
+      signal({ hasTune: false, canAdd: false, canStop: false, items: [], selected: null }),
     loopLapPercent: () => signal(0),
     bindings: signal({
       A: { device: null, portId: null, present: false, error: null },

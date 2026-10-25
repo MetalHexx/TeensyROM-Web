@@ -367,9 +367,18 @@ describe('MappableControls', () => {
       it('offers only the relative and step styles and moves whole steps', () => {
         const select = pick('A', 'loop-select', 'value');
 
-        expect(select.styles).toEqual(['relative-offset', 'relative-signed', 'step', 'step-release']);
+        expect(select.styles).toEqual([
+          'relative-offset',
+          'relative-signed',
+          'step',
+          'step-release',
+        ]);
         expect(select.wholeSteps).toBe(true);
-        expect(select.defaults).toEqual({ ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 });
+        expect(select.defaults).toEqual({
+          ccStyle: 'relative-offset',
+          sensitivity: 1,
+          stepAmount: 1,
+        });
       });
     });
   });

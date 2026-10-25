@@ -177,6 +177,44 @@ export const ManyMarkers: Story = {
   },
 };
 
+/** The six items of the queued-jump sequence, with the given states applied by item number. */
+function jumpTiles(states: Record<number, Partial<LoopTileModel>>): LoopTileModel[] {
+  const lengths = ['7.8s', '13.4s', 'CUE', '8.0s', '8.0s', 'CUE'];
+  return lengths.map((lengthText, index) =>
+    tile(index + 1, {
+      kind: lengthText === 'CUE' ? 'cue' : 'loop',
+      lengthText,
+      ...states[index + 1],
+    })
+  );
+}
+
+/** A queued jump, step 1: Item 2 runs, Item 4 is queued, and the knob has moved on to Item 5. */
+export const QueuedJumpKnobMovedOn: Story = {
+  args: {
+    runningProgressPercent: 53,
+    model: plateModel(
+      jumpTiles({ 2: { activity: 'running' }, 4: { activity: 'queued' }, 5: { selected: true } })
+    ),
+  },
+};
+
+/** A queued jump, step 2: the lap ended, Item 4 runs, and the selection stays on Item 5. */
+export const QueuedJumpLapEnded: Story = {
+  args: {
+    runningProgressPercent: 12,
+    model: plateModel(jumpTiles({ 4: { activity: 'running' }, 5: { selected: true } })),
+  },
+};
+
+/** A queued jump, step 3: the knob was left alone, so the selection follows to Item 4. */
+export const QueuedJumpSelectionFollows: Story = {
+  args: {
+    runningProgressPercent: 12,
+    model: plateModel(jumpTiles({ 4: { activity: 'running', selected: true } })),
+  },
+};
+
 /** The narrow layout at about 300px. */
 export const Narrow: Story = {
   args: FewMarkers.args,

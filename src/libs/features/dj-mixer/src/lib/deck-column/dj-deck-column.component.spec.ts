@@ -278,16 +278,15 @@ function dropEventWithPayload(payload: DjFileDragPayload | null): DragEvent {
   const event = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
   const dataTransfer = {
     types: payload ? [DJ_FILE_DRAG_TYPE] : [],
-    getData: (type: string) => (payload && type === DJ_FILE_DRAG_TYPE ? JSON.stringify(payload) : ''),
+    getData: (type: string) =>
+      payload && type === DJ_FILE_DRAG_TYPE ? JSON.stringify(payload) : '',
   } as unknown as DataTransfer;
   Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true });
   return event;
 }
 
 function gridAreas(fixture: ComponentFixture<DjDeckColumnComponent>): string[] {
-  return Array.from(fixture.nativeElement.children).map(
-    (el) => (el as HTMLElement).style.gridArea
-  );
+  return Array.from(fixture.nativeElement.children).map((el) => (el as HTMLElement).style.gridArea);
 }
 
 function transport(fixture: ComponentFixture<DjDeckColumnComponent>): DeckTransportComponent {
@@ -370,7 +369,13 @@ describe('DjDeckColumnComponent', () => {
           canStop: true,
           items: [
             loopItem({ activity: 'running', selected: true }),
-            loopItem({ id: 'm2', name: 'Item 2', kind: 'cue', lengthText: 'CUE', endPercent: null }),
+            loopItem({
+              id: 'm2',
+              name: 'Item 2',
+              kind: 'cue',
+              lengthText: 'CUE',
+              endPercent: null,
+            }),
             loopItem({ id: 'm3', name: 'Item 3', activity: 'queued', ready: false }),
           ],
           selected: selection(),
@@ -469,12 +474,15 @@ describe('DjDeckColumnComponent', () => {
       ['clearEnd', 'clearMarkerEnd', undefined, ['B']],
       ['deleteSelected', 'deleteMarker', undefined, ['B']],
       ['snap', 'snapMarker', { boundary: 'end', direction: 'next' }, ['B', 'end', 'next']],
-    ] as const)('routes the plate output %s to DeckService.%s with the slot', (output, method, payload, args) => {
-      const { fixture, deckService } = render(DECK_B);
-      (plate(fixture)[output] as { emit: (value: unknown) => void }).emit(payload);
+    ] as const)(
+      'routes the plate output %s to DeckService.%s with the slot',
+      (output, method, payload, args) => {
+        const { fixture, deckService } = render(DECK_B);
+        (plate(fixture)[output] as { emit: (value: unknown) => void }).emit(payload);
 
-      expect(deckService[method]).toHaveBeenCalledWith(...args);
-    });
+        expect(deckService[method]).toHaveBeenCalledWith(...args);
+      }
+    );
 
     describe('the nudge pins', () => {
       const withSelection = (id: string) =>
@@ -600,7 +608,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it("the toggle's showing follows the summary", () => {
-      const { fixture } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { showing: 'pause' } });
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { showing: 'pause' } }
+      );
 
       expect(fixture.componentInstance.transportModel().playPause.showing).toBe('pause');
       expect(transport(fixture).model().playPause.showing).toBe('pause');
@@ -622,7 +633,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('uses the drag pin for positionPercent while held, falling back to the summary otherwise', () => {
-      const { fixture } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { scrubPercent: 33 } });
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { scrubPercent: 33 } }
+      );
 
       expect(fixture.componentInstance.positionPercent()).toBe(33);
 
@@ -680,7 +694,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('pins the position on scrubCommit, dispatches seek, and releases the pin once it lands', async () => {
-      const { fixture, deckService } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { scrubPercent: 0 } });
+      const { fixture, deckService } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { scrubPercent: 0 } }
+      );
       let landSeek: () => void = () => undefined;
       deckService.seek.mockImplementation(
         () =>
@@ -747,12 +764,24 @@ describe('DjDeckColumnComponent', () => {
       const { fixture, store, deckService } = renderLive(DECK_B);
       const voices = store.decks().B.voices;
 
-      store.setDeckEngineControls({ slot: 'B', speed: 1.7, faderSpeed: 1.7, nudging: false, voices });
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 1.7,
+        faderSpeed: 1.7,
+        nudging: false,
+        voices,
+      });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(1.5);
       expect(strip(fixture).model().speedText).toBe('1.700×');
 
-      store.setDeckEngineControls({ slot: 'B', speed: 0.3, faderSpeed: 0.3, nudging: false, voices });
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 0.3,
+        faderSpeed: 0.3,
+        nudging: false,
+        voices,
+      });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(0.5);
       expect(strip(fixture).model().speedText).toBe('0.300×');
@@ -1021,7 +1050,7 @@ describe('DjDeckColumnComponent', () => {
       expect(deckService.bindDevice).toHaveBeenCalledWith('B', null);
     });
 
-    it('dispatches enableMidi and identify with this deck\'s slot', () => {
+    it("dispatches enableMidi and identify with this deck's slot", () => {
       const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
       bindingPlate(fixture).enableMidi.emit();
@@ -1073,8 +1102,11 @@ describe('DjDeckColumnComponent', () => {
       expect(el.classList.contains('drop-overlay--hot')).toBe(false);
     });
 
-    it('dispatches load with this deck\'s slot and the dropped payload', () => {
-      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+    it("dispatches load with this deck's slot and the dropped payload", () => {
+      const { fixture, deckService } = render(
+        { slot: 'B', letter: 'B', index: 1 },
+        { dropActive: true }
+      );
       const el = overlay(fixture) as HTMLElement;
       const payload: DjFileDragPayload = {
         deviceId: 'device-1',
@@ -1089,7 +1121,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('dispatches nothing on a drop without the DJ file type', () => {
-      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+      const { fixture, deckService } = render(
+        { slot: 'B', letter: 'B', index: 1 },
+        { dropActive: true }
+      );
       const el = overlay(fixture) as HTMLElement;
 
       el.dispatchEvent(dropEventWithPayload(null));

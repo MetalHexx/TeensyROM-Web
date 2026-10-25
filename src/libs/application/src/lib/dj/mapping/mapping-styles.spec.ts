@@ -3,12 +3,10 @@ import type { MappableControl, ValueDefaults } from './mappable-controls';
 import type { MappingStyleKind } from '../ports';
 import {
   actionOf,
-  actionsFor,
   actionsForControl,
   clampAmount,
   defaultAmountFor,
   defaultStyle,
-  isStyleAvailable,
   isStyleAvailableFor,
   kindFor,
   relativeTicks,
@@ -91,10 +89,10 @@ describe('stylesFor', () => {
     expect(stylesFor(nature, sourceKind)).toEqual(expected);
   });
 
-  it('agrees with isStyleAvailable', () => {
-    expect(isStyleAvailable('value', 'note', 'absolute')).toBe(false);
-    expect(isStyleAvailable('value', 'cc', 'absolute')).toBe(true);
-    expect(isStyleAvailable('trigger', 'cc', 'latch')).toBe(false);
+  it('agrees with isStyleAvailableFor on a control with no style list', () => {
+    expect(isStyleAvailableFor(knob, 'note', 'absolute')).toBe(false);
+    expect(isStyleAvailableFor(knob, 'cc', 'absolute')).toBe(true);
+    expect(isStyleAvailableFor(trigger, 'cc', 'latch')).toBe(false);
   });
 });
 
@@ -135,16 +133,19 @@ describe('action and trigger', () => {
   });
 
   it.each([
-    ['trigger', 'note', ['fire']],
-    ['trigger', 'cc', ['fire']],
-    ['state', 'note', ['toggle', 'on', 'off']],
-    ['state', 'cc', ['toggle', 'on', 'off']],
-    ['hold', 'note', ['hold']],
-    ['value', 'note', ['step']],
-    ['value', 'cc', ['absolute', 'relative-offset', 'relative-signed', 'step']],
-  ] as const)('%s from a %s source offers the actions %j', (nature, sourceKind, expected) => {
-    expect(actionsFor(nature, sourceKind)).toEqual(expected);
-  });
+    ['trigger', 'note', trigger, ['fire']],
+    ['trigger', 'cc', trigger, ['fire']],
+    ['state', 'note', toggle, ['toggle', 'on', 'off']],
+    ['state', 'cc', toggle, ['toggle', 'on', 'off']],
+    ['hold', 'note', held, ['hold']],
+    ['value', 'note', knob, ['step']],
+    ['value', 'cc', knob, ['absolute', 'relative-offset', 'relative-signed', 'step']],
+  ] as const)(
+    '%s from a %s source offers the actions',
+    (_nature, sourceKind, control, expected) => {
+      expect(actionsForControl(control, sourceKind)).toEqual(expected);
+    }
+  );
 });
 
 const selector = {
@@ -157,7 +158,12 @@ describe('the control-aware styles', () => {
   it('offer a control with no style list what its nature offers', () => {
     expect(stylesForControl(knob, 'cc')).toEqual(stylesFor('value', 'cc'));
     expect(stylesForControl(trigger, 'note')).toEqual(stylesFor('trigger', 'note'));
-    expect(actionsForControl(knob, 'cc')).toEqual(actionsFor('value', 'cc'));
+    expect(actionsForControl(knob, 'cc')).toEqual([
+      'absolute',
+      'relative-offset',
+      'relative-signed',
+      'step',
+    ]);
   });
 
   it('narrow a whole-step selection to the relative and step styles', () => {

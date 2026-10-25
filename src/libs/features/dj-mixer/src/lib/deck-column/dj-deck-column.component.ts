@@ -121,7 +121,7 @@ function selectedRowModel(
   };
 }
 
-type SpeedJump ='up' | 'home' | 'down';
+type SpeedJump = 'up' | 'home' | 'down';
 
 /** The channel strip's `jump` id is an opaque string; this is the one place it is narrowed. */
 function isSpeedJump(id: string): id is SpeedJump {

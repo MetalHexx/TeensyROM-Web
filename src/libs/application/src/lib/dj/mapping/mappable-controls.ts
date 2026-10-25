@@ -56,8 +56,8 @@ export type MappableControl =
       readonly defaults: ValueDefaults;
       /** The styles this control offers, when fewer than its nature's. */
       readonly styles?: readonly MappingStyleKind[];
-      /** A selection that moves one place per tick or press, whatever the mapping's amount: the
-       *  engine ignores sensitivity and never applies `absolute`. */
+      /** A selection that moves one place per tick or press: the engine ignores sensitivity, reads
+       *  a step amount only for its sign (the direction), and never applies `absolute`. */
       readonly wholeSteps?: boolean;
       read(): number;
       set(value: number): void;
@@ -313,7 +313,11 @@ export class MappableControls {
         id('loop-select'),
         'Loop select',
         () => loops().markers.length,
-        () => Math.max(0, loops().markers.findIndex((marker) => marker.id === loops().selectedId)),
+        () =>
+          Math.max(
+            0,
+            loops().markers.findIndex((marker) => marker.id === loops().selectedId)
+          ),
         (index) => decks.selectMarkerAt(slot, index)
       ),
       trigger(id('loop-toggle'), 'Loop toggle', () =>

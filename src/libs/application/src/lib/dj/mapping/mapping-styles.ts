@@ -98,11 +98,6 @@ export function kindFor(action: StyleAction, trigger: StyleTrigger): MappingStyl
   return action === 'fire' ? 'press' : action === 'toggle' ? 'latch' : action;
 }
 
-/** The actions a control offers for a source, in menu order. */
-export function actionsFor(nature: ControlNature, sourceKind: MidiSourceKind): StyleAction[] {
-  return [...new Set(stylesFor(nature, sourceKind).map(actionOf))];
-}
-
 /** The styles a control of this nature offers for a source of this kind, in menu order. */
 export function stylesFor(nature: ControlNature, sourceKind: MidiSourceKind): MappingStyleKind[] {
   switch (nature) {
@@ -144,14 +139,6 @@ export function isStyleAvailableFor(
   kind: MappingStyleKind
 ): boolean {
   return stylesForControl(control, sourceKind).includes(kind);
-}
-
-export function isStyleAvailable(
-  nature: ControlNature,
-  sourceKind: MidiSourceKind,
-  kind: MappingStyleKind
-): boolean {
-  return stylesFor(nature, sourceKind).includes(kind);
 }
 
 /** The amount a fresh style of this kind starts with: the control's sensitivity for a relative

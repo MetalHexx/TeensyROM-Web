@@ -357,27 +357,33 @@ describe('DjBindingsPanelComponent', () => {
       expect(modelOf(fixture, 1).amount).toBeNull();
     });
 
-    it('offers a whole-step selection only the relative and step styles and no amount', () => {
-      const selection: MappableControl = {
-        identity: { owner: 'A', control: 'loop-select' },
-        name: 'Loop select',
-        nature: 'value',
-        min: 0,
-        max: 4,
-        home: 0,
-        step: 1,
-        defaults: { ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 },
-        styles: ['relative-offset', 'relative-signed', 'step', 'step-release'],
-        wholeSteps: true,
-        read: () => 0,
-        set: () => undefined,
-      };
+    const selection: MappableControl = {
+      identity: { owner: 'A', control: 'loop-select' },
+      name: 'Loop select',
+      nature: 'value',
+      min: 0,
+      max: 4,
+      home: 0,
+      step: 1,
+      defaults: { ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 },
+      styles: ['relative-offset', 'relative-signed', 'step', 'step-release'],
+      wholeSteps: true,
+      read: () => 0,
+      set: () => undefined,
+    };
+
+    it('offers a whole-step selection only the relative and step styles, a direction for a key only', () => {
       const { fixture, seed } = render([selection]);
       seed(
         [XL],
         [
           mapping('encoder', selection.identity, { kind: 'relative-offset', amount: 1 }),
-          mapping('key', selection.identity, { kind: 'step', amount: 1 }, { kind: 'note', number: 2 }),
+          mapping(
+            'key',
+            selection.identity,
+            { kind: 'step', amount: 1 },
+            { kind: 'note', number: 2 }
+          ),
         ]
       );
 
@@ -387,7 +393,31 @@ describe('DjBindingsPanelComponent', () => {
         'step',
       ]);
       expect(modelOf(fixture, 0).amount).toBeNull();
-      expect(modelOf(fixture, 1).amount).toBeNull();
+      expect(modelOf(fixture, 1).amount).toMatchObject({
+        label: 'Direction (+ next, − previous)',
+        value: 100,
+        min: -100,
+        max: 100,
+      });
+    });
+
+    it('stores a negative amount when a whole-step key is set to step backward', () => {
+      const { fixture, seed, mappings } = render([selection]);
+      seed(
+        [XL],
+        [
+          mapping(
+            'key',
+            selection.identity,
+            { kind: 'step', amount: 1 },
+            { kind: 'note', number: 2 }
+          ),
+        ]
+      );
+
+      rows(fixture)[0].amountChange.emit(-100);
+
+      expect(mappings.setStyle).toHaveBeenCalledWith('key', { kind: 'step', amount: -1 });
     });
 
     it('shows a nudge hold with an editable amount in percent, and a voice hold with none', () => {
