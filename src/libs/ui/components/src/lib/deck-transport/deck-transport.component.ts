@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { PositionStripComponent } from '../position-strip/position-strip.component';
+import { PositionStripComponent, type PositionMark } from '../position-strip/position-strip.component';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
@@ -25,6 +25,10 @@ export interface DeckTransportModel {
   readonly totalText: string;
   /** What the position strip draws: how the bar is coloured and whether a loop mark appears. */
   readonly bar: ScrubBarState;
+  /** Loop brackets and cue ticks the position strip draws above its bar. A list that changes
+   *  rarely — not a per-frame input; the playhead stays `positionPercent`. Empty reserves the
+   *  strip's marks lane with nothing in it. */
+  readonly marks: readonly PositionMark[];
   /** The position strip's accessible name, e.g. 'Position deck A'. */
   readonly scrubAccessibleName: string;
   /** The merged Play/Pause key: which label it shows, and whether it is reachable. */

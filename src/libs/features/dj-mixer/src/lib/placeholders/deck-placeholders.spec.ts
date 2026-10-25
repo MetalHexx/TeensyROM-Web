@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LoopsCuesPanelModel } from '@teensyrom-nx/ui/components';
+import type { LoopsCuesPlateModel } from '@teensyrom-nx/ui/components/dj';
 import { createDeckPlaceholders } from './deck-placeholders';
 
 /** Recursively collects every string value keyed by (or ending with) `accessibleName`. */
@@ -30,7 +30,7 @@ describe('createDeckPlaceholders', () => {
   it('type-checks against the model-shaped component inputs', () => {
     const models = createDeckPlaceholders({ slot: 'B', letter: 'B', index: 1 });
 
-    const loopsCues: LoopsCuesPanelModel = models.loopsCues;
+    const loopsCues: LoopsCuesPlateModel = models.loopsCues;
 
     expect(loopsCues).toBeDefined();
   });

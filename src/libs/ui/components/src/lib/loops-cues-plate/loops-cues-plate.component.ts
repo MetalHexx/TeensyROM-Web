@@ -1,29 +1,47 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import type {
-  LoopsCuesPanelModel,
-  MarkerRowAction,
-} from '../loops-cues-panel/loops-cues-panel.component';
-import { MarkerRowComponent } from '../marker-row/marker-row.component';
+import {
+  LoopSelectedRowComponent,
+  type LoopBoundaryNudge,
+  type LoopBoundarySnap,
+  type LoopSelectedRowModel,
+} from '../loop-selected-row/loop-selected-row.component';
+import { LoopTileGridComponent } from '../loop-tile-grid/loop-tile-grid.component';
+import type { LoopTileModel } from '../loop-tile/loop-tile.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
 
+/** Everything the loops/cues plate draws, caller-composed. */
+export interface LoopsCuesPlateModel {
+  /** The section's own aria-label, e.g. 'Loops/Cues deck A'. */
+  readonly accessibleName: string;
+  readonly addAccessibleName: string;
+  readonly stopAccessibleName: string;
+  readonly addDisabled: boolean;
+  readonly stopDisabled: boolean;
+  /** Names the tile grid, e.g. 'Loops and cues, deck A'. */
+  readonly gridAccessibleName: string;
+  /** Shown in the grid's place when there are no tiles: no tune, or a tune with no markers. */
+  readonly emptyText: string | null;
+  readonly selected: LoopSelectedRowModel;
+  readonly tiles: readonly LoopTileModel[];
+}
+
 /**
- * One deck's loops/cues faceplate: an engraved caption, the Add and Stop keys, and one
- * `MarkerRowComponent` per `model().rows` entry. The row list scrolls once the rows outgrow the
- * plate, and the plate fills its slot's height. Purely presentational and inert — the caller owns
- * every marker, every drag offset and every write. The keys carry no `data-control` anchor: Stop
- * here would collide with the transport's mappable `stop` on the same deck.
- *
- * The twelve row-level outputs arrive as one `rowAction` carrying the row's index, the same shape
- * as `LoopsCuesPanelComponent`.
+ * One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the fixed
+ * selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
+ * Purely presentational and inert — the caller owns every marker, every drag offset and every
+ * write. The keys carry their own `data-control` ids (`loop-add`, `loop-stop`), distinct from the
+ * transport's `stop`, so the mapping overlay resolves each to the right control.
  *
  * @example
  * ```html
  * <lib-loops-cues-plate
- *   [model]="loopsCuesModel()"
- *   (addMarker)="onAddMarker()"
- *   (stopLoop)="onStopLoop()"
- *   (rowAction)="onMarkerRowAction($event)"
+ *   [model]="plateModel()"
+ *   [runningProgressPercent]="progress()"
+ *   (addMarker)="onAdd()"
+ *   (stopLoop)="onStop()"
+ *   (triggerTile)="onTrigger($event)"
+ *   (selectTile)="onSelect($event)"
  * />
  * ```
  */
@@ -32,20 +50,37 @@ import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
   templateUrl: './loops-cues-plate.component.html',
   styleUrl: './loops-cues-plate.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SynthPanelComponent, SynthKeyComponent, MarkerRowComponent],
+  imports: [SynthPanelComponent, SynthKeyComponent, LoopSelectedRowComponent, LoopTileGridComponent],
 })
 export class LoopsCuesPlateComponent {
   /** The plate's display model and state. */
-  readonly model = input.required<LoopsCuesPanelModel>();
+  readonly model = input.required<LoopsCuesPlateModel>();
+  /** 0–100; reaches only the running tile. */
+  readonly runningProgressPercent = input<number>(0);
+  /** While non-null, the selected loop's Start boundary follows it. */
+  readonly startDragOffset = input<number | null>(null);
+  /** While non-null, the selected loop's End boundary follows it. */
+  readonly endDragOffset = input<number | null>(null);
   /** Emits when the Add key is pressed. */
   readonly addMarker = output<void>();
   /** Emits when the Stop key is pressed. */
   readonly stopLoop = output<void>();
-  /** Every row-level output re-emitted with the row's index in `model().rows`. */
-  readonly rowAction = output<{ index: number; action: MarkerRowAction; value?: number }>();
-
-  /** Re-packages one row's output with its own position in `model().rows`. */
-  protected onRowAction(index: number, action: MarkerRowAction, value?: number): void {
-    this.rowAction.emit({ index, action, value });
-  }
+  /** Emits when the selected row's trigger key is pressed. */
+  readonly toggleSelected = output<void>();
+  /** Emits when the selected row's Set End key is pressed. */
+  readonly setEnd = output<void>();
+  /** Emits when the selected row's Clear End key is pressed. */
+  readonly clearEnd = output<void>();
+  /** Emits when the selected row's Delete key is pressed. */
+  readonly deleteSelected = output<void>();
+  /** Emits a tile's id when its trigger key is pressed. */
+  readonly triggerTile = output<string>();
+  /** Emits a tile's id when its select button is pressed. */
+  readonly selectTile = output<string>();
+  /** Fires on every nudge drag tick, tagged with the boundary — readout only. */
+  readonly nudgeInput = output<LoopBoundaryNudge>();
+  /** Fires when a nudge is released, tagged with the boundary. */
+  readonly nudgeCommit = output<LoopBoundaryNudge>();
+  /** Emits when a boundary's snap key is pressed, tagged with the boundary and direction. */
+  readonly snap = output<LoopBoundarySnap>();
 }

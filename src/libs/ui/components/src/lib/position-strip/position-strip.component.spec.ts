@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
-import { PositionStripComponent } from './position-strip.component';
+import { PositionStripComponent, type PositionMark } from './position-strip.component';
 
 describe('PositionStripComponent', () => {
   let fixture: ComponentFixture<PositionStripComponent>;
@@ -185,6 +185,106 @@ describe('PositionStripComponent', () => {
       set('barState', state);
 
       expect(loopMark()).toBeNull();
+    });
+  });
+
+  describe('marks', () => {
+    const loop: PositionMark = {
+      id: 'a',
+      kind: 'loop',
+      startPercent: 20,
+      endPercent: 35,
+      activity: 'idle',
+      selected: false,
+    };
+    const cue: PositionMark = {
+      id: 'b',
+      kind: 'cue',
+      startPercent: 60,
+      endPercent: null,
+      activity: 'idle',
+      selected: false,
+    };
+
+    function lane(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.lane');
+    }
+
+    function marks(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.lane .mark'));
+    }
+
+    it('keeps its old structure and reserves no lane while marks is null', () => {
+      expect(lane()).toBeNull();
+      expect(fixture.nativeElement.hasAttribute('data-marks')).toBe(false);
+      expect(Array.from<Element>(fixture.nativeElement.children).map((el) => el.tagName)).toEqual([
+        'INPUT',
+        'DIV',
+      ]);
+    });
+
+    it('reserves the lane for an empty list, with no marks in it', () => {
+      set('marks', []);
+
+      expect(lane()).not.toBeNull();
+      expect(fixture.nativeElement.hasAttribute('data-marks')).toBe(true);
+      expect(marks()).toEqual([]);
+    });
+
+    it('draws a loop as a bracket from start to end, and a cue as a tick at its start', () => {
+      set('marks', [loop, cue]);
+
+      const [bracket, tick] = marks();
+      expect(bracket.dataset['kind']).toBe('loop');
+      expect(bracket.style.left).toBe('20%');
+      expect(bracket.style.width).toBe('15%');
+      expect(tick.dataset['kind']).toBe('cue');
+      expect(tick.style.left).toBe('60%');
+      expect(tick.style.width).toBe('');
+    });
+
+    it('carries each mark’s activity and selection', () => {
+      set('marks', [
+        { ...loop, id: 'q', activity: 'queued' },
+        { ...loop, id: 'r', activity: 'running', selected: true },
+        { ...cue, selected: true },
+      ]);
+
+      const [queued, running, selectedCue] = marks();
+      expect(queued.dataset['activity']).toBe('queued');
+      expect(queued.hasAttribute('data-selected')).toBe(false);
+      expect(running.dataset['activity']).toBe('running');
+      expect(running.hasAttribute('data-selected')).toBe(true);
+      expect(selectedCue.hasAttribute('data-selected')).toBe(true);
+    });
+
+    it('holds a mark outside 0–100 on the track and never draws a negative width', () => {
+      set('marks', [
+        { ...loop, startPercent: -10, endPercent: 140 },
+        { ...loop, id: 'c', startPercent: 50, endPercent: 40 },
+      ]);
+
+      const [wide, reversed] = marks();
+      expect(wide.style.left).toBe('0%');
+      expect(wide.style.width).toBe('100%');
+      expect(reversed.style.width).toBe('0%');
+    });
+
+    it('is hidden from assistive technology', () => {
+      set('marks', [loop]);
+
+      expect(lane()?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('still scrubs through the range with marks present', () => {
+      set('marks', [loop]);
+
+      drag(55, 'input');
+      drag(55, 'change');
+
+      expect(inputs).toEqual([55]);
+      expect(commits).toEqual([55]);
+      expect(range().disabled).toBe(false);
     });
   });
 

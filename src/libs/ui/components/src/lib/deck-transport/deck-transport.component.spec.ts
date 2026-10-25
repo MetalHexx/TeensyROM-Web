@@ -12,6 +12,7 @@ function testModel(): DeckTransportModel {
     emptyText: 'No tune — drop a SID here',
     totalText: '03:12',
     bar: { kind: 'loop', introPercent: 25 },
+    marks: [],
     scrubAccessibleName: 'Position deck A',
     playPause: { showing: 'play', disabled: false },
     canStop: true,
@@ -196,6 +197,24 @@ describe('DeckTransportComponent', () => {
       setModel({ state: 'analyzing', bar: { kind: 'analyzing' } });
 
       expect((root().querySelector('input[type="range"]') as HTMLInputElement).disabled).toBe(true);
+    });
+
+    it('draws the model’s marks in the strip’s lane', () => {
+      setModel({
+        marks: [
+          {
+            id: 'loop-1',
+            kind: 'loop',
+            startPercent: 20,
+            endPercent: 35,
+            activity: 'running',
+            selected: true,
+          },
+          { id: 'cue-1', kind: 'cue', startPercent: 60, endPercent: null, activity: 'idle', selected: false },
+        ],
+      });
+
+      expect(root().querySelectorAll('.lane .mark').length).toBe(2);
     });
   });
 

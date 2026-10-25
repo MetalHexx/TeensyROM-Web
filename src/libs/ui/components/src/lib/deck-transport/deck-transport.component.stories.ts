@@ -49,6 +49,7 @@ function baseModel(): DeckTransportModel {
     emptyText: 'No tune — drop a SID here',
     totalText: '03:12',
     bar: { kind: 'loop', introPercent: 25 },
+    marks: [],
     scrubAccessibleName: 'Position deck A',
     playPause: { showing: 'play', disabled: false },
     canStop: true,
@@ -120,6 +121,24 @@ export const Paused: Story = {
 
 export const Stopped: Story = {
   args: { model: baseModel(), positionPercent: 0, elapsedText: '00:00.0', frameLabel: 'frame 0' },
+  render: atEveryWidth,
+};
+
+/** Loop brackets and cue ticks along the strip: a running selected loop, a queued one, a cue. */
+export const WithMarks: Story = {
+  args: {
+    model: {
+      ...playingModel(),
+      marks: [
+        { id: 'a', kind: 'loop', startPercent: 18, endPercent: 34, activity: 'running', selected: true },
+        { id: 'b', kind: 'loop', startPercent: 48, endPercent: 60, activity: 'queued', selected: false },
+        { id: 'c', kind: 'cue', startPercent: 78, endPercent: null, activity: 'idle', selected: false },
+      ],
+    },
+    positionPercent: 26,
+    elapsedText: '00:50.0',
+    frameLabel: 'frame 2500',
+  },
   render: atEveryWidth,
 };
 

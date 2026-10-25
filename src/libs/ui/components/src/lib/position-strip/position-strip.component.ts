@@ -1,6 +1,29 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 
+/** One loop bracket or cue tick drawn in the strip's marks lane. */
+export interface PositionMark {
+  readonly id: string;
+  readonly kind: 'loop' | 'cue';
+  /** 0–100 across the track. */
+  readonly startPercent: number;
+  /** 0–100; loops only. */
+  readonly endPercent: number | null;
+  readonly activity: 'idle' | 'queued' | 'running';
+  readonly selected: boolean;
+}
+
+/** A mark with its position held to 0–100, ready to draw. */
+interface DrawnMark {
+  readonly mark: PositionMark;
+  readonly left: number;
+  /** A loop's bracket width; `null` for a cue. */
+  readonly width: number | null;
+}
+
+const clampPercent = (value: number): number =>
+  Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
+
 /**
  * One continuous bar, lit from the start up to the position, with a loop mark and a playhead, over
  * a native range input that does the scrubbing. Same contract as `lib-scrub-position-bar`, new
@@ -9,6 +32,10 @@ import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.com
  * continuous (`step="any"`), so drag values are fractional percents and nothing rounds them on the
  * way to the bar. Purely presentational: it holds no drag-pin state, so `positionPercent` is
  * whatever the caller decides to show — the live playhead or a pinned drag value.
+ *
+ * Given `marks` (even an empty list) it reserves a lane above the strip and draws a bracket per
+ * loop and a tick per cue. The lane ignores the pointer and is hidden from assistive technology;
+ * the range keeps every pointer and keyboard interaction. With `marks` null nothing is added.
  *
  * @example
  * ```html
@@ -27,6 +54,9 @@ import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.com
   templateUrl: './position-strip.component.html',
   styleUrl: './position-strip.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-marks]': 'marks() !== null ? "" : null',
+  },
 })
 export class PositionStripComponent {
   /** What the strip draws: how the bar is coloured and whether a loop mark appears. */
@@ -38,6 +68,9 @@ export class PositionStripComponent {
   /** The range's `aria-valuetext`, e.g. '01:23.4 of 03:12' — caller-composed, so it says the
    *  position as time rather than as a percentage. */
   readonly valueText = input<string | null>(null);
+  /** Loop brackets and cue ticks for the marks lane. `null` reserves no lane; an array, even an
+   *  empty one, does. Changes rarely — the playhead is `positionPercent`, not this. */
+  readonly marks = input<readonly PositionMark[] | null>(null);
   /** Fires on every drag tick — a live preview, never a seek. */
   readonly scrubInput = output<number>();
   /** Fires on release only. This is the one that should seek. */
@@ -48,6 +81,16 @@ export class PositionStripComponent {
     const percent = this.positionPercent();
     return Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
   });
+
+  /** The marks held to 0–100, a loop's end never before its start. */
+  protected readonly drawnMarks = computed<readonly DrawnMark[]>(() =>
+    (this.marks() ?? []).map((mark) => {
+      const left = clampPercent(mark.startPercent);
+      const width =
+        mark.kind === 'loop' ? Math.max(0, clampPercent(mark.endPercent ?? left) - left) : null;
+      return { mark, left, width };
+    })
+  );
 
   /** Where the loop mark sits, or `null` outside the 'loop' state. 0 means loop-from-top. */
   protected readonly loopMarkPercent = computed<number | null>(() => {

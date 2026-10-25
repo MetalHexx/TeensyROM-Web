@@ -11,6 +11,13 @@
   min-width: 0;
 }
 
+// With marks, the host grows by the lane's height; the strip and the range sit in what is left
+// below it.
+:host([data-marks]) {
+  --marks-offset: var(--position-strip-marks-height, 0.625rem);
+  height: calc(var(--position-strip-height, 0.875rem) + var(--marks-offset));
+}
+
 * {
   box-sizing: border-box;
 }
@@ -62,6 +69,10 @@ input[type='range'] {
     cursor: not-allowed;
   }
 
+  :host([data-marks]) & {
+    top: calc(var(--marks-offset) + (100% - var(--marks-offset)) / 2);
+  }
+
   &:focus-visible ~ .strip {
     outline: 2px solid var(--color-highlight);
     outline-offset: 2px;
@@ -71,6 +82,9 @@ input[type='range'] {
 .strip {
   position: absolute;
   inset: 0;
+  :host([data-marks]) & {
+    top: var(--marks-offset);
+  }
   overflow: hidden;
   pointer-events: none;
   border-radius: var(--border-radius-sm);
@@ -141,4 +155,59 @@ input[type='range'] {
 .playhead {
   background: var(--synth-pointer);
   box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
+}
+
+// The marks lane shares the track's 0–100 scale (the same 2px inset), sits above the strip and
+// takes no pointer input.
+.lane {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  left: 2px;
+  height: var(--position-strip-marks-height, 0.625rem);
+  pointer-events: none;
+}
+
+// `--mark-color` follows the activity, `--mark-ring` the selection, `--mark-fill` how lit it is.
+.mark {
+  --mark-color: var(--color-primary-bright);
+  --mark-ring: var(--mark-color);
+  --mark-fill: color-mix(in srgb, var(--mark-color) 20%, transparent);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.mark[data-activity='queued'] {
+  --mark-color: var(--color-directory);
+  --mark-fill: color-mix(in srgb, var(--mark-color) 35%, transparent);
+}
+
+.mark[data-activity='running'] {
+  --mark-fill: var(--mark-color);
+}
+
+.mark[data-selected] {
+  --mark-ring: var(--color-highlight);
+}
+
+.mark[data-selected][data-activity='running'] {
+  --mark-color: var(--color-highlight);
+}
+
+.mark[data-kind='loop'] {
+  min-width: 2px;
+  border: 1px solid var(--mark-ring);
+  border-radius: 2px;
+  background: var(--mark-fill);
+}
+
+.mark[data-kind='cue'] {
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--mark-ring);
+}
+
+.mark[data-kind='cue'][data-selected] {
+  box-shadow: 0 0 0 1px var(--mark-ring), 0 0 6px var(--mark-ring);
 }

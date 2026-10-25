@@ -97,6 +97,8 @@ export class DjDeckColumnComponent {
       emptyText: 'No tune — drop a SID here',
       totalText: summary.totalText,
       bar: summary.bar,
+      // Markers arrive with the live deck wiring; until then the strip shows an empty lane.
+      marks: [],
       scrubAccessibleName: `Position deck ${letter}`,
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
