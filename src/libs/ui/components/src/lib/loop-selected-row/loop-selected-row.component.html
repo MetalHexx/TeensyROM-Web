@@ -8,7 +8,7 @@
     [disabled]="model().empty || model().triggerDisabled"
     (press)="trigger.emit()"
   />
-  <div class="display" role="group" [attr.aria-label]="displayText()">
+  <div class="display" role="img" [attr.aria-label]="displayText()">
     @if (!model().empty) {
     <span class="name" aria-hidden="true">{{ model().name }}</span>
     <span class="kind" aria-hidden="true">{{ model().kindLabel }}</span>
