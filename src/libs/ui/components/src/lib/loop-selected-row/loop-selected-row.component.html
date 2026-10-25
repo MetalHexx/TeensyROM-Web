@@ -1,0 +1,61 @@
+<div class="top">
+  <lib-synth-key
+    class="trigger"
+    data-control="loop-toggle"
+    icon="play_arrow"
+    [accessibleName]="model().triggerAccessibleName"
+    [stateLight]="stateLight()"
+    [disabled]="model().empty || model().triggerDisabled"
+    (press)="trigger.emit()"
+  />
+  <div class="display" role="group" [attr.aria-label]="displayText()">
+    @if (!model().empty) {
+    <span class="name" aria-hidden="true">{{ model().name }}</span>
+    <span class="kind" aria-hidden="true">{{ model().kindLabel }}</span>
+    <span class="span" aria-hidden="true">{{ model().spanText }}</span>
+    }
+  </div>
+  <lib-synth-key
+    data-control="loop-set-end"
+    label="Set End"
+    icon="last_page"
+    [accessibleName]="model().setEndAccessibleName"
+    [disabled]="model().empty || model().setEndDisabled"
+    (press)="setEnd.emit()"
+  />
+  <lib-synth-key
+    data-control="loop-clear-end"
+    label="Clear End"
+    icon="close"
+    [accessibleName]="model().clearEndAccessibleName"
+    [disabled]="model().empty || model().clearEndDisabled"
+    (press)="clearEnd.emit()"
+  />
+  <lib-synth-key
+    data-control="loop-delete"
+    icon="delete"
+    [accessibleName]="model().deleteAccessibleName"
+    [disabled]="model().empty || model().deleteDisabled"
+    (press)="deleteMarker.emit()"
+  />
+</div>
+<div class="boundaries">
+  <lib-loop-boundary
+    data-control="loop-start"
+    [model]="startBoundary()"
+    [dragOffsetFrames]="startDragOffset()"
+    (nudgeInput)="nudgeInput.emit({ boundary: 'start', offsetFrames: $event })"
+    (nudgeCommit)="nudgeCommit.emit({ boundary: 'start', offsetFrames: $event })"
+    (snapPrevious)="snap.emit({ boundary: 'start', direction: 'previous' })"
+    (snapNext)="snap.emit({ boundary: 'start', direction: 'next' })"
+  />
+  <lib-loop-boundary
+    data-control="loop-end"
+    [model]="endBoundary()"
+    [dragOffsetFrames]="endDragOffset()"
+    (nudgeInput)="nudgeInput.emit({ boundary: 'end', offsetFrames: $event })"
+    (nudgeCommit)="nudgeCommit.emit({ boundary: 'end', offsetFrames: $event })"
+    (snapPrevious)="snap.emit({ boundary: 'end', direction: 'previous' })"
+    (snapNext)="snap.emit({ boundary: 'end', direction: 'next' })"
+  />
+</div>

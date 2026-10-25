@@ -1,0 +1,98 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px var(--spacing-sm) var(--spacing-sm);
+  container-type: inline-size;
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--color-highlight-rgb), 0.6);
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--color-highlight-rgb), 0.07),
+    rgba(var(--color-highlight-rgb), 0.02)
+  );
+  box-shadow: 0 0 12px rgba(var(--color-highlight-rgb), 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:host([data-empty]) {
+  border-color: var(--synth-control-border);
+  background: none;
+  box-shadow: none;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+lib-synth-key {
+  flex: 0 0 auto;
+}
+
+.display {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  height: 26px;
+  padding: 0 9px;
+  overflow: hidden;
+  background: var(--synth-display-face);
+  border: 1px solid var(--synth-display-border);
+  border-radius: var(--border-radius-sm);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9);
+  color: var(--synth-display-text);
+  font-family: 'Roboto Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--synth-display-text);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kind {
+  flex: 0 0 auto;
+  color: var(--synth-display-dim);
+  font-size: 0.53rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.span {
+  flex: 0 1 auto;
+  margin-inline-start: auto;
+  overflow: hidden;
+  color: var(--color-highlight);
+  font-size: 0.69rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boundaries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+// Too narrow for two boundaries abreast: stack them, and drop the key labels for their icons.
+@container (max-width: 26rem) {
+  .boundaries {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  lib-synth-key {
+    --synth-key-label-display: none;
+  }
+}

@@ -1,0 +1,156 @@
+// The native range is the hit target and the keyboard slider; everything drawn sits beneath it and
+// ignores the pointer. It is made see-through by styling, never `opacity: 0`.
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.tag {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  color: var(--synth-legend);
+  font-size: 0.53rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+lib-synth-key {
+  flex: 0 0 auto;
+}
+
+.nudge {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 2.5rem;
+  height: 22px;
+}
+
+input[type='range'] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+
+  &::-webkit-slider-runnable-track {
+    height: 100%;
+    background: transparent;
+    border: 0;
+  }
+
+  &::-moz-range-track {
+    height: 100%;
+    background: transparent;
+    border: 0;
+  }
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 3px;
+    height: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  &::-moz-range-thumb {
+    width: 3px;
+    height: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+
+  &:focus-visible ~ .strip {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+}
+
+.strip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 4px;
+  background: var(--synth-display-face);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), inset 0 0 0 1px #000;
+}
+
+:host([data-empty]) .strip {
+  opacity: 0.35;
+}
+
+.centre {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tick {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--color-primary-bright);
+  box-shadow: 0 0 4px rgba(var(--color-primary-bright-rgb), 0.9);
+}
+
+.bar {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: rgba(var(--color-highlight-rgb), 0.6);
+}
+
+.cap {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 1px;
+  background: var(--synth-pointer);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+.readout {
+  flex: 0 0 auto;
+  width: 2.8rem;
+  color: var(--color-dimmed-light);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.625rem;
+  text-align: end;
+  white-space: nowrap;
+}
+
+:host([data-empty]) {
+  .tag {
+    opacity: 0.6;
+  }
+
+  .readout {
+    color: var(--color-dimmed);
+  }
+}
