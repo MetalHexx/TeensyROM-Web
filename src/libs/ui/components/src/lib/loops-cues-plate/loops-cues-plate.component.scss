@@ -54,6 +54,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  --synth-key-padding: 0 10px;
 }
 
 // The selected row keeps its height; the tile grid (which sizes itself `flex: 1 1 auto`) takes

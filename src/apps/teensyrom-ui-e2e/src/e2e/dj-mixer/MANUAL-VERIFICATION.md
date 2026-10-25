@@ -135,17 +135,13 @@ initial chunks only, in bytes:
 | **initial JavaScript** | **2,073,332** | **2,114,954 (+41,622)** |
 | `styles` | 34,883 | 35,125 (+242) |
 
-The styles chunk grew by the `--synth-display-*` token lines, as designed. **The initial JavaScript
-did not hold: it grew by 41.6 kB.** The `dj-mixer` route is still lazy; the growth is the nine new
-shared components (about 39 kB) and the new DJ application code (about 2 kB), which the lazy route
-still has pulled into the initial chunks. The layout imports
-`@teensyrom-nx/ui/components` and the application stores through their barrels, and esbuild gives a
-file the entry points of everything that statically imports it, so any component the DJ view uses
-and the barrel exports lands in the initial chunk (on `main` already: 79 of the library's
-components, `lib-crossfader` and `lib-channel-fader` among them; now 87). Components nothing uses
-(`lib-menu-item`, `lib-thumbnail-image`) are tree-shaken out, so it is the use that places them.
-Separating them needs a second entry point for the DJ components (and the same for the DJ
-application code), not a smaller import; it is not done here.
+The styles chunk grew by the `--synth-display-*` token lines, as designed. This table is the
+first measure, taken when the DJ components were still reaching the initial chunks through the
+barrels: it showed the initial JavaScript 41.6 kB over `main`, which was recorded here as a failed
+check. That was superseded. With the DJ-only components moved to the `@teensyrom-nx/ui/components/dj`
+entry point, the check **passed**: the initial JavaScript came in 59 B under `main`. Components the
+lazy route uses and the main barrel exports still land in the initial chunks (79 of the library's
+components were already there on `main`); the DJ ones no longer do.
 
 ### Bench verdict (operator, real hardware)
 
@@ -160,6 +156,90 @@ On your C64s with a real TeensyROM, say whether:
 4. The restyled deck plays as before: voices, Kill, speed and the pad hold behave as they did.
 5. A mapped nudge note held and released, and released by unplugging the controller, ends the
    nudge.
+
+## Loops and cues
+
+Browser check of the deck column's Loops / Cues plate and the position strip's marks lane, now fed
+from the store, against `ASID-DJ-ROOT-WIREFRAME-LOOPS.html` (frame A). Driven as in the sections
+above: `pnpm start`, `/dj-mixer` in a **1920 x 1080** same-origin `<iframe>` with
+`lib-scaling-container { transform: none }` injected, no API and no device. A bundled `.sid`
+(`InSID3_Out.sid`) was served from a local CORS server, the iframe's `fetch` was stubbed to return it
+for the `/files/content` call, and `DeckService.load('A', ...)` was reached through the dev-mode
+`ng.getComponent` handle on the deck column (storage type `'SD'`). The tune loaded and played for
+real; the output has no MIDI port bound. Controls were pressed with DOM clicks on the buttons found
+by their accessible names; the nudge strip was driven with `input` then `change` events on its range.
+
+**Live behaviour, deck A.** An empty deck shows a disabled Add and Stop, an empty selected row
+("nothing selected" for a reader, an empty display) and "Load a tune to add loops". With the tune
+playing: Add placed a cue at the playhead (then a second, and a third) and selected each; Set End on
+Item 2 made it a 1.5 s loop; selecting Item 2 and pressing its trigger started it (tile and row lit
+"running", the tile's lap bar advancing, `loopLapPercent` 64% mid-lap, the row reading
+`00:08.5-00:10.0`); Stop loop released it (all tiles idle, Stop disabled again). The strip above the
+transport showed three marks (two cue ticks and the loop bracket, the selected one highlighted).
+Dragging the End nudge strip showed `+12 fr` while held (the pin) and committing moved the end to
+`00:10.2` with the pin cleared. Deck B stayed empty and its plate unchanged. The console showed no
+errors from the plate. The document did not scroll (1080 = 1080).
+
+**Against frame A (1920 x 1080), measured on both pages.** Both are 474px wide. The first pass found
+the plate's keys drawn at the shared key's size rather than the mockup's compact sizes, which left
+the selected-row display 162px wide against the mockup's 197px and truncated "Item N"; the boundary
+rows were 26px tall with 32px snap keys against the mockup's 22px squares. Fixed in P02's
+components, as sizing custom properties on the shared key (`--synth-key-*`, defaults unchanged) set
+by the row, the boundary, the tile and the plate header:
+
+| element | mockup | view, after |
+| --- | --- | --- |
+| selected row (w x h) | 444.7 x 70.3 | 440.4 x 70.6 |
+| trigger / Set End / Clear End / delete keys (w) | 32 / 68.8 / 79.5 / 26 | 32 / 69 / 79.7 / 26 |
+| row display (w x h) | 197.2 x 26 | 192.1 x 26 |
+| boundary snap keys / nudge strip (w) | 22 / 72.7 | 22 / 69.6 |
+| tile trigger | 30 x 30 | 30 x 30 |
+| Add / Stop keys (w) | 58.9 / 65.5 | 59.3 / 65.6 |
+| plate (w x h) | 474 x 344 | 474 x 334 |
+
+What remains is the synth panel's padding, which leaves the plate's content 4px narrower than the
+mockup's (this moves the display, nudge strip and tiles by a few px), and the plate's height, which
+here is whatever the deck column's grid slot gives (334 against the mockup's 344). The fixed row, the
+two-column tile grid and the marks lane read as frame A draws them.
+
+**Not checked in the browser here.** The queued and not-ready tile and row states: no readiness
+delay or queued trigger was produced against the stubbed tune, and Storybook was not run, since the
+tune loaded in the view. Deck B was not given a tune.
+
+**Automated.** `pnpm nx test dj-mixer`, `pnpm nx lint dj-mixer`, `pnpm nx run-many -t typecheck -p
+application dj-mixer`, `pnpm nx build teensyrom-ui` and the five DJ end-to-end specs
+(`dj-mixer-*.cy.ts`, 43 tests, run against `serve-static` with `--excludeTaskDependencies` because
+Cypress gave up waiting for the production build the dependent task starts) pass.
+
+### Bundle check (loops and cues)
+
+`pnpm nx build teensyrom-ui` on this branch against `main` (3899450b, after ASID-DJ-9 and
+CLI-PARITY-9), the initial chunks only, in bytes (both built with the same `node_modules`):
+
+| chunk | main | this branch |
+| --- | --- | --- |
+| shared ui / vendor chunk | 1,356,281 | 1,356,272 (-9) |
+| `main` | 419,772 | 419,823 (+51) |
+| shared application chunk | 170,554 | 185,122 (+14,568) |
+| other initial chunks and `polyfills` | 132,747 | 133,096 (+349) |
+| **initial JavaScript** | **2,079,354** | **2,094,313 (+14,959)** |
+| `styles` | 35,125 | 35,125 (0) |
+
+The new components add 0 B: they live in `dj.ts` and the ui chunk did not grow. The 14.6 kB is the
+application layer: the loops state, `DeckLoops`, the loops selectors and the marker commands on
+`DeckService`, which the lazy DJ route's store pulls into the shared application chunk (the same
+effect the ASID-DJ-8 table describes). The initial JavaScript is over the 2.00 MB budget by 129 kB
+here against 114 kB on `main`; that warning is already on `main` and `project.json`'s budgets are
+unchanged.
+
+### Bench checklist (operator, real hardware)
+
+- [ ] Loops and cues are placed, triggered and left on both decks, from the mouse and from the
+  controller.
+- [ ] A loop is added and its end set mid-set from the controller, then corrected with snap.
+- [ ] A long tune reloaded has its loops ready within about a second.
+- [ ] The speed controls work inside a loop, and the speed is kept on leaving it.
+- [ ] The other deck's timing is unaffected while one deck loads or rebuilds.
 
 ## Byte fidelity (P03-T02)
 

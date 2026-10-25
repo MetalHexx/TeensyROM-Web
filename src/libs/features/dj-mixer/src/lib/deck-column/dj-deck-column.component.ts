@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ScalingContainerComponent } from '@teensyrom-nx/ui/components';
 import type { BindingCardModel, BindingPortModel } from '@teensyrom-nx/ui/components';
 import {
@@ -11,6 +20,12 @@ import type {
   DeckChannelStripModel,
   DeckTransportModel,
   DeckTransportState,
+  LoopBoundaryModel,
+  LoopBoundaryNudge,
+  LoopBoundarySnap,
+  LoopSelectedRowModel,
+  LoopTileModel,
+  LoopsCuesPlateModel,
 } from '@teensyrom-nx/ui/components/dj';
 import {
   DeckService,
@@ -18,12 +33,15 @@ import {
   DjStore,
   SPEED_FADER_RANGE,
   type DeckTransportSummary,
+  type LoopActivity,
+  type LoopBoundarySummary,
+  type LoopItemSummary,
+  type LoopSelectionSummary,
   cartridgeOptions,
   formatElapsed,
 } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
-import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
 
 const STATE_LABELS: Record<DeckTransportState, string> = {
   playing: 'Play',
@@ -39,7 +57,71 @@ function transportState(led: DeckTransportSummary['led']): DeckTransportState {
   return led === 'ended' ? 'stopped' : led;
 }
 
-type SpeedJump = 'up' | 'home' | 'down';
+const ACTIVITY_WORDS: Record<LoopActivity, string> = {
+  idle: '',
+  queued: 'queued',
+  running: 'running',
+};
+
+/** The tile's select-button name: what it is, how long, and where it stands, spelled out. */
+function tileSelectName(item: LoopItemSummary, letter: string): string {
+  const state = [ACTIVITY_WORDS[item.activity], item.ready ? '' : 'not ready']
+    .filter((word) => word !== '')
+    .join(' and ');
+  const length = item.kind === 'loop' ? item.lengthText : '';
+  return [item.name, item.kind, length, state, `deck ${letter}`]
+    .filter((part) => part !== '')
+    .join(', ');
+}
+
+/** A boundary model from its summary; null is a cue's End or an empty row: drawn empty, inert. */
+function boundaryModel(
+  tag: 'Start' | 'End',
+  letter: string,
+  summary: LoopBoundarySummary | null
+): LoopBoundaryModel {
+  const word = tag.toLowerCase();
+  return {
+    tag,
+    empty: summary === null,
+    disabled: summary === null || summary.rangeFrames === 0,
+    offsetFrames: summary?.offsetFrames ?? 0,
+    rangeFrames: summary?.rangeFrames ?? 0,
+    tickPercents: summary?.tickPercents ?? [],
+    previousDisabled: !summary?.canSnapPrevious,
+    nextDisabled: !summary?.canSnapNext,
+    nudgeAccessibleName: `Nudge ${word} deck ${letter}`,
+    previousAccessibleName: `Snap ${word} to previous moment deck ${letter}`,
+    nextAccessibleName: `Snap ${word} to next moment deck ${letter}`,
+  };
+}
+
+function selectedRowModel(
+  selection: LoopSelectionSummary | null,
+  letter: string
+): LoopSelectedRowModel {
+  const name = selection?.name ?? 'selected marker';
+  return {
+    empty: selection === null,
+    name: selection?.name ?? '',
+    kindLabel: selection === null ? '' : selection.kind === 'loop' ? 'LOOP' : 'CUE',
+    spanText: selection?.spanText ?? '',
+    activity: selection?.activity ?? 'idle',
+    ready: selection?.ready ?? true,
+    triggerDisabled: selection === null,
+    setEndDisabled: selection === null,
+    clearEndDisabled: selection?.kind !== 'loop',
+    deleteDisabled: selection === null,
+    start: boundaryModel('Start', letter, selection?.start ?? null),
+    end: boundaryModel('End', letter, selection?.end ?? null),
+    triggerAccessibleName: `Trigger ${name} deck ${letter}`,
+    setEndAccessibleName: `Set end of ${name} deck ${letter}`,
+    clearEndAccessibleName: `Clear end of ${name} deck ${letter}`,
+    deleteAccessibleName: `Delete ${name} deck ${letter}`,
+  };
+}
+
+type SpeedJump ='up' | 'home' | 'down';
 
 /** The channel strip's `jump` id is an opaque string; this is the one place it is narrowed. */
 function isSpeedJump(id: string): id is SpeedJump {
@@ -70,13 +152,59 @@ export class DjDeckColumnComponent {
   /** Whether a SID drag is currently in flight anywhere in the view — lights this deck's overlay. */
   readonly dropActive = input<boolean>(false);
 
-  /** Loops/Cues stays on the inert placeholder — present, but not yet wired. */
-  readonly models = computed(() => createDeckPlaceholders(this.deck()));
-
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
   private readonly binding = computed(() => this.djStore.bindingSummary(this.deck().slot)());
   private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
   private readonly canShape = computed(() => this.djStore.canShape(this.deck().slot)());
+
+  /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
+  readonly loops = computed(() => this.djStore.loopsSummary(this.deck().slot)());
+  /** The one per-frame value the plate takes: the running tile's lap. */
+  readonly loopLapPercent = computed(() => this.djStore.loopLapPercent(this.deck().slot)());
+
+  // Non-null only while a nudge strip is being dragged: the pointer's offset pins the boundary
+  // readout until the nudge is committed or the selection moves on.
+  readonly startDragOffset = signal<number | null>(null);
+  readonly endDragOffset = signal<number | null>(null);
+
+  readonly plateModel = computed<LoopsCuesPlateModel>(() => {
+    const { letter } = this.deck();
+    const { hasTune, canAdd, canStop, items, selected } = this.loops();
+    return {
+      accessibleName: `Loops/Cues deck ${letter}`,
+      addAccessibleName: `Add cue deck ${letter}`,
+      stopAccessibleName: `Stop loop deck ${letter}`,
+      addDisabled: !canAdd,
+      stopDisabled: !canStop,
+      gridAccessibleName: `Loops deck ${letter}`,
+      emptyText: hasTune ? 'Add a cue at the playhead' : 'Load a tune to add loops',
+      selected: selectedRowModel(selected, letter),
+      tiles: items.map(
+        (item): LoopTileModel => ({
+          id: item.id,
+          name: item.name,
+          kind: item.kind,
+          lengthText: item.lengthText,
+          activity: item.activity,
+          selected: item.selected,
+          ready: item.ready,
+          triggerAccessibleName: `Trigger ${item.name} deck ${letter}`,
+          selectAccessibleName: tileSelectName(item, letter),
+        })
+      ),
+    };
+  });
+
+  constructor() {
+    const selectedId = computed(() => this.loops().selected?.id ?? null);
+    effect(() => {
+      selectedId();
+      untracked(() => {
+        this.startDragOffset.set(null);
+        this.endDragOffset.set(null);
+      });
+    });
+  }
 
   // Non-null only mid-drag or mid-seek: the pointer's own value pins the thumb so a polled
   // position update can't fight it — the POC transport adapter's pin-until-landed rule, carried
@@ -97,8 +225,7 @@ export class DjDeckColumnComponent {
       emptyText: 'No tune — drop a SID here',
       totalText: summary.totalText,
       bar: summary.bar,
-      // Markers arrive with the live deck wiring; until then the strip shows an empty lane.
-      marks: [],
+      marks: this.loops().items,
       scrubAccessibleName: `Position deck ${letter}`,
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
@@ -289,6 +416,51 @@ export class DjDeckColumnComponent {
     if (this.scrubDragValue() === value) {
       this.scrubDragValue.set(null);
     }
+  }
+
+  onAddMarker(): void {
+    this.deckService.addMarker(this.deck().slot);
+  }
+
+  onStopLoop(): void {
+    this.deckService.stopMarkerLoop(this.deck().slot);
+  }
+
+  onToggleSelected(): void {
+    void this.deckService.toggleMarker(this.deck().slot);
+  }
+
+  onTriggerTile(id: string): void {
+    void this.deckService.toggleMarker(this.deck().slot, id);
+  }
+
+  onSelectTile(id: string): void {
+    this.deckService.selectMarker(this.deck().slot, id);
+  }
+
+  onSetEnd(): void {
+    this.deckService.setMarkerEnd(this.deck().slot);
+  }
+
+  onClearEnd(): void {
+    this.deckService.clearMarkerEnd(this.deck().slot);
+  }
+
+  onDeleteSelected(): void {
+    this.deckService.deleteMarker(this.deck().slot);
+  }
+
+  onSnap({ boundary, direction }: LoopBoundarySnap): void {
+    this.deckService.snapMarker(this.deck().slot, boundary, direction);
+  }
+
+  onNudgeInput({ boundary, offsetFrames }: LoopBoundaryNudge): void {
+    (boundary === 'start' ? this.startDragOffset : this.endDragOffset).set(offsetFrames);
+  }
+
+  onNudgeCommit({ boundary, offsetFrames }: LoopBoundaryNudge): void {
+    this.deckService.nudgeMarker(this.deck().slot, boundary, offsetFrames);
+    (boundary === 'start' ? this.startDragOffset : this.endDragOffset).set(null);
   }
 
   onSpeedChange(multiplier: number): void {

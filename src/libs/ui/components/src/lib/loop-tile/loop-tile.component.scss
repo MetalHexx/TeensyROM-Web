@@ -29,6 +29,10 @@
 
 .trigger {
   flex: 0 0 auto;
+  --synth-key-height: 30px;
+  --synth-key-min-width: 30px;
+  --synth-key-padding: 0;
+  --synth-key-icon-size: 16px;
 }
 
 .select {

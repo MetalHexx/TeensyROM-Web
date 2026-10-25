@@ -23,6 +23,10 @@
 
 lib-synth-key {
   flex: 0 0 auto;
+  --synth-key-height: 22px;
+  --synth-key-min-width: 22px;
+  --synth-key-padding: 0;
+  --synth-key-icon-size: 12px;
 }
 
 .nudge {
@@ -137,7 +141,7 @@ input[type='range'] {
 
 .readout {
   flex: 0 0 auto;
-  width: 2.8rem;
+  width: 2.4rem;
   color: var(--color-dimmed-light);
   font-family: 'Roboto Mono', monospace;
   font-size: 0.625rem;

@@ -34,6 +34,22 @@
 
 lib-synth-key {
   flex: 0 0 auto;
+  --synth-key-font-size: 0.53rem;
+  --synth-key-letter-spacing: 0.08em;
+  --synth-key-padding: 0 7px;
+  --synth-key-gap: 4px;
+  --synth-key-icon-size: 12px;
+}
+
+// The trigger and delete keys are icon-only squares: the width comes from `min-width`, not padding.
+.trigger,
+lib-synth-key[data-control='loop-delete'] {
+  --synth-key-min-width: 26px;
+  --synth-key-padding: 0;
+}
+
+.trigger {
+  --synth-key-min-width: 32px;
 }
 
 .display {
