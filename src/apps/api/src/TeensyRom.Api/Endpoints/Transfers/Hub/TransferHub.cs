@@ -20,7 +20,7 @@ public sealed class TransferHub(
     {
         var job = registry.Get(jobId) ?? throw new HubException($"Transfer job '{jobId}' not found.");
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(jobId));
+        await Groups.AddToGroupAsync(Context.ConnectionId, TransferHubGroups.Job(jobId));
         tracker.Add(Context.ConnectionId, jobId);
         job.Touch();
 
@@ -28,11 +28,30 @@ public sealed class TransferHub(
     }
 
     /// <summary>
+    /// Joins the caller's connection to the all-transfers group and returns every current job. Deliberately
+    /// bypasses the subscription tracker and <c>Touch</c>: watching everything must never keep a job alive
+    /// or delay its abandonment.
+    /// </summary>
+    public async Task<List<TransferJobDto>> SubscribeAll()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, TransferHubGroups.All);
+
+        return registry.All()
+            .Select(job => TransferJobDto.From(job.ToSnapshot()))
+            .OrderByDescending(dto => dto.StartedUtc)
+            .ToList();
+    }
+
+    /// <summary>Removes the caller's connection from the all-transfers group.</summary>
+    public Task UnsubscribeAll() =>
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, TransferHubGroups.All);
+
+    /// <summary>
     /// Removes the caller's connection from the job's group and the subscription tracker.
     /// </summary>
     public async Task Unsubscribe(string jobId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(jobId));
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, TransferHubGroups.Job(jobId));
         tracker.Remove(Context.ConnectionId, jobId);
     }
 
@@ -45,6 +64,4 @@ public sealed class TransferHub(
         tracker.RemoveConnection(Context.ConnectionId);
         return base.OnDisconnectedAsync(exception);
     }
-
-    private static string GroupName(string jobId) => $"job-{jobId}";
 }

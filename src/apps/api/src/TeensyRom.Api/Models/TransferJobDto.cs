@@ -22,6 +22,7 @@ namespace TeensyRom.Api.Models
         [Required] public long BytesSent { get; set; }
         public int? TotalFiles { get; set; }
         public string? CurrentFile { get; set; }
+        [Required] public TransferOriginDto Origin { get; set; } = new();
         [Required] public DateTime StartedUtc { get; set; }
         [Required] public DateTime LastActivityUtc { get; set; }
         public string? Error { get; set; }
@@ -51,6 +52,7 @@ namespace TeensyRom.Api.Models
             BytesSent = snapshot.BytesSent,
             TotalFiles = snapshot.TotalFiles,
             CurrentFile = snapshot.CurrentFile,
+            Origin = TransferOriginDto.From(snapshot.Origin),
             StartedUtc = snapshot.StartedUtc,
             LastActivityUtc = snapshot.LastActivityUtc,
             Error = snapshot.Error,

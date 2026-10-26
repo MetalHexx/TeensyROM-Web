@@ -149,6 +149,28 @@
         }
       }
     },
+    "/api/transfers": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "List Transfer Jobs",
+        "description": "Lists every transfer job the engine knows about, whatever its origin.\n\n- Newest first.\n- Returns 200 with an empty list when there are no jobs.",
+        "operationId": "ListTransferJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListJobsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transfers/{jobId}": {
       "get": {
         "tags": [
@@ -2721,6 +2743,20 @@
           }
         }
       },
+      "ListJobsResponse": {
+        "required": [
+          "jobs"
+        ],
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferJobDto"
+            }
+          }
+        }
+      },
       "MachineType": {
         "enum": [
           "Unknown",
@@ -3271,6 +3307,7 @@
           "filesSent",
           "filesFailed",
           "bytesSent",
+          "origin",
           "startedUtc",
           "lastActivityUtc",
           "failures",
@@ -3321,6 +3358,9 @@
           "currentFile": {
             "type": "string",
             "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/TransferOriginDto"
           },
           "startedUtc": {
             "type": "string",
@@ -3384,6 +3424,7 @@
           "filesSent",
           "filesFailed",
           "bytesSent",
+          "origin",
           "startedUtc",
           "lastActivityUtc",
           "failures",
@@ -3434,6 +3475,9 @@
           "currentFile": {
             "type": "string",
             "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/TransferOriginDto"
           },
           "startedUtc": {
             "type": "string",
@@ -3496,6 +3540,31 @@
           "Cancelled",
           "Abandoned",
           "Aborted"
+        ]
+      },
+      "TransferOriginDto": {
+        "required": [
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TransferOriginKind"
+          },
+          "watchFolderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "watchFolderPath": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TransferOriginKind": {
+        "enum": [
+          "Upload",
+          "WatchFolder"
         ]
       },
       "UploadFileResponse": {

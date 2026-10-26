@@ -15,6 +15,7 @@ namespace TeensyRom.Core.Entities.Transfers
         public required long BytesSent { get; init; }
         public int? TotalFiles { get; init; }               // null until sealed; then FilesReceived
         public string? CurrentFile { get; init; }            // relative path being written, or null
+        public required TransferOrigin Origin { get; init; }
         public required DateTime StartedUtc { get; init; }
         public required DateTime LastActivityUtc { get; init; }
         public string? Error { get; init; }                  // set on Aborted

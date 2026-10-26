@@ -15,11 +15,20 @@ public class TransferProgressNotifierTests
     private static TransferJob NewJob() =>
         new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
 
-    private static (TransferProgressNotifier Notifier, IClientProxy GroupProxy, ITransferJobRegistry Registry) NewNotifier(TimeSpan throttle)
+    private sealed record NotifierSetup(
+        TransferProgressNotifier Notifier, IClientProxy GroupProxy, IClientProxy AllProxy, ITransferJobRegistry Registry);
+
+    private static NotifierSetup NewNotifier(TimeSpan throttle, TransferJob? job = null)
     {
         var groupProxy = Substitute.For<IClientProxy>();
+        var allProxy = Substitute.For<IClientProxy>();
         var clients = Substitute.For<IHubClients>();
-        clients.Group(Arg.Any<string>()).Returns(groupProxy);
+        clients.Group(Arg.Any<string>()).Returns(allProxy);
+        if (job is not null)
+        {
+            clients.Group(TransferHubGroups.Job(job.JobId)).Returns(groupProxy);
+        }
+        clients.Group(TransferHubGroups.All).Returns(allProxy);
 
         var hubContext = Substitute.For<IHubContext<TransferHub>>();
         hubContext.Clients.Returns(clients);
@@ -28,7 +37,7 @@ public class TransferProgressNotifierTests
         var options = new TransferOptions { SnapshotThrottle = throttle };
         var notifier = new TransferProgressNotifier(hubContext, registry, options, Substitute.For<ILoggingService>());
 
-        return (notifier, groupProxy, registry);
+        return new NotifierSetup(notifier, groupProxy, allProxy, registry);
     }
 
     private static bool IsSnapshotFor(object?[] args, string jobId) =>
@@ -38,7 +47,7 @@ public class TransferProgressNotifierTests
     public async Task JobChanged_MarkedRepeatedlyWithinOneThrottleWindow_BroadcastsExactlyOnce()
     {
         var job = NewJob();
-        var (notifier, groupProxy, registry) = NewNotifier(TimeSpan.FromMilliseconds(20));
+        var (notifier, groupProxy, allProxy, registry) = NewNotifier(TimeSpan.FromMilliseconds(20), job);
         registry.Get(job.JobId).Returns(job);
 
         await notifier.StartAsync(CancellationToken.None);
@@ -57,18 +66,22 @@ public class TransferProgressNotifierTests
 
         await groupProxy.Received(1).SendCoreAsync(
             "JobSnapshot", Arg.Is<object?[]>(a => IsSnapshotFor(a, job.JobId)), Arg.Any<CancellationToken>());
+        await allProxy.Received(1).SendCoreAsync(
+            "JobSnapshot", Arg.Is<object?[]>(a => IsSnapshotFor(a, job.JobId)), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task NoDirtyJobs_ProducesNoTraffic()
     {
-        var (notifier, groupProxy, _) = NewNotifier(TimeSpan.FromMilliseconds(20));
+        var (notifier, groupProxy, allProxy, _) = NewNotifier(TimeSpan.FromMilliseconds(20));
 
         await notifier.StartAsync(CancellationToken.None);
         await Task.Delay(TimeSpan.FromMilliseconds(100));
         await notifier.StopAsync(CancellationToken.None);
 
         await groupProxy.DidNotReceive().SendCoreAsync(
+            Arg.Any<string>(), Arg.Any<object?[]>(), Arg.Any<CancellationToken>());
+        await allProxy.DidNotReceive().SendCoreAsync(
             Arg.Any<string>(), Arg.Any<object?[]>(), Arg.Any<CancellationToken>());
     }
 
@@ -79,12 +92,14 @@ public class TransferProgressNotifierTests
         job.TryTransitionTo(TransferJobState.Cancelled);
 
         // A throttle long enough that the assertion below could only pass via the immediate flush path.
-        var (notifier, groupProxy, registry) = NewNotifier(TimeSpan.FromMinutes(5));
+        var (notifier, groupProxy, allProxy, registry) = NewNotifier(TimeSpan.FromMinutes(5), job);
         registry.Get(job.JobId).Returns(job);
 
         notifier.JobChanged(job);
 
         await groupProxy.Received(1).SendCoreAsync(
+            "JobSnapshot", Arg.Is<object?[]>(a => IsSnapshotFor(a, job.JobId)), Arg.Any<CancellationToken>());
+        await allProxy.Received(1).SendCoreAsync(
             "JobSnapshot", Arg.Is<object?[]>(a => IsSnapshotFor(a, job.JobId)), Arg.Any<CancellationToken>());
     }
 }

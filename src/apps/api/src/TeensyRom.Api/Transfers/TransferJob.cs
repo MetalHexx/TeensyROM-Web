@@ -44,6 +44,7 @@ namespace TeensyRom.Api.Transfers
         public string DeviceId { get; }
         public TeensyStorageType StorageType { get; }
         public DirectoryPath Destination { get; }
+        public TransferOrigin Origin { get; }
         public TransferJobState State { get; private set; }
         public DateTime LastActivityUtc { get; private set; }
 
@@ -73,12 +74,14 @@ namespace TeensyRom.Api.Transfers
             DirectoryPath destination,
             TransferOptions options,
             Func<DateTime>? clock = null,
-            int expectedArchiveCount = 0)
+            int expectedArchiveCount = 0,
+            TransferOrigin? origin = null)
         {
             JobId = Guid.NewGuid().ToString("N");
             DeviceId = deviceId;
             StorageType = storageType;
             Destination = destination;
+            Origin = origin ?? TransferOrigin.Upload;
             _options = options;
             _clock = clock ?? (() => DateTime.UtcNow);
             _expectedArchiveCount = expectedArchiveCount;
@@ -463,6 +466,7 @@ namespace TeensyRom.Api.Transfers
                     DeviceId = DeviceId,
                     StorageType = StorageType,
                     DestinationDirectory = Destination.Value,
+                    Origin = Origin,
                     State = State,
                     FilesReceived = _filesReceived,
                     FilesSent = _filesSent,
