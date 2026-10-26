@@ -117,7 +117,7 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
+     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset, when the device isn\'t idle, happens on the first uploaded file.
      * Create Transfer Job
      */
     async createTransferJobRaw(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreateJobResponse>> {
@@ -160,7 +160,7 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
+     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset, when the device isn\'t idle, happens on the first uploaded file.
      * Create Transfer Job
      */
     async createTransferJob(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CreateJobResponse> {

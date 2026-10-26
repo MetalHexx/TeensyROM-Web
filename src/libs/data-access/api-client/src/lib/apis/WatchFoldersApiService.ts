@@ -21,6 +21,8 @@ import type {
   ProblemDetails,
   RemoveWatchFolderDeviceResponse,
   RemoveWatchFolderResponse,
+  SetWatchFolderDeviceBody,
+  SetWatchFolderDeviceResponse,
   SetWatchFolderEnabledBody,
   SetWatchFolderEnabledResponse,
 } from '../models/index';
@@ -37,6 +39,10 @@ import {
     RemoveWatchFolderDeviceResponseToJSON,
     RemoveWatchFolderResponseFromJSON,
     RemoveWatchFolderResponseToJSON,
+    SetWatchFolderDeviceBodyFromJSON,
+    SetWatchFolderDeviceBodyToJSON,
+    SetWatchFolderDeviceResponseFromJSON,
+    SetWatchFolderDeviceResponseToJSON,
     SetWatchFolderEnabledBodyFromJSON,
     SetWatchFolderEnabledBodyToJSON,
     SetWatchFolderEnabledResponseFromJSON,
@@ -54,6 +60,12 @@ export interface RemoveWatchFolderRequest {
 export interface RemoveWatchFolderDeviceRequest {
     watchFolderId: string;
     deviceId: string;
+}
+
+export interface SetWatchFolderDeviceRequest {
+    watchFolderId: string;
+    deviceId: string;
+    setWatchFolderDeviceBody: SetWatchFolderDeviceBody;
 }
 
 export interface SetWatchFolderEnabledRequest {
@@ -210,7 +222,59 @@ export class WatchFoldersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Turns a watch folder on or off without changing its destinations.
+     * Changes the device folder and/or the launch flag of a device\'s destination on a watch folder.  - A null or absent value is left as it is; at least one must be given. - Only the device folder and launch flag change. A different device or storage is a different destination. - Setting the values it already has succeeds and changes nothing. - The change applies to the next set of files delivered.
+     * Set Watch Folder Device
+     */
+    async setWatchFolderDeviceRaw(requestParameters: SetWatchFolderDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SetWatchFolderDeviceResponse>> {
+        if (requestParameters['watchFolderId'] == null) {
+            throw new runtime.RequiredError(
+                'watchFolderId',
+                'Required parameter "watchFolderId" was null or undefined when calling setWatchFolderDevice().'
+            );
+        }
+
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling setWatchFolderDevice().'
+            );
+        }
+
+        if (requestParameters['setWatchFolderDeviceBody'] == null) {
+            throw new runtime.RequiredError(
+                'setWatchFolderDeviceBody',
+                'Required parameter "setWatchFolderDeviceBody" was null or undefined when calling setWatchFolderDevice().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        const response = await this.request({
+            path: `/api/watch-folders/{watchFolderId}/devices/{deviceId}`.replace(`{${"watchFolderId"}}`, encodeURIComponent(String(requestParameters['watchFolderId']))).replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SetWatchFolderDeviceBodyToJSON(requestParameters['setWatchFolderDeviceBody']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SetWatchFolderDeviceResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Changes the device folder and/or the launch flag of a device\'s destination on a watch folder.  - A null or absent value is left as it is; at least one must be given. - Only the device folder and launch flag change. A different device or storage is a different destination. - Setting the values it already has succeeds and changes nothing. - The change applies to the next set of files delivered.
+     * Set Watch Folder Device
+     */
+    async setWatchFolderDevice(requestParameters: SetWatchFolderDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SetWatchFolderDeviceResponse> {
+        const response = await this.setWatchFolderDeviceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Turns a watch folder on or off without changing its destinations.  - Files that land while the folder is off are not sent later, not even after it is turned back on.
      * Set Watch Folder Enabled
      */
     async setWatchFolderEnabledRaw(requestParameters: SetWatchFolderEnabledRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SetWatchFolderEnabledResponse>> {
@@ -246,7 +310,7 @@ export class WatchFoldersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Turns a watch folder on or off without changing its destinations.
+     * Turns a watch folder on or off without changing its destinations.  - Files that land while the folder is off are not sent later, not even after it is turned back on.
      * Set Watch Folder Enabled
      */
     async setWatchFolderEnabled(requestParameters: SetWatchFolderEnabledRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SetWatchFolderEnabledResponse> {

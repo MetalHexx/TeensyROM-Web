@@ -68,6 +68,8 @@ export * from './SealJobResponse';
 export * from './SearchResponse';
 export * from './SearchSettingsDto';
 export * from './SearchWeightsDto';
+export * from './SetWatchFolderDeviceBody';
+export * from './SetWatchFolderDeviceResponse';
 export * from './SetWatchFolderEnabledBody';
 export * from './SetWatchFolderEnabledResponse';
 export * from './StopEngineResponse';

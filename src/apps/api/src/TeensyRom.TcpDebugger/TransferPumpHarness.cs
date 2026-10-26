@@ -8,14 +8,14 @@ namespace TeensyRom.TcpDebugger;
 
 /// <summary>
 /// Isolation harness for the FILE-TRANSFER-4 ack-timeout bug, one level up from
-/// Program.ExecuteTransferFilesCommand: mirrors TransferPump's actual per-job sequence - one
-/// unconditional device reset via ResetCommandHandler, then N sequential
+/// Program.ExecuteTransferFilesCommand: mirrors the per-job sequence TransferPump follows when it
+/// resets - one unconditional device reset via ResetCommandHandler, then N sequential
 /// TransferFilesCommandHandler calls (one file per batch) against the same connection - with
-/// none of TransferPump's queue/staging/registry/DI machinery around it. TransferPump always
-/// resets before the first file of a job regardless of current firmware state, unlike Program's
-/// single-file harness which only resets when the FW check reports minimal - this class exists to
-/// cover that gap, and to exercise several sequential SendFile calls back-to-back the way a real
-/// batch drop does.
+/// none of TransferPump's queue/staging/registry/DI machinery around it. This harness always
+/// resets once per job to stress the SendFile path; TransferPump itself skips the reset when its
+/// record shows the device idle (Transfer:SkipResetWhenIdle). Unlike Program's single-file
+/// harness, which only resets when the FW check reports minimal, this class exercises several
+/// sequential SendFile calls back-to-back the way a real batch drop does.
 /// </summary>
 internal static class TransferPumpHarness
 {
@@ -47,7 +47,7 @@ internal static class TransferPumpHarness
 
     private static async Task ResetOnceAsync(TcpCommunicationPort tcpPort, Program.SimpleLoggingService log)
     {
-        Program.LogHeader("Reset (unconditional, once per job - mirrors TransferPump.ResetDeviceAsync)");
+        Program.LogHeader("Reset (unconditional, once per job - the reset TransferPump.ResetDeviceAsync performs when the device is not recorded idle)");
 
         var handler = new ResetCommandHandler(log, new TeensyRom.Core.Serial.Recovery.ConnectionOptions());
         var sw = Stopwatch.StartNew();
