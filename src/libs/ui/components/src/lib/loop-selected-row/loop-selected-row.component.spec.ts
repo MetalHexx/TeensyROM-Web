@@ -37,6 +37,17 @@ const loop: LoopSelectedRowModel = {
   setEndAccessibleName: 'Set end of Item 3',
   clearEndAccessibleName: 'Clear end of Item 3',
   deleteAccessibleName: 'Delete Item 3',
+  playNowDisabled: false,
+  playNowAccessibleName: 'Play now Item 3',
+  sharesGlobal: true,
+  globalDisabled: false,
+  globalAccessibleName: 'GBL Item 3',
+};
+
+const cue: Partial<LoopSelectedRowModel> = {
+  kindLabel: 'CUE',
+  clearEndDisabled: true,
+  end: boundary('End', { empty: true }),
 };
 
 describe('LoopSelectedRowComponent', () => {
@@ -64,13 +75,64 @@ describe('LoopSelectedRowComponent', () => {
     const emitted: string[] = [];
     const c = fixture.componentInstance;
     c.trigger.subscribe(() => emitted.push('trigger'));
-    c.setEnd.subscribe(() => emitted.push('setEnd'));
+    c.playNow.subscribe(() => emitted.push('playNow'));
+    c.toggleGlobal.subscribe(() => emitted.push('toggleGlobal'));
     c.clearEnd.subscribe(() => emitted.push('clearEnd'));
     c.deleteMarker.subscribe(() => emitted.push('delete'));
-    for (const control of ['loop-toggle', 'loop-set-end', 'loop-clear-end', 'loop-delete']) {
+    for (const control of [
+      'loop-toggle',
+      'loop-play-now',
+      'loop-global',
+      'loop-clear-end',
+      'loop-delete',
+    ]) {
       button(`[data-control="${control}"]`).click();
     }
-    expect(emitted).toEqual(['trigger', 'setEnd', 'clearEnd', 'delete']);
+    expect(emitted).toEqual(['trigger', 'playNow', 'toggleGlobal', 'clearEnd', 'delete']);
+  });
+
+  it('shows the End boundary on a loop and no Set End key anywhere', () => {
+    expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
+    expect(range('loop-end')).not.toBeNull();
+    expect(el().querySelector('[data-control="loop-end"] [data-part="snap-next"]')).not.toBeNull();
+  });
+
+  it("puts Set End in a cue's End slot, in place of the snap keys, and emits setEnd from it", () => {
+    setModel(cue);
+    const emitted: string[] = [];
+    fixture.componentInstance.setEnd.subscribe(() => emitted.push('setEnd'));
+    button('[data-control="loop-end"] [data-control="loop-set-end"]').click();
+    expect(emitted).toEqual(['setEnd']);
+    expect(el().querySelector('[data-control="loop-end"] [data-part^="snap-"]')).toBeNull();
+    expect(el().querySelector('[data-control="loop-end"] input')).toBeNull();
+  });
+
+  it("disables a cue's Set End key from the model", () => {
+    setModel({ ...cue, setEndDisabled: true });
+    expect(button('[data-control="loop-set-end"]').disabled).toBe(true);
+  });
+
+  it('follows sharesGlobal in the GBL switch and the display text', () => {
+    const gbl = (): HTMLButtonElement => button('[data-control="loop-global"]');
+    expect(gbl().getAttribute('aria-pressed')).toBe('true');
+    expect(gbl().hasAttribute('data-lit')).toBe(true);
+    expect(display().getAttribute('aria-label')).not.toContain('own settings');
+    setModel({ sharesGlobal: false });
+    expect(gbl().getAttribute('aria-pressed')).toBe('false');
+    expect(gbl().hasAttribute('data-lit')).toBe(false);
+    expect(display().getAttribute('aria-label')).toContain('own settings');
+  });
+
+  it('makes Clear End icon-only', () => {
+    const clear = button('[data-control="loop-clear-end"]');
+    expect(clear.textContent?.trim()).toBe('close');
+    expect(clear.querySelector('.text')).toBeNull();
+  });
+
+  it('disables play now and GBL from the model', () => {
+    setModel({ playNowDisabled: true, globalDisabled: true });
+    expect(button('[data-control="loop-play-now"]').disabled).toBe(true);
+    expect(button('[data-control="loop-global"]').disabled).toBe(true);
   });
 
   it('tags nudges with the boundary they came from', () => {
@@ -118,23 +180,19 @@ describe('LoopSelectedRowComponent', () => {
   });
 
   it('disables Clear End on a cue and the empty End boundary with it', () => {
-    setModel({
-      kindLabel: 'CUE',
-      clearEndDisabled: true,
-      end: boundary('End', { empty: true }),
-    });
+    setModel(cue);
     expect(button('[data-control="loop-clear-end"]').disabled).toBe(true);
     expect(button('[data-control="loop-set-end"]').disabled).toBe(false);
-    expect(range('loop-end').disabled).toBe(true);
     expect(range('loop-start').disabled).toBe(false);
   });
 
   it('blanks the display and disables every key and boundary when nothing is selected', () => {
-    setModel({ empty: true, name: '', kindLabel: '', spanText: '' });
+    setModel({ empty: true, name: '', kindLabel: '', spanText: '', end: boundary('End', { empty: true }) });
     expect(display().getAttribute('aria-label')).toBe('nothing selected');
     expect(display().textContent?.trim()).toBe('');
     const controls = Array.from(el().querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input'));
     expect(controls.length).toBeGreaterThan(0);
     expect(controls.every((control) => control.disabled)).toBe(true);
+    expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
   });
 });

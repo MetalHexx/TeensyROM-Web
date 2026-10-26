@@ -28,6 +28,7 @@ import { LoopTileComponent, type LoopTileModel } from '../loop-tile/loop-tile.co
  *   accessibleName="Loops and cues, deck A"
  *   emptyText="No loops or cues yet"
  *   (triggerTile)="onTrigger($event)"
+ *   (playNowTile)="onPlayNow($event)"
  *   (selectTile)="onSelect($event)"
  * />
  * ```
@@ -50,6 +51,8 @@ export class LoopTileGridComponent {
   readonly emptyText = input<string | null>(null);
   /** Emits the tile's id when its trigger key is pressed. */
   readonly triggerTile = output<string>();
+  /** Emits the tile's id when its play-now key is pressed. */
+  readonly playNowTile = output<string>();
   /** Emits the tile's id when its select button is pressed. */
   readonly selectTile = output<string>();
 

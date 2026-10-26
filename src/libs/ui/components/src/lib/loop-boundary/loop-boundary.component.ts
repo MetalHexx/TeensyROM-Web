@@ -21,6 +21,16 @@ export interface LoopBoundaryModel {
   readonly nextAccessibleName: string;
 }
 
+/** A one-shot key that takes the place of a boundary's snap keys, strip and readout. */
+export interface LoopBoundaryAction {
+  readonly label: string;
+  readonly icon: string;
+  readonly accessibleName: string;
+  readonly disabled: boolean;
+  /** Rendered as the key's `data-control`, so a learn overlay can find it. */
+  readonly control: string;
+}
+
 const MINUS = '−';
 const EMPTY_READOUT = '—';
 
@@ -28,6 +38,10 @@ const EMPTY_READOUT = '—';
  * One boundary of the selected loop or cue: the tag, a previous-snap key, a bipolar nudge strip, a
  * next-snap key and the offset readout. Purely presentational: it holds no drag value, so the
  * caller feeds `dragOffsetFrames` while a drag is live and the committed offset is shown otherwise.
+ *
+ * With an `action` set the boundary keeps its frame and tag but holds one full-width one-shot key
+ * in place of the snap keys, strip and readout; `actionPress` reports the press. A cue's End slot
+ * uses it for Set End.
  *
  * The strip is a native range input under a drawn strip (centre line, magenta moment ticks, a bar
  * from the centre to the value), so it stays keyboard-operable and visible to assistive tech.
@@ -53,6 +67,7 @@ const EMPTY_READOUT = '—';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[attr.data-empty]': 'model().empty ? "" : null',
+    '[attr.data-action]': 'action() ? "" : null',
   },
 })
 export class LoopBoundaryComponent {
@@ -60,6 +75,8 @@ export class LoopBoundaryComponent {
   readonly model = input.required<LoopBoundaryModel>();
   /** While non-null, the readout and bar follow it instead of the committed offset. */
   readonly dragOffsetFrames = input<number | null>(null);
+  /** When set, replaces the snap keys, strip and readout with this one key. */
+  readonly action = input<LoopBoundaryAction | null>(null);
   /** Fires on every drag tick with the live offset in frames — readout only. */
   readonly nudgeInput = output<number>();
   /** Fires on release with the offset in frames — the value to apply. */
@@ -68,6 +85,8 @@ export class LoopBoundaryComponent {
   readonly snapPrevious = output<void>();
   /** Emits when the snap-to-next-moment key is pressed. */
   readonly snapNext = output<void>();
+  /** Emits when the action key is pressed. */
+  readonly actionPress = output<void>();
 
   protected readonly controlsDisabled = computed(() => {
     const model = this.model();

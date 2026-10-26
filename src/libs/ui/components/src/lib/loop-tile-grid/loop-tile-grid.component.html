@@ -8,6 +8,7 @@
       [model]="tile"
       [progressPercent]="tile.activity === 'running' ? runningProgressPercent() : 0"
       (trigger)="triggerTile.emit(tile.id)"
+      (playNow)="playNowTile.emit(tile.id)"
       (selectTile)="selectTile.emit(tile.id)"
     />
   </div>

@@ -15,6 +15,7 @@ import {
   type LoopItemSummary,
   type LoopSelectionSummary,
   type MidiPortOption,
+  type SettingsInPlaySummary,
   type Slot,
 } from '@teensyrom-nx/application';
 import {
@@ -164,6 +165,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   const bindingSummary = signal(idleBindingSummary(options.binding));
   const loopsSummary = signal(emptyLoopsSummary(options.loops));
   const loopLapPercent = signal(0);
+  const settingsInPlay = signal<SettingsInPlaySummary>({ markerId: null, name: 'Main' });
   const deckState = signal({
     subtune: options.subtune ?? 0,
     speed: 1,
@@ -201,6 +203,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
           bindingSummary: () => bindingSummary,
           loopsSummary: () => loopsSummary,
           loopLapPercent: () => loopLapPercent,
+          settingsInPlay: () => settingsInPlay,
           deck: () => deckState,
           canShape: () => signal(false),
           bindings,
@@ -223,6 +226,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     bindingSummary,
     loopsSummary,
     loopLapPercent,
+    settingsInPlay,
     deckState,
     deckService,
     devices,
@@ -397,6 +401,54 @@ describe('DjDeckColumnComponent', () => {
       ]);
       expect(model.tiles.map((t) => t.selected)).toEqual([true, false, false]);
       expect(model.stopDisabled).toBe(false);
+    });
+
+    it('fills the play-now and GBL fields from the selection, and defaults them with none', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem()],
+          selected: selection({ sharesGlobal: false }),
+        },
+      });
+      let row = plate(fixture).model().selected;
+
+      expect([row.sharesGlobal, row.playNowDisabled, row.globalDisabled]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+      expect([row.playNowAccessibleName, row.globalAccessibleName]).toEqual([
+        'Play now Item 1 deck B',
+        'GBL Item 1 deck B',
+      ]);
+
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, items: [loopItem()] }));
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+
+      expect([row.sharesGlobal, row.playNowDisabled, row.globalDisabled]).toEqual([
+        true,
+        true,
+        true,
+      ]);
+    });
+
+    it('marks a tile that keeps its own settings, in its name and for its dot', () => {
+      const { fixture } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem(), loopItem({ id: 'm2', name: 'Item 2', ownSettings: true })],
+        },
+      });
+      const { tiles } = plate(fixture).model();
+
+      expect(tiles.map((t) => t.ownSettings)).toEqual([false, true]);
+      expect(tiles.map((t) => t.playNowAccessibleName)).toEqual([
+        'Play now Item 1 deck B',
+        'Play now Item 2 deck B',
+      ]);
+      expect(tiles[1].selectAccessibleName).toBe('Item 2, loop, 7.8s, own settings, deck B');
     });
 
     it('fills the selected row and applies the disabled rules', () => {
@@ -724,6 +776,24 @@ describe('DjDeckColumnComponent', () => {
 
   describe('the channel strip', () => {
     const DECK_B: DeckRef = { slot: 'B', letter: 'B', index: 1 };
+
+    it('names whose settings are in play on the sign', () => {
+      const { fixture, settingsInPlay } = render(DECK_B);
+      expect(strip(fixture).model().settingsSign).toEqual({
+        text: 'Main',
+        own: false,
+        accessibleName: 'Settings in play deck B: Main',
+      });
+
+      settingsInPlay.set({ markerId: 'm2', name: 'Item 2' });
+      fixture.detectChanges();
+
+      expect(strip(fixture).model().settingsSign).toEqual({
+        text: 'Item 2',
+        own: true,
+        accessibleName: 'Settings in play deck B: Item 2',
+      });
+    });
 
     it('shows the live multiplier and builds its names from the deck letter', () => {
       const { fixture, store } = renderLive(DECK_B);

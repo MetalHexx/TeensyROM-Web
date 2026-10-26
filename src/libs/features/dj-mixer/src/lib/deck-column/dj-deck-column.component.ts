@@ -65,7 +65,11 @@ const ACTIVITY_WORDS: Record<LoopActivity, string> = {
 
 /** The tile's select-button name: what it is, how long, and where it stands, spelled out. */
 function tileSelectName(item: LoopItemSummary, letter: string): string {
-  const state = [ACTIVITY_WORDS[item.activity], item.ready ? '' : 'not ready']
+  const state = [
+    ACTIVITY_WORDS[item.activity],
+    item.ready ? '' : 'not ready',
+    item.ownSettings ? 'own settings' : '',
+  ]
     .filter((word) => word !== '')
     .join(' and ');
   const length = item.kind === 'loop' ? item.lengthText : '';
@@ -112,6 +116,11 @@ function selectedRowModel(
     setEndDisabled: selection === null,
     clearEndDisabled: selection?.kind !== 'loop',
     deleteDisabled: selection === null,
+    playNowDisabled: selection === null,
+    playNowAccessibleName: `Play now ${name} deck ${letter}`,
+    sharesGlobal: selection?.sharesGlobal ?? true,
+    globalDisabled: selection === null,
+    globalAccessibleName: `GBL ${name} deck ${letter}`,
     start: boundaryModel('Start', letter, selection?.start ?? null),
     end: boundaryModel('End', letter, selection?.end ?? null),
     triggerAccessibleName: `Trigger ${name} deck ${letter}`,
@@ -190,6 +199,8 @@ export class DjDeckColumnComponent {
           ready: item.ready,
           triggerAccessibleName: `Trigger ${item.name} deck ${letter}`,
           selectAccessibleName: tileSelectName(item, letter),
+          ownSettings: item.ownSettings,
+          playNowAccessibleName: `Play now ${item.name} deck ${letter}`,
         })
       ),
     };
@@ -272,7 +283,13 @@ export class DjDeckColumnComponent {
   readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
     const { speed, faderSpeed, nudging, voices } = this.deckState();
+    const { markerId, name } = this.djStore.settingsInPlay(this.deck().slot)();
     return {
+      settingsSign: {
+        text: name,
+        own: markerId !== null,
+        accessibleName: `Settings in play deck ${letter}: ${name}`,
+      },
       voiceAccessibleName: `Voice deck ${letter}`,
       speedAccessibleName: `Speed deck ${letter}`,
       voices: voices.map(({ muted }, i) => {

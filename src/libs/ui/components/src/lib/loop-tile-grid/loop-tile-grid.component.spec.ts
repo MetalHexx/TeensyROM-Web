@@ -14,6 +14,8 @@ function tile(id: string, overrides: Partial<LoopTileModel> = {}): LoopTileModel
     ready: true,
     triggerAccessibleName: `Trigger ${id}`,
     selectAccessibleName: `Select ${id}`,
+    ownSettings: false,
+    playNowAccessibleName: `Play now ${id}`,
     ...overrides,
   };
 }
@@ -52,14 +54,18 @@ describe('LoopTileGridComponent', () => {
     expect(items()).toHaveLength(3);
   });
 
-  it('emits the tile id for trigger and select', () => {
+  it('emits the tile id for trigger, play now and select', () => {
     const triggered: string[] = [];
+    const playedNow: string[] = [];
     const selected: string[] = [];
     fixture.componentInstance.triggerTile.subscribe((id) => triggered.push(id));
+    fixture.componentInstance.playNowTile.subscribe((id) => playedNow.push(id));
     fixture.componentInstance.selectTile.subscribe((id) => selected.push(id));
     items()[1].querySelector<HTMLButtonElement>('lib-synth-key button')?.click();
+    items()[0].querySelector<HTMLButtonElement>('lib-synth-key.play-now button')?.click();
     items()[2].querySelector<HTMLButtonElement>('button.select')?.click();
     expect(triggered).toEqual(['b']);
+    expect(playedNow).toEqual(['a']);
     expect(selected).toEqual(['c']);
   });
 

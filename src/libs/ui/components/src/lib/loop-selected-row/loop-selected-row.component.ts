@@ -1,5 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { LoopBoundaryComponent, type LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
+import {
+  LoopBoundaryComponent,
+  type LoopBoundaryAction,
+  type LoopBoundaryModel,
+} from '../loop-boundary/loop-boundary.component';
 import type { LoopTileActivity } from '../loop-tile/loop-tile.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 
@@ -28,6 +32,12 @@ export interface LoopSelectedRowModel {
   readonly setEndAccessibleName: string;
   readonly clearEndAccessibleName: string;
   readonly deleteAccessibleName: string;
+  readonly playNowDisabled: boolean;
+  readonly playNowAccessibleName: string;
+  /** GBL lit: the marker shares the main track's settings. */
+  readonly sharesGlobal: boolean;
+  readonly globalDisabled: boolean;
+  readonly globalAccessibleName: string;
 }
 
 /** A boundary nudge, tagged with the boundary it belongs to. */
@@ -50,15 +60,19 @@ const ACTIVITY_WORDS: Record<LoopTileActivity, string> = {
 
 const NOTHING_SELECTED = 'nothing selected';
 const NOT_READY = 'not ready';
+const OWN_SETTINGS = 'own settings';
+const SET_END_LABEL = 'Set End';
+const SET_END_ICON = 'last_page';
+const SET_END_CONTROL = 'loop-set-end';
 
 /**
  * The selected loop or cue, across both columns of the plate: a trigger key, a small display of the
- * name, kind and span, the Set End, Clear End and Delete keys, and beneath them the Start and End
- * boundaries side by side. Purely presentational: it computes no time or snap target and holds no
+ * name, kind and span, a play-now key, the GBL switch, the Clear End and Delete keys, and beneath
+ * them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key. Purely presentational: it computes no time or snap target and holds no
  * drag value. The caller supplies every label and the drag offsets.
  *
  * With `model.empty` the display is blank and every key and boundary is disabled. The display's
- * accessible text carries the running, queued or not-ready state in words.
+ * accessible text carries the running, queued, not-ready and own-settings state in words.
  *
  * @example
  * ```html
@@ -67,6 +81,8 @@ const NOT_READY = 'not ready';
  *   [startDragOffset]="startDrag()"
  *   [endDragOffset]="endDrag()"
  *   (trigger)="onTrigger()"
+ *   (playNow)="onPlayNow()"
+ *   (toggleGlobal)="onToggleGlobal()"
  *   (setEnd)="onSetEnd()"
  *   (clearEnd)="onClearEnd()"
  *   (deleteMarker)="onDelete()"
@@ -95,7 +111,11 @@ export class LoopSelectedRowComponent {
   readonly endDragOffset = input<number | null>(null);
   /** Emits when the trigger key is pressed. */
   readonly trigger = output<void>();
-  /** Emits when Set End is pressed. */
+  /** Emits when the play-now key is pressed. */
+  readonly playNow = output<void>();
+  /** Emits when the GBL switch is pressed. */
+  readonly toggleGlobal = output<void>();
+  /** Emits when Set End, in a cue's End slot, is pressed. */
   readonly setEnd = output<void>();
   /** Emits when Clear End is pressed. */
   readonly clearEnd = output<void>();
@@ -123,7 +143,11 @@ export class LoopSelectedRowComponent {
   protected readonly displayText = computed(() => {
     const model = this.model();
     if (model.empty) return NOTHING_SELECTED;
-    const state = [ACTIVITY_WORDS[model.activity], model.ready ? '' : NOT_READY]
+    const state = [
+      ACTIVITY_WORDS[model.activity],
+      model.ready ? '' : NOT_READY,
+      model.sharesGlobal ? '' : OWN_SETTINGS,
+    ]
       .filter((word) => word !== '')
       .join(', ');
     return [model.name, model.kindLabel.toLowerCase(), state, model.spanText]
@@ -133,6 +157,19 @@ export class LoopSelectedRowComponent {
 
   protected readonly startBoundary = computed(() => this.boundary('start'));
   protected readonly endBoundary = computed(() => this.boundary('end'));
+
+  /** Set End, in the End slot of a selected cue; a loop and an empty row show the boundary. */
+  protected readonly endAction = computed<LoopBoundaryAction | null>(() => {
+    const model = this.model();
+    if (model.empty || !model.end.empty) return null;
+    return {
+      label: SET_END_LABEL,
+      icon: SET_END_ICON,
+      accessibleName: model.setEndAccessibleName,
+      disabled: model.setEndDisabled,
+      control: SET_END_CONTROL,
+    };
+  });
 
   private boundary(name: LoopBoundaryName): LoopBoundaryModel {
     const model = this.model();

@@ -41,6 +41,11 @@ function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelecte
     setEndAccessibleName: 'Set end deck A',
     clearEndAccessibleName: 'Clear end deck A',
     deleteAccessibleName: 'Delete selected deck A',
+    playNowDisabled: false,
+    playNowAccessibleName: 'Play now selected deck A',
+    sharesGlobal: true,
+    globalDisabled: false,
+    globalAccessibleName: 'GBL selected deck A',
     ...overrides,
   };
 }
@@ -66,6 +71,8 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
     ready: true,
     triggerAccessibleName: `Trigger Item ${number}`,
     selectAccessibleName: `Select Item ${number}, loop`,
+    ownSettings: false,
+    playNowAccessibleName: `Play now Item ${number}`,
     ...overrides,
   };
 }
@@ -101,10 +108,13 @@ describe('LoopsCuesPlateComponent', () => {
     component.addMarker.subscribe(plain('add'));
     component.stopLoop.subscribe(plain('stop'));
     component.toggleSelected.subscribe(plain('toggle'));
+    component.playNowSelected.subscribe(plain('playNowSelected'));
+    component.toggleGlobal.subscribe(plain('toggleGlobal'));
     component.setEnd.subscribe(plain('setEnd'));
     component.clearEnd.subscribe(plain('clearEnd'));
     component.deleteSelected.subscribe(plain('delete'));
     component.triggerTile.subscribe(valued('triggerTile'));
+    component.playNowTile.subscribe(valued('playNowTile'));
     component.selectTile.subscribe(valued('selectTile'));
     component.nudgeCommit.subscribe(valued('nudgeCommit'));
     component.snap.subscribe(valued('snap'));
@@ -144,11 +154,19 @@ describe('LoopsCuesPlateComponent', () => {
 
     it('re-emits each selected-row key as its own output', () => {
       byName('Trigger selected deck A').click();
-      byName('Set end deck A').click();
+      byName('Play now selected deck A').click();
+      byName('GBL selected deck A').click();
       byName('Clear end deck A').click();
       byName('Delete selected deck A').click();
 
-      expect(emitted).toEqual(['toggle', 'setEnd', 'clearEnd', 'delete']);
+      expect(emitted).toEqual(['toggle', 'playNowSelected', 'toggleGlobal', 'clearEnd', 'delete']);
+    });
+
+    it("re-emits Set End from a cue's End slot", () => {
+      setModel(model({ selected: selectedRow({ kindLabel: 'CUE', end: boundary('End', { empty: true }) }) }));
+      byName('Set end deck A').click();
+
+      expect(emitted).toEqual(['setEnd']);
     });
 
     it('re-emits a boundary snap tagged with the boundary and direction', () => {
@@ -169,12 +187,14 @@ describe('LoopsCuesPlateComponent', () => {
       expect(emitted).toEqual([['nudgeCommit', { boundary: 'end', offsetFrames: 12 }]]);
     });
 
-    it('emits the tile id for a tile trigger and a tile select', () => {
+    it('emits the tile id for a tile trigger, play now and select', () => {
       byName('Trigger Item 2').click();
+      byName('Play now Item 2').click();
       byName('Select Item 2, loop').click();
 
       expect(emitted).toEqual([
         ['triggerTile', 'item-2'],
+        ['playNowTile', 'item-2'],
         ['selectTile', 'item-2'],
       ]);
     });

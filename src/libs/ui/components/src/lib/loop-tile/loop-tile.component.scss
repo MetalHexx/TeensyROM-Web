@@ -35,6 +35,14 @@
   --synth-key-icon-size: 16px;
 }
 
+.play-now {
+  flex: 0 0 auto;
+  --synth-key-height: 30px;
+  --synth-key-min-width: 26px;
+  --synth-key-padding: 0;
+  --synth-key-icon-size: 14px;
+}
+
 .select {
   flex: 1 1 auto;
   display: flex;
@@ -70,6 +78,17 @@
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// The dot is the mockup's 6px "own settings" light.
+.own {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-highlight);
+  box-shadow: 0 0 6px var(--color-highlight);
 }
 
 .length {

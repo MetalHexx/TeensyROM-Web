@@ -1,4 +1,16 @@
 <span class="tag">{{ model().tag }}</span>
+@if (action(); as action) {
+<lib-synth-key
+  class="action"
+  data-part="action"
+  [attr.data-control]="action.control"
+  [label]="action.label"
+  [icon]="action.icon"
+  [accessibleName]="action.accessibleName"
+  [disabled]="action.disabled"
+  (press)="actionPress.emit()"
+/>
+} @else {
 <lib-synth-key
   data-part="snap-previous"
   icon="chevron_left"
@@ -37,3 +49,4 @@
   (press)="snapNext.emit()"
 />
 <span class="readout" data-part="readout">{{ readout() }}</span>
+}

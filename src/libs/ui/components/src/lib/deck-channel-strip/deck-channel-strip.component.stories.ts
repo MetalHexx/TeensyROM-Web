@@ -12,7 +12,8 @@ const meta: Meta<DeckChannelStripComponent> = {
           "One deck's voice-and-speed channel strip on a single faceplate: three voice pairs " +
           '(a latching mute key over a Kill/Punch hold pad), the speed display, a hardware-drawn ' +
           'fader that is still a native range, the nudge pads and the jump keys. It is sized for ' +
-          'the roughly 88px voice-and-speed column and fills its height. Purely presentational. ' +
+          'the roughly 88px voice-and-speed column and fills its height. A sign at the top of the ' +
+          'voice section names whose settings are in play. Purely presentational. ' +
           'The Held story presses the pads with an Enter keydown.',
       },
     },
@@ -42,6 +43,11 @@ type Story = StoryObj<DeckChannelStripComponent>;
 
 function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
   return {
+    settingsSign: {
+      text: 'Main',
+      own: false,
+      accessibleName: `Settings in play deck ${deck}: Main`,
+    },
     voiceAccessibleName: `Voice deck ${deck}`,
     speedAccessibleName: `Speed deck ${deck}`,
     voices: [1, 2, 3].map((n) => ({
@@ -103,6 +109,20 @@ export const MutedVoice: Story = {
     model: {
       ...baseModel(),
       voices: baseModel().voices.map((voice, i) => ({ ...voice, muted: i === 1 })),
+    },
+  },
+};
+
+/** A marker's own settings in play: the sign is lit cyan and names the marker. */
+export const OwnSettingsSign: Story = {
+  args: {
+    model: {
+      ...baseModel(),
+      settingsSign: {
+        text: 'Item 2',
+        own: true,
+        accessibleName: 'Settings in play deck A: Item 2',
+      },
     },
   },
 };

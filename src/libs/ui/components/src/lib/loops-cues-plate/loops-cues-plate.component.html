@@ -27,6 +27,8 @@
       [startDragOffset]="startDragOffset()"
       [endDragOffset]="endDragOffset()"
       (trigger)="toggleSelected.emit()"
+      (playNow)="playNowSelected.emit()"
+      (toggleGlobal)="toggleGlobal.emit()"
       (setEnd)="setEnd.emit()"
       (clearEnd)="clearEnd.emit()"
       (deleteMarker)="deleteSelected.emit()"
@@ -42,6 +44,7 @@
       [accessibleName]="model().gridAccessibleName"
       [emptyText]="model().emptyText"
       (triggerTile)="triggerTile.emit($event)"
+      (playNowTile)="playNowTile.emit($event)"
       (selectTile)="selectTile.emit($event)"
     />
   </section>

@@ -41,6 +41,9 @@ export interface LoopsCuesPlateModel {
  *   (addMarker)="onAdd()"
  *   (stopLoop)="onStop()"
  *   (triggerTile)="onTrigger($event)"
+ *   (playNowTile)="onPlayNow($event)"
+ *   (playNowSelected)="onPlayNowSelected()"
+ *   (toggleGlobal)="onToggleGlobal()"
  *   (selectTile)="onSelect($event)"
  * />
  * ```
@@ -67,7 +70,11 @@ export class LoopsCuesPlateComponent {
   readonly stopLoop = output<void>();
   /** Emits when the selected row's trigger key is pressed. */
   readonly toggleSelected = output<void>();
-  /** Emits when the selected row's Set End key is pressed. */
+  /** Emits when the selected row's play-now key is pressed. */
+  readonly playNowSelected = output<void>();
+  /** Emits when the selected row's GBL switch is pressed. */
+  readonly toggleGlobal = output<void>();
+  /** Emits when the selected row's Set End key, in a cue's End slot, is pressed. */
   readonly setEnd = output<void>();
   /** Emits when the selected row's Clear End key is pressed. */
   readonly clearEnd = output<void>();
@@ -75,6 +82,8 @@ export class LoopsCuesPlateComponent {
   readonly deleteSelected = output<void>();
   /** Emits a tile's id when its trigger key is pressed. */
   readonly triggerTile = output<string>();
+  /** Emits a tile's id when its play-now key is pressed. */
+  readonly playNowTile = output<string>();
   /** Emits a tile's id when its select button is pressed. */
   readonly selectTile = output<string>();
   /** Fires on every nudge drag tick, tagged with the boundary — readout only. */

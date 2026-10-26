@@ -20,15 +20,21 @@ export interface LoopTileModel {
   readonly triggerAccessibleName: string;
   /** Names the select button and carries kind, length and state in words, e.g. 'not ready'. */
   readonly selectAccessibleName: string;
+  /** The marker keeps its own settings: draws the dot. */
+  readonly ownSettings: boolean;
+  /** Names the play-now key; the caller composes it. */
+  readonly playNowAccessibleName: string;
 }
 
 /**
- * A compact loop or cue tile: a trigger key whose state light shows idle, queued or running, and a
- * select button over the name, the length and the tile's own small timeline. Purely presentational:
+ * A compact loop or cue tile: a trigger key whose state light shows idle, queued or running, a
+ * one-shot play-now key, and a select button over the name, the length and the tile's own small timeline. Purely presentational:
  * it computes no time or percentage and the caller supplies every label.
  *
  * A loop's timeline fills to `progressPercent` with a playhead while running; a cue draws a single
- * magenta tick. A selected tile carries `aria-current` and a cyan ring.
+ * magenta tick. A selected tile carries `aria-current` and a cyan ring. A small lit dot beside the
+ * name marks a marker that keeps its own settings; it is decorative, so the caller puts the same
+ * fact into `selectAccessibleName`.
  *
  * @example
  * ```html
@@ -36,6 +42,7 @@ export interface LoopTileModel {
  *   [model]="tile"
  *   [progressPercent]="53"
  *   (trigger)="onTrigger(tile.id)"
+ *   (playNow)="onPlayNow(tile.id)"
  *   (selectTile)="onSelect(tile.id)"
  * />
  * ```
@@ -60,6 +67,8 @@ export class LoopTileComponent {
   readonly progressPercent = input<number>(0);
   /** Emits when the trigger key is pressed. */
   readonly trigger = output<void>();
+  /** Emits when the play-now key is pressed. */
+  readonly playNow = output<void>();
   /** Emits when the select button is pressed. */
   readonly selectTile = output<void>();
 

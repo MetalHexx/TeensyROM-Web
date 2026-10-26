@@ -2,6 +2,7 @@
   <div class="strip">
     <section class="voices" [attr.aria-label]="model().voiceAccessibleName">
       <span class="section-label" aria-hidden="true">Voice</span>
+      <lib-deck-settings-sign [model]="model().settingsSign" />
       @for (voice of model().voices; track $index) {
       <div class="pair" [attr.data-voice]="$index + 1">
         <lib-synth-key

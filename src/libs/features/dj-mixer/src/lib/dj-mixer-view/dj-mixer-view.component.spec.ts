@@ -129,6 +129,7 @@ function createDjStoreStub() {
     loopsSummary: () =>
       signal({ hasTune: false, canAdd: false, canStop: false, items: [], selected: null }),
     loopLapPercent: () => signal(0),
+    settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
     bindings: signal({
       A: { device: null, portId: null, present: false, error: null },
       B: { device: null, portId: null, present: false, error: null },
@@ -603,8 +604,8 @@ describe('DjMixerViewComponent', () => {
   });
 
   describe('the control anchors', () => {
-    // The selected loop row does not render keys for these two yet; drop this when it does.
-    const NOT_YET_RENDERED: readonly string[] = ['loop-play-now', 'loop-global'];
+    // Set End lives in a selected cue's End slot, so no element exists with nothing or a loop selected.
+    const NOT_YET_RENDERED: readonly string[] = ['loop-set-end'];
     const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
       DECK_CONTROL_IDS.filter((control) => !NOT_YET_RENDERED.includes(control)).map(
         (control): ControlIdentity => ({ owner, control })
@@ -622,7 +623,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(154);
+      expect(ALL_IDENTITIES).toHaveLength(156);
       expect(mismatched).toEqual([]);
     });
   });

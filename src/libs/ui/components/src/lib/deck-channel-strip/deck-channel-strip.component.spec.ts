@@ -4,6 +4,7 @@ import { DeckChannelStripComponent, DeckChannelStripModel } from './deck-channel
 
 function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelStripModel {
   return {
+    settingsSign: { text: 'Main', own: false, accessibleName: 'Settings in play deck A: Main' },
     voiceAccessibleName: 'Voice deck A',
     speedAccessibleName: 'Speed deck A',
     voices: [1, 2, 3].map((n) => ({
@@ -87,6 +88,18 @@ describe('DeckChannelStripComponent', () => {
     );
     fixture.detectChanges();
   }
+
+  it('renders the settings sign at the top of the voice section, above V1', () => {
+    setModel({
+      settingsSign: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' },
+    });
+    const voices = q('section.voices');
+    const sign = voices.querySelector('lib-deck-settings-sign') as HTMLElement;
+    expect(sign.getAttribute('aria-label')).toBe('Settings in play deck A: Item 2');
+    expect(sign.hasAttribute('data-own')).toBe(true);
+    const first = voices.querySelector('[data-voice="1"]') as HTMLElement;
+    expect(sign.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 
   it('emits the inverse of the mute with the voice index, and reports mute as aria-pressed', () => {
     expect(byName('Mute voice 2 deck A').getAttribute('aria-pressed')).toBe('true');

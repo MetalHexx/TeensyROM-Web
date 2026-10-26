@@ -102,13 +102,19 @@ lib-synth-key[data-control='loop-delete'] {
   gap: 10px;
 }
 
-// Too narrow for two boundaries abreast: stack them, and drop the key labels for their icons.
+// Too narrow for two boundaries abreast: stack them, and give the display a line of its own so the
+// span is never truncated.
 @container (max-width: 26rem) {
   .boundaries {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  lib-synth-key {
-    --synth-key-label-display: none;
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .display {
+    flex: 1 0 100%;
+    order: 1;
   }
 }

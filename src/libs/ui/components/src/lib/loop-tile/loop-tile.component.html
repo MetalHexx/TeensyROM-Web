@@ -5,6 +5,12 @@
   [stateLight]="stateLight()"
   (press)="trigger.emit()"
 />
+<lib-synth-key
+  class="play-now"
+  icon="bolt"
+  [accessibleName]="model().playNowAccessibleName"
+  (press)="playNow.emit()"
+/>
 <button
   type="button"
   class="select"
@@ -14,6 +20,9 @@
 >
   <span class="line">
     <span class="name">{{ model().name }}</span>
+    @if (model().ownSettings) {
+    <span class="own" aria-hidden="true"></span>
+    }
     <span class="length" [class.length--cue]="model().kind === 'cue'">{{ model().lengthText }}</span>
   </span>
   <span class="timeline" [class.timeline--cue]="model().kind === 'cue'" aria-hidden="true">
