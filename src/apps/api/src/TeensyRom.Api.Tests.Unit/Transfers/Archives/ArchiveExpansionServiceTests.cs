@@ -119,6 +119,41 @@ public sealed class ArchiveExpansionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ExpandAsync_FirmwareFileTypesInsideArchive_AreAdmittedAndAnUnsupportedTypeIsSkipped()
+    {
+        var job = NewJob();
+        AcceptArchive(job);
+
+        var topPath = WriteTopLevelArchive(job.JobId, "TOP");
+        var readme = new byte[] { 1 };
+        var info = new byte[] { 2, 2 };
+        var disk = new byte[] { 3, 3, 3 };
+        var doc = new byte[] { 4, 4, 4, 4 };
+
+        _reader.Define("TOP", new FakeArchive
+        {
+            Entries =
+            [
+                new FakeEntry("readme.md", readme.Length, readme),
+                new FakeEntry("info.nfo", info.Length, info),
+                new FakeEntry("disk.d81", disk.Length, disk),
+                new FakeEntry("skip.doc", doc.Length, doc)
+            ],
+            DeclaredUncompressedBytes = readme.Length + info.Length + disk.Length + doc.Length
+        });
+
+        var service = NewService();
+        await service.ExpandAsync(new ArchiveExpansionRequest(job.JobId, topPath, "pack.zip"), CancellationToken.None);
+
+        await _admission.Received(1).AdmitAsync(job, Arg.Any<Stream>(), "pack/readme.md", readme.Length, false, Arg.Any<CancellationToken>());
+        await _admission.Received(1).AdmitAsync(job, Arg.Any<Stream>(), "pack/info.nfo", info.Length, false, Arg.Any<CancellationToken>());
+        await _admission.Received(1).AdmitAsync(job, Arg.Any<Stream>(), "pack/disk.d81", disk.Length, false, Arg.Any<CancellationToken>());
+        await _admission.DidNotReceive().AdmitAsync(job, Arg.Any<Stream>(), "pack/skip.doc", Arg.Any<long>(), false, Arg.Any<CancellationToken>());
+        job.ToSnapshot().Failures.Should().BeEmpty();
+        job.PendingCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task ExpandAsync_MultipleArchivesForSameJob_DefersEverythingUntilTheLastOneFinishes()
     {
         var job = NewJob(expectedArchiveCount: 2);

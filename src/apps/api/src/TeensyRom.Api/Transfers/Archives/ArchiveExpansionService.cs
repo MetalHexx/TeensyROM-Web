@@ -19,20 +19,6 @@ namespace TeensyRom.Api.Transfers.Archives
         TransferOptions options,
         ILoggingService log)
     {
-        /// <summary>
-        /// Mirrors <c>TRANSFER_SUPPORTED_EXTENSIONS</c> in
-        /// <c>libs/application/src/lib/transfer/transfer.constants.ts</c> - the browser's own drop-scan
-        /// filter - so an archive's contents are admitted exactly like a dropped folder's contents.
-        /// Deliberately not <see cref="TeensyRom.Core.Entities.Storage.StorageHelper.FileTargets"/>: that
-        /// list mis-maps `.nfo` to D64 and carries no `.zip`. `.zip` is included here for fidelity with the
-        /// browser list even though <see cref="IArchiveReader.IsArchiveExtension"/> always intercepts it
-        /// first and routes it to the nested-archive branch instead of this one.
-        /// </summary>
-        private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".sid", ".crt", ".prg", ".p00", ".hex", ".kla", ".koa", ".art", ".aas", ".hpi", ".seq", ".txt", ".d64", ".zip"
-        };
-
         // Keyed by job id. A job's archives are processed one at a time on the global queue, so whichever
         // archive turns out to be the last one (HasExpansionOutstanding going false) drains everything
         // every archive before it produced - not just its own.
@@ -255,7 +241,7 @@ namespace TeensyRom.Api.Transfers.Archives
                     }
 
                     var isNestedArchive = reader.IsArchiveExtension(entry.Path);
-                    var isSupported = SupportedExtensions.Contains(Path.GetExtension(entry.Path));
+                    var isSupported = TransferableFileTypes.IsTransferable(entry.Path);
 
                     if (!isNestedArchive && !isSupported)
                     {

@@ -30,7 +30,8 @@ export const UPLOAD_RATE_MIN_DIVISOR_MS = 100;
 
 /**
  * File extensions the scanner admits into a transfer manifest, matched case-insensitively.
- * Verbatim from the API's own file-type mapping.
+ * Mirrors the engine's `TransferableFileTypes` (the firmware's own extension table), plus the archive
+ * extensions the server expands.
  */
 export const TRANSFER_SUPPORTED_EXTENSIONS = new Set<string>([
   '.sid',
@@ -46,6 +47,14 @@ export const TRANSFER_SUPPORTED_EXTENSIONS = new Set<string>([
   '.seq',
   '.txt',
   '.d64',
+  '.nfo',
+  '.md',
+  '.ocp',
+  '.pic',
+  '.d71',
+  '.d81',
+  '.reu',
+  '.trh',
   '.zip',
   '.7z',
   '.rar',

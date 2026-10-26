@@ -29,7 +29,8 @@ internal static class UploadSources
     // The file types the web app's drop zone takes; archives are in because the engine expands them.
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".sid", ".crt", ".prg", ".p00", ".hex", ".kla", ".koa", ".art", ".aas", ".hpi", ".seq", ".txt", ".d64", ".zip", ".7z", ".rar"
+        ".sid", ".crt", ".prg", ".p00", ".hex", ".kla", ".koa", ".art", ".aas", ".hpi", ".seq", ".txt", ".d64",
+        ".nfo", ".md", ".ocp", ".pic", ".d71", ".d81", ".reu", ".trh", ".zip", ".7z", ".rar"
     };
 
     // Links are never followed, so a walk can't leave the named folder or loop; hidden and system files (.DS_Store, Thumbs.db) stay home.

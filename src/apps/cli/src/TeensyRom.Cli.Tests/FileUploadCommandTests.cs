@@ -327,9 +327,9 @@ public sealed class FileUploadCommandTests : IDisposable
     {
         Write("mixed/a.sid", 10);
         Write("mixed/B.PRG", 10);
-        Write("mixed/notes.md", 10);
+        Write("mixed/notes.doc", 10);
         Write("mixed/deep/c.d64", 10);
-        Write("mixed/deep/readme.md", 10);
+        Write("mixed/deep/readme.doc", 10);
         Write("mixed/deep/pack.ZIP", 10);
         Write("mixed/.hidden.sid", 10, hidden: true);
         var host = NewHost();
@@ -343,11 +343,33 @@ public sealed class FileUploadCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task AFolder_SendsTheFirmwareFileTypesAddedToTheList()
+    {
+        Write("firmware/info.nfo", 10);
+        Write("firmware/disk.d71", 10);
+        Write("firmware/disk.d81", 10);
+        Write("firmware/cart.reu", 10);
+        Write("firmware/cart.trh", 10);
+        Write("firmware/readme.md", 10);
+        Write("firmware/art.ocp", 10);
+        Write("firmware/pic.pic", 10);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "firmware", "--to", "/x");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        Uploaded().Should().BeEquivalentTo(
+            "firmware/info.nfo", "firmware/disk.d71", "firmware/disk.d81", "firmware/cart.reu",
+            "firmware/cart.trh", "firmware/readme.md", "firmware/art.ocp", "firmware/pic.pic");
+        host.Consoles.StdErr.Should().NotContain("left out");
+    }
+
+    [Fact]
     public async Task TheLeftOutNotice_IsNotPartOfTheJsonDocument_AndASingleFileReadsInTheSingular()
     {
         Write("mixed/a.sid", 10);
-        Write("mixed/notes.md", 10);
-        Write("mixed/.hidden.md", 10, hidden: true);
+        Write("mixed/notes.doc", 10);
+        Write("mixed/.hidden.doc", 10, hidden: true);
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "mixed", "--to", "/x", "--json");
@@ -361,7 +383,7 @@ public sealed class FileUploadCommandTests : IDisposable
     [Fact]
     public async Task AFolderHoldingNothingSupported_HasNothingToUpload_AndMentionsFileTypes()
     {
-        Write("docs/notes.md", 10);
+        Write("docs/notes.doc", 10);
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "docs", "--to", "/x");
@@ -374,15 +396,15 @@ public sealed class FileUploadCommandTests : IDisposable
     [Fact]
     public async Task ANamedFileOfAnUnsupportedType_IsAFailedRowWithItsOwnMessage_AndExitsOne()
     {
-        Write("notes.md", 10);
+        Write("notes.doc", 10);
         var host = NewHost();
 
-        var exitCode = await host.RunAsync("file", "upload", "notes.md", "--to", "/x", "--json");
+        var exitCode = await host.RunAsync("file", "upload", "notes.doc", "--to", "/x", "--json");
 
         exitCode.Should().Be((int)CliExitCode.Failed);
         var report = Parse(host.Consoles.StdOut);
         var row = report.GetProperty("files")[0];
-        row.GetProperty("localPath").GetString().Should().Be("notes.md");
+        row.GetProperty("localPath").GetString().Should().Be("notes.doc");
         row.GetProperty("ok").GetBoolean().Should().BeFalse();
         row.GetProperty("message").GetString().Should().Be("not a file type the TeensyROM takes");
         report.GetProperty("totals").GetProperty("failed").GetInt32().Should().Be(1);
@@ -392,10 +414,10 @@ public sealed class FileUploadCommandTests : IDisposable
     [Fact]
     public async Task ANamedUnsupportedFile_BesideASupportedOne_IsAFailedRow_ThatIsNotANotFound()
     {
-        Write("notes.md", 10);
+        Write("notes.doc", 10);
         var host = NewHost();
 
-        var exitCode = await host.RunAsync("file", "upload", "loose.sid", "notes.md", "--to", "/x", "--json");
+        var exitCode = await host.RunAsync("file", "upload", "loose.sid", "notes.doc", "--to", "/x", "--json");
 
         exitCode.Should().Be((int)CliExitCode.Failed);
         Uploaded().Should().Equal("loose.sid");

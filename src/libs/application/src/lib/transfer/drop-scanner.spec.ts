@@ -109,6 +109,36 @@ describe('DropScanner', () => {
       );
     });
 
+    it('admits every firmware file type and still skips a type the firmware does not take', async () => {
+      const tree = directoryEntry('Firmware', [
+        fileEntry('info.nfo'),
+        fileEntry('disk.d71'),
+        fileEntry('disk.d81'),
+        fileEntry('cart.reu'),
+        fileEntry('cart.trh'),
+        fileEntry('readme.md'),
+        fileEntry('art.ocp'),
+        fileEntry('pic.pic'),
+        fileEntry('notes.doc'),
+      ]);
+
+      const scanner = new DropScanner();
+      const result = await scanner.scan(asItemList([dropItem(tree)]), noopProgress, signal());
+
+      expect(result.entries.map((e) => e.relativePath).sort()).toEqual(
+        [
+          'Firmware/info.nfo',
+          'Firmware/disk.d71',
+          'Firmware/disk.d81',
+          'Firmware/cart.reu',
+          'Firmware/cart.trh',
+          'Firmware/readme.md',
+          'Firmware/art.ocp',
+          'Firmware/pic.pic',
+        ].sort()
+      );
+    });
+
     it('gives a dropped loose file just its own name, with no folder prefix', async () => {
       const folder = directoryEntry('Games', [fileEntry('pitfall.prg')]);
       const looseFile = fileEntry('standalone.sid');
