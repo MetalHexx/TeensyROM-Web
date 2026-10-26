@@ -52,6 +52,7 @@ public sealed class ContractScenarios(SharedApiFixture api)
     [Fact]
     public async Task EngineStatus_Json_NamesTheEnginesLogFolder_AndAnExistingLogFile()
     {
+        await WaitForTheEnginesFirstLogFileAsync();
         using var cli = new CliHarness();
 
         (await cli.RunAsync("engine", "status", "--json")).Should().Be(0);
@@ -61,6 +62,24 @@ public sealed class ContractScenarios(SharedApiFixture api)
         var logFile = status.GetProperty("logFile").GetString();
         Path.GetFileName(logFile).Should().StartWith("Logs-").And.EndWith(".txt");
         File.Exists(logFile).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// The engine batches its file logging, flushing every 5 seconds or at 20 entries, so its first <c>Logs-*.txt</c> can
+    /// land a few seconds after it starts answering. Waits for that file, up to 15 seconds, so the status call under test
+    /// has one to name.
+    /// </summary>
+    private static async Task WaitForTheEnginesFirstLogFileAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Directory.Exists(TeensyRomHome.EngineLogsPath)
+                && Directory.EnumerateFiles(TeensyRomHome.EngineLogsPath, "Logs-*.txt").Any()) return;
+
+            await Task.Delay(250);
+        }
     }
 
     [Fact]
