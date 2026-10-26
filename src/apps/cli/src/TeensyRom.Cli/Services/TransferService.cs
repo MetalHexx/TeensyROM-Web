@@ -12,10 +12,10 @@ internal sealed class TransferService(ITeensyRomApiClient api, IDeviceService de
     // Cancelling is what frees the device, so it is tried even after Ctrl+C, but it must not hang if tr-web has gone.
     private static readonly TimeSpan CancelTimeout = TimeSpan.FromSeconds(15);
 
-    public async Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, CancellationToken ct)
+    public async Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, bool launch, CancellationToken ct)
     {
         var deviceId = devices.RequireDeviceId();
-        var body = new CreateJobBody { DestinationDirectory = deviceFolder, ExpectedArchiveCount = expectedArchiveCount };
+        var body = new CreateJobBody { DestinationDirectory = deviceFolder, ExpectedArchiveCount = expectedArchiveCount, Launch = launch };
 
         try
         {
@@ -45,6 +45,9 @@ internal sealed class TransferService(ITeensyRomApiClient api, IDeviceService de
 
     public async Task<TransferJobDto> GetAsync(string jobId, CancellationToken ct) =>
         (await ApiErrors.Call(() => api.GetTransferJobAsync(jobId, ct))).Job;
+
+    public async Task<IReadOnlyList<TransferJobDto>> ListAsync(CancellationToken ct) =>
+        (await ApiErrors.Call(() => api.ListTransferJobsAsync(ct))).Jobs.ToList();
 
     public async Task DownloadAsync(TeensyStorageType storage, string devicePath, Stream destination, CancellationToken ct)
     {

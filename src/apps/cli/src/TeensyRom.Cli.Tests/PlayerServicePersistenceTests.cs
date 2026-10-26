@@ -838,6 +838,43 @@ namespace TeensyRom.Cli.Tests
         }
 
         [Fact]
+        public async Task When_RecordLaunchedForALaunch_Then_ItIsPlayingInDirectoryMode_PublishedAndPersisted_WithoutLaunching()
+        {
+            var song = Listed<SongItem>("/music/sub/1.sid");
+            var player = Restored(Record(mode: PlayMode.Random, filter: TeensyFilterType.Music, state: PlayState.Stopped, storage: TeensyStorageType.USB));
+            var published = new List<ILaunchableItem>();
+            player.FileLaunched.Subscribe(published.Add);
+
+            player.RecordLaunched(song, LaunchStatus.Launched);
+
+            var state = player.GetState();
+            state.PlayMode.Should().Be(PlayMode.CurrentDirectory);
+            state.FilterType.Should().Be(TeensyFilterType.All);
+            state.ScopePath.Should().Be("/music/sub/");
+            state.PlayState.Should().Be(PlayState.Playing);
+            state.CurrentItem.Should().BeSameAs(song);
+            published.Should().Equal(song);
+            await _launchService.DidNotReceiveWithAnyArgs().LaunchFile(default, default!);
+            _store.Load(Bench.Id)!.PlayState.Should().Be(PlayState.Playing);
+        }
+
+        [Fact]
+        public void When_RecordLaunchedForAnIncompatibleFile_Then_ItIsStopped_AndNothingIsPublished()
+        {
+            var song = Listed<SongItem>("/music/1.sid");
+            var player = Restored(Record(state: PlayState.Playing));
+            var published = new List<ILaunchableItem>();
+            player.FileLaunched.Subscribe(published.Add);
+
+            player.RecordLaunched(song, LaunchStatus.Incompatible);
+
+            player.GetState().PlayState.Should().Be(PlayState.Stopped);
+            player.GetState().CurrentItem.Should().BeSameAs(song);
+            published.Should().BeEmpty();
+            _store.Load(Bench.Id)!.PlayState.Should().Be(PlayState.Stopped);
+        }
+
+        [Fact]
         public async Task When_RandomOnceAsyncRunsTwice_Then_BothPicksAreInTheHistory_AndNextAsyncWalksFromTheLast()
         {
             var (first, second) = (Listed<SongItem>("/music/first.sid"), Listed<SongItem>("/music/second.sid"));

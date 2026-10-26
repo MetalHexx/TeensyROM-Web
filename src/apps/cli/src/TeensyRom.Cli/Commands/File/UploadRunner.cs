@@ -20,7 +20,7 @@ internal sealed record UploadRunResult(TransferJobDto Job, IReadOnlyList<UploadR
 
 /// <summary>
 /// Streams files through one transfer job: creates it, polls it from the moment it exists, uploads, seals, and waits for
-/// it to end. Whatever happens, the job is cancelled unless it ended on its own, so the device is never left leased.
+/// it to end, including the launch it was asked to make. Whatever happens, the job is cancelled unless it ended on its own, so the device is never left leased.
 /// </summary>
 internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore lastLaunches)
 {
@@ -28,15 +28,17 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
     internal TimeSpan PollInterval { get; init; } = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
-    /// Uploads <paramref name="files"/> in order and returns once the job has ended. A file tr-web refuses (a 400) or that
+    /// Uploads <paramref name="files"/> in order and returns once the job has ended and tr-web is done launching. A file tr-web refuses (a 400) or that
     /// can't be read is that file's rejection and the rest carry on; anything else ends the run.
     /// </summary>
+    /// <param name="launch">Asks tr-web to launch the one file once it lands; the result's job says how that went.</param>
     /// <param name="progress">Told about the job at least every poll; runs on the poll's thread.</param>
     /// <exception cref="CliException"><see cref="CliExitCode.Failed"/> when <paramref name="ct"/> is cancelled; the job is cancelled first.</exception>
     public async Task<UploadRunResult> RunAsync(
         TeensyStorageType storage,
         string deviceFolder,
         IReadOnlyList<UploadFile> files,
+        bool launch,
         Action<UploadProgress>? progress,
         CancellationToken ct)
     {
@@ -49,7 +51,7 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
 
         try
         {
-            created = await transfers.CreateAsync(storage, deviceFolder, files.Count(file => file.IsArchive), ct);
+            created = await transfers.CreateAsync(storage, deviceFolder, files.Count(file => file.IsArchive), launch, ct);
             latest = created;
             poll = PollAsync(created.JobId, stopPoll.Token);
 
@@ -98,7 +100,7 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
                 Volatile.Write(ref latest, job);
                 progress?.Invoke(new UploadProgress(job.FilesSent, job.TotalFiles ?? files.Count, job.FilesFailed + Volatile.Read(ref rejectedCount), job.CurrentFile));
 
-                if (IsFinished(job.State)) return job;
+                if (IsFinished(job.State) && job.LaunchState != TransferLaunchState.Pending) return job;
 
                 await Task.Delay(PollInterval, token);
             }

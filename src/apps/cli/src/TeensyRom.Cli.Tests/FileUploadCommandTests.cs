@@ -43,8 +43,12 @@ public sealed class FileUploadCommandTests : IDisposable
     private string? _jobError;
     private int _archiveEntries;
     private volatile bool _sealed;
-    private (TeensyStorageType Storage, string Folder, int Archives)? _created;
+    private (TeensyStorageType Storage, string Folder, int Archives, bool Launch)? _created;
     private Exception? _createError;
+    private TransferLaunchState _launchState = TransferLaunchState.None;
+    private string? _launchedPath;
+    private string? _launchError;
+    private int _pendingPolls;
 
     public FileUploadCommandTests()
     {
@@ -60,11 +64,11 @@ public sealed class FileUploadCommandTests : IDisposable
         _storage.StorageType.Returns(_ => _storageType);
         _storage.When(s => s.UseStorage(Arg.Any<TeensyStorageType>())).Do(call => _storageType = call.Arg<TeensyStorageType>());
 
-        _transfers.CreateAsync(default, default!, default, default).ReturnsForAnyArgs(call =>
+        _transfers.CreateAsync(default, default!, default, default, default).ReturnsForAnyArgs(call =>
         {
             if (_createError is not null) return Task.FromException<TransferJobDto>(_createError);
 
-            _created = (call.ArgAt<TeensyStorageType>(0), call.ArgAt<string>(1), call.ArgAt<int>(2));
+            _created = (call.ArgAt<TeensyStorageType>(0), call.ArgAt<string>(1), call.ArgAt<int>(2), call.ArgAt<bool>(3));
             _calls.Add("create");
             return Task.FromResult(Job(TransferJobState.Created));
         });
@@ -150,7 +154,10 @@ public sealed class FileUploadCommandTests : IDisposable
                 FilesSent = _uploaded.Count(upload => !UploadSources.IsArchive(upload.Relative) && _failures.All(failure => failure.RelativePath != upload.Relative)) + _archiveEntries,
                 FilesFailed = _failures.Count,
                 Error = _jobError,
-                Failures = _failures.ToList()
+                Failures = _failures.ToList(),
+                LaunchState = state == _endState && _sealed && Interlocked.Decrement(ref _pendingPolls) >= 0 ? TransferLaunchState.Pending : _launchState,
+                LaunchedPath = _launchedPath,
+                LaunchError = _launchError
             };
         }
     }
@@ -185,7 +192,7 @@ public sealed class FileUploadCommandTests : IDisposable
         var exitCode = await host.RunAsync("file", "upload", "loose.sid", "--to", "/music");
 
         exitCode.Should().Be(0, host.Consoles.StdErr);
-        _created.Should().Be((TeensyStorageType.SD, "/music", 0));
+        _created.Should().Be((TeensyStorageType.SD, "/music", 0, false));
         _uploaded.Should().Equal([("loose.sid", Path.Combine(_root, "loose.sid"))]);
         _calls.Should().Equal("create", "upload loose.sid", "seal");
         Lines(host).Should().Equal("/music/loose.sid");
@@ -469,7 +476,7 @@ public sealed class FileUploadCommandTests : IDisposable
         var exitCode = await host.RunAsync("file", "upload", "packs", "--to", "/demos");
 
         exitCode.Should().Be(0, host.Consoles.StdErr);
-        _created.Should().Be((TeensyStorageType.SD, "/demos", 3));
+        _created.Should().Be((TeensyStorageType.SD, "/demos", 3, false));
         Uploaded().Should().BeEquivalentTo("packs/one.zip", "packs/two.7z", "packs/THREE.RAR", "packs/plain.txt");
     }
 
@@ -667,20 +674,22 @@ public sealed class FileUploadCommandTests : IDisposable
     // ---- launch ------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Launch_SendsTheFile_ThenLaunchesIt_WithFileLaunchOutput()
+    public async Task Launch_AsksTheEngineToLaunch_ThenReportsAndRecordsWhatItLaunched_WithoutLaunchingItself()
     {
         Write("x.prg", 10);
         var item = new GameItem { Name = "x.prg", Path = "/games/x.prg", Size = 10 };
         _storage.GetFile("/games/x.prg").Returns(item);
-        _player.LaunchOnceAsync(item).Returns(new LaunchOutcome(LaunchStatus.Launched, item, "Launched"));
+        (_launchState, _launchedPath) = (TransferLaunchState.Launched, "/games/x.prg");
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games");
 
         exitCode.Should().Be(0, host.Consoles.StdErr);
         _calls.Should().Equal("create", "upload x.prg", "seal");
-        _player.ReceivedCalls().Select(call => call.GetMethodInfo().Name).Where(name => name is "UseStorage" or "LaunchOnceAsync")
-            .Should().Equal("UseStorage", "LaunchOnceAsync");
+        _created.Should().Be((TeensyStorageType.SD, "/games", 0, true));
+        _player.ReceivedCalls().Select(call => call.GetMethodInfo().Name).Where(name => name is "UseStorage" or "RecordLaunched" or "LaunchOnceAsync")
+            .Should().Equal("UseStorage", "RecordLaunched");
+        _player.Received(1).RecordLaunched(item, LaunchStatus.Launched);
         Lines(host).Should().Equal("/games/x.prg");
     }
 
@@ -690,7 +699,7 @@ public sealed class FileUploadCommandTests : IDisposable
         Write("x.prg", 10);
         var item = new GameItem { Name = "x.prg", Path = "/games/x.prg", Size = 10 };
         _storage.GetFile("/games/x.prg").Returns(item);
-        _player.LaunchOnceAsync(item).Returns(new LaunchOutcome(LaunchStatus.Launched, item, "Launched"));
+        (_launchState, _launchedPath) = (TransferLaunchState.Launched, "/games/x.prg");
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games", "--json");
@@ -699,6 +708,54 @@ public sealed class FileUploadCommandTests : IDisposable
         var document = Parse(host.Consoles.StdOut);
         document.GetProperty("status").GetString().Should().Be("launched");
         document.TryGetProperty("totals", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Launch_WaitsOutAPendingLaunch_BeforeReporting()
+    {
+        Write("x.prg", 10);
+        var item = new GameItem { Name = "x.prg", Path = "/games/x.prg", Size = 10 };
+        _storage.GetFile("/games/x.prg").Returns(item);
+        (_launchState, _launchedPath, _pendingPolls) = (TransferLaunchState.Launched, "/games/x.prg", 3);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        _player.Received(1).RecordLaunched(item, LaunchStatus.Launched);
+    }
+
+    [Fact]
+    public async Task Launch_OfAFileTheDeviceCannotRun_RecordsItAsIncompatible_AndExitsOne()
+    {
+        Write("x.prg", 10);
+        var item = new GameItem { Name = "x.prg", Path = "/games/x.prg", Size = 10 };
+        _storage.GetFile("/games/x.prg").Returns(item);
+        (_launchState, _launchedPath) = (TransferLaunchState.Incompatible, "/games/x.prg");
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        _player.Received(1).RecordLaunched(item, LaunchStatus.Incompatible);
+    }
+
+    [Theory]
+    [InlineData(TransferLaunchState.Failed, "The device refused to start it.", "The device refused to start it.")]
+    [InlineData(TransferLaunchState.Failed, null, "The TeensyROM didn't launch /games/x.prg.")]
+    [InlineData(TransferLaunchState.None, null, "The TeensyROM didn't launch /games/x.prg.")]
+    public async Task Launch_ThatTheEngineDidNotMake_IsExitOne_WithItsError(TransferLaunchState state, string? error, string expected)
+    {
+        Write("x.prg", 10);
+        (_launchState, _launchError) = (state, error);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games");
+
+        exitCode.Should().Be((int)CliExitCode.Failed);
+        host.Consoles.StdErr.Should().Contain(expected);
+        _player.DidNotReceiveWithAnyArgs().RecordLaunched(default!, default);
+        await _player.DidNotReceiveWithAnyArgs().LaunchOnceAsync(default!);
     }
 
     [Fact]
@@ -712,7 +769,7 @@ public sealed class FileUploadCommandTests : IDisposable
 
         exitCode.Should().Be((int)CliExitCode.Failed);
         host.Consoles.StdErr.Should().Contain("The path is not usable.").And.Contain("1 of 1 files failed.");
-        await _player.DidNotReceiveWithAnyArgs().LaunchOnceAsync(default!);
+        _player.DidNotReceiveWithAnyArgs().RecordLaunched(default!, default);
     }
 
     [Fact]
@@ -720,13 +777,32 @@ public sealed class FileUploadCommandTests : IDisposable
     {
         Write("x.prg", 10);
         _storage.GetFile("/games/x.prg").Returns((ILaunchableItem?)null);
+        (_launchState, _launchedPath) = (TransferLaunchState.Launched, "/games/x.prg");
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "--launch", "x.prg", "--to", "/games");
 
         exitCode.Should().Be((int)CliExitCode.NotFound);
         host.Consoles.StdErr.Should().Contain("/games/x.prg wasn't found on the TeensyROM after the upload.");
-        await _player.DidNotReceiveWithAnyArgs().LaunchOnceAsync(default!);
+        _player.DidNotReceiveWithAnyArgs().RecordLaunched(default!, default);
+    }
+
+    [Fact]
+    public async Task APlainUpload_ThatTheEngineLaunched_ShowsTheCopyAndNoticesTheLaunch()
+    {
+        var item = new GameItem { Name = "x.prg", Path = "/games/x.prg", Size = 10 };
+        Write("x.prg", 10);
+        _storage.GetFile("/games/x.prg").Returns(item);
+        (_launchState, _launchedPath) = (TransferLaunchState.Launched, "/games/x.prg");
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("file", "upload", "x.prg", "--to", "/games");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        _created!.Value.Launch.Should().BeFalse();
+        host.Consoles.StdErr.Should().Contain("Launched /games/x.prg.");
+        Lines(host).Should().Contain("/games/x.prg");
+        _player.Received(1).RecordLaunched(item, LaunchStatus.Launched);
     }
 
     // ---- the run -----------------------------------------------------------------------------------------------------
@@ -1024,6 +1100,7 @@ public sealed class UploadRunnerTests
         private readonly List<string> _calls = [];
         private volatile TransferJobState _state = TransferJobState.Receiving;
         private int _polls;
+        private int _pendingPolls;
 
         public TransferJobState EndState { get; set; } = TransferJobState.Completed;
 
@@ -1035,7 +1112,10 @@ public sealed class UploadRunnerTests
 
         public int Polls => Volatile.Read(ref _polls);
 
-        public (TeensyStorageType Storage, string Folder, int Archives)? Created { get; private set; }
+        public (TeensyStorageType Storage, string Folder, int Archives, bool Launch)? Created { get; private set; }
+
+        /// <summary>How many looks at the ended job still show its launch as pending.</summary>
+        public int PendingPolls { get => _pendingPolls; set => _pendingPolls = value; }
 
         public Func<string, CancellationToken, Task> Upload { get; set; } = (_, _) => Task.CompletedTask;
 
@@ -1061,11 +1141,20 @@ public sealed class UploadRunnerTests
             lock (_lock) _calls.Add(call);
         }
 
-        private TransferJobDto Job() => new() { JobId = "job-1", DeviceId = DeviceId, State = _state, FilesSent = Sent, FilesFailed = Failed, FilesReceived = Received };
-
-        public Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, CancellationToken ct)
+        private TransferJobDto Job() => new()
         {
-            Created = (storage, deviceFolder, expectedArchiveCount);
+            JobId = "job-1",
+            DeviceId = DeviceId,
+            State = _state,
+            FilesSent = Sent,
+            FilesFailed = Failed,
+            FilesReceived = Received,
+            LaunchState = _state == EndState && Interlocked.Decrement(ref _pendingPolls) >= 0 ? TransferLaunchState.Pending : TransferLaunchState.None
+        };
+
+        public Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, bool launch, CancellationToken ct)
+        {
+            Created = (storage, deviceFolder, expectedArchiveCount, launch);
             Record("create");
             return Task.FromResult(Job());
         }
@@ -1082,6 +1171,8 @@ public sealed class UploadRunnerTests
             _state = EndState;
             if (OnSeal is not null) await OnSeal();
         }
+
+        public Task<IReadOnlyList<TransferJobDto>> ListAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<TransferJobDto> GetAsync(string jobId, CancellationToken ct)
         {
@@ -1107,8 +1198,8 @@ public sealed class UploadRunnerTests
 
     private static readonly UploadFile[] ThreeFiles = [Upload("a.prg"), Upload("b.prg"), Upload("c.prg")];
 
-    private Task<UploadRunResult> RunAsync(IReadOnlyList<UploadFile> files, Action<UploadProgress>? progress = null, CancellationToken ct = default) =>
-        new UploadRunner(_transfers, _store) { PollInterval = TimeSpan.FromMilliseconds(5) }.RunAsync(TeensyStorageType.SD, "/x", files, progress, ct);
+    private Task<UploadRunResult> RunAsync(IReadOnlyList<UploadFile> files, Action<UploadProgress>? progress = null, CancellationToken ct = default, bool launch = false) =>
+        new UploadRunner(_transfers, _store) { PollInterval = TimeSpan.FromMilliseconds(5) }.RunAsync(TeensyStorageType.SD, "/x", files, launch, progress, ct);
 
     private void SeedPlaying() => _store.Seed(FileUploadCommandTests.PlayingRecord(DeviceId));
 
@@ -1127,7 +1218,19 @@ public sealed class UploadRunnerTests
     {
         await RunAsync([Upload("a.prg"), Upload("pack.zip", archive: true), Upload("b.7z", archive: true)]);
 
-        _transfers.Created.Should().Be((TeensyStorageType.SD, "/x", 2));
+        _transfers.Created.Should().Be((TeensyStorageType.SD, "/x", 2, false));
+    }
+
+    [Fact]
+    public async Task Run_AsksForTheLaunch_AndKeepsPollingPastTheEndWhileItIsPending()
+    {
+        _transfers.PendingPolls = 3;
+
+        var result = await RunAsync([ThreeFiles[0]], launch: true);
+
+        _transfers.Created!.Value.Launch.Should().BeTrue();
+        result.Job.LaunchState.Should().Be(TransferLaunchState.None);
+        _transfers.Polls.Should().BeGreaterThanOrEqualTo(4);
     }
 
     [Fact]

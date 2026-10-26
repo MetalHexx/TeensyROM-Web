@@ -11,8 +11,9 @@ internal interface ITransferService
 {
     /// <summary>Starts a job on the selected device, whose files land in <paramref name="deviceFolder"/>.</summary>
     /// <param name="expectedArchiveCount">How many of the files that will be uploaded are archives for tr-web to expand.</param>
+    /// <param name="launch">Asks tr-web to launch the one file once it lands; the job's <c>LaunchState</c> then tells how that went.</param>
     /// <exception cref="Errors.CliException"><see cref="Errors.CliExitCode.Failed"/> when the device is already transferring.</exception>
-    Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, CancellationToken ct);
+    Task<TransferJobDto> CreateAsync(TeensyStorageType storage, string deviceFolder, int expectedArchiveCount, bool launch, CancellationToken ct);
 
     /// <summary>Opens <paramref name="localFile"/> for async read and streams it into the job at <paramref name="relativePath"/>.</summary>
     /// <param name="relativePath">Relative to the job's folder and '/'-separated; never holds <c>..</c> or a root.</param>
@@ -24,6 +25,9 @@ internal interface ITransferService
     Task SealAsync(string jobId, CancellationToken ct);
 
     Task<TransferJobDto> GetAsync(string jobId, CancellationToken ct);
+
+    /// <summary>Every transfer job tr-web knows, from any device and any origin.</summary>
+    Task<IReadOnlyList<TransferJobDto>> ListAsync(CancellationToken ct);
 
     /// <summary>Streams the file at <paramref name="devicePath"/> into <paramref name="destination"/>, which is left open.</summary>
     /// <exception cref="Api.TeensyApiException">tr-web refused: 404 when the file is missing, 413 when it is over its 10 MB limit.</exception>

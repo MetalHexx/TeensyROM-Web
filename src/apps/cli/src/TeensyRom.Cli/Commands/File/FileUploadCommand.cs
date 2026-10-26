@@ -24,7 +24,7 @@ internal sealed class FileUploadSettings : StorageSettings
     public string? To { get; set; }
 
     [CommandOption("--launch")]
-    [Description("Launch the file once it's on the TeensyROM. Takes exactly one launchable file, not a folder or an archive.")]
+    [Description("Have the TeensyROM launch the file once it lands. Takes exactly one launchable file, not a folder or an archive.")]
     public bool Launch { get; set; }
 
     [CommandOption("-y|--yes")]
@@ -55,7 +55,8 @@ internal sealed class FileUploadSettings : StorageSettings
 /// <summary>
 /// <c>trom file upload [LOCAL_PATHS] --to &lt;DEVICE_FOLDER&gt;</c>: copies local files and folders to the TeensyROM in
 /// one transfer job and reports each file. With no paths the current folder's contents are sent, after asking unless
-/// <c>--yes</c>. With <c>--launch</c> the one file is launched once it has landed.
+/// <c>--yes</c>. With <c>--launch</c> tr-web launches the one file once it has landed, and the command reports and records
+/// what it launched; no launch is made from here.
 /// </summary>
 /// <remarks>
 /// Everything local (stdin, walking the sources, the <c>--launch</c> checks, the confirmation) happens before the engine
@@ -113,14 +114,18 @@ internal sealed class FileUploadCommand(
 
         var to = settings.To!;
 
-        var run = await CommandRun.CancellableAsync(token => TransferAsync(to, token));
+        var run = await CommandRun.CancellableAsync(token => TransferAsync(to, settings.Launch, token));
         var job = run.Job;
         var report = BuildReport(to, run);
         var succeeded = report.Totals.Failed == 0 && job.State == TransferJobState.Completed;
 
-        if (settings.Launch && succeeded) return await LaunchAsync(DevicePath(to, _plan.Files[0].RelativePath));
+        var launched = await RecordLaunchAsync(job);
+
+        if (settings.Launch && succeeded) return ReportLaunch(job, launched, DevicePath(to, _plan.Files[0].RelativePath));
 
         CopyResults.Show(Output, report);
+
+        if (!settings.Launch && job.LaunchState == TransferLaunchState.Launched) Output.Notice($"Launched {job.LaunchedPath}.");
 
         if (job.State is TransferJobState.Aborted or TransferJobState.Abandoned && !string.IsNullOrWhiteSpace(job.Error)) Output.Notice(job.Error);
 
@@ -198,9 +203,9 @@ internal sealed class FileUploadCommand(
     }
 
     /// <summary>Runs the job, with a live progress line on stderr when a person is watching one.</summary>
-    private Task<UploadRunResult> TransferAsync(string to, CancellationToken ct) =>
+    private Task<UploadRunResult> TransferAsync(string to, bool launch, CancellationToken ct) =>
         CommandRun.WithStatusAsync<UploadProgress, UploadRunResult>(
-            Output, "Starting the transfer...", Describe, progress => runner.RunAsync(storage.StorageType, to, _plan.Files, progress, ct));
+            Output, "Starting the transfer...", Describe, progress => runner.RunAsync(storage.StorageType, to, _plan.Files, launch, progress, ct));
 
     private static string Describe(UploadProgress progress) =>
         $"Sending {progress.Sent}/{progress.Total}, {progress.Failed} failed" + (string.IsNullOrEmpty(progress.CurrentFile) ? string.Empty : $" — {progress.CurrentFile}");
@@ -253,14 +258,38 @@ internal sealed class FileUploadCommand(
         return owner?.LocalPath ?? (archives.Count == 1 ? archives[0].LocalPath : failure.RelativePath);
     }
 
-    private async Task<int> LaunchAsync(string devicePath)
+    /// <summary>
+    /// Records in the player the launch tr-web made for the job, after the runner has marked the device stopped. Null when
+    /// tr-web launched nothing, or the file it launched can't be found.
+    /// </summary>
+    private async Task<ILaunchableItem?> RecordLaunchAsync(TransferJobDto job)
     {
-        var item = await storage.GetFile(devicePath)
-            ?? throw new CliException(CliExitCode.NotFound, $"{devicePath} wasn't found on the TeensyROM after the upload.");
+        if (job.LaunchState is not (TransferLaunchState.Launched or TransferLaunchState.Incompatible) || string.IsNullOrEmpty(job.LaunchedPath)) return null;
+        if (await storage.GetFile(job.LaunchedPath) is not { } item) return null;
 
         player.UseStorage(storage.StorageType);
+        player.RecordLaunched(item, job.LaunchState == TransferLaunchState.Launched ? LaunchStatus.Launched : LaunchStatus.Incompatible);
 
-        return new LaunchReport(Output).Report(await player.LaunchOnceAsync(item), storage.StorageType, $"{devicePath} wasn't found.");
+        return item;
+    }
+
+    /// <summary>The result of an upload that asked tr-web to launch its file.</summary>
+    /// <exception cref="CliException">The file didn't launch.</exception>
+    private int ReportLaunch(TransferJobDto job, ILaunchableItem? item, string devicePath)
+    {
+        var path = job.LaunchedPath ?? devicePath;
+
+        switch (job.LaunchState)
+        {
+            case TransferLaunchState.Launched or TransferLaunchState.Incompatible:
+                var status = job.LaunchState == TransferLaunchState.Launched ? LaunchStatus.Launched : LaunchStatus.Incompatible;
+
+                if (item is null) throw new CliException(CliExitCode.NotFound, $"{path} wasn't found on the TeensyROM after the upload.");
+
+                return new LaunchReport(Output).Report(new LaunchOutcome(status, item, null), storage.StorageType, $"{path} wasn't found.");
+            default:
+                throw new CliException(CliExitCode.Failed, string.IsNullOrWhiteSpace(job.LaunchError) ? $"The TeensyROM didn't launch {path}." : job.LaunchError);
+        }
     }
 
     private static string DevicePath(string to, string relativePath) => $"{to.TrimEnd('/')}/{relativePath}";

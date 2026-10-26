@@ -32,6 +32,74 @@ namespace TeensyRom.Cli.Api.Generated
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Set Watch Folder Enabled
+        /// </summary>
+        /// <remarks>
+        /// Turns a watch folder on or off without changing its destinations.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<SetWatchFolderEnabledResponse> SetWatchFolderEnabledAsync(string watchFolderId, SetWatchFolderEnabledBody body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Remove Watch Folder
+        /// </summary>
+        /// <remarks>
+        /// Stops watching a folder and removes all its destinations.
+        /// <br/>
+        /// <br/>- Never touches the folder on disk or anything on a device.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<RemoveWatchFolderResponse> RemoveWatchFolderAsync(string watchFolderId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Remove Watch Folder Device
+        /// </summary>
+        /// <remarks>
+        /// Stops sending a watch folder's files to a device.
+        /// <br/>
+        /// <br/>- Removes every destination of that device on the folder.
+        /// <br/>- Removing the last destination removes the folder too.
+        /// <br/>- Never touches the folder on disk or anything on a device.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<RemoveWatchFolderDeviceResponse> RemoveWatchFolderDeviceAsync(string watchFolderId, string deviceId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Get Watch Folders
+        /// </summary>
+        /// <remarks>
+        /// Lists every watch folder with its destinations and what it is doing right now.
+        /// <br/>
+        /// <br/>- A watch folder is a folder on the engine's machine; its destinations are device storages that receive its files.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<GetWatchFoldersResponse> GetWatchFoldersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Add Watch Folder
+        /// </summary>
+        /// <remarks>
+        /// Sends the files of a folder on the engine's machine to a device storage.
+        /// <br/>
+        /// <br/>- Adding a folder that is already watched adds a destination for another device to it.
+        /// <br/>- A device receives a folder through one destination only; a second one is refused with 409.
+        /// <br/>- A folder nested inside a watched folder, or containing one, is refused with 400.
+        /// <br/>- The device must be connected and report its chip id, and the storage must be available.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AddWatchFolderResponse> AddWatchFolderAsync(AddWatchFolderBody body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Get Application Version
         /// </summary>
         /// <remarks>
@@ -80,6 +148,20 @@ namespace TeensyRom.Cli.Api.Generated
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<SealJobResponse> SealTransferJobAsync(string jobId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// List Transfer Jobs
+        /// </summary>
+        /// <remarks>
+        /// Lists every transfer job the engine knows about, whatever its origin.
+        /// <br/>
+        /// <br/>- Newest first.
+        /// <br/>- Returns 200 with an empty list when there are no jobs.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ListJobsResponse> ListTransferJobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -146,8 +228,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-copy and directory watching configuration
-        /// <br/>  - Watch directory location, auto-transfer path, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -159,7 +241,6 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)
         /// <br/>- TCP port must be between 1 and 65535
         /// <br/>- Timeout values must be positive integers (milliseconds)
-        /// <br/>- Watch directory must be empty or a valid absolute path
         /// <br/>- Search weights must be non-negative with at least one &gt; 0
         /// <br/>
         /// <br/>Settings are persisted to Settings.json and immediately available in memory.
@@ -178,7 +259,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-copy and directory watching configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -546,6 +627,526 @@ namespace TeensyRom.Cli.Api.Generated
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Set Watch Folder Enabled
+        /// </summary>
+        /// <remarks>
+        /// Turns a watch folder on or off without changing its destinations.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<SetWatchFolderEnabledResponse> SetWatchFolderEnabledAsync(string watchFolderId, SetWatchFolderEnabledBody body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (watchFolderId == null)
+                throw new System.ArgumentNullException("watchFolderId");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/watch-folders/{watchFolderId}/enabled"
+                    urlBuilder_.Append("api/watch-folders/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(watchFolderId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/enabled");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<SetWatchFolderEnabledResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Remove Watch Folder
+        /// </summary>
+        /// <remarks>
+        /// Stops watching a folder and removes all its destinations.
+        /// <br/>
+        /// <br/>- Never touches the folder on disk or anything on a device.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<RemoveWatchFolderResponse> RemoveWatchFolderAsync(string watchFolderId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (watchFolderId == null)
+                throw new System.ArgumentNullException("watchFolderId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/watch-folders/{watchFolderId}"
+                    urlBuilder_.Append("api/watch-folders/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(watchFolderId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<RemoveWatchFolderResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Remove Watch Folder Device
+        /// </summary>
+        /// <remarks>
+        /// Stops sending a watch folder's files to a device.
+        /// <br/>
+        /// <br/>- Removes every destination of that device on the folder.
+        /// <br/>- Removing the last destination removes the folder too.
+        /// <br/>- Never touches the folder on disk or anything on a device.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<RemoveWatchFolderDeviceResponse> RemoveWatchFolderDeviceAsync(string watchFolderId, string deviceId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (watchFolderId == null)
+                throw new System.ArgumentNullException("watchFolderId");
+
+            if (deviceId == null)
+                throw new System.ArgumentNullException("deviceId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/watch-folders/{watchFolderId}/devices/{deviceId}"
+                    urlBuilder_.Append("api/watch-folders/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(watchFolderId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/devices/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(deviceId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<RemoveWatchFolderDeviceResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Get Watch Folders
+        /// </summary>
+        /// <remarks>
+        /// Lists every watch folder with its destinations and what it is doing right now.
+        /// <br/>
+        /// <br/>- A watch folder is a folder on the engine's machine; its destinations are device storages that receive its files.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<GetWatchFoldersResponse> GetWatchFoldersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/watch-folders"
+                    urlBuilder_.Append("api/watch-folders");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<GetWatchFoldersResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Add Watch Folder
+        /// </summary>
+        /// <remarks>
+        /// Sends the files of a folder on the engine's machine to a device storage.
+        /// <br/>
+        /// <br/>- Adding a folder that is already watched adds a destination for another device to it.
+        /// <br/>- A device receives a folder through one destination only; a second one is refused with 409.
+        /// <br/>- A folder nested inside a watched folder, or containing one, is refused with 400.
+        /// <br/>- The device must be connected and report its chip id, and the storage must be available.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AddWatchFolderResponse> AddWatchFolderAsync(AddWatchFolderBody body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/watch-folders"
+                    urlBuilder_.Append("api/watch-folders");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AddWatchFolderResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Get Application Version
         /// </summary>
         /// <remarks>
@@ -840,6 +1441,86 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// List Transfer Jobs
+        /// </summary>
+        /// <remarks>
+        /// Lists every transfer job the engine knows about, whatever its origin.
+        /// <br/>
+        /// <br/>- Newest first.
+        /// <br/>- Returns 200 with an empty list when there are no jobs.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ListJobsResponse> ListTransferJobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/transfers"
+                    urlBuilder_.Append("api/transfers");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ListJobsResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
                         }
                         else
                         {
@@ -1302,8 +1983,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-copy and directory watching configuration
-        /// <br/>  - Watch directory location, auto-transfer path, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -1315,7 +1996,6 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)
         /// <br/>- TCP port must be between 1 and 65535
         /// <br/>- Timeout values must be positive integers (milliseconds)
-        /// <br/>- Watch directory must be empty or a valid absolute path
         /// <br/>- Search weights must be non-negative with at least one &gt; 0
         /// <br/>
         /// <br/>Settings are persisted to Settings.json and immediately available in memory.
@@ -1427,7 +2107,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-copy and directory watching configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -4154,6 +4834,58 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AddWatchFolderBody
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        public string Path { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("deviceId")]
+        public string DeviceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("storageType")]
+        public TeensyStorageType StorageType { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("devicePath")]
+        public string? DevicePath { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launch")]
+        public bool Launch { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AddWatchFolderResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolder")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public WatchFolderDto WatchFolder { get; set; } = new WatchFolderDto();
+
+        [System.Text.Json.Serialization.JsonPropertyName("created")]
+        public bool Created { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AppSettingsDto
     {
 
@@ -4469,6 +5201,9 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("expectedArchiveCount")]
         public int ExpectedArchiveCount { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launch")]
+        public bool Launch { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4793,17 +5528,6 @@ namespace TeensyRom.Cli.Api.Generated
     public partial class FileTransferSettingsDto
     {
 
-        [System.Text.Json.Serialization.JsonPropertyName("watchDirectoryLocation")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string WatchDirectoryLocation { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("autoTransferPath")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string AutoTransferPath { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("autoFileCopyEnabled")]
-        public bool AutoFileCopyEnabled { get; set; } = default!;
-
         [System.Text.Json.Serialization.JsonPropertyName("autoLaunchOnCopyEnabled")]
         public bool AutoLaunchOnCopyEnabled { get; set; } = default!;
 
@@ -4995,6 +5719,25 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("version")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Version { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class GetWatchFoldersResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolders")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<WatchFolderDto> WatchFolders { get; set; } = new System.Collections.ObjectModel.Collection<WatchFolderDto>();
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -5244,6 +5987,25 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ListJobsResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("jobs")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<TransferJobDto> Jobs { get; set; } = new System.Collections.ObjectModel.Collection<TransferJobDto>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum MachineType
     {
 
@@ -5475,6 +6237,46 @@ namespace TeensyRom.Cli.Api.Generated
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class RemoveFavoriteResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("message")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Message { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RemoveWatchFolderDeviceResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("folderRemoved")]
+        public bool FolderRemoved { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolder")]
+        public WatchFolderDto2? WatchFolder { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RemoveWatchFolderResponse
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("message")]
@@ -5803,6 +6605,43 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SetWatchFolderEnabledBody
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SetWatchFolderEnabledResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolder")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public WatchFolderDto WatchFolder { get; set; } = new WatchFolderDto();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class StopEngineResponse
     {
 
@@ -5976,6 +6815,10 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("currentFile")]
         public string? CurrentFile { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("origin")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public TransferOriginDto Origin { get; set; } = new TransferOriginDto();
+
         [System.Text.Json.Serialization.JsonPropertyName("startedUtc")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public System.DateTimeOffset StartedUtc { get; set; } = default!;
@@ -6012,6 +6855,15 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("expandedFileCount")]
         public int? ExpandedFileCount { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launchState")]
+        public TransferLaunchState LaunchState { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launchedPath")]
+        public string? LaunchedPath { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launchError")]
+        public string? LaunchError { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -6064,6 +6916,10 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("currentFile")]
         public string? CurrentFile { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("origin")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public TransferOriginDto Origin { get; set; } = new TransferOriginDto();
+
         [System.Text.Json.Serialization.JsonPropertyName("startedUtc")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public System.DateTimeOffset StartedUtc { get; set; } = default!;
@@ -6101,6 +6957,15 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("expandedFileCount")]
         public int? ExpandedFileCount { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("launchState")]
+        public TransferLaunchState LaunchState { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launchedPath")]
+        public string? LaunchedPath { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launchError")]
+        public string? LaunchError { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -6136,6 +7001,63 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"Aborted")]
         Aborted = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TransferLaunchState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Pending")]
+        Pending = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Launched")]
+        Launched = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Incompatible")]
+        Incompatible = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Failed")]
+        Failed = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TransferOriginDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("kind")]
+        public TransferOriginKind Kind { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolderId")]
+        public string? WatchFolderId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("watchFolderPath")]
+        public string? WatchFolderPath { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TransferOriginKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Upload")]
+        Upload = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"WatchFolder")]
+        WatchFolder = 1,
 
     }
 
@@ -6229,6 +7151,123 @@ namespace TeensyRom.Cli.Api.Generated
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
         }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class WatchFolderDestinationDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("deviceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string DeviceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("deviceName")]
+        public string? DeviceName { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("storageType")]
+        public TeensyStorageType StorageType { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Path { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("launch")]
+        public bool Launch { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class WatchFolderDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Path { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public WatchFolderState State { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("destinations")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<WatchFolderDestinationDto> Destinations { get; set; } = new System.Collections.ObjectModel.Collection<WatchFolderDestinationDto>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class WatchFolderDto2
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Path { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public WatchFolderState State { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("destinations")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<WatchFolderDestinationDto> Destinations { get; set; } = new System.Collections.ObjectModel.Collection<WatchFolderDestinationDto>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum WatchFolderState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Watching")]
+        Watching = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Off")]
+        Off = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Unavailable")]
+        Unavailable = 2,
 
     }
 
