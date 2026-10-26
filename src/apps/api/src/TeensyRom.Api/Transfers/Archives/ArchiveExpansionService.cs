@@ -294,6 +294,11 @@ namespace TeensyRom.Api.Transfers.Archives
                     else
                     {
                         EnqueueProduced(job.JobId, scratchPath, targetPath, actualBytes);
+
+                        // Counted now, while the walk runs, not when admission later stages the entry: the
+                        // job publishes this total the moment its last archive finishes, which is before
+                        // admission starts. See TransferJob.OnEntryExpanded.
+                        job.OnEntryExpanded();
                         producedBytes += actualBytes;
                     }
 

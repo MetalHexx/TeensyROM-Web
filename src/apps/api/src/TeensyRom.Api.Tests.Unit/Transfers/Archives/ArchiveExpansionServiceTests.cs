@@ -360,7 +360,7 @@ public sealed class ArchiveExpansionServiceTests : IDisposable
 
     /// <summary>
     /// Drives the walk against a real <see cref="TransferAdmission"/> rather than the class-level mock, so
-    /// admitting a produced entry really runs <see cref="TransferJob.OnEntryExpanded"/> and really raises
+    /// admitting a produced entry really runs <see cref="TransferJob.OnEntryAdmitted"/> and really raises
     /// <see cref="TransferJob.PendingCount"/>. A mocked admission never exercises that side effect, which is
     /// exactly why the mocked suite above cannot catch the ExpandAsync/TransferJob ordering this guards.
     /// </summary>
@@ -388,7 +388,7 @@ public sealed class ArchiveExpansionServiceTests : IDisposable
         staging.StageAsync(job.JobId, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
-                // Runs inside TransferAdmission.AdmitAsync, strictly before OnEntryExpanded raises
+                // Runs inside TransferAdmission.AdmitAsync, strictly before OnEntryAdmitted raises
                 // PendingCount for this entry - the exact window the old ExpandAsync ordering could leave
                 // at zero, because the archive's own slot had already been released by then.
                 minPendingCountObservedDuringStaging = Math.Min(minPendingCountObservedDuringStaging, job.PendingCount);
@@ -411,6 +411,82 @@ public sealed class ArchiveExpansionServiceTests : IDisposable
             // the device - this stub queue never drains it, so PendingCount correctly stays at 1.
             job.PendingCount.Should().Be(1);
             await queue.Received(1).EnqueueAsync(job.DeviceId, Arg.Any<StagedFile>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(stagingPath);
+        }
+    }
+
+    /// <summary>
+    /// The contract the browser composes its device percent from: <c>ExpandedFileCount</c> is null until
+    /// expansion is done, then exactly the final total - never a partial one. Admission runs AFTER the job
+    /// stops reporting expansion as outstanding, so a count raised by admission is visible mid-climb (0, 1,
+    /// 2, ... N) to anything reading the job while the entries are staged and queued - a snapshot taken by
+    /// the SignalR flush, or by <c>GET /api/transfers/{id}</c>. Every observation point of a real
+    /// <see cref="TransferAdmission"/> is sampled here, and each must already see the final total.
+    /// </summary>
+    [Fact]
+    public async Task ExpandAsync_RealTransferAdmission_ExpandedFileCountIsTheFinalTotalAtEveryPointAdmissionCanBeObserved()
+    {
+        var job = NewJob();
+        AcceptArchive(job);
+
+        var topPath = WriteTopLevelArchive(job.JobId, "THREE");
+        var content = new byte[] { 1, 2, 3 };
+        _reader.Define("THREE", new FakeArchive
+        {
+            Entries =
+            [
+                new FakeEntry("a.sid", content.Length, content),
+                new FakeEntry("b.sid", content.Length, content),
+                new FakeEntry("c.sid", content.Length, content)
+            ],
+            DeclaredUncompressedBytes = content.Length * 3
+        });
+
+        var registry = Substitute.For<ITransferJobRegistry>();
+        registry.Get(job.JobId).Returns(job);
+
+        var gate = Substitute.For<ITransferCapacityGate>();
+        gate.Adjust(Arg.Any<long>(), Arg.Any<long>()).Returns(ci => (long)ci[1]);
+
+        var stagingPath = Path.GetTempFileName();
+        File.WriteAllBytes(stagingPath, content);
+
+        var observed = new List<int?>();
+        void Observe() => observed.Add(job.ToSnapshot().ExpandedFileCount);
+
+        var staging = Substitute.For<ITransferStagingStore>();
+        staging.StageAsync(job.JobId, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Observe(); // before the entry is counted as admitted
+                return Task.FromResult(stagingPath);
+            });
+
+        var queue = Substitute.For<ITransferQueue>();
+        queue.EnqueueAsync(Arg.Any<string>(), Arg.Any<StagedFile>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Observe(); // the moment the entry can reach the device
+                return ValueTask.CompletedTask;
+            });
+
+        var notifier = Substitute.For<ITransferProgressNotifier>();
+        notifier.When(n => n.JobChanged(job)).Do(_ => Observe()); // what a broadcast would publish
+
+        var realAdmission = new TransferAdmission(gate, staging, queue, notifier, registry);
+
+        try
+        {
+            var service = new ArchiveExpansionService(_reader, _scratch, realAdmission, registry, _options, _log);
+            await service.ExpandAsync(new ArchiveExpansionRequest(job.JobId, topPath, "three.zip"), CancellationToken.None);
+
+            observed.Should().HaveCount(9, "each of the three entries is observed while staging, while queueing and on notify");
+            observed.Should().OnlyContain(count => count == 3,
+                "the total is final the instant expansion stops being outstanding, before any entry is admitted");
+            job.ToSnapshot().ExpandedFileCount.Should().Be(3);
         }
         finally
         {

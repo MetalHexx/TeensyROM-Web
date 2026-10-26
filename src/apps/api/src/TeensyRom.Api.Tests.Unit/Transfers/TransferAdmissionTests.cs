@@ -82,7 +82,7 @@ public class TransferAdmissionTests : IDisposable
     }
 
     [Fact]
-    public async Task AdmitAsync_CountAsReceivedFalse_RaisesExpandedCountAndPendingButNotFilesReceived()
+    public async Task AdmitAsync_CountAsReceivedFalse_RaisesPendingButNeitherFilesReceivedNorTheExpandedTotal()
     {
         var admission = NewAdmission();
         var job = NewJob();
@@ -95,7 +95,10 @@ public class TransferAdmissionTests : IDisposable
         job.PendingCount.Should().Be(1);
         var snapshot = job.ToSnapshot();
         snapshot.FilesReceived.Should().Be(0);
-        snapshot.ExpandedFileCount.Should().Be(1);
+
+        // The expanded total belongs to the walk (TransferJob.OnEntryExpanded), which has already counted
+        // every entry by the time admission runs; admitting one must not count it a second time.
+        snapshot.ExpandedFileCount.Should().Be(0);
     }
 
     [Fact]

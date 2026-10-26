@@ -248,17 +248,35 @@ namespace TeensyRom.Api.Transfers
         }
 
         /// <summary>
-        /// One extracted entry has been admitted. Raises <see cref="PendingCount"/> and the expanded-file
-        /// total; deliberately does NOT raise the received-file count — the entry was never uploaded. Must
-        /// be called before <see cref="ReleaseFinishedArchiveSlots"/> runs for the archive that produced
-        /// it, never after — see the ordering note there.
+        /// The walk has produced one extracted entry. Raises the expanded-file total and nothing else. The
+        /// walk calls this as it goes, so every entry an archive yields is counted before
+        /// <see cref="OnArchiveExpansionFinished"/> runs for that archive - which is what makes the total
+        /// published as <c>ExpandedFileCount</c> exact from the very instant
+        /// <see cref="HasExpansionOutstanding"/> goes false, and that instant is before the first held upload
+        /// is released to the device. Counting at admission instead would be too late: admission only runs
+        /// after that point, so the published total would climb 0, 1, 2 ... N while the entries trickle in.
         /// </summary>
         public void OnEntryExpanded()
         {
             lock (_lock)
             {
-                PendingCount++;
                 _expandedFileCount++;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// One extracted entry has been admitted to staging. Raises <see cref="PendingCount"/>; deliberately
+        /// does NOT raise the received-file count (the entry was never uploaded) nor the expanded-file total
+        /// (the walk already counted it - see <see cref="OnEntryExpanded"/>). Must be called before
+        /// <see cref="ReleaseFinishedArchiveSlots"/> runs for the archive that produced it, never after - see
+        /// the ordering note there.
+        /// </summary>
+        public void OnEntryAdmitted()
+        {
+            lock (_lock)
+            {
+                PendingCount++;
                 LastActivityUtc = _clock();
             }
         }
@@ -467,7 +485,9 @@ namespace TeensyRom.Api.Transfers
                     // still inbound gives it a total that grows, which is the exact backwards movement the
                     // design forbids. Gating on _archivesOutstanding == 0 alone leaks a wrong value twice —
                     // before the first archive has finished uploading, and in the gap between one archive
-                    // finishing and the next arriving.
+                    // finishing and the next arriving. The count itself is raised by the walk
+                    // (OnEntryExpanded), not by admission, so the first non-null value is already the
+                    // final one - nothing the browser can read ever shows a partial total.
                     ExpandedFileCount = HasExpansionOutstanding ? null : _expandedFileCount
                 };
             }

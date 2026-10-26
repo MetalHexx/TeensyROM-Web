@@ -422,10 +422,10 @@ public class TransferJobTests
         job.OnArchiveExpansionStarted("game.zip", 2000);
         observed.Add(job.PendingCount);
 
-        job.OnEntryExpanded();
+        job.OnEntryAdmitted();
         observed.Add(job.PendingCount);
 
-        job.OnEntryExpanded();
+        job.OnEntryAdmitted();
         observed.Add(job.PendingCount);
 
         // Lowers _archivesOutstanding but must not touch PendingCount yet - releasing the archive's own
@@ -519,6 +519,35 @@ public class TransferJobTests
         job.OnArchiveExpansionFinished();
 
         job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void ExpandedFileCount_IsExactTheInstantTheLastArchiveFinishes_BeforeAnyEntryIsAdmitted()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("a.zip", 100);
+
+        // The walk counts what it produces as it goes; admission has not started.
+        job.OnEntryExpanded();
+        job.OnEntryExpanded();
+        job.OnEntryExpanded();
+        job.ToSnapshot().ExpandedFileCount.Should().BeNull();
+
+        job.OnArchiveExpansionFinished();
+
+        // Final from the first moment it is non-null - the admission that follows must not move it.
+        job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+
+        job.OnEntryAdmitted();
+        job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+        job.OnEntryAdmitted();
+        job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+        job.OnEntryAdmitted();
+        job.ReleaseFinishedArchiveSlots();
+        job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+        job.PendingCount.Should().Be(3);
     }
 
     [Fact]
