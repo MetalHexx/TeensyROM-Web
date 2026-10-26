@@ -293,6 +293,117 @@ final commit of the phase corrective, after the loop controls were mapped.
 - [ ] The speed controls work inside a loop, and the speed is kept on leaving it.
 - [ ] The other deck's timing is unaffected while one deck loads or rebuilds.
 
+## Per-loop settings and play now
+
+Browser check of the play-now and GBL keys, the cue's Set End slot, the tiles' play-now keys and
+dots, and the settings sign on the SID panel and the channel strip, against
+`ASID-DJ-ROOT-WIREFRAME-LOOP-SETTINGS.html` (frames A to D). Driven as in "Loops and cues": `pnpm
+start`, `/dj-mixer` in a **1920 x 1080** same-origin `<iframe>` with `lib-scaling-container {
+transform: none }` injected, no API and no device. `InSID3_Out.sid` came from a local CORS server
+(which also served the mockup page over `http://`, measured in the same browser), the iframe's
+`fetch` was stubbed for `/files/content`, and `DeckService.load('A', ...)` was reached through
+`ng.getComponent` on the deck column. Keys were pressed with DOM clicks on their accessible names;
+the Key knob was turned with an `input` event on its range.
+
+**Live behaviour, deck A.** Two cues were added, Set End on Item 2 made it a loop, and GBL on Item 2
+was unlatched (its `aria-pressed` went false and its tile grew the dot). Then:
+
+| step | Key readout | sign (SID panel and strip) | tiles |
+| --- | --- | --- | --- |
+| tune playing, nothing in play | `5A` | Main | Item 2 own dot |
+| Key turned +3 on the main track | `2A` | Main | unchanged |
+| play key on Item 2 (own settings) | `5A` | ITEM 2, lit | Item 2 running |
+| play-now on Item 1 (shares) | `2A` | Main | all idle |
+| play-now on Item 2 | `5A` | ITEM 2, lit | Item 2 running |
+| play-now on Item 1, then the play key on Item 2 | `2A`, then `5A` | Main, then ITEM 2, lit | follows |
+| Stop loop, then Stop | `2A` | Main | idle, deck stopped |
+
+The two signs agreed at every step, and Deck B's stayed Main. The row's GBL read unlatched for Item 2
+and latched for Item 1. The console showed no errors from the plate.
+
+**Learn overlays (mapping mode set on the store, as in the transport section).**
+
+| selection | `loop-play-now` / `loop-global` | `loop-set-end` | `loop-end-snap-*` |
+| --- | --- | --- | --- |
+| a loop (bindings closed and open) | one overlay each, centred on its key | none | on the End boundary's snap keys, as before |
+| a cue (bindings closed and open) | one overlay each, centred on its key | one, over the End slot's Set End key | none (the slot has no snap keys) |
+
+Each overlay sat 3 px outside its key on every side, as the existing ones do (play-now 34 x 32
+around 28 x 26 before the sizing fix below, Set End 169 x 28 around 163.5 x 22).
+
+**Against frames A to D (1920 x 1080), measured on both pages.** The first pass found the row's
+keys narrower than the mockup's (play-now 28.1 wide against 32, GBL 32.2 against 44.2, Clear End
+28.1 against 26) and, with the bindings panel open, the tiles squeezed to 122 px, which cut each
+name down to its first letter. Fixed in P03-T01's components: the play-now key takes the trigger's
+32 px, Clear End the delete key's 26 px and GBL a 44 px minimum, and the tile grid takes one tile per
+line below 24rem. After:
+
+| element | mockup | view |
+| --- | --- | --- |
+| selected row (w x h) | 443.9 x 71.1 | 439.9 x 71.1 |
+| row keys, left to right (w) | 32 / 32 / display 235.6 / 44.2 / 26 / 26 | 32 / 32 / display 231.7 / 44 / 26 / 26 |
+| tile (w x h), trigger, play-now | 218.9 x 40, 30 x 30, 26 x 30 | 214.9 x 40, 30 x 30, 26 x 30 |
+| tile's own-settings dot | 6 x 6 | 6 x 6 |
+| cue's Set End key (w x h) | 165.9 x 22 | 163.5 x 22 |
+| sign on the SID panel, Main / Item 2 (w x h) | 50.2 x 18 / 61.3 x 18 | 50.2 x 18 / 61.2 x 18 |
+| gap from the deck label to its sign | 8 | 8 |
+| sign on the channel strip, full width of V1 | 61.7 (V1 61.7) | 69.9 (V1 69.9) |
+
+The 4 px in the row, display and tile is the synth panel's padding, as the Loops and cues table
+records. The channel strip's column is 8 px wider than the mockup's, so its V1 and sign are as well;
+both fill the strip. The label sits first and the sign after it on both decks, as the mockup draws
+them. One difference stays: the mockup's GBL key draws a lamp dot beside its label, and the shared
+key has none, so the view shows lit as cyan text, border and glow with the pressed look, and unlit
+as plain dim text. The span text is fully readable at 474 px and when narrow.
+
+**Narrow width (bindings panel open).** The plate is 288 px. The top line wraps its keys above the
+display, which takes a line of its own: its text is whole (display scroll width equals client width,
+the span `00:03.9-00:04.4` at 91 of 91 px). The two tiles take a line each, 250 px wide, with no
+name, length or dot clipped. The page does not scroll (1080 = 1080). The same plate with the same
+selection before the grid change had tiles 122 px wide and clipped names.
+
+**Storybook** (`pnpm nx run ui-components:storybook`, port 4400), for states the live run did not
+produce: `dj-loops-cues-plate--mixed-settings` (own dots on two of four tiles, row keys as in the
+table), `--queued-jump-knob-moved-on` (queued tile, outline and row on another tile), `--narrow`
+(300 px, one tile per line, nothing clipped); `dj-loop-selected-row--cue-set-end-slot` (Set End key
+180.5 x 22 in the 474 px row, no snap keys); `dj-loop-tile--not-ready` (both keys present and
+enabled); `dj-deck-settings-sign--marker` (lit, 61.2 x 18, named "Settings in play deck A: Item 2").
+
+**Automated.** `pnpm nx test dj-mixer`, `pnpm nx lint dj-mixer`, `pnpm nx test ui-components`,
+`pnpm nx run-many -t typecheck -p application dj-mixer`, `pnpm nx build teensyrom-ui` and the five DJ
+end-to-end specs (`dj-mixer-*.cy.ts`, 43 tests, run against a `serve-static` started by hand, with
+`--excludeTaskDependencies`) pass. No spec selected the row's keys, so none changed.
+
+### Bundle check (per-loop settings)
+
+`pnpm nx build teensyrom-ui` on this branch against `main` (c25d7588, after ASID-DJ-10), the initial
+chunks only, in bytes (both built with the same `node_modules`):
+
+| chunk | main | this branch |
+| --- | --- | --- |
+| shared ui / vendor chunk | 1,358,451 | 1,358,451 (0) |
+| `main` | 419,823 | 419,823 (0) |
+| shared application chunk | 187,929 | 195,774 (+7,845) |
+| other initial chunks and `polyfills` | 133,334 | 133,334 (0) |
+| **initial JavaScript** | **2,099,537** | **2,107,382 (+7,845)** |
+| `styles` | 35,125 | 35,125 (0) |
+
+The new components add 0 B: they live in `dj.ts` and the ui chunk did not grow. The 7.8 kB is the
+application layer, which the lazy DJ route's store pulls into the shared application chunk: the
+per-marker settings state, the settings landing with a jump, play-now, the GBL toggle and their
+mapped controls. The initial JavaScript is over the 2.00 MB budget by 142.51 kB here against 134.66
+kB on `main`; that warning is already on `main` and `project.json`'s budgets are unchanged.
+
+### Bench checklist (operator, real hardware, per-loop settings)
+
+- [ ] A marker's settings land with the jump into it with no audible glitch or timing slip, from a
+  queued trigger and from play-now, in both directions between a marker with its own settings and
+  one that shares.
+- [ ] Rapid repeated play-now presses hold up over a long run.
+- [ ] The other deck's timing is unaffected while one deck jumps with settings.
+- [ ] GBL toggled mid-set on the running loop A/Bs between its own settings and the main track's.
+- [ ] Play-now and GBL are learned and played from the controller.
+
 ## Byte fidelity (P03-T02)
 
 Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM

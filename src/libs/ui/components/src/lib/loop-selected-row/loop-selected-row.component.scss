@@ -41,15 +41,24 @@ lib-synth-key {
   --synth-key-icon-size: 12px;
 }
 
-// The trigger and delete keys are icon-only squares: the width comes from `min-width`, not padding.
+// The trigger, play-now, clear-end and delete keys are icon-only: the width comes from `min-width`,
+// not padding.
 .trigger,
+.play-now,
+lib-synth-key[data-control='loop-clear-end'],
 lib-synth-key[data-control='loop-delete'] {
   --synth-key-min-width: 26px;
   --synth-key-padding: 0;
 }
 
-.trigger {
+.trigger,
+.play-now {
   --synth-key-min-width: 32px;
+}
+
+// GBL takes the mockup's width, which leaves room for its lamp; the shared key draws none.
+.global {
+  --synth-key-min-width: 44px;
 }
 
 .display {

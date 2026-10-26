@@ -23,6 +23,7 @@ import {
   type PanelFilterMode,
   type PanelRange,
   type PanelWaveform,
+  type SettingsInPlaySummary,
   type Slot,
   type VoiceKnob,
   type VoiceSwitch,
@@ -44,6 +45,10 @@ import {
   type SidFilterSectionModel,
   type SidVoiceStripModel,
 } from '@teensyrom-nx/ui/components';
+import {
+  DeckSettingsSignComponent,
+  type DeckSettingsSignModel,
+} from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
 
 const KEY_FORMAT_OPTIONS: readonly SegmentedControlOption[] = [
@@ -73,6 +78,7 @@ interface DeckPanelView {
    *  second, so the two Key sections sit nearest the divider. */
   readonly lowerOrder: readonly ('filter' | 'key')[];
   readonly panicName: string;
+  readonly sign: DeckSettingsSignModel;
 }
 
 function knob(
@@ -97,7 +103,8 @@ function buildDeckPanel(
   deck: DeckRef,
   panel: DeckPanelState,
   disabled: boolean,
-  keyReadout: string
+  keyReadout: string,
+  settingsInPlay: SettingsInPlaySummary
 ): DeckPanelView {
   const name = `Deck ${deck.letter}`;
   return {
@@ -153,6 +160,11 @@ function buildDeckPanel(
     },
     lowerOrder: deck.index % 2 === 0 ? ['filter', 'key'] : ['key', 'filter'],
     panicName: `${name} panic: return the panel to home`,
+    sign: {
+      text: settingsInPlay.name,
+      own: settingsInPlay.markerId !== null,
+      accessibleName: `Settings in play deck ${deck.letter}: ${settingsInPlay.name}`,
+    },
   };
 }
 
@@ -169,6 +181,7 @@ function buildDeckPanel(
     ScalingContainerComponent,
     SynthPanelComponent,
     DeckLabelComponent,
+    DeckSettingsSignComponent,
     IconButtonComponent,
     PanelSectionComponent,
     PanicButtonComponent,
@@ -207,12 +220,13 @@ export class DjSidPanelComponent {
       panel: this.store.deckPanel(deck.slot),
       canShape: this.store.canShape(deck.slot),
       keyReadout: this.store.keyReadout(deck.slot),
+      settingsInPlay: this.store.settingsInPlay(deck.slot),
     }))
   );
 
   protected readonly panels = computed<readonly DeckPanelView[]>(() =>
-    this.deckSources().map(({ deck, panel, canShape, keyReadout }) =>
-      buildDeckPanel(deck, panel(), !canShape(), keyReadout())
+    this.deckSources().map(({ deck, panel, canShape, keyReadout, settingsInPlay }) =>
+      buildDeckPanel(deck, panel(), !canShape(), keyReadout(), settingsInPlay())
     )
   );
 

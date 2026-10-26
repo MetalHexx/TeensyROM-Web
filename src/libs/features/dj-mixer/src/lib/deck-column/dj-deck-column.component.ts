@@ -451,6 +451,18 @@ export class DjDeckColumnComponent {
     void this.deckService.toggleMarker(this.deck().slot, id);
   }
 
+  onPlayNowSelected(): void {
+    void this.deckService.playMarkerNow(this.deck().slot);
+  }
+
+  onPlayNowTile(id: string): void {
+    void this.deckService.playMarkerNow(this.deck().slot, id);
+  }
+
+  onToggleGlobal(): void {
+    this.deckService.toggleMarkerGlobal(this.deck().slot);
+  }
+
   onSelectTile(id: string): void {
     this.deckService.selectMarker(this.deck().slot, id);
   }

@@ -3,6 +3,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 import {
   DjStore,
+  EMPTY_DECK_LOOPS,
+  HOME_DECK_PANEL,
   MixerService,
   SidPanelPainter,
   type DeckPanelTargets,
@@ -352,6 +354,56 @@ describe('DjSidPanelComponent', () => {
       fixture.detectChanges();
 
       expect(keyReadoutText(fixture, 'A')).toBe('C#m');
+    });
+  });
+
+  describe('the settings sign', () => {
+    const marker = (id: string) => ({
+      id,
+      start: { frame: 100, offsetFrames: 0 },
+      end: null,
+      voices: [0, 1, 2],
+      settings: null,
+      ownSettings: true,
+      ready: true,
+    });
+
+    function sign(fixture: ComponentFixture<DjSidPanelComponent>, letter: string) {
+      const el = find(
+        fixture,
+        `lib-deck-settings-sign[aria-label^="Settings in play deck ${letter}"]`
+      );
+      return { name: el.getAttribute('aria-label'), own: el.hasAttribute('data-own') };
+    }
+
+    it('sits beside each deck label and follows the settings in play per deck', () => {
+      const { fixture, store } = render();
+      const cells = fixture.nativeElement.querySelectorAll('.deck-label-cell');
+      expect(
+        Array.from(cells).map((cell) =>
+          Array.from((cell as HTMLElement).children).map((child) => child.tagName.toLowerCase())
+        )
+      ).toEqual(Array(2).fill(['lib-deck-label', 'lib-deck-settings-sign']));
+      expect(sign(fixture, 'A')).toEqual({ name: 'Settings in play deck A: Main', own: false });
+
+      store.setDeckLoops({
+        slot: 'A',
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers: [marker('a'), marker('b')],
+          settingsInPlayId: 'b',
+          mainSettings: { panel: HOME_DECK_PANEL, mutes: [false, false, false] },
+        },
+      });
+      fixture.detectChanges();
+
+      expect(sign(fixture, 'A')).toEqual({ name: 'Settings in play deck A: Item 2', own: true });
+      expect(sign(fixture, 'B')).toEqual({ name: 'Settings in play deck B: Main', own: false });
+
+      store.setDeckLoops({ slot: 'A', loops: { ...EMPTY_DECK_LOOPS, markers: [marker('a')] } });
+      fixture.detectChanges();
+
+      expect(sign(fixture, 'A')).toEqual({ name: 'Settings in play deck A: Main', own: false });
     });
   });
 
