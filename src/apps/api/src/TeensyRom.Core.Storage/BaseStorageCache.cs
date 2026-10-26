@@ -30,14 +30,33 @@ namespace TeensyRom.Core.Storage
 
         protected void InvalidateIdCache() => _fileIdCache = null;
 
-        public void UpsertDirectory(DirectoryPath path, IStorageCacheItem directory)
+        /// <summary>
+        /// Runs a change to the cache under the write lock that <see cref="WriteToDisk"/> also holds. Without it a
+        /// persist (a job finalizing or being cancelled) can enumerate the dictionary while the transfer pump's upsert
+        /// is removing and re-adding an entry, and the serializer throws "Collection was modified". The lock
+        /// supports recursion, so the mutators below can call one another.
+        /// </summary>
+        private void Mutate(Action change)
+        {
+            _ioLock.EnterWriteLock();
+            try
+            {
+                change();
+            }
+            finally
+            {
+                _ioLock.ExitWriteLock();
+            }
+        }
+
+        public void UpsertDirectory(DirectoryPath path, IStorageCacheItem directory) => Mutate(() =>
         {
             DeleteDirectory(path);
             Insert(path, directory);
             InvalidateIdCache();
-        }
+        });
 
-        public void UpsertFile(FileItem fileItem)
+        public void UpsertFile(FileItem fileItem) => Mutate(() =>
         {
             IStorageCacheItem parentStorageItem = null!;
 
@@ -45,7 +64,7 @@ namespace TeensyRom.Core.Storage
             {
                 parentStorageItem = GetByDirPath(fileItem.Path.Directory)!;
             }
-            else 
+            else
             {
                 EnsureParents(fileItem.Path.Directory);
                 parentStorageItem = GetByDirPath(fileItem.Path.Directory)!;
@@ -53,9 +72,9 @@ namespace TeensyRom.Core.Storage
             parentStorageItem!.UpsertFile(fileItem);
             UpsertDirectory(parentStorageItem.Path, parentStorageItem);
             InvalidateIdCache();
-        }
+        });
 
-        public virtual void EnsureParents(DirectoryPath parentPath)
+        public virtual void EnsureParents(DirectoryPath parentPath) => Mutate(() =>
         {
             var parentDirectory = GetByDirPath(parentPath);
 
@@ -73,18 +92,18 @@ namespace TeensyRom.Core.Storage
 
             EnsureParents(parentPath.ParentPath);
 
-            var grandParent = GetByDirPath(parentPath.ParentPath) 
+            var grandParent = GetByDirPath(parentPath.ParentPath)
                 ?? throw new Exception("Directory should not be null since it was just ensured");
 
             grandParent.InsertSubdirectory(new DirectoryItem(parentDirectory.Path));
-        }
+        });
 
         protected void Insert(DirectoryPath path, IStorageCacheItem cacheItem)
         {
             TryAdd(path.Value, cacheItem);
         }
 
-        public void DeleteDirectory(DirectoryPath path)
+        public void DeleteDirectory(DirectoryPath path) => Mutate(() =>
         {
             var dir = GetByDirPath(path);
 
@@ -92,9 +111,9 @@ namespace TeensyRom.Core.Storage
 
             Remove(path.Value);
             InvalidateIdCache();
-        }
+        });
 
-        public void DeleteDirectoryWithChildren(DirectoryPath path)
+        public void DeleteDirectoryWithChildren(DirectoryPath path) => Mutate(() =>
         {
             var currentDir = GetByDirPath(path);
 
@@ -102,15 +121,15 @@ namespace TeensyRom.Core.Storage
 
             foreach (var directory in currentDir.Directories)
             {
-                if (!path.Equals(directory.Path)) 
+                if (!path.Equals(directory.Path))
                 {
                     DeleteDirectoryWithChildren(directory.Path);
                 }
             }
             DeleteDirectory(currentDir.Path);
-        }
+        });
 
-        public void ClearCache()
+        public void ClearCache() => Mutate(() =>
         {
             Clear();
             InvalidateIdCache();
@@ -118,7 +137,7 @@ namespace TeensyRom.Core.Storage
             if (!File.Exists(CacheFilePath)) return;
 
             File.Delete(CacheFilePath);
-        }
+        });
 
         public virtual IStorageCacheItem? GetByDirPath(DirectoryPath path)
         {
@@ -145,7 +164,7 @@ namespace TeensyRom.Core.Storage
                 .ToList();
         }
 
-        public void DeleteFile(FilePath path)
+        public void DeleteFile(FilePath path) => Mutate(() =>
         {
             var parentDir = GetByDirPath(path.Directory);
 
@@ -153,7 +172,7 @@ namespace TeensyRom.Core.Storage
 
             parentDir.DeleteFile(path);
             InvalidateIdCache();
-        }
+        });
 
         protected Func<KeyValuePair<string, IStorageCacheItem>, bool> FileExcludeFilter(IEnumerable<DirectoryPath> excludePaths) =>
             kvp => !excludePaths
