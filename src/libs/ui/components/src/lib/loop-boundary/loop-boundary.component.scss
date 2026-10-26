@@ -29,6 +29,18 @@ lib-synth-key {
   --synth-key-icon-size: 12px;
 }
 
+// The action key fills the slot beside the tag. A column flex host stretches its button to the
+// full width, as the channel strip's full-width keys do.
+lib-synth-key.action {
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  --synth-key-padding: 0 var(--spacing-sm);
+  --synth-key-font-size: 0.53rem;
+  --synth-key-letter-spacing: 0.08em;
+  --synth-key-gap: 5px;
+}
+
 .nudge {
   position: relative;
   flex: 1 1 auto;

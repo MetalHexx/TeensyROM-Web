@@ -16,8 +16,10 @@ export default defineConfig(() => ({
     exclude: [],
     setupFiles: ['src/test-setup.ts'],
     reporters: ['default', ['json', { outputFile: '../../.test-timings/infrastructure.json' }]],
-    testTimeout: 2000,
-    hookTimeout: 5000,
+    // 2000ms flaked on loaded CI runners: a different TestBed spec timed out each run, at ~1s on an
+    // idle machine. See dj-mixer.
+    testTimeout: 10000,
+    hookTimeout: 10000,
     onConsoleLog(log) {
       if (log.includes('Could not parse CSS stylesheet')) {
         return false;

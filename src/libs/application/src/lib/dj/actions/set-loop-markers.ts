@@ -3,12 +3,9 @@ import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import { DeckLoopMarker, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
 
-/** True when `next` differs from `current` in readiness alone — same markers, same order, same
- *  boundaries. */
-function readinessOnly(
-  current: readonly DeckLoopMarker[],
-  next: readonly DeckLoopMarker[]
-): boolean {
+/** True when `next` holds the same markers as `current`, in the same order, with the same
+ *  boundaries and voices — whatever their readiness or settings. */
+function samePlaces(current: readonly DeckLoopMarker[], next: readonly DeckLoopMarker[]): boolean {
   return (
     current.length === next.length &&
     current.every((marker, i) => {
@@ -23,8 +20,8 @@ function readinessOnly(
   );
 }
 
-/** Replaces a deck's marker list. A readiness-only change is frequent while the engine builds, so
- *  it logs nothing. */
+/** Replaces a deck's marker list. A readiness change is frequent while the engine builds, and a
+ *  settings change on every knob tick, so neither logs. */
 export function setLoopMarkers(store: WritableStore<DjState>) {
   return {
     setLoopMarkers: ({
@@ -36,7 +33,7 @@ export function setLoopMarkers(store: WritableStore<DjState>) {
     }): void => {
       const actionMessage = createAction('set-loop-markers');
 
-      if (!readinessOnly(store.loops()[slot].markers, markers)) {
+      if (!samePlaces(store.loops()[slot].markers, markers)) {
         logInfo(LogType.Info, `Deck ${slot} markers -> ${markers.length}`);
       }
 

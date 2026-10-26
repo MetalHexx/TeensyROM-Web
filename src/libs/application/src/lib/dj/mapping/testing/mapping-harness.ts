@@ -157,6 +157,8 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
         start: { frame: index * 100, offsetFrames: 0 },
         end: null,
         voices: [],
+        settings: null,
+        ownSettings: false,
         ready: true,
       }));
       djStore.setDeckLoops({

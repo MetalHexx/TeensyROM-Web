@@ -22,7 +22,8 @@ import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
-import { DjStore, HOME_DECK_PANEL } from './dj-store';
+import { DjStore, HOME_DECK_PANEL, type DeckMixerSettings } from './dj-store';
+import { encodeMixerSettings } from './loops/marker-settings-codec';
 import {
   FRAME_CLOCK_FACTORY,
   REPLAY_RUNNER_FACTORY,
@@ -1676,11 +1677,12 @@ describe('DeckService', () => {
       await service.snapMarker('A', 'start', 'next');
       await service.toggleMarker('A');
       service.stopMarkerLoop('A');
+      service.toggleMarkerGlobal('A');
 
       const refusals = vi
         .mocked(logWarn)
         .mock.calls.filter(([message]) => message.startsWith('DeckService'));
-      expect(refusals).toHaveLength(11);
+      expect(refusals).toHaveLength(12);
       expect(markersOf('A')).toEqual([]);
     });
 
@@ -1820,6 +1822,41 @@ describe('DeckService', () => {
       expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
     });
 
+    it('plays the selected marker now when no id is given, and does nothing with none selected', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await service.playMarkerNow('A');
+      expect(loopsOf('A').runningId).toBeNull();
+
+      await loadPlayable('A');
+      await service.playMarkerNow('A');
+
+      expect(loopsOf('A').runningId).toBe('a');
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+    });
+
+    it('plays a marker now over a running loop, without queuing behind it', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+
+      await service.playMarkerNow('A', 'b');
+
+      expect(loopsOf('A').runningId).toBe('b');
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(runtime.position('A')).toBe(300);
+    });
+
+    it('starts playback first when the deck is paused, then plays the marker now', async () => {
+      await loadPlayable('A');
+      await service.togglePlayPause('A');
+      expect(store.deck('A')().status).toBe('paused');
+
+      await service.playMarkerNow('A', 'a');
+
+      expect(store.deck('A')().status).toBe('playing');
+      expect(loopsOf('A').runningId).toBe('a');
+    });
+
     it('does not start playback to let a running marker go', async () => {
       await loadPlayable('A');
       await service.toggleMarker('A', 'a');
@@ -1887,6 +1924,155 @@ describe('DeckService', () => {
       await service.seek('A', 50);
 
       expect(disengage).not.toHaveBeenCalled();
+    });
+
+    describe('marker settings', () => {
+      const SETTINGS_A: DeckMixerSettings = {
+        panel: { ...HOME_DECK_PANEL, keySemitones: 3, cutoff: 40 },
+        mutes: [true, false, false],
+      };
+      const SETTINGS_E: DeckMixerSettings = {
+        panel: { ...HOME_DECK_PANEL, keySemitones: -4 },
+        mutes: [false, true, false],
+      };
+      const engineMutes = (slot: 'A' | 'B') =>
+        runtime.snapshot(slot).voices.map((voice) => voice.muted);
+      const markerOf = (slot: 'A' | 'B', id: string) =>
+        loopsOf(slot).markers.find((marker) => marker.id === id);
+
+      /** Loads a tune with a loop (a) and a cue (e) that keep their own settings, and a cue (c)
+       *  that shares the main track's. */
+      async function loadWithSettings(slot: 'A' | 'B'): Promise<TuneFixture> {
+        const fixture = register(makeFixture());
+        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+          {
+            ...loopMarker('a', 100, 120),
+            settings: encodeMixerSettings(SETTINGS_A),
+            usesOwnSettings: true,
+          },
+          cueMarker('c', 500),
+          {
+            ...cueMarker('e', 700),
+            settings: encodeMixerSettings(SETTINGS_E),
+            usesOwnSettings: true,
+          },
+        ]);
+        await loadAndWait(slot, fixture);
+        await vi.waitFor(() =>
+          expect(loopsOf(slot).markers.every((marker) => marker.ready)).toBe(true)
+        );
+        return fixture;
+      }
+
+      it('flips the selected marker GBL, and applies at once to the one running', async () => {
+        await loadWithSettings('A');
+        service.selectMarker('A', 'c');
+
+        service.toggleMarkerGlobal('A');
+        expect(markerOf('A', 'c')?.ownSettings).toBe(true);
+        expect(loopsOf('A').settingsInPlayId).toBeNull();
+
+        service.toggleMarkerGlobal('A');
+        expect(markerOf('A', 'c')?.ownSettings).toBe(false);
+
+        await service.toggleMarker('A', 'a');
+        service.selectMarker('A', 'a');
+        service.toggleMarkerGlobal('A');
+        expect(loopsOf('A').settingsInPlayId).toBeNull();
+        expect(engineMutes('A')).toEqual([false, false, false]);
+
+        service.toggleMarkerGlobal('A');
+        expect(loopsOf('A').settingsInPlayId).toBe('a');
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(store.panel().A).toEqual(SETTINGS_A.panel);
+      });
+
+      it('keeps a performer mute in the marker whose own settings are in play', async () => {
+        await loadWithSettings('A');
+        await service.toggleMarker('A', 'a');
+
+        service.setVoiceMuted('A', 2, true);
+
+        expect(markerOf('A', 'a')?.settings?.mutes).toEqual([true, false, true]);
+        expect(engineMutes('A')).toEqual([true, false, true]);
+      });
+
+      it('keeps a performer mute in the main track while it is in play, writing no marker', async () => {
+        await loadWithSettings('A');
+        const markers = loopsOf('A').markers;
+
+        service.setVoiceMuted('A', 1, true);
+
+        expect(loopsOf('A').markers).toBe(markers);
+        expect(engineMutes('A')).toEqual([false, true, false]);
+      });
+
+      it('lets a cue own settings go on a scrub, though nothing runs or queues', async () => {
+        await loadWithSettings('A');
+        await service.toggleMarker('A', 'e');
+        expect(loopsOf('A').runningId).toBeNull();
+        expect(loopsOf('A').settingsInPlayId).toBe('e');
+        expect(store.panel().A).toEqual(SETTINGS_E.panel);
+
+        await service.seek('A', 50);
+
+        expect(loopsOf('A').settingsInPlayId).toBeNull();
+        expect(store.panel().A).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('A')).toEqual([false, false, false]);
+      });
+
+      it('lets a cue own settings go when the transport stops', async () => {
+        await loadWithSettings('A');
+        await service.toggleMarker('A', 'e');
+
+        service.stop('A');
+
+        expect(loopsOf('A').settingsInPlayId).toBeNull();
+        expect(store.panel().A).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('A')).toEqual([false, false, false]);
+      });
+
+      it("never writes a tune change back into the marker that was in play", async () => {
+        const first = await loadWithSettings('A');
+        await service.toggleMarker('A', 'a');
+        const save = vi.spyOn(TestBed.inject(DeckLoops), 'saveSettingsInPlay');
+        const positions = TestBed.inject(LOOP_POSITIONS_STORE);
+        const savedBefore = (await positions.load(first.reference.identity)).find(
+          (marker) => marker.id === 'a'
+        );
+
+        await loadAndWait('A', register(makeFixture()));
+
+        expect(save).not.toHaveBeenCalled();
+        expect(loopsOf('A').settingsInPlayId).toBeNull();
+        expect(store.panel().A).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('A')).toEqual([false, false, false]);
+        expect(
+          (await positions.load(first.reference.identity)).find((marker) => marker.id === 'a')
+        ).toEqual(savedBefore);
+      });
+
+      it('never writes a subtune change back into the marker that was in play', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 2 }));
+        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+          {
+            ...loopMarker('a', 100, 120),
+            settings: encodeMixerSettings(SETTINGS_A),
+            usesOwnSettings: true,
+          },
+        ]);
+        await loadAndWait('A', fixture);
+        await vi.waitFor(() => expect(loopsOf('A').markers.every((marker) => marker.ready)).toBe(true));
+        await service.toggleMarker('A', 'a');
+        const save = vi.spyOn(TestBed.inject(DeckLoops), 'saveSettingsInPlay');
+
+        await service.selectSubtune('A', 2);
+
+        expect(save).not.toHaveBeenCalled();
+        expect(store.panel().A).toBe(HOME_DECK_PANEL);
+        await service.selectSubtune('A', 1);
+        expect(markerOf('A', 'a')?.settings).toEqual(SETTINGS_A);
+      });
     });
 
     describe('auditioning an edit', () => {

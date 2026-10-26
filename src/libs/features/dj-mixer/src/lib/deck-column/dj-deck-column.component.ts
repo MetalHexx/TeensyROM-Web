@@ -42,6 +42,7 @@ import {
 } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
+import { settingsSignModel } from '../settings-sign-model';
 
 const STATE_LABELS: Record<DeckTransportState, string> = {
   playing: 'Play',
@@ -65,7 +66,11 @@ const ACTIVITY_WORDS: Record<LoopActivity, string> = {
 
 /** The tile's select-button name: what it is, how long, and where it stands, spelled out. */
 function tileSelectName(item: LoopItemSummary, letter: string): string {
-  const state = [ACTIVITY_WORDS[item.activity], item.ready ? '' : 'not ready']
+  const state = [
+    ACTIVITY_WORDS[item.activity],
+    item.ready ? '' : 'not ready',
+    item.ownSettings ? 'own settings' : '',
+  ]
     .filter((word) => word !== '')
     .join(' and ');
   const length = item.kind === 'loop' ? item.lengthText : '';
@@ -112,6 +117,11 @@ function selectedRowModel(
     setEndDisabled: selection === null,
     clearEndDisabled: selection?.kind !== 'loop',
     deleteDisabled: selection === null,
+    playNowDisabled: selection === null,
+    playNowAccessibleName: `Play now ${name} deck ${letter}`,
+    sharesGlobal: selection?.sharesGlobal ?? true,
+    globalDisabled: selection === null,
+    globalAccessibleName: `GBL ${name} deck ${letter}`,
     start: boundaryModel('Start', letter, selection?.start ?? null),
     end: boundaryModel('End', letter, selection?.end ?? null),
     triggerAccessibleName: `Trigger ${name} deck ${letter}`,
@@ -155,6 +165,7 @@ export class DjDeckColumnComponent {
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
   private readonly binding = computed(() => this.djStore.bindingSummary(this.deck().slot)());
   private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
+  private readonly settingsInPlay = computed(() => this.djStore.settingsInPlay(this.deck().slot)());
   private readonly canShape = computed(() => this.djStore.canShape(this.deck().slot)());
 
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
@@ -190,6 +201,8 @@ export class DjDeckColumnComponent {
           ready: item.ready,
           triggerAccessibleName: `Trigger ${item.name} deck ${letter}`,
           selectAccessibleName: tileSelectName(item, letter),
+          ownSettings: item.ownSettings,
+          playNowAccessibleName: `Play now ${item.name} deck ${letter}`,
         })
       ),
     };
@@ -273,6 +286,7 @@ export class DjDeckColumnComponent {
     const { letter } = this.deck();
     const { speed, faderSpeed, nudging, voices } = this.deckState();
     return {
+      settingsSign: settingsSignModel(this.deck(), this.settingsInPlay()),
       voiceAccessibleName: `Voice deck ${letter}`,
       speedAccessibleName: `Speed deck ${letter}`,
       voices: voices.map(({ muted }, i) => {
@@ -432,6 +446,18 @@ export class DjDeckColumnComponent {
 
   onTriggerTile(id: string): void {
     void this.deckService.toggleMarker(this.deck().slot, id);
+  }
+
+  onPlayNowSelected(): void {
+    void this.deckService.playMarkerNow(this.deck().slot);
+  }
+
+  onPlayNowTile(id: string): void {
+    void this.deckService.playMarkerNow(this.deck().slot, id);
+  }
+
+  onToggleGlobal(): void {
+    this.deckService.toggleMarkerGlobal(this.deck().slot);
   }
 
   onSelectTile(id: string): void {

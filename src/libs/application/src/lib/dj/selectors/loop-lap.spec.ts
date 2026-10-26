@@ -8,6 +8,8 @@ function marker(id: string, start: number, end: number | null, nudge = 0): DeckL
     start: { frame: start, offsetFrames: nudge },
     end: end === null ? null : { frame: end, offsetFrames: -nudge },
     voices: [0, 1, 2],
+    settings: null,
+    ownSettings: false,
     ready: true,
   };
 }

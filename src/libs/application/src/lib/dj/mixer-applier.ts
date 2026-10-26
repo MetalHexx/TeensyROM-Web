@@ -9,43 +9,13 @@ import {
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { readSidField, SID_REGISTER_COUNT } from '@sidablist/core';
 import type { SidField } from '@sidablist/core';
-import {
-  DjStore,
-  type PanelFilterMode,
-  type PanelWaveform,
-  type SwitchLock,
-  type VoiceSwitch,
-} from './dj-store';
+import { DjStore, type DeckPanelState, type VoiceSwitch } from './dj-store';
 import { DeckRuntime } from './deck-runtime';
 import { DECK_SLOTS, type Slot } from './slot';
-import { voicePitchMultiplier } from './mixer/pitch';
+import { engineSettingsOf, SWITCH_FIELDS } from './mixer/engine-settings';
 
 /** Matches `DeckRuntime`'s refusal to hand out a slot whose engine bundle was never built. */
 const UNBUILT_SLOT = /has not been built/;
-
-const WAVEFORM_BITS: Record<PanelWaveform, number> = {
-  triangle: 1,
-  sawtooth: 2,
-  pulse: 4,
-  noise: 8,
-};
-
-const FILTER_TYPE_BITS: Record<PanelFilterMode, number> = {
-  'low-pass': 1,
-  'band-pass': 2,
-  'high-pass': 4,
-};
-
-/** The field each voice switch sits on. */
-const SWITCH_FIELDS = { ring: 'ringMod', sync: 'sync', filter: 'filtered' } as const;
-
-const VOICE_OFFSET_KNOBS = ['pulseWidth', 'attack', 'decay', 'sustain', 'release'] as const;
-
-const VOICE_SWITCH_LOCKS = [
-  ['ring', 'ringLock'],
-  ['sync', 'syncLock'],
-  ['filter', 'filterLock'],
-] as const;
 
 /**
  * Turns each deck's stored SID panel into engine calls: each voice's pitch multiplier (Key, Coarse
@@ -53,7 +23,9 @@ const VOICE_SWITCH_LOCKS = [
  * deck's cutoff and resonance offsets and filter-mode lock. The library does the arithmetic,
  * clamps each field and composes the result with the tune; this class only hands over the panel.
  *
- * One effect per slot re-applies the whole deck whenever its panel changes. Every library call is
+ * One effect per slot re-applies the whole deck whenever its panel changes, unless the engine
+ * already holds that very panel: a jump that landed a marker's settings records the panel it put
+ * there (`markInEngine`), so the effect does not re-apply the landing's work. Every library call is
  * idempotent, so a full re-apply per change costs no extra writes.
  *
  * `applyDeck` reaches `DeckRuntime.requireSlot`, which throws until `DeckService`'s constructor has
@@ -69,6 +41,9 @@ export class MixerApplier {
 
   private installed = false;
   private readonly warnedUnbuilt = new Set<Slot>();
+  /** The panel object each slot's engine holds now: the one `applyDeck` last pushed or a landing
+   *  recorded. A last-pushed record rather than a one-shot mark, so it cannot go stale. */
+  private readonly inEngine: Record<Slot, DeckPanelState | null> = { A: null, B: null };
   /** Scratch buffers for `tuneSwitchOn`, reused so a read allocates nothing. */
   private readonly written = new Uint8Array(SID_REGISTER_COUNT);
   private readonly sent = new Uint8Array(SID_REGISTER_COUNT);
@@ -84,48 +59,43 @@ export class MixerApplier {
       for (const slot of DECK_SLOTS) {
         const panel = this.store.deckPanel(slot);
         effect(() => {
-          panel();
-          untracked(() => this.applyDeck(slot));
+          const current = panel();
+          untracked(() => {
+            if (this.inEngine[slot] !== current) {
+              this.applyDeck(slot);
+            }
+          });
         });
       }
     });
   }
 
-  /** Synchronously pushes this slot's stored panel to its engine. Never throws: a failure is
-   *  logged and confined to this slot. */
+  /** Synchronously pushes this slot's stored panel to its engine, always, and records it as what
+   *  the engine holds. Never throws: a failure is logged and confined to this slot. */
   applyDeck(slot: Slot): void {
     const panel = untracked(() => this.store.deckPanel(slot)());
+    this.inEngine[slot] = panel;
 
     try {
-      panel.voices.forEach((strip, voice) => {
-        this.runtime.setVoicePitch(
-          slot,
-          voice,
-          voicePitchMultiplier(panel.keySemitones, strip.coarse, strip.fine)
-        );
-        for (const knob of VOICE_OFFSET_KNOBS) {
-          this.runtime.setFieldOffset(slot, { name: knob, voice }, Math.round(strip[knob]));
-        }
-        this.lock(
-          slot,
-          { name: 'waveform', voice },
-          strip.waveformLock === null ? null : WAVEFORM_BITS[strip.waveformLock]
-        );
-        for (const [sw, lockKey] of VOICE_SWITCH_LOCKS) {
-          this.lock(slot, { name: SWITCH_FIELDS[sw], voice }, switchValue(strip[lockKey]));
-        }
-      });
-
-      this.runtime.setFieldOffset(slot, { name: 'cutoff' }, Math.round(panel.cutoff));
-      this.runtime.setFieldOffset(slot, { name: 'resonance' }, Math.round(panel.resonance));
-      this.lock(
-        slot,
-        { name: 'filterType' },
-        panel.filterModeLock === null ? null : FILTER_TYPE_BITS[panel.filterModeLock]
+      const { voicePitch = [], fieldOffsets = [], fieldHolds = [] } = engineSettingsOf(panel);
+      voicePitch.forEach((multiplier, voice) =>
+        this.runtime.setVoicePitch(slot, voice, multiplier)
       );
+      for (const { field, amount } of fieldOffsets) {
+        this.runtime.setFieldOffset(slot, field, amount);
+      }
+      for (const { field, value } of fieldHolds) {
+        this.lock(slot, field, value);
+      }
     } catch (error) {
       this.report(slot, error);
     }
+  }
+
+  /** Records that `panel` is what the engine now holds for this slot — a jump landed it — so the
+   *  panel effect does not re-apply the landing's work. Any other panel applies as usual. */
+  markInEngine(slot: Slot, panel: DeckPanelState): void {
+    this.inEngine[slot] = panel;
   }
 
   /** Returns the deck's panel to home, clears its detected key, and pushes the result to the
@@ -168,9 +138,4 @@ export class MixerApplier {
     }
     logError(`MixerApplier: applying deck ${slot} failed`, error);
   }
-}
-
-/** A switch lock as the field value to hold, `null` handing the field back to the tune. */
-function switchValue(lock: SwitchLock): number | null {
-  return lock === null ? null : lock ? 1 : 0;
 }

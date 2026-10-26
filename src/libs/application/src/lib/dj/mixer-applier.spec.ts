@@ -7,6 +7,8 @@ import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
+import { engineSettingsOf } from './mixer/engine-settings';
+import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, type DeckDetectedKey } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
@@ -80,6 +82,7 @@ describe('MixerApplier', () => {
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess() },
+        { provide: DeckLoops, useValue: { saveSettingsInPlay: vi.fn() } },
       ],
     });
   }
@@ -288,6 +291,31 @@ describe('MixerApplier', () => {
       expect(wasReleased('A', 'filterType')).toBe(true);
     });
 
+    it('pushes exactly what engineSettingsOf lists for the panel', () => {
+      makeShapeable('A');
+      service.setKeySemitones('A', -3);
+      service.setVoiceKnob('A', 2, 'fine', -17.5);
+      service.setVoiceKnob('A', 0, 'release', 9);
+      service.setFilterKnob('A', 'cutoff', 120);
+      service.pressWaveform('A', 1, 'noise');
+      service.pressFilterMode('A', 'high-pass');
+      store.setVoiceStrip({ slot: 'A', voice: 1, patch: { ringLock: false, syncLock: true } });
+      const expected = engineSettingsOf(store.deckPanel('A')());
+      clearSpies();
+
+      applier.applyDeck('A');
+
+      expect(setVoicePitch.mock.calls).toEqual(
+        (expected.voicePitch ?? []).map((multiplier, voice) => ['A', voice, multiplier])
+      );
+      expect(setFieldOffset.mock.calls).toEqual(
+        (expected.fieldOffsets ?? []).map(({ field, amount }) => ['A', field, amount])
+      );
+      const holds = (expected.fieldHolds ?? []).filter(({ value }) => value !== null);
+      expect(holdField.mock.calls).toEqual(holds.map(({ field, value }) => ['A', field, value]));
+      expect(releaseField).toHaveBeenCalledTimes((expected.fieldHolds ?? []).length - holds.length);
+    });
+
     it('never touches the other slot', () => {
       makeShapeable('A');
       service.setKeySemitones('A', 3);
@@ -353,6 +381,45 @@ describe('MixerApplier', () => {
 
       expect(setVoicePitch).not.toHaveBeenCalled();
       expect(setFieldOffset).not.toHaveBeenCalled();
+    });
+
+    it('skips a panel a landing has recorded as in the engine, and applies the next edit as usual', () => {
+      makeShapeable('A');
+      TestBed.flushEffects();
+      service.setKeySemitones('A', 3);
+      applier.markInEngine('A', store.deckPanel('A')());
+      clearSpies();
+
+      TestBed.flushEffects();
+      expect(setVoicePitch).not.toHaveBeenCalled();
+
+      service.setKeySemitones('A', 4);
+      TestBed.flushEffects();
+      expect(setVoicePitch).toHaveBeenCalledTimes(3);
+    });
+
+    it('treats the panel applyDeck last pushed as already in the engine', () => {
+      makeShapeable('A');
+      TestBed.flushEffects();
+      service.setKeySemitones('A', 3);
+      applier.applyDeck('A');
+      clearSpies();
+
+      TestBed.flushEffects();
+
+      expect(setVoicePitch).not.toHaveBeenCalled();
+    });
+
+    it('applies a panel written under a record for another one', () => {
+      makeShapeable('A');
+      TestBed.flushEffects();
+      applier.markInEngine('A', store.deckPanel('B')());
+      clearSpies();
+
+      service.setKeySemitones('A', 5);
+      TestBed.flushEffects();
+
+      expect(setVoicePitch).toHaveBeenCalledTimes(3);
     });
 
     it('confines a throw in one slot to that slot and logs it with the slot', () => {

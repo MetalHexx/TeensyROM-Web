@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
+import type { JumpSettings } from '@sidablist/core';
 import type { LoopMarker, TuneIdentity } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
 import {
@@ -8,7 +9,10 @@ import {
   type DeckLoopBoundary,
   type DeckLoopMarker,
   type DeckLoopsState,
+  type DeckMixerSettings,
+  type DeckPanelState,
 } from './dj-store';
+import { MixerApplier } from './mixer-applier';
 import { LOOP_POSITIONS_STORE } from './ports';
 import { otherSlot, type Slot } from './slot';
 import {
@@ -19,7 +23,9 @@ import {
   resolvedFrame,
   type LoopBoundaryName,
 } from './loops/loop-marker-math';
+import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { nextOffset, type LoopSnapDirection } from './loops/moment-reach';
+import { engineSettingsOf } from './mixer/engine-settings';
 
 /** The SID's three voices: a new marker plays them all. */
 const ALL_VOICES: readonly number[] = [0, 1, 2];
@@ -38,6 +44,27 @@ interface LoopBounds {
  *  its start to be ready. */
 type QueuedVia = 'engine' | 'ready';
 
+type Mutes = DeckMixerSettings['mutes'];
+
+const NO_MUTES: Mutes = [false, false, false];
+
+/** What an edit changed in the list: where the markers are, or only the settings they carry. A
+ *  settings change fires on every knob tick, so it skips what a position change must redo. */
+type MarkerChange = 'positions' | 'settings';
+
+function mutesOf(voices: readonly { readonly muted: boolean }[]): Mutes {
+  return [voices[0]?.muted ?? false, voices[1]?.muted ?? false, voices[2]?.muted ?? false];
+}
+
+function sameMutes(a: Mutes, b: Mutes): boolean {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
+/** The settings a marker plays with itself, or null while it shares the main track's. */
+function ownSettingsOf(marker: DeckLoopMarker): DeckMixerSettings | null {
+  return marker.ownSettings ? marker.settings : null;
+}
+
 /** What the engine runs for a marker: its bounds as a loop, or null for a cue. */
 function loopBoundsOf(marker: DeckLoopMarker): LoopBounds | null {
   return marker.end !== null && markerKind(marker) === 'loop'
@@ -53,9 +80,16 @@ function jumpOf(marker: DeckLoopMarker): { startFrame: number; endFrame: number 
   };
 }
 
-/** What a marker list is stored as: the marker without its readiness. */
+/** What a marker list is stored as: the marker without its readiness, its settings encoded. */
 function stored(marker: DeckLoopMarker): LoopMarker {
-  return { id: marker.id, start: marker.start, end: marker.end, voices: marker.voices };
+  return {
+    id: marker.id,
+    start: marker.start,
+    end: marker.end,
+    voices: marker.voices,
+    ...(marker.settings === null ? {} : { settings: encodeMixerSettings(marker.settings) }),
+    ...(marker.ownSettings ? { usesOwnSettings: true } : {}),
+  };
 }
 
 /** The selection a deck keeps when its list becomes `next`: the same marker where it still exists,
@@ -91,6 +125,11 @@ function reselect(
  * marker loop is looping when `runningId` is set; the track's own repeat loop counts as nothing
  * looping.
  *
+ * Each marker can keep its own mixer settings (GBL unlatched). The deck's settings in play are the
+ * main track's until a jump lands in an independent marker, which swaps its copy in (the main
+ * track's held aside) and carries it to the engine with the jump; a jump into a sharing marker
+ * brings the main track's back, and so does letting go. Mixer edits reach the copy in play.
+ *
  * The engine notifies synchronously inside calls such as `capturePosition`, `setJumpTargets`,
  * `setActiveLoop` and `queueJump`, and `reflect` runs in that notification. Every path here
  * therefore writes the store and its own bookkeeping before it calls the engine, so `reflect`
@@ -101,6 +140,7 @@ export class DeckLoops {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
   private readonly positions = inject(LOOP_POSITIONS_STORE);
+  private readonly mixerApplier = inject(MixerApplier);
 
   /** The tune each slot's markers belong to; null while nothing is attached. */
   private readonly attached: Record<Slot, TuneIdentity | null> = { A: null, B: null };
@@ -123,6 +163,14 @@ export class DeckLoops {
   /** The last `tune.handOffs` `reflect` saw. A landing is only ever this rising: the engine drops
    *  its queue for other reasons too, and this collaborator's own edits are among them. */
   private readonly seenHandOffs: Record<Slot, number> = { A: 0, B: 0 };
+
+  /** The voices' latched mutes as of the end of the last `reflect`. At a queued landing the engine
+   *  and the store's mirror already hold the landed mutes, so this is what the main track had. */
+  private readonly seenMutes: Record<Slot, Mutes> = { A: NO_MUTES, B: NO_MUTES };
+
+  /** The settings the engine's queued jump was built from, or null when it carries none:
+   *  `syncQueued` re-queues when the settings the marker would carry now are another object. */
+  private readonly queuedSource: Record<Slot, DeckMixerSettings | null> = { A: null, B: null };
 
   /** Loads the tune's saved markers into the deck, selects the first, and declares their start
    *  frames to the engine. A store that fails to load is logged and leaves the deck with no
@@ -149,7 +197,18 @@ export class DeckLoops {
     this.resetActivity(slot);
     // The engine resets its hand-off counter on a load and on a subtune change.
     this.seenHandOffs[slot] = this.runtime.snapshot(slot).tune?.handOffs ?? 0;
-    const markers = saved.map((marker): DeckLoopMarker => ({ ...marker, ready: false }));
+    const markers = saved.map((record): DeckLoopMarker => {
+      const settings = decodeMixerSettings(record.settings);
+      return {
+        id: record.id,
+        start: record.start,
+        end: record.end,
+        voices: record.voices,
+        settings,
+        ownSettings: record.usesOwnSettings === true && settings !== null,
+        ready: false,
+      };
+    });
     this.store.setDeckLoops({
       slot,
       loops: {
@@ -185,6 +244,7 @@ export class DeckLoops {
    * - a marker waiting for readiness engages once its start is ready;
    * - a running marker's changed start applies once that start is ready, and an audition waiting
    *   on it seeks there.
+   * It ends by noting the voices' mutes, which a queued landing reads as the main track's.
    */
   reflect(slot: Slot): void {
     if (this.attached[slot] === null) {
@@ -209,10 +269,13 @@ export class DeckLoops {
       this.landQueued(slot);
     } else if (snapshot.loop === null && this.loopsOf(slot).runningId !== null) {
       this.resetActivity(slot);
+      this.releaseSettings(slot);
     }
     this.engageWhenReady(slot);
     this.syncRunning(slot);
     this.seekToPendingStart(slot);
+    // Read afresh: a nested reflect may have stored newer mutes than this one's snapshot held.
+    this.seenMutes[slot] = mutesOf(this.runtime.snapshot(slot).voices);
   }
 
   /**
@@ -242,10 +305,39 @@ export class DeckLoops {
     }
   }
 
-  /** Lets the running marker go and drops whatever is queued. The playhead never moves. */
+  /**
+   * Jumps into marker `id` now, without waiting for the lap. Any marker but the running one engages
+   * as `toggle`'s idle press does (now, or once its start is ready), replacing whatever was queued;
+   * it never queues behind a running loop and never lets a marker go. The running marker restarts
+   * from the start the engine holds, as a stab: the engine and a marker queued behind it are left
+   * as they are, and a start audition still waiting is dropped. A deck that is not playing is
+   * started by the caller first.
+   */
+  playNow(slot: Slot, id: string): void {
+    if (this.identityOf(slot, 'playNow') === null) {
+      return;
+    }
+    const { markers, runningId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (marker === undefined) {
+      this.refuse(slot, 'playNow', `has no marker ${id}`);
+      return;
+    }
+    const engaged = this.engaged[slot];
+    if (runningId === id && engaged !== null) {
+      this.pendingStart[slot] = null;
+      this.jumpInto(slot, marker, engaged.startFrame);
+    } else {
+      this.engageOrWait(slot, marker);
+    }
+  }
+
+  /** Lets the running marker go, drops whatever is queued, and returns the deck to the main
+   *  track's settings. The playhead never moves. */
   stop(slot: Slot): void {
     this.resetActivity(slot);
     this.runtime.setActiveLoop(slot, null);
+    this.releaseSettings(slot);
   }
 
   /** A manual scrub or a transport stop: the marker loop, the queue and a wait for readiness are
@@ -280,7 +372,11 @@ export class DeckLoops {
       const bounds = loopBoundsOf(marker);
       if (bounds !== null) {
         this.arm(slot, marker, false);
-        this.jump(slot, Math.max(bounds.startFrame, bounds.endFrame - 2 * this.oneSecond(slot)));
+        this.jumpInto(
+          slot,
+          marker,
+          Math.max(bounds.startFrame, bounds.endFrame - 2 * this.oneSecond(slot))
+        );
       }
     }
   }
@@ -300,6 +396,8 @@ export class DeckLoops {
       start: { frame, offsetFrames: 0 },
       end: null,
       voices: ALL_VOICES,
+      settings: null,
+      ownSettings: false,
       ready: false,
     };
     this.commit(slot, [...this.loopsOf(slot).markers, marker], marker.id);
@@ -333,11 +431,15 @@ export class DeckLoops {
     this.selectId(slot, markers[clamp(Math.round(index), 0, markers.length - 1)].id);
   }
 
-  /** Ends the selected marker at the playhead, making it a loop. Refused unless the playhead is
-   *  after the marker's start. */
+  /** Ends the selected cue at the playhead, making it a loop. Refused for a marker that already
+   *  has an end, and unless the playhead is after the marker's start. */
   setEnd(slot: Slot): void {
     const marker = this.selectedMarker(slot, 'setEnd');
     if (marker === null) {
+      return;
+    }
+    if (marker.end !== null) {
+      this.refuse(slot, 'setEnd', 'selected marker already has an end');
       return;
     }
     const position = this.runtime.position(slot);
@@ -417,32 +519,115 @@ export class DeckLoops {
     return offset === null ? marker.id : this.nudge(slot, boundary, offset);
   }
 
+  /**
+   * Flips the selected marker's GBL: unlatched it keeps its own settings, latched it shares the
+   * main track's. The marker running or in play changes at once — unlatching makes its settings
+   * the ones in play, latching lets them go; any other marker only has its list entry change, and
+   * its settings land at its next jump-in. The settings in play settle first and the marker's new
+   * state is committed after, so a marker queued behind is re-synced against the settings in play
+   * once they have changed.
+   */
+  toggleGlobal(slot: Slot): void {
+    const marker = this.selectedMarker(slot, 'toggleGlobal');
+    if (marker === null) {
+      return;
+    }
+    const { markers, selectedId, runningId, settingsInPlayId, mainSettings } = this.loopsOf(slot);
+    const sounding = this.soundingOf(slot);
+    if (marker.ownSettings) {
+      if (settingsInPlayId === marker.id) {
+        this.releaseSettings(slot);
+      }
+    } else if (marker.id === runningId || marker.id === settingsInPlayId) {
+      const kept = marker.settings;
+      this.swapSettings(slot, (kept ?? sounding).panel, marker.id, mainSettings ?? sounding);
+      if (kept !== null) {
+        this.pushSettings(slot, kept.mutes);
+      }
+    }
+    const toggled: DeckLoopMarker = {
+      ...marker,
+      settings: marker.settings ?? sounding,
+      ownSettings: !marker.ownSettings,
+    };
+    this.commit(
+      slot,
+      markers.map((other) => (other.id === marker.id ? toggled : other)),
+      selectedId,
+      'settings'
+    );
+  }
+
+  /**
+   * Keeps the marker whose own settings are in play true to the deck's mixer: when what is sounding
+   * (the panel, the voices' mutes) differs from its copy, the copy takes it. Does nothing while the
+   * main track's settings are in play, whose panel already lives in the store. Not gated on the
+   * marker being independent: with the same tune on both decks the other deck may latch it while
+   * it is in play here, and this deck keeps playing — and editing — its copy until its next jump.
+   */
+  saveSettingsInPlay(slot: Slot): void {
+    const { markers, selectedId, settingsInPlayId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === settingsInPlayId);
+    if (marker === undefined) {
+      return;
+    }
+    const sounding = this.soundingOf(slot);
+    const { settings } = marker;
+    if (
+      settings !== null &&
+      settings.panel === sounding.panel &&
+      sameMutes(settings.mutes, sounding.mutes)
+    ) {
+      return;
+    }
+    this.commit(
+      slot,
+      markers.map((other) => (other === marker ? { ...marker, settings: sounding } : other)),
+      selectedId,
+      'settings'
+    );
+  }
+
   /** Lands a changed list on the slot, saves it, and gives it to the other deck when that deck
-   *  holds the same tune. */
-  private commit(slot: Slot, markers: readonly DeckLoopMarker[], selectedId: string | null): void {
+   *  holds the same tune. A settings change leaves the other deck's pending start audition and
+   *  its own sound alone: it plays the new settings at its next jump into the marker. */
+  private commit(
+    slot: Slot,
+    markers: readonly DeckLoopMarker[],
+    selectedId: string | null,
+    change: MarkerChange = 'positions'
+  ): void {
     const identity = this.attached[slot];
     if (identity === null) {
       return;
     }
-    this.land(slot, markers, selectedId);
+    this.land(slot, markers, selectedId, change);
     this.save(slot, identity, markers);
 
     const other = otherSlot(slot);
     const otherIdentity = this.attached[other];
     if (otherIdentity !== null && sameTune(identity, otherIdentity)) {
       const { markers: before, selectedId: beforeId } = this.loopsOf(other);
-      // An edit from this deck never moves the other deck's playhead.
-      this.pendingStart[other] = null;
-      this.land(other, markers, reselect(before, beforeId, markers));
+      if (change === 'positions') {
+        // An edit from this deck never moves the other deck's playhead.
+        this.pendingStart[other] = null;
+      }
+      this.land(other, markers, reselect(before, beforeId, markers), change);
     }
   }
 
   /**
    * The one routine that puts a list on a deck, for a local edit and for the other deck alike:
    * store first — each marker's readiness taken from this deck's own engine — then the engine's
-   * targets, then a reflect for whatever the declaration made ready.
+   * targets (unless only settings changed, which moves no start), then a reflect for whatever the
+   * declaration made ready. A marker in play that the list no longer holds is let go.
    */
-  private land(slot: Slot, markers: readonly DeckLoopMarker[], selectedId: string | null): void {
+  private land(
+    slot: Slot,
+    markers: readonly DeckLoopMarker[],
+    selectedId: string | null,
+    change: MarkerChange
+  ): void {
     const prepared = this.preparedOf(slot);
     this.store.setLoopMarkers({
       slot,
@@ -453,7 +638,13 @@ export class DeckLoops {
     });
     this.selectId(slot, selectedId);
     this.syncActivity(slot);
-    this.declare(slot);
+    const { settingsInPlayId } = this.loopsOf(slot);
+    if (settingsInPlayId !== null && !markers.some((marker) => marker.id === settingsInPlayId)) {
+      this.releaseSettings(slot);
+    }
+    if (change === 'positions') {
+      this.declare(slot);
+    }
     this.reflect(slot);
   }
 
@@ -495,8 +686,8 @@ export class DeckLoops {
     }
   }
 
-  /** Keeps the engine's queue on the queued marker's current target, and drops a queue whose
-   *  marker is gone. */
+  /** Keeps the engine's queue on the queued marker's current target and the settings it carries,
+   *  and drops a queue whose marker is gone. */
   private syncQueued(slot: Slot): void {
     const { markers, queuedId } = this.loopsOf(slot);
     if (queuedId === null) {
@@ -512,13 +703,18 @@ export class DeckLoops {
     }
     const target = jumpOf(marker);
     const queued = this.runtime.snapshot(slot).tune?.queuedJump ?? null;
-    if (queued?.startFrame !== target.startFrame || queued.endFrame !== target.endFrame) {
-      this.runtime.queueJump(slot, target);
+    if (
+      queued?.startFrame !== target.startFrame ||
+      queued.endFrame !== target.endFrame ||
+      this.queuedSource[slot] !== this.settingsToCarry(slot, marker)
+    ) {
+      this.queueInEngine(slot, marker);
     }
   }
 
   /** The engine handed off to the marker queued in it: that marker is running now (a cue runs
-   *  nothing), and the selection follows it unless it moved while the jump waited. */
+   *  nothing), the settings the jump carried are in play, and the selection follows it unless it
+   *  moved while the jump waited. */
   private landQueued(slot: Slot): void {
     const { markers, queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
     if (this.queuedVia[slot] !== 'engine' || queuedId === null) {
@@ -530,9 +726,26 @@ export class DeckLoops {
       return;
     }
     const bounds = loopBoundsOf(marker);
+    const carried = this.queuedSource[slot];
+    // The queue's bookkeeping goes first: the swap re-syncs the queue, and a marker still queued
+    // would be queued again.
     this.queuedVia[slot] = null;
+    this.queuedSource[slot] = null;
     this.engaged[slot] = bounds;
     this.setActivity(slot, bounds === null ? null : marker.id, null, false);
+    if (carried !== null) {
+      const { mainSettings } = this.loopsOf(slot);
+      if (marker.ownSettings) {
+        const main = mainSettings ?? {
+          panel: this.store.panel()[slot],
+          mutes: this.seenMutes[slot],
+        };
+        this.swapSettings(slot, carried.panel, marker.id, main);
+      } else {
+        this.swapSettings(slot, carried.panel, null, null);
+      }
+      this.mixerApplier.markInEngine(slot, carried.panel);
+    }
     if (!selectionMovedWhileQueued) {
       this.selectId(slot, marker.id);
     }
@@ -546,7 +759,7 @@ export class DeckLoops {
     const marker = this.loopsOf(slot).markers.find((candidate) => candidate.id === id);
     if (marker?.ready && engaged?.startFrame === resolvedFrame(marker.start)) {
       this.pendingStart[slot] = null;
-      this.jump(slot, engaged.startFrame);
+      this.jumpInto(slot, marker, engaged.startFrame);
     }
   }
 
@@ -559,14 +772,15 @@ export class DeckLoops {
     if (boundary === 'end') {
       this.pendingStart[slot] = null;
       if (marker.end !== null && engaged !== null) {
-        this.jump(
+        this.jumpInto(
           slot,
+          marker,
           Math.max(engaged.startFrame, resolvedFrame(marker.end) - 2 * this.oneSecond(slot))
         );
       }
     } else if (marker.ready) {
       this.pendingStart[slot] = null;
-      this.jump(slot, resolvedFrame(marker.start));
+      this.jumpInto(slot, marker, resolvedFrame(marker.start));
     } else {
       this.pendingStart[slot] = marker.id;
     }
@@ -581,7 +795,7 @@ export class DeckLoops {
     const marker = markers.find((candidate) => candidate.id === queuedId);
     if (marker?.ready) {
       this.arm(slot, marker, !selectionMovedWhileQueued);
-      this.jump(slot, resolvedFrame(marker.start));
+      this.jumpInto(slot, marker, resolvedFrame(marker.start));
     }
   }
 
@@ -589,11 +803,12 @@ export class DeckLoops {
   private engageOrWait(slot: Slot, marker: DeckLoopMarker): void {
     if (marker.ready) {
       this.arm(slot, marker, false);
-      this.jump(slot, resolvedFrame(marker.start));
+      this.jumpInto(slot, marker, resolvedFrame(marker.start));
       return;
     }
     const via = this.queuedVia[slot];
     this.queuedVia[slot] = 'ready';
+    this.queuedSource[slot] = null;
     this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
     if (via === 'engine') {
       this.runtime.queueJump(slot, null);
@@ -604,13 +819,25 @@ export class DeckLoops {
   private queueThroughEngine(slot: Slot, marker: DeckLoopMarker): void {
     this.queuedVia[slot] = 'engine';
     this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
-    this.runtime.queueJump(slot, jumpOf(marker));
+    this.queueInEngine(slot, marker);
+  }
+
+  /** Queues `marker` in the engine with the settings its landing needs, noting what they were
+   *  built from first so `syncQueued` can tell when they go stale. */
+  private queueInEngine(slot: Slot, marker: DeckLoopMarker): void {
+    const source = this.settingsToCarry(slot, marker);
+    this.queuedSource[slot] = source;
+    this.runtime.queueJump(slot, {
+      ...jumpOf(marker),
+      ...(source === null ? {} : { settings: engineSettingsOf(source.panel, source.mutes) }),
+    });
   }
 
   /** Drops the queued marker, and the engine's queue when that is where it waits. */
   private cancelQueue(slot: Slot): void {
     const via = this.queuedVia[slot];
     this.queuedVia[slot] = null;
+    this.queuedSource[slot] = null;
     this.setActivity(slot, this.loopsOf(slot).runningId, null, false);
     if (via === 'engine') {
       this.runtime.queueJump(slot, null);
@@ -624,6 +851,7 @@ export class DeckLoops {
   private arm(slot: Slot, marker: DeckLoopMarker, follow: boolean): void {
     const bounds = loopBoundsOf(marker);
     this.queuedVia[slot] = null;
+    this.queuedSource[slot] = null;
     this.engaged[slot] = bounds;
     this.setActivity(slot, bounds === null ? null : marker.id, null, false);
     if (follow) {
@@ -632,16 +860,98 @@ export class DeckLoops {
     this.runtime.setActiveLoop(slot, bounds);
   }
 
-  private jump(slot: Slot, frame: number): void {
-    this.runtime
-      .seekToFrame(slot, frame)
-      .catch((error: unknown) => logError(`DeckLoops: deck ${slot}'s jump failed`, error));
+  /**
+   * The one routine for every immediate jump into `marker`: the settings it plays with go in with
+   * the jump, and the deck's settings in play follow. A marker sharing the main track's settings
+   * while those are in play has nothing to carry, and the jump is a plain seek.
+   *
+   * What the jump carries is captured before the swap, which clears what it is read from. The store
+   * is written before the engine is called, since the engine notifies synchronously. A target in
+   * the engine's prepared frames always lands within the call, so the settings travel with the
+   * seek; any other target may land by replay or from an entry image, so the settings go in at
+   * once and the seek carries none.
+   */
+  private jumpInto(slot: Slot, marker: DeckLoopMarker, frame: number): void {
+    const target = this.settingsToCarry(slot, marker);
+    if (target === null) {
+      this.seek(slot, frame);
+      return;
+    }
+    const own = ownSettingsOf(marker);
+    const { mainSettings } = this.loopsOf(slot);
+    if (own === null) {
+      this.swapSettings(slot, target.panel, null, null);
+    } else {
+      this.swapSettings(slot, target.panel, marker.id, mainSettings ?? this.soundingOf(slot));
+    }
+    if (this.preparedOf(slot).has(frame)) {
+      this.mixerApplier.markInEngine(slot, target.panel);
+      this.seek(slot, frame, engineSettingsOf(target.panel, target.mutes));
+    } else {
+      this.pushSettings(slot, target.mutes);
+      this.seek(slot, frame);
+    }
+  }
+
+  private seek(slot: Slot, frame: number, settings?: JumpSettings): void {
+    (settings === undefined
+      ? this.runtime.seekToFrame(slot, frame)
+      : this.runtime.seekToFrame(slot, frame, settings)
+    ).catch((error: unknown) => logError(`DeckLoops: deck ${slot}'s jump failed`, error));
+  }
+
+  /** What is sounding on the deck: its panel and the voices' latched mutes as the store holds them. */
+  private soundingOf(slot: Slot): DeckMixerSettings {
+    return { panel: this.store.panel()[slot], mutes: mutesOf(this.store.decks()[slot].voices) };
+  }
+
+  /** The settings a jump into `marker` carries: its own while it is independent, else the main
+   *  track's when a marker's own are in play, else none — the main track's stay in play. */
+  private settingsToCarry(slot: Slot, marker: DeckLoopMarker): DeckMixerSettings | null {
+    const own = ownSettingsOf(marker);
+    if (own !== null) {
+      return own;
+    }
+    const { settingsInPlayId, mainSettings } = this.loopsOf(slot);
+    return settingsInPlayId === null ? null : mainSettings;
+  }
+
+  /** Every change to the settings in play goes through here: the deck's panel, the marker in play
+   *  and the held main settings are written together, then a marker queued behind is re-synced
+   *  against the new settings in play rather than the old. */
+  private swapSettings(
+    slot: Slot,
+    panel: DeckPanelState,
+    settingsInPlayId: string | null,
+    mainSettings: DeckMixerSettings | null
+  ): void {
+    this.store.setSettingsInPlay({ slot, panel, settingsInPlayId, mainSettings });
+    this.syncQueued(slot);
+  }
+
+  /** Puts the store's panel and `mutes` in the engine now, synchronously. */
+  private pushSettings(slot: Slot, mutes: Mutes): void {
+    this.mixerApplier.applyDeck(slot);
+    mutes.forEach((muted, voice) => this.runtime.setVoiceMuted(slot, voice, muted));
+  }
+
+  /** Returns the deck to the main track's settings, at once, when a marker's own are in play. The
+   *  playhead never moves. */
+  private releaseSettings(slot: Slot): void {
+    const { settingsInPlayId, mainSettings } = this.loopsOf(slot);
+    if (settingsInPlayId === null) {
+      return;
+    }
+    const main = mainSettings ?? this.soundingOf(slot);
+    this.swapSettings(slot, main.panel, null, null);
+    this.pushSettings(slot, main.mutes);
   }
 
   /** Forgets the running and queued markers and the bounds the engine was enforcing. Touches
    *  nothing in the engine. */
   private resetActivity(slot: Slot): void {
     this.queuedVia[slot] = null;
+    this.queuedSource[slot] = null;
     this.engaged[slot] = null;
     this.setActivity(slot, null, null, false);
   }

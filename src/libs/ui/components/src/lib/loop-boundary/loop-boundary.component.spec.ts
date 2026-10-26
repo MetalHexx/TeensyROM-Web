@@ -1,6 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LoopBoundaryComponent, type LoopBoundaryModel } from './loop-boundary.component';
+import {
+  LoopBoundaryComponent,
+  type LoopBoundaryAction,
+  type LoopBoundaryModel,
+} from './loop-boundary.component';
 
 const boundary: LoopBoundaryModel = {
   tag: 'Start',
@@ -14,6 +18,14 @@ const boundary: LoopBoundaryModel = {
   nudgeAccessibleName: 'Nudge start',
   previousAccessibleName: 'Snap start to previous moment',
   nextAccessibleName: 'Snap start to next moment',
+};
+
+const setEndAction: LoopBoundaryAction = {
+  label: 'Set End',
+  icon: 'last_page',
+  accessibleName: 'Set end here',
+  disabled: false,
+  control: 'loop-set-end',
 };
 
 describe('LoopBoundaryComponent', () => {
@@ -104,6 +116,42 @@ describe('LoopBoundaryComponent', () => {
     expect(snap('snap-next').disabled).toBe(true);
     expect(el().querySelector('.tick')).toBeNull();
     expect(el().querySelector('.bar')).toBeNull();
+  });
+
+  describe('with an action', () => {
+    const action = (): HTMLElement | null => el().querySelector('[data-part="action"]');
+
+    beforeEach(() => {
+      setModel({ tag: 'End', empty: true });
+      set('action', setEndAction);
+    });
+
+    it('holds the action key in place of the snap keys, strip and readout, keeping the tag', () => {
+      expect(action()?.getAttribute('data-control')).toBe('loop-set-end');
+      expect(action()?.textContent).toContain('Set End');
+      expect(el().querySelector('.tag')?.textContent?.trim()).toBe('End');
+      expect(el().querySelector('[data-part="snap-previous"]')).toBeNull();
+      expect(el().querySelector('[data-part="snap-next"]')).toBeNull();
+      expect(el().querySelector('input[type="range"]')).toBeNull();
+      expect(el().querySelector('.readout')).toBeNull();
+    });
+
+    it('emits actionPress when the key is pressed, and not when it is disabled', () => {
+      const presses: number[] = [];
+      fixture.componentInstance.actionPress.subscribe(() => presses.push(1));
+      el().querySelector<HTMLButtonElement>('[data-part="action"] button')?.click();
+      expect(presses).toHaveLength(1);
+      set('action', { ...setEndAction, disabled: true });
+      expect(el().querySelector<HTMLButtonElement>('[data-part="action"] button')?.disabled).toBe(true);
+    });
+
+    it('renders the usual snap keys, strip and readout once the action is cleared', () => {
+      set('action', null);
+      expect(action()).toBeNull();
+      expect(snap('snap-next')).not.toBeNull();
+      expect(range()).not.toBeNull();
+      expect(readout()).toBe('—');
+    });
   });
 
   it('disables every control when disabled, and the strip alone for a zero range', () => {

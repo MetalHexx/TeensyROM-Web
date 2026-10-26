@@ -378,13 +378,15 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** Latches or unlatches a voice's mute. Refused while the deck has nothing shapeable loaded. */
+  /** Latches or unlatches a voice's mute, and keeps it in the marker whose own settings are in
+   *  play. Refused while the deck has nothing shapeable loaded. */
   setVoiceMuted(slot: Slot, voice: number, muted: boolean): void {
     if (!this.canShape(slot, 'setVoiceMuted')) {
       return;
     }
     this.runtime.setVoiceMuted(slot, voice, muted);
     this.reflectEngineControls(slot);
+    this.loops.saveSettingsInPlay(slot);
   }
 
   /** Holds or releases a voice. A release is always honoured — a hold must never be left stuck
@@ -443,6 +445,14 @@ export class DeckService {
     }
   }
 
+  /** Flips the selected marker's GBL: unlatched it keeps its own settings, latched it shares the
+   *  main track's. On the marker running or in play it applies at once. */
+  toggleMarkerGlobal(slot: Slot): void {
+    if (this.canShape(slot, 'toggleMarkerGlobal')) {
+      this.loops.toggleGlobal(slot);
+    }
+  }
+
   /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
    *  auditions it on this deck, whatever is running or queued. The edit lands before the first
    *  await; a deck that is not playing is started first, as `toggleMarker` does. */
@@ -475,6 +485,28 @@ export class DeckService {
       }
     }
     this.loops.toggle(slot, target);
+  }
+
+  /**
+   * Jumps into a marker now — the selected one when `id` is omitted, and nothing when none is —
+   * without waiting for the lap, restarting it when it is the one running. A deck that is not
+   * playing is started first, through the same path as Play, as `toggleMarker` does.
+   */
+  async playMarkerNow(slot: Slot, id?: string): Promise<void> {
+    if (!this.canShape(slot, 'playMarkerNow')) {
+      return;
+    }
+    const target = id ?? this.store.loops()[slot].selectedId;
+    if (target === null) {
+      return;
+    }
+    if (this.store.deck(slot)().status !== 'playing') {
+      await this.togglePlayPause(slot);
+      if (this.store.deck(slot)().status !== 'playing') {
+        return;
+      }
+    }
+    this.loops.playNow(slot, target);
   }
 
   /** Lets the running marker loop go and drops whatever is queued. The playhead never moves. */
@@ -626,11 +658,12 @@ export class DeckService {
     this.loops.audition(slot, boundary, edited);
   }
 
-  /** Drops the marker loop and anything queued behind it or waiting for readiness; a no-op while
-   *  neither is set, so the repeat setting and the engine are left alone. */
+  /** Drops the marker loop, anything queued behind it or waiting for readiness, and a marker's
+   *  own settings in play; a no-op while none is set, so the repeat setting and the engine are
+   *  left alone. */
   private releaseMarkers(slot: Slot): void {
-    const { runningId, queuedId } = this.store.loops()[slot];
-    if (runningId !== null || queuedId !== null) {
+    const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
+    if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {
       this.loops.disengage(slot);
     }
   }

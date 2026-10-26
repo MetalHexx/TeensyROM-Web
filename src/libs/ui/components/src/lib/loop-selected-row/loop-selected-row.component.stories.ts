@@ -10,10 +10,13 @@ const meta: Meta<LoopSelectedRowComponent> = {
     docs: {
       description: {
         component:
-          'The selected loop or cue: a trigger key, a small display of the name, kind and span, the ' +
-          'Set End, Clear End and Delete keys, and beneath them the Start and End boundaries. With ' +
-          'nothing selected the display is blank and every key and boundary is disabled. The ' +
-          "display's accessible text carries the running, queued or not-ready state in words. " +
+          'The selected loop or cue: a trigger key, a one-shot play-now key, a small display of the ' +
+          'name, kind and span, the GBL switch (lit and pressed while the marker shares the main ' +
+          "track's settings), an icon-only Clear End key and Delete, and beneath them the Start and " +
+          "End boundaries. On a cue the End slot holds the Set End key instead of the snap keys and " +
+          'strip. With nothing selected the display is blank and every key and boundary is ' +
+          "disabled. The display's accessible text carries the running, queued, not-ready and " +
+          'own-settings state in words. ' +
           'Presentational only: it computes no time or snap target and holds no drag value; the ' +
           'boundary outputs are tagged with the boundary they came from.',
       },
@@ -24,7 +27,9 @@ const meta: Meta<LoopSelectedRowComponent> = {
     startDragOffset: { description: "While non-null, the Start boundary's readout and bar follow it." },
     endDragOffset: { description: "While non-null, the End boundary's readout and bar follow it." },
     trigger: { description: 'Emits when the trigger key is pressed.' },
-    setEnd: { description: 'Emits when Set End is pressed.' },
+    playNow: { description: 'Emits when the play-now key is pressed.' },
+    toggleGlobal: { description: 'Emits when the GBL switch is pressed.' },
+    setEnd: { description: "Emits when Set End, in a cue's End slot, is pressed." },
     clearEnd: { description: 'Emits when Clear End is pressed.' },
     deleteMarker: { description: 'Emits when Delete is pressed.' },
     nudgeInput: { description: 'Fires on every nudge drag tick, tagged with the boundary.' },
@@ -83,6 +88,11 @@ const loop: LoopSelectedRowModel = {
   setEndAccessibleName: 'Set the end of Item 3 here',
   clearEndAccessibleName: 'Clear the end of Item 3, making it a cue',
   deleteAccessibleName: 'Delete Item 3',
+  playNowDisabled: false,
+  playNowAccessibleName: 'Play now Item 3',
+  sharesGlobal: true,
+  globalDisabled: false,
+  globalAccessibleName: 'GBL Item 3',
 };
 
 const none: LoopSelectedRowModel = {
@@ -95,28 +105,37 @@ const none: LoopSelectedRowModel = {
   setEndDisabled: true,
   clearEndDisabled: true,
   deleteDisabled: true,
+  playNowDisabled: true,
+  globalDisabled: true,
   start: boundary('Start', { disabled: true, tickPercents: [] }),
-  end: boundary('End', { disabled: true, tickPercents: [] }),
+  end: boundary('End', { empty: true, disabled: true, tickPercents: [] }),
 };
 
-/** A selected loop with both boundaries nudged. */
-export const Loop: Story = { args: { model: loop, startDragOffset: null, endDragOffset: null } };
+const cue: LoopSelectedRowModel = {
+  ...loop,
+  name: 'Item 4',
+  kindLabel: 'CUE',
+  spanText: '02:43.2',
+  clearEndDisabled: true,
+  end: boundary('End', { empty: true, tickPercents: [] }),
+  triggerAccessibleName: 'Trigger Item 4',
+  playNowAccessibleName: 'Play now Item 4',
+  globalAccessibleName: 'GBL Item 4',
+};
 
-/** A selected cue: Clear End disabled, End drawn empty. */
-export const Cue: Story = {
-  args: {
-    model: {
-      ...loop,
-      name: 'Item 4',
-      kindLabel: 'CUE',
-      spanText: '02:43.2',
-      clearEndDisabled: true,
-      end: boundary('End', { empty: true, tickPercents: [] }),
-      triggerAccessibleName: 'Trigger Item 4',
-    },
-    startDragOffset: null,
-    endDragOffset: null,
-  },
+/** A selected loop sharing the main track's settings: GBL lit with a ringed-dot lamp, both boundaries nudged. */
+export const LoopSharingGlobal: Story = {
+  args: { model: loop, startDragOffset: null, endDragOffset: null },
+};
+
+/** A loop with its own settings: GBL unlit with an empty-ring lamp, and the display says "own settings" to assistive tech. */
+export const LoopOwnSettings: Story = {
+  args: { model: { ...loop, sharesGlobal: false }, startDragOffset: null, endDragOffset: null },
+};
+
+/** A selected cue: Clear End disabled, and the End slot holds Set End in place of the snap keys. */
+export const CueSetEndSlot: Story = {
+  args: { model: cue, startDragOffset: null, endDragOffset: null },
 };
 
 /** Nothing selected: blank display, every key and boundary disabled. */

@@ -3,7 +3,7 @@ import { anchorFor } from './control-anchors';
 
 describe('anchorFor', () => {
   it('gives every mappable deck control an anchor scoped to its deck', () => {
-    expect(DECK_CONTROL_IDS).toHaveLength(77);
+    expect(DECK_CONTROL_IDS).toHaveLength(79);
     for (const owner of DECK_SLOTS) {
       for (const control of DECK_CONTROL_IDS) {
         const anchor = anchorFor({ owner, control });

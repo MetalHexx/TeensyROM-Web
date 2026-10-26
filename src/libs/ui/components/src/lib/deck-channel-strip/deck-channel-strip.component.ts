@@ -1,4 +1,8 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  DeckSettingsSignComponent,
+  type DeckSettingsSignModel,
+} from '../deck-settings-sign/deck-settings-sign.component';
 import { HoldPadComponent } from '../hold-pad/hold-pad.component';
 import type { JumpButtonModel } from '../jump-button-group/jump-button-group.component';
 import { SynthFaderComponent } from '../synth-fader/synth-fader.component';
@@ -26,6 +30,8 @@ export interface DeckChannelStripModel {
   readonly voiceAccessibleName: string;
   /** The speed section's aria-label, e.g. 'Speed deck A'. */
   readonly speedAccessibleName: string;
+  /** Whose settings are in play; drawn full-width above the first voice. */
+  readonly settingsSign: DeckSettingsSignModel;
   readonly voices: readonly ChannelStripVoiceModel[];
   /** The speed being played, e.g. '1.000×'. */
   readonly speedText: string;
@@ -47,11 +53,11 @@ export interface DeckChannelStripModel {
 }
 
 /**
- * One deck's voice-and-speed channel strip on a single faceplate: three voice pairs (a latching
- * mute key over a Kill/Punch hold pad), the speed display, a hardware-drawn speed fader that is
- * still a native range, the speed-nudge pads and the jump keys. Purely presentational — it keeps
- * no state and the caller feeds every value back through `model`. It is sized for the roughly 88px
- * voice-and-speed column and fills that column's height.
+ * One deck's voice-and-speed channel strip on a single faceplate: a sign naming whose settings are
+ * in play, three voice pairs (a latching mute key over a Kill/Punch hold pad), the speed display, a
+ * hardware-drawn speed fader that is still a native range, the speed-nudge pads and the jump keys.
+ * Purely presentational — it keeps no state and the caller feeds every value back through
+ * `model`. It is sized for the roughly 88px voice-and-speed column and fills that column's height.
  *
  * @example
  * ```html
@@ -70,7 +76,13 @@ export interface DeckChannelStripModel {
   templateUrl: './deck-channel-strip.component.html',
   styleUrl: './deck-channel-strip.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SynthPanelComponent, SynthKeyComponent, HoldPadComponent, SynthFaderComponent],
+  imports: [
+    SynthPanelComponent,
+    SynthKeyComponent,
+    HoldPadComponent,
+    SynthFaderComponent,
+    DeckSettingsSignComponent,
+  ],
 })
 export class DeckChannelStripComponent {
   /** Everything the strip draws; the caller builds it from the deck's store state. */

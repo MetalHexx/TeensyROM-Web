@@ -10,12 +10,15 @@ const meta: Meta<LoopTileComponent> = {
       description: {
         component:
           'A compact loop or cue tile: a trigger key whose state light shows idle (dark), queued ' +
-          '(amber, blinking, steady under reduced motion) or running (green), and a select button ' +
+          '(amber, blinking, steady under reduced motion) or running (green), a one-shot play-now ' +
+          'key (bolt), and a select button ' +
           "over the name, the length and the tile's own timeline. A loop's timeline fills to " +
           '`progressPercent` with a playhead while running; a cue draws a single magenta tick. A ' +
           'selected tile carries `aria-current` and a cyan ring; a tile that is not ready draws a ' +
-          'dashed, dim timeline and says so in its accessible name. Presentational only: the ' +
-          'caller supplies every label and the progress.',
+          'dashed, dim timeline and says so in its accessible name. A small lit dot beside the name ' +
+          'marks a marker that keeps its own settings; it is decorative, so the caller adds the ' +
+          'same fact to the select name. Presentational only: the caller supplies every label and ' +
+          'the progress.',
       },
     },
   },
@@ -23,6 +26,7 @@ const meta: Meta<LoopTileComponent> = {
     model: { description: "The tile's state: id, name, kind, length text, activity, flags and names." },
     progressPercent: { description: '0–100; drawn only while the tile is running.' },
     trigger: { description: 'Emits when the trigger key is pressed.' },
+    playNow: { description: 'Emits when the play-now key is pressed.' },
     selectTile: { description: 'Emits when the select button is pressed.' },
   },
   render: (args) => ({
@@ -48,10 +52,33 @@ const base: LoopTileModel = {
   ready: true,
   triggerAccessibleName: 'Trigger Item 3',
   selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, idle',
+  ownSettings: false,
+  playNowAccessibleName: 'Play now Item 3',
 };
 
 /** An idle loop. */
 export const Idle: Story = { args: { model: base, progressPercent: 0 } };
+
+/** A marker with its own settings: the lit dot beside the name, against a sharing twin below. */
+export const OwnSettings: Story = {
+  args: {
+    model: {
+      ...base,
+      ownSettings: true,
+      selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, own settings',
+    },
+    progressPercent: 0,
+  },
+  render: (args) => ({
+    props: { ...args, sharing: base },
+    template: `
+      <div style="width: 232px; display: flex; flex-direction: column; gap: 8px">
+        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
+        <lib-loop-tile [model]="sharing" [progressPercent]="0" />
+      </div>
+    `,
+  }),
+};
 
 /** The selected tile: cyan ring and `aria-current`. */
 export const Selected: Story = { args: { model: { ...base, selected: true }, progressPercent: 0 } };

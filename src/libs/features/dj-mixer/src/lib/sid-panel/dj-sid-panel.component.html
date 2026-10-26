@@ -8,6 +8,7 @@
             [label]="'Deck ' + panel.deck.letter"
             [accentSide]="panel.deck.index === 0 ? 'start' : 'end'"
           ></lib-deck-label>
+          <lib-deck-settings-sign [model]="panel.sign" />
         </span>
         @if ($first) {
         <lib-icon-button

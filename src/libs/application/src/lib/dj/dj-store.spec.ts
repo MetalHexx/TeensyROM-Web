@@ -340,6 +340,52 @@ describe('DjStore', () => {
       store.setDeckDetectedKey({ slot: 'B', detectedKey: null });
       expect(store.decks().B.detectedKey).toBeNull();
     });
+
+    it('setSettingsInPlay writes the panel, the marker in play and the held settings together, for one slot', () => {
+      const main = { panel: HOME_DECK_PANEL, mutes: [true, false, false] } as const;
+      const shaped = {
+        ...HOME_DECK_PANEL,
+        voices: [{ ...HOME_VOICE_STRIP, coarse: 7 }, HOME_VOICE_STRIP, HOME_VOICE_STRIP] as const,
+      };
+      vi.mocked(logInfo).mockClear();
+
+      store.setSettingsInPlay({ slot: 'A', panel: shaped, settingsInPlayId: 'm1', mainSettings: main });
+
+      expect(store.panel().A).toBe(shaped);
+      expect(store.loops().A.settingsInPlayId).toBe('m1');
+      expect(store.loops().A.mainSettings).toBe(main);
+      expect(store.panel().B).toBe(HOME_DECK_PANEL);
+      expect(store.loops().B.settingsInPlayId).toBeNull();
+      expect(logInfo).toHaveBeenCalledTimes(1);
+
+      store.setSettingsInPlay({ slot: 'A', panel: HOME_DECK_PANEL, settingsInPlayId: null, mainSettings: null });
+      expect(store.loops().A.settingsInPlayId).toBeNull();
+      expect(store.loops().A.mainSettings).toBeNull();
+    });
+
+    it('setLoopMarkers logs a change to the markers but not to their readiness or settings', () => {
+      const marker = {
+        id: 'm1',
+        start: { frame: 100, offsetFrames: 0 },
+        end: null,
+        voices: [0, 1, 2],
+        settings: null,
+        ownSettings: false,
+        ready: false,
+      };
+      store.setLoopMarkers({ slot: 'A', markers: [marker] });
+      vi.mocked(logInfo).mockClear();
+
+      store.setLoopMarkers({ slot: 'A', markers: [{ ...marker, ready: true }] });
+      store.setLoopMarkers({
+        slot: 'A',
+        markers: [{ ...marker, settings: { panel: HOME_DECK_PANEL, mutes: [false, false, false] }, ownSettings: true }],
+      });
+      expect(logInfo).not.toHaveBeenCalled();
+
+      store.setLoopMarkers({ slot: 'A', markers: [{ ...marker, start: { frame: 100, offsetFrames: 3 } }] });
+      expect(logInfo).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('deckPanel', () => {

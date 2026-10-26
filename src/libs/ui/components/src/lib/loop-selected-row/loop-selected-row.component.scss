@@ -41,15 +41,26 @@ lib-synth-key {
   --synth-key-icon-size: 12px;
 }
 
-// The trigger and delete keys are icon-only squares: the width comes from `min-width`, not padding.
+// The trigger, play-now, clear-end and delete keys are icon-only: the width comes from `min-width`,
+// not padding.
 .trigger,
+.play-now,
+lib-synth-key[data-control='loop-clear-end'],
 lib-synth-key[data-control='loop-delete'] {
   --synth-key-min-width: 26px;
   --synth-key-padding: 0;
 }
 
-.trigger {
+.trigger,
+.play-now {
   --synth-key-min-width: 32px;
+}
+
+// GBL takes the mockup's width; its lamp is the key's icon at a lamp's size.
+.global {
+  --synth-key-min-width: 44px;
+  --synth-key-padding: 0 6px;
+  --synth-key-icon-size: 10px;
 }
 
 .display {
@@ -102,13 +113,19 @@ lib-synth-key[data-control='loop-delete'] {
   gap: 10px;
 }
 
-// Too narrow for two boundaries abreast: stack them, and drop the key labels for their icons.
+// Too narrow for two boundaries abreast: stack them, and give the display a line of its own so the
+// span is never truncated.
 @container (max-width: 26rem) {
   .boundaries {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  lib-synth-key {
-    --synth-key-label-display: none;
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .display {
+    flex: 1 0 100%;
+    order: 1;
   }
 }

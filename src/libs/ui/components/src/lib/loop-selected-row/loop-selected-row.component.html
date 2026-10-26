@@ -8,6 +8,14 @@
     [disabled]="model().empty || model().triggerDisabled"
     (press)="trigger.emit()"
   />
+  <lib-synth-key
+    class="play-now"
+    data-control="loop-play-now"
+    icon="bolt"
+    [accessibleName]="model().playNowAccessibleName"
+    [disabled]="model().empty || model().playNowDisabled"
+    (press)="playNow.emit()"
+  />
   <div class="display" role="img" [attr.aria-label]="displayText()">
     @if (!model().empty) {
     <span class="name" aria-hidden="true">{{ model().name }}</span>
@@ -16,22 +24,25 @@
     }
   </div>
   <lib-synth-key
-    data-control="loop-set-end"
-    label="Set End"
-    icon="last_page"
-    [accessibleName]="model().setEndAccessibleName"
-    [disabled]="model().empty || model().setEndDisabled"
-    (press)="setEnd.emit()"
+    class="global"
+    data-control="loop-global"
+    label="GBL"
+    [icon]="globalLamp()"
+    [accessibleName]="model().globalAccessibleName"
+    [latched]="globalLatched()"
+    [disabled]="model().empty || model().globalDisabled"
+    (press)="toggleGlobal.emit()"
   />
   <lib-synth-key
+    class="icon-only"
     data-control="loop-clear-end"
-    label="Clear End"
     icon="close"
     [accessibleName]="model().clearEndAccessibleName"
     [disabled]="model().empty || model().clearEndDisabled"
     (press)="clearEnd.emit()"
   />
   <lib-synth-key
+    class="icon-only"
     data-control="loop-delete"
     icon="delete"
     [accessibleName]="model().deleteAccessibleName"
@@ -52,10 +63,12 @@
   <lib-loop-boundary
     data-control="loop-end"
     [model]="endBoundary()"
+    [action]="endAction()"
     [dragOffsetFrames]="endDragOffset()"
     (nudgeInput)="nudgeInput.emit({ boundary: 'end', offsetFrames: $event })"
     (nudgeCommit)="nudgeCommit.emit({ boundary: 'end', offsetFrames: $event })"
     (snapPrevious)="snap.emit({ boundary: 'end', direction: 'previous' })"
     (snapNext)="snap.emit({ boundary: 'end', direction: 'next' })"
+    (actionPress)="setEnd.emit()"
   />
 </div>

@@ -104,6 +104,14 @@ export const HOME_DECK_PANEL: DeckPanelState = {
   keySemitones: 0,
 };
 
+/** A marker's own copy of the deck's mixer settings: the SID panel as the knobs hold it, and each
+ *  voice's latched mute. Speed and the Kill/Punch holds are never part of it. */
+export interface DeckMixerSettings {
+  readonly panel: DeckPanelState;
+  /** Voice 0…2's latched mute. */
+  readonly mutes: readonly [boolean, boolean, boolean];
+}
+
 export interface DeckState {
   loaded: TuneReference | null;
   status: DeckStatus;
@@ -167,6 +175,11 @@ export interface DeckLoopMarker {
   readonly voices: readonly number[];
   /** Its resolved start frame is in the engine's `preparedFrames`: a jump to it lands instantly. */
   readonly ready: boolean;
+  /** Its own settings; null until GBL is first unlatched, and kept when GBL latches again. */
+  readonly settings: DeckMixerSettings | null;
+  /** GBL unlatched: the marker plays with `settings`. False, the default, shares the main track's.
+   *  Implies `settings !== null`. */
+  readonly ownSettings: boolean;
 }
 
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
@@ -181,6 +194,11 @@ export interface DeckLoopsState {
   selectionMovedWhileQueued: boolean;
   /** Frames, ascending, from the tune index. */
   detectedMoments: readonly number[];
+  /** The marker whose own settings are in play, or null while the main track's are. */
+  settingsInPlayId: string | null;
+  /** The main track's settings, held aside while a marker's own are in play; null otherwise,
+   *  when the panel and the engine's mutes are the main track's. */
+  mainSettings: DeckMixerSettings | null;
 }
 
 export interface DjState {
@@ -201,6 +219,8 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
   queuedId: null,
   selectionMovedWhileQueued: false,
   detectedMoments: [],
+  settingsInPlayId: null,
+  mainSettings: null,
 };
 
 const initialDeckState: DeckState = {

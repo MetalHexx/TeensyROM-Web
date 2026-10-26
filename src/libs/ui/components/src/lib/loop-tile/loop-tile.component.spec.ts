@@ -12,18 +12,23 @@ const tile: LoopTileModel = {
   ready: true,
   triggerAccessibleName: 'Trigger Item 3',
   selectAccessibleName: 'Select Item 3, loop, 7.8 seconds',
+  ownSettings: false,
+  playNowAccessibleName: 'Play now Item 3',
 };
 
 describe('LoopTileComponent', () => {
   let fixture: ComponentFixture<LoopTileComponent>;
   let triggers: number;
   let selects: number;
+  let playNows: number;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [LoopTileComponent] }).compileComponents();
     fixture = TestBed.createComponent(LoopTileComponent);
     triggers = 0;
     selects = 0;
+    playNows = 0;
+    fixture.componentInstance.playNow.subscribe(() => playNows++);
     fixture.componentInstance.trigger.subscribe(() => triggers++);
     fixture.componentInstance.selectTile.subscribe(() => selects++);
     setModel({});
@@ -37,6 +42,8 @@ describe('LoopTileComponent', () => {
   const el = (): HTMLElement => fixture.nativeElement;
   const triggerButton = (): HTMLButtonElement =>
     el().querySelector<HTMLButtonElement>('lib-synth-key button') as HTMLButtonElement;
+  const playNowButton = (): HTMLButtonElement =>
+    el().querySelector<HTMLButtonElement>('lib-synth-key.play-now button') as HTMLButtonElement;
   const selectButton = (): HTMLButtonElement =>
     el().querySelector<HTMLButtonElement>('button.select') as HTMLButtonElement;
   const stateLight = (): string | null =>
@@ -49,7 +56,16 @@ describe('LoopTileComponent', () => {
     expect([triggers, selects]).toEqual([1, 1]);
   });
 
-  it('names the two buttons from the model', () => {
+  it('emits playNow from its own key, apart from trigger and selectTile', () => {
+    playNowButton().click();
+    expect([triggers, playNows, selects]).toEqual([0, 1, 0]);
+    triggerButton().click();
+    selectButton().click();
+    expect([triggers, playNows, selects]).toEqual([1, 1, 1]);
+  });
+
+  it('names the three buttons from the model', () => {
+    expect(playNowButton().getAttribute('aria-label')).toBe('Play now Item 3');
     expect(triggerButton().getAttribute('aria-label')).toBe('Trigger Item 3');
     expect(selectButton().getAttribute('aria-label')).toBe('Select Item 3, loop, 7.8 seconds');
   });
@@ -82,6 +98,12 @@ describe('LoopTileComponent', () => {
     setModel({ kind: 'cue', lengthText: 'CUE', activity: 'running' });
     expect(el().querySelector('.cue-tick')).not.toBeNull();
     expect(el().querySelector('.fill')).toBeNull();
+  });
+
+  it('draws the own-settings dot only for a marker with its own settings, hidden from assistive tech', () => {
+    expect(el().querySelector('.own')).toBeNull();
+    setModel({ ownSettings: true });
+    expect(el().querySelector('.own')?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('flags a tile that is not ready', () => {

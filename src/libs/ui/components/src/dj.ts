@@ -9,6 +9,7 @@ export * from './lib/position-strip/position-strip.component';
 export * from './lib/deck-transport/deck-transport.component';
 export * from './lib/synth-fader/synth-fader.component';
 export * from './lib/deck-channel-strip/deck-channel-strip.component';
+export * from './lib/deck-settings-sign/deck-settings-sign.component';
 export * from './lib/loops-cues-plate/loops-cues-plate.component';
 export * from './lib/binding-plate/binding-plate.component';
 export * from './lib/hold-press/hold-press.directive';

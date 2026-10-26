@@ -50,13 +50,13 @@ lib-scaling-container {
   align-items: center;
 }
 
+// Each deck's label and settings sign sit in a row centred over its own half, as the mockup draws it.
 .deck-label-cell {
-  display: contents;
-}
-
-// Each label sits centred over its own half, as the mockup draws it.
-.deck-label-cell lib-deck-label {
-  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .bindings-button {

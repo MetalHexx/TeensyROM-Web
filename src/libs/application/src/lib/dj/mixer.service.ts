@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { clamp } from '@sidablist/core';
 import {
   DjStore,
   type KeyDisplayFormat,
@@ -9,8 +8,9 @@ import {
   type VoiceStripState,
   type VoiceSwitch,
 } from './dj-store';
+import { DeckLoops } from './deck-loops';
 import { MixerApplier } from './mixer-applier';
-import { PANEL_RANGES, type PanelRange } from './mixer/panel-ranges';
+import { PANEL_RANGES, bounded } from './mixer/panel-ranges';
 import type { Slot } from './slot';
 
 export type VoiceKnob =
@@ -30,14 +30,6 @@ const SWITCH_LOCKS = {
   filter: 'filterLock',
 } as const satisfies Record<VoiceSwitch, keyof VoiceStripState>;
 
-/** A knob value as stored: snapped to a whole number when the knob is stepped, then clamped to
- *  the knob's travel. */
-function bounded(range: PanelRange, value: number): number {
-  const snapped = range.step === null ? value : Math.round(value);
-  // + 0 turns a −0 from rounding into 0.
-  return clamp(snapped, range.min, range.max) + 0;
-}
-
 function isVoice(voice: number): boolean {
   return Number.isInteger(voice) && voice >= 0 && voice <= 2;
 }
@@ -50,11 +42,15 @@ function isVoice(voice: number): boolean {
  *
  * Panel controls are refused while the deck has nothing shapeable loaded. Panic and the key
  * display format are always accepted. Non-finite values and a voice outside 0…2 are ignored.
+ *
+ * Every accepted write also reaches the settings in play: when a marker's own settings are in play
+ * on the deck, `DeckLoops` keeps the result in that marker's copy.
  */
 @Injectable({ providedIn: 'root' })
 export class MixerService {
   private readonly store = inject(DjStore);
   private readonly applier = inject(MixerApplier);
+  private readonly loops = inject(DeckLoops);
 
   /** One voice knob's offset, clamped to its range; Coarse and the envelope and pulse-width
    *  knobs snap to whole numbers, Fine keeps full resolution. */
@@ -62,11 +58,13 @@ export class MixerService {
     if (!isVoice(voice) || !Number.isFinite(value) || !this.canShape(slot, knob)) {
       return;
     }
-    this.store.setVoiceStrip({
-      slot,
-      voice,
-      patch: { [knob]: bounded(PANEL_RANGES[knob], value) },
-    });
+    this.write(slot, () =>
+      this.store.setVoiceStrip({
+        slot,
+        voice,
+        patch: { [knob]: bounded(PANEL_RANGES[knob], value) },
+      })
+    );
   }
 
   /** The cutoff or resonance offset, snapped to a whole number and clamped to its range. */
@@ -74,7 +72,9 @@ export class MixerService {
     if (!Number.isFinite(value) || !this.canShape(slot, knob)) {
       return;
     }
-    this.store.setDeckPanel({ slot, patch: { [knob]: bounded(PANEL_RANGES[knob], value) } });
+    this.write(slot, () =>
+      this.store.setDeckPanel({ slot, patch: { [knob]: bounded(PANEL_RANGES[knob], value) } })
+    );
   }
 
   /** Key offset, rounded to a whole semitone and clamped to ±12. */
@@ -82,10 +82,12 @@ export class MixerService {
     if (!Number.isFinite(semitones) || !this.canShape(slot, 'key')) {
       return;
     }
-    this.store.setDeckPanel({
-      slot,
-      patch: { keySemitones: bounded(PANEL_RANGES.key, semitones) },
-    });
+    this.write(slot, () =>
+      this.store.setDeckPanel({
+        slot,
+        patch: { keySemitones: bounded(PANEL_RANGES.key, semitones) },
+      })
+    );
   }
 
   /** A press on a waveform button: the locked waveform hands back to the tune; any other locks
@@ -95,11 +97,13 @@ export class MixerService {
       return;
     }
     const current = this.strip(slot, voice).waveformLock;
-    this.store.setVoiceStrip({
-      slot,
-      voice,
-      patch: { waveformLock: current === waveform ? null : waveform },
-    });
+    this.write(slot, () =>
+      this.store.setVoiceStrip({
+        slot,
+        voice,
+        patch: { waveformLock: current === waveform ? null : waveform },
+      })
+    );
   }
 
   /** Locks the voice to `waveform`, or — when `locked` is false — releases the lock only if it is
@@ -111,7 +115,9 @@ export class MixerService {
     if (!locked && this.strip(slot, voice).waveformLock !== waveform) {
       return;
     }
-    this.store.setVoiceStrip({ slot, voice, patch: { waveformLock: locked ? waveform : null } });
+    this.write(slot, () =>
+      this.store.setVoiceStrip({ slot, voice, patch: { waveformLock: locked ? waveform : null } })
+    );
   }
 
   /** A press on a filter-mode button, with the waveform rule applied to the deck's filter mode. */
@@ -120,7 +126,9 @@ export class MixerService {
       return;
     }
     const current = this.store.deckPanel(slot)().filterModeLock;
-    this.store.setDeckPanel({ slot, patch: { filterModeLock: current === mode ? null : mode } });
+    this.write(slot, () =>
+      this.store.setDeckPanel({ slot, patch: { filterModeLock: current === mode ? null : mode } })
+    );
   }
 
   /** Locks the filter mode to `mode`, or — when `locked` is false — releases the lock only if it
@@ -132,7 +140,9 @@ export class MixerService {
     if (!locked && this.store.deckPanel(slot)().filterModeLock !== mode) {
       return;
     }
-    this.store.setDeckPanel({ slot, patch: { filterModeLock: locked ? mode : null } });
+    this.write(slot, () =>
+      this.store.setDeckPanel({ slot, patch: { filterModeLock: locked ? mode : null } })
+    );
   }
 
   /** A press on Ring, Sync or Filt: a locked switch hands back to the tune; an unlocked one locks
@@ -144,7 +154,7 @@ export class MixerService {
     const lockKey = SWITCH_LOCKS[sw];
     const lock =
       this.strip(slot, voice)[lockKey] === null ? this.oppositeOfTune(slot, voice, sw) : null;
-    this.store.setVoiceStrip({ slot, voice, patch: { [lockKey]: lock } });
+    this.write(slot, () => this.store.setVoiceStrip({ slot, voice, patch: { [lockKey]: lock } }));
   }
 
   /** Locks the switch to the opposite of the tune's state — unless it is already locked, which
@@ -158,16 +168,23 @@ export class MixerService {
       return;
     }
     const lock = locked ? this.oppositeOfTune(slot, voice, sw) : null;
-    this.store.setVoiceStrip({ slot, voice, patch: { [lockKey]: lock } });
+    this.write(slot, () => this.store.setVoiceStrip({ slot, voice, patch: { [lockKey]: lock } }));
   }
 
-  /** Returns the deck's whole panel to home. Speed, mutes and the other deck are untouched. */
+  /** Returns the deck's whole panel to home. Speed, mutes and the other deck are untouched. A
+   *  marker's own settings in play go home with it, and the marker stays independent. */
   panic(slot: Slot): void {
-    this.store.resetDeckPanel({ slot, reason: 'panic' });
+    this.write(slot, () => this.store.resetDeckPanel({ slot, reason: 'panic' }));
   }
 
   setKeyDisplayFormat(format: KeyDisplayFormat): void {
     this.store.setKeyDisplayFormat({ format });
+  }
+
+  /** Runs an accepted write, then lets the settings in play keep its result. */
+  private write(slot: Slot, write: () => void): void {
+    write();
+    this.loops.saveSettingsInPlay(slot);
   }
 
   private strip(slot: Slot, voice: number): VoiceStripState {

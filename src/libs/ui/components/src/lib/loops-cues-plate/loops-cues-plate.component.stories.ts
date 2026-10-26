@@ -15,9 +15,18 @@ const meta: Meta<LoopsCuesPlateComponent> = {
           "One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the " +
           'fixed selected-loop row, and a two-column tile grid that takes the remaining height and ' +
           'scrolls. Purely presentational — it holds no state of its own; the caller owns every ' +
-          'marker, the drag offsets and the running tile’s progress.',
+          'marker, the drag offsets and the running tile’s progress. Each tile and the selected row ' +
+          'carry a play-now key; the selected row adds the GBL switch, and a marker with its own ' +
+          'settings shows a lit dot on its tile.',
       },
     },
+  },
+  argTypes: {
+    model: { description: "Everything the plate draws: names, flags, the selected row and the tiles." },
+    runningProgressPercent: { description: '0–100; reaches only the running tile.' },
+    playNowSelected: { description: "Emits when the selected row's play-now key is pressed." },
+    toggleGlobal: { description: "Emits when the selected row's GBL switch is pressed." },
+    playNowTile: { description: "Emits a tile's id when its play-now key is pressed." },
   },
   render: (args) => ({
     props: args,
@@ -71,6 +80,11 @@ function emptySelected(): LoopSelectedRowModel {
     setEndAccessibleName: 'Set end deck A',
     clearEndAccessibleName: 'Clear end deck A',
     deleteAccessibleName: 'Delete selected deck A',
+    playNowDisabled: true,
+    playNowAccessibleName: 'Play now selected deck A',
+    sharesGlobal: true,
+    globalDisabled: true,
+    globalAccessibleName: 'GBL selected deck A',
   };
 }
 
@@ -88,6 +102,11 @@ function selectedFor(tile: LoopTileModel): LoopSelectedRowModel {
     setEndDisabled: !isCue,
     clearEndDisabled: isCue,
     deleteDisabled: false,
+    playNowDisabled: false,
+    playNowAccessibleName: `Play now ${tile.name} deck A`,
+    sharesGlobal: !tile.ownSettings,
+    globalDisabled: false,
+    globalAccessibleName: `GBL ${tile.name} deck A`,
     start: boundary('Start'),
     end: boundary('End', { empty: isCue, disabled: isCue }),
   };
@@ -105,6 +124,8 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
     ready: true,
     triggerAccessibleName: `Trigger Item ${number}`,
     selectAccessibleName: `Select Item ${number}, ${kind}`,
+    ownSettings: false,
+    playNowAccessibleName: `Play now Item ${number}`,
     ...overrides,
   };
 }
@@ -156,6 +177,19 @@ export const FewMarkers: Story = {
       tile(1, { selected: true, activity: 'running' }),
       tile(2, { activity: 'queued' }),
       tile(3, { kind: 'cue' }),
+    ]),
+  },
+};
+
+/** A mix: Items 2 and 4 keep their own settings (lit dot), the selected Item 2's GBL is unlit. */
+export const MixedSettings: Story = {
+  args: {
+    runningProgressPercent: 40,
+    model: plateModel([
+      tile(1),
+      tile(2, { selected: true, activity: 'running', ownSettings: true }),
+      tile(3, { kind: 'cue' }),
+      tile(4, { ownSettings: true }),
     ]),
   },
 };

@@ -394,6 +394,24 @@ describe('DeckRuntime', () => {
       expect(seek).toHaveBeenCalledExactlyOnceWith(320);
     });
 
+    it('seekToFrame hands the jump settings to the engine with the frame', async () => {
+      const seek = vi.spyOn(playerFor(0), 'seek').mockResolvedValue(undefined);
+      const settings = { voicePitch: [2, 1, 1], voiceMutes: [true, false, false] };
+
+      await runtime.seekToFrame('A', 320, settings);
+
+      expect(seek).toHaveBeenCalledExactlyOnceWith(320, settings);
+    });
+
+    it('queueJump hands the jump settings to the engine with the target', () => {
+      const queue = vi.spyOn(playerFor(0), 'queueJump').mockImplementation(() => undefined);
+      const settings = { voiceMutes: [false, true, false] };
+
+      runtime.queueJump('A', { startFrame: 20, endFrame: 80, settings });
+
+      expect(queue.mock.calls).toEqual([[{ startFrame: 20, endFrame: 80, settings }]]);
+    });
+
     it('throws for a slot that has not been built', () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({

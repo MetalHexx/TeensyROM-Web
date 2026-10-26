@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { TuneReference } from '@sidablist/tunes';
-import { DjStore, EMPTY_DECK_LOOPS, type DeckLoopMarker, type DeckStatus } from '../dj-store';
+import {
+  DjStore,
+  EMPTY_DECK_LOOPS,
+  HOME_DECK_PANEL,
+  type DeckLoopMarker,
+  type DeckStatus,
+} from '../dj-store';
 
 /** 50 play calls a second. */
 const INTERVAL_US = 20_000;
@@ -26,6 +32,8 @@ function marker(
     start: { frame: start, offsetFrames: 0 },
     end: end === null ? null : { frame: end, offsetFrames: 0 },
     voices: [0, 1, 2],
+    settings: null,
+    ownSettings: false,
     ready: false,
     ...extra,
   };
@@ -107,6 +115,46 @@ describe('loopsSummary', () => {
       selectionMovedWhileQueued: false,
     });
     expect(store.loopsSummary('A')().canStop).toBe(true);
+  });
+
+  it("can stop while a marker's own settings are in play, even with nothing running or queued", () => {
+    loadTune();
+    setLoops([marker('a', 100)]);
+    expect(store.loopsSummary('A')().canStop).toBe(false);
+
+    setLoops([marker('a', 100)], {
+      settingsInPlayId: 'a',
+      mainSettings: { panel: HOME_DECK_PANEL, mutes: [false, false, false] },
+    });
+
+    expect(store.loopsSummary('A')().canStop).toBe(true);
+  });
+
+  describe('GBL', () => {
+    beforeEach(() => loadTune());
+
+    it('marks an item with its own settings and a selection without them as sharing', () => {
+      const own = { panel: HOME_DECK_PANEL, mutes: [false, false, false] } as const;
+      setLoops([marker('a', 100, null, { settings: own, ownSettings: true }), marker('b', 200)]);
+
+      expect(
+        store
+          .loopsSummary('A')()
+          .items.map((item) => item.ownSettings)
+      ).toEqual([true, false]);
+      expect(store.loopsSummary('A')().selected?.sharesGlobal).toBe(false);
+
+      store.setLoopSelection({ slot: 'A', selectedId: 'b', selectionMovedWhileQueued: false });
+      expect(store.loopsSummary('A')().selected?.sharesGlobal).toBe(true);
+    });
+
+    it('treats a latched marker that keeps a copy as sharing', () => {
+      const kept = { panel: HOME_DECK_PANEL, mutes: [true, false, false] } as const;
+      setLoops([marker('a', 100, null, { settings: kept, ownSettings: false })]);
+
+      expect(store.loopsSummary('A')().items[0].ownSettings).toBe(false);
+      expect(store.loopsSummary('A')().selected?.sharesGlobal).toBe(true);
+    });
   });
 
   describe('items', () => {

@@ -23,6 +23,7 @@ const meta: Meta<LoopTileGridComponent> = {
     accessibleName: { description: "Names the list, e.g. 'Loops and cues, deck A'." },
     emptyText: { description: 'Shown when there are no tiles; null shows nothing.' },
     triggerTile: { description: "Emits the tile's id when its trigger key is pressed." },
+    playNowTile: { description: "Emits the tile's id when its play-now key is pressed." },
     selectTile: { description: "Emits the tile's id when its select button is pressed." },
   },
   render: (args) => ({
@@ -55,6 +56,8 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
     ready: true,
     triggerAccessibleName: `Trigger Item ${number}`,
     selectAccessibleName: `Select Item ${number}, ${kind}`,
+    ownSettings: false,
+    playNowAccessibleName: `Play now Item ${number}`,
     ...overrides,
   };
 }
