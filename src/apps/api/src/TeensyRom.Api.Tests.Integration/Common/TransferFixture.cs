@@ -1,10 +1,13 @@
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Api.WatchFolders;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Storage;
 using TeensyRom.Core.Serial.Recovery;
@@ -72,6 +75,23 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public TransferOptions Options { get; }
 
+        /// <summary>Millisecond-scale watch-folder timing, so an arrival is delivered within a fraction of a second.</summary>
+        public WatchFolderOptions WatchOptions { get; } = new()
+        {
+            SettleTime = TimeSpan.FromMilliseconds(150),
+            PollInterval = TimeSpan.FromMilliseconds(25),
+            GroupingWindow = TimeSpan.FromMilliseconds(250),
+            MaxSetHold = TimeSpan.FromSeconds(10),
+            UnavailableRetryInterval = TimeSpan.FromMilliseconds(100)
+        };
+
+        /// <summary>Which folders the engine's watcher is watching right now.</summary>
+        public RecordingFolderWatchFactory WatchFactory { get; }
+
+        /// <summary>Every line the engine logged.</summary>
+        public RecordingLoggingService Log =>
+            (RecordingLoggingService)_factory.Services.GetRequiredService<ILoggingService>();
+
         public TimeSpan IdleAbandonmentThreshold
         {
             get => Options.IdleAbandonmentThreshold;
@@ -111,6 +131,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
             _scratchRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-scratch-").FullName;
             Options = new TransferOptions { StagingRoot = _stagingRoot, ScratchRoot = _scratchRoot };
             configureOptions?.Invoke(Options);
+            WatchFactory = new RecordingFolderWatchFactory(new FileSystemFolderWatchFactory(WatchOptions));
 
             _factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(builder =>
@@ -178,6 +199,13 @@ namespace TeensyRom.Api.Tests.Integration.Common
                             new RecordingFileLaunchService(sp.GetRequiredService<IDeviceLeaseCoordinator>()));
 
                         services.AddSingleton(Options);
+
+                        services.AddSingleton(WatchOptions);
+                        services.RemoveAll<IFolderWatchFactory>();
+                        services.AddSingleton<IFolderWatchFactory>(WatchFactory);
+                        services.RemoveAll<ILoggingService>();
+                        services.AddSingleton<ILoggingService>(sp => new RecordingLoggingService(sp.GetRequiredService<LoggingService>()));
+
                         configureServices?.Invoke(services);
                     });
                 });

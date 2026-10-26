@@ -23,13 +23,16 @@ namespace TeensyRom.Api.Tests.Integration.Transfers.WatchFolders
 
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task DisposeAsync()
+        public async Task DisposeAsync()
         {
             var store = f.Services.GetRequiredService<IWatchFolderStore>();
             foreach (var folder in store.GetAll()) store.RemoveFolder(folder.Id);
-            foreach (var dir in _tempDirs.Where(Directory.Exists)) Directory.Delete(dir, recursive: true);
 
-            return Task.CompletedTask;
+            // The engine's watcher stops watching a removed folder on its own loop; its directory is deleted only after that.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (f.WatchFactory.ActiveWatchCount > 0 && DateTime.UtcNow < deadline) await Task.Delay(10);
+
+            foreach (var dir in _tempDirs.Where(Directory.Exists)) Directory.Delete(dir, recursive: true);
         }
 
         private string NewFolder()
