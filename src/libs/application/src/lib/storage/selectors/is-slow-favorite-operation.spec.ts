@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { updateState } from '@angular-architects/ngrx-toolkit';
 import '@analogjs/vitest-angular/setup-zone';
@@ -18,15 +18,19 @@ import { STORAGE_SERVICE, IStorageService } from '@teensyrom-nx/domain';
  * - Handles multiple rapid state changes
  * - Caches and reuses the same signal instance
  *
- * NOTE: These tests use REAL timers with actual delays to avoid fake timer issues.
- * Test timeouts are set to accommodate the 3.5+ second delays.
+ * NOTE: These tests run on fake timers, so the 3.5-second threshold is exact and costs no real time.
+ * Real timers left margins of 50-200ms around the threshold, which a loaded CI runner would overrun.
  */
 describe('isSlowFavoriteOperation', () => {
   let store: WritableStore<StorageState>;
   let mockStorageService: IStorageService;
 
-  // Helper to wait for async operations with real timers
-  const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+  // Moves virtual time forward. Effects flush first: the selector's toObservable only sees a state
+  // change once its effect has run, and its delay timer starts from that point.
+  const wait = async (ms: number) => {
+    TestBed.flushEffects();
+    await vi.advanceTimersByTimeAsync(ms);
+  };
 
   // Helper function to update favorite operation processing state in the store
   const setFavoriteProcessing = (isProcessing: boolean, error: string | null = null) => {
@@ -39,6 +43,8 @@ describe('isSlowFavoriteOperation', () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     // Mock storage service
     mockStorageService = {
       getDirectory: vi.fn(),
@@ -57,6 +63,10 @@ describe('isSlowFavoriteOperation', () => {
     });
 
     store = TestBed.inject(StorageStore) as unknown as WritableStore<StorageState>;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Initial State', () => {
