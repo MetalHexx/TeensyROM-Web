@@ -38,7 +38,7 @@ public class TransferJobServiceTests : IDisposable
         var pump = new TransferPump(
             Substitute.For<ITransferQueue>(), _registry, _leases, Substitute.For<ITransferCapacityGate>(),
             Substitute.For<ITransferStagingStore>(), _scratch, _admission, _deviceManager,
-            Substitute.For<IServiceScopeFactory>(), _notifier, new TransferOptions(), Substitute.For<ILoggingService>());
+            Substitute.For<IServiceScopeFactory>(), _notifier, Substitute.For<ITransferAutoLauncher>(), new TransferOptions(), Substitute.For<ILoggingService>());
 
         return new TransferJobService(
             _deviceManager, _registry, _leases, _admission, _scratch, _archiveReader, _expansionQueue, _notifier, pump);

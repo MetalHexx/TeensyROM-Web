@@ -60,7 +60,7 @@ namespace TeensyRom.Api.Transfers
                 return Failed(TransferStartError.InvalidDestination, ex.Message);
             }
 
-            var job = registry.Create(request.DeviceId, request.StorageType, destination, request.ExpectedArchiveCount, request.Origin);
+            var job = registry.Create(request.DeviceId, request.StorageType, destination, request.ExpectedArchiveCount, request.Origin, request.LaunchRequested);
 
             if (!leases.TryAcquire(request.DeviceId, job.JobId))
             {

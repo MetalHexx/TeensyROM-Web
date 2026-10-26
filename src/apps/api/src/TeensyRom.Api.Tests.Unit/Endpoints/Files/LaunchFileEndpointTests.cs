@@ -1,8 +1,9 @@
-using MediatR;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.DependencyInjection;
 using RadEndpoints.Testing;
 using System.Net;
 using TeensyRom.Api.Endpoints.Player.LaunchFile;
+using TeensyRom.Api.Services;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
@@ -26,7 +27,10 @@ public class LaunchFileEndpointTests
         };
         var device = new TeensyRomDevice(cart, Substitute.For<ICommunicationPort>(), _sdStorage, Substitute.For<IStorageService>());
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        return EndpointFactory.CreateEndpoint<LaunchFileEndpoint>(Substitute.For<IMediator>(), _deviceManager);
+
+        var scopeFactory = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+        var launcher = new FileLaunchService(_deviceManager, scopeFactory);
+        return EndpointFactory.CreateEndpoint<LaunchFileEndpoint>(launcher);
     }
 
     private static LaunchFileRequest Request() => new() { DeviceId = DeviceId, StorageType = TeensyStorageType.SD, FilePath = "/music/tune.sid" };

@@ -30,7 +30,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
         public override Task Handle(CreateJobRequest r, CancellationToken ct)
         {
             var result = jobs.Start(new TransferJobStart(
-                r.DeviceId, r.StorageType, r.Body.DestinationDirectory, r.Body.ExpectedArchiveCount, TransferOrigin.Upload));
+                r.DeviceId, r.StorageType, r.Body.DestinationDirectory, r.Body.ExpectedArchiveCount, TransferOrigin.Upload, r.Body.Launch));
 
             if (!result.Started)
             {

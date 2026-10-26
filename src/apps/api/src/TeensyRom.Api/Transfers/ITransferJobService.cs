@@ -8,7 +8,8 @@ namespace TeensyRom.Api.Transfers
         TeensyStorageType StorageType,
         string DestinationDirectory,
         int ExpectedArchiveCount,
-        TransferOrigin Origin);
+        TransferOrigin Origin,
+        bool LaunchRequested = false);
 
     public enum TransferStartError { DeviceNotFound, StorageUnavailable, InvalidDestination, DeviceBusy }
 

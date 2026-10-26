@@ -47,6 +47,11 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
         /// "no archive has arrived yet" from "no archive is coming". Zero for an ordinary transfer.
         /// </summary>
         public int ExpectedArchiveCount { get; set; }
+
+        /// <summary>
+        /// Launch one file when this transfer completes even when the auto-launch setting is off.
+        /// </summary>
+        public bool Launch { get; set; }
     }
 
     public class CreateJobRequestValidator : AbstractValidator<CreateJobRequest>

@@ -83,6 +83,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
             services.AddSingleton<TransferProgressNotifier>();
             services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
+            services.AddSingleton<IFileLaunchService, FileLaunchService>();
+            services.AddSingleton<ITransferAutoLauncher, TransferAutoLauncher>();
             services.AddSingleton<TransferPump>();
             services.AddSingleton<ITransferJobService, TransferJobService>();
             services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();

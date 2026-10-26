@@ -2141,6 +2141,9 @@
           "expectedArchiveCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "launch": {
+            "type": "boolean"
           }
         }
       },
@@ -3315,7 +3318,8 @@
           "bytesPerSecond",
           "filesPerSecond",
           "expansionBytesWritten",
-          "expansionBytesDeclared"
+          "expansionBytesDeclared",
+          "launchState"
         ],
         "type": "object",
         "properties": {
@@ -3409,6 +3413,17 @@
           "expandedFileCount": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "launchState": {
+            "$ref": "#/components/schemas/TransferLaunchState"
+          },
+          "launchedPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchError": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -3432,7 +3447,8 @@
           "bytesPerSecond",
           "filesPerSecond",
           "expansionBytesWritten",
-          "expansionBytesDeclared"
+          "expansionBytesDeclared",
+          "launchState"
         ],
         "type": "object",
         "properties": {
@@ -3527,6 +3543,17 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "launchState": {
+            "$ref": "#/components/schemas/TransferLaunchState"
+          },
+          "launchedPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchError": {
+            "type": "string",
+            "nullable": true
           }
         },
         "nullable": true
@@ -3540,6 +3567,15 @@
           "Cancelled",
           "Abandoned",
           "Aborted"
+        ]
+      },
+      "TransferLaunchState": {
+        "enum": [
+          "None",
+          "Pending",
+          "Launched",
+          "Incompatible",
+          "Failed"
         ]
       },
       "TransferOriginDto": {

@@ -27,6 +27,7 @@ namespace TeensyRom.Api.Transfers
         IDeviceConnectionManager deviceManager,
         IServiceScopeFactory scopeFactory,
         ITransferProgressNotifier notifier,
+        ITransferAutoLauncher autoLauncher,
         TransferOptions options,
         ILoggingService log) : BackgroundService
     {
@@ -431,8 +432,8 @@ namespace TeensyRom.Api.Transfers
         /// <summary>
         /// Completion's single seam, shared by the pump and the sweeper: a Sealed job whose
         /// <see cref="TransferJob.PendingCount"/> has reached zero has delivered everything it took in,
-        /// so it becomes Completed. Idempotent and safe to call concurrently -
-        /// <see cref="TransferJob.TryTransitionTo"/> guards the actual transition, and the
+        /// so it becomes Completed, and launches one file when a launch is due. Idempotent and safe to call concurrently -
+        /// <see cref="TransferJob.TryComplete"/> guards the actual transition, and the
         /// release/purge/persist/notify side effects only run for the caller that wins it. Cancellation
         /// does not come through here at all; see <see cref="Cancel"/>.
         /// </summary>
@@ -443,7 +444,11 @@ namespace TeensyRom.Api.Transfers
                 return;
             }
 
-            if (!job.TryTransitionTo(TransferJobState.Completed))
+            // Decided before the transition: TryComplete publishes Completed and a Pending launch together,
+            // so a poller never sees Completed with the launch undecided.
+            var launchDue = autoLauncher.ShouldLaunch(job);
+
+            if (!job.TryComplete(launchDue))
             {
                 return;
             }
@@ -452,6 +457,7 @@ namespace TeensyRom.Api.Transfers
             staging.PurgeJob(job.JobId);
             scratch.PurgeJob(job.JobId);
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
+            autoLauncher.StartLaunch(job);
             notifier.JobChanged(job);
         }
 

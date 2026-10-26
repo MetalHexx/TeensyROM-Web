@@ -39,6 +39,10 @@ namespace TeensyRom.Api.Transfers
         private int _archivesAccepted;       // archives uploaded and handed to expansion
         private int _archivesOutstanding;    // accepted but not yet finished expanding
         private int _archiveSlotsPendingRelease; // finished archives whose own PendingCount slot is still held
+        private string? _launchCandidate;    // best file to launch seen so far - one path, never a list
+        private TransferLaunchState _launchState;
+        private string? _launchedPath;       // the path pending or launched
+        private string? _launchError;
 
         public string JobId { get; }
         public string DeviceId { get; }
@@ -47,6 +51,15 @@ namespace TeensyRom.Api.Transfers
         public TransferOrigin Origin { get; }
         public TransferJobState State { get; private set; }
         public DateTime LastActivityUtc { get; private set; }
+
+        /// <summary>True when the creator asked for a launch on completion regardless of the auto-launch setting.</summary>
+        public bool LaunchRequested { get; }
+
+        /// <summary>The best launchable file this job has sent so far, or null when none qualifies.</summary>
+        public string? LaunchCandidate
+        {
+            get { lock (_lock) return _launchCandidate; }
+        }
 
         /// <summary>
         /// Work this job still owns: files staged and not yet written to the device, plus the slot each
@@ -75,13 +88,15 @@ namespace TeensyRom.Api.Transfers
             TransferOptions options,
             Func<DateTime>? clock = null,
             int expectedArchiveCount = 0,
-            TransferOrigin? origin = null)
+            TransferOrigin? origin = null,
+            bool launchRequested = false)
         {
             JobId = Guid.NewGuid().ToString("N");
             DeviceId = deviceId;
             StorageType = storageType;
             Destination = destination;
             Origin = origin ?? TransferOrigin.Upload;
+            LaunchRequested = launchRequested;
             _options = options;
             _clock = clock ?? (() => DateTime.UtcNow);
             _expectedArchiveCount = expectedArchiveCount;
@@ -122,6 +137,40 @@ namespace TeensyRom.Api.Transfers
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Sealed to Completed. When <paramref name="launchDue"/> and a candidate exists, the launch becomes
+        /// Pending and its path is recorded in the same locked step, so no reader can see Completed with a
+        /// launch still undecided. Returns false, changing nothing, when the transition is illegal.
+        /// </summary>
+        public bool TryComplete(bool launchDue)
+        {
+            lock (_lock)
+            {
+                if (!IsLegalTransition(State, TransferJobState.Completed)) return false;
+
+                State = TransferJobState.Completed;
+
+                if (launchDue && _launchCandidate is not null)
+                {
+                    _launchState = TransferLaunchState.Pending;
+                    _launchedPath = _launchCandidate;
+                }
+
+                return true;
+            }
+        }
+
+        /// <summary>Records the final outcome of the launch <see cref="TryComplete"/> left Pending.</summary>
+        public void CompleteLaunch(TransferLaunchState state, string? error)
+        {
+            lock (_lock)
+            {
+                _launchState = state;
+                _launchError = error;
+                LastActivityUtc = _clock();
+            }
         }
 
         private static bool IsLegalTransition(TransferJobState from, TransferJobState to) => (from, to) switch
@@ -170,6 +219,11 @@ namespace TeensyRom.Api.Transfers
                 LastActivityUtc = now;
                 RecordRateSample(now, completed.SizeBytes);
                 RecordCompletion(completed);
+
+                if (LaunchCandidateRanker.IsBetter(completed.TargetPath, _launchCandidate))
+                {
+                    _launchCandidate = completed.TargetPath;
+                }
             }
         }
 
@@ -484,6 +538,9 @@ namespace TeensyRom.Api.Transfers
                     ExpandingArchive = _expandingArchive,
                     ExpansionBytesWritten = _expansionBytesWritten,
                     ExpansionBytesDeclared = _expansionBytesDeclared,
+                    LaunchState = _launchState,
+                    LaunchedPath = _launchedPath,
+                    LaunchError = _launchError,
                     // Null until no further archives can arrive AND none is still expanding. The browser
                     // composes the job's expected total from this; a count published while an archive is
                     // still inbound gives it a total that grows, which is the exact backwards movement the

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
@@ -64,6 +65,10 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public TestServer Server => _factory.Server;
 
         public FakeDeviceConnectionManager DeviceManager { get; }
+
+        /// <summary>The launches the engine requested; no launch ever reaches the fake port.</summary>
+        public RecordingFileLaunchService Launches =>
+            (RecordingFileLaunchService)_factory.Services.GetRequiredService<IFileLaunchService>();
 
         public TransferOptions Options { get; }
 
@@ -163,6 +168,14 @@ namespace TeensyRom.Api.Tests.Integration.Common
                             LaunchSettleMs = 10,
                             ConnectTimeoutMs = 50
                         });
+
+                        var launchDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IFileLaunchService));
+                        if (launchDescriptor != null)
+                        {
+                            services.Remove(launchDescriptor);
+                        }
+                        services.AddSingleton<IFileLaunchService>(sp =>
+                            new RecordingFileLaunchService(sp.GetRequiredService<IDeviceLeaseCoordinator>()));
 
                         services.AddSingleton(Options);
                         configureServices?.Invoke(services);

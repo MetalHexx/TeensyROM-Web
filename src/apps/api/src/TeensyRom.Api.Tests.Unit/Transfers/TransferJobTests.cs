@@ -615,4 +615,107 @@ public class TransferJobTests
         dto.ExpansionBytesDeclared.Should().Be(500);
         dto.ExpandedFileCount.Should().BeNull();
     }
+
+    private static TransferJob SealedJobSending(params string[] targetPaths)
+    {
+        var job = NewJob();
+        job.TryTransitionTo(TransferJobState.Receiving);
+
+        foreach (var path in targetPaths)
+        {
+            job.OnFileReceived(1);
+            job.OnFileSent(new TransferFileCompleted(job.JobId, path, path, true, null, 1));
+        }
+
+        job.TryTransitionTo(TransferJobState.Sealed);
+        return job;
+    }
+
+    [Fact]
+    public void LaunchCandidate_TracksTheBestFileSentSoFar()
+    {
+        var job = SealedJobSending("/t/z.sid", "/t/b/zed.prg", "/t/c/alpha.prg", "/t/readme.nfo");
+
+        job.LaunchCandidate.Should().Be("/t/c/alpha.prg");
+    }
+
+    [Fact]
+    public void LaunchCandidate_FailedFilesAndUnlaunchableTypesNeverQualify()
+    {
+        var job = NewJob();
+        job.TryTransitionTo(TransferJobState.Receiving);
+        job.OnFileReceived(1);
+        job.OnFileFailed(Failure(job, "game.prg", "boom", 1));
+        job.OnFileReceived(1);
+        job.OnFileSent(new TransferFileCompleted(job.JobId, "a.d64", "/t/a.d64", true, null, 1));
+
+        job.LaunchCandidate.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryComplete_LaunchDueWithCandidate_CompletesAndSetsLaunchPendingTogether()
+    {
+        var job = SealedJobSending("/t/game.prg");
+
+        job.TryComplete(launchDue: true).Should().BeTrue();
+
+        var snapshot = job.ToSnapshot();
+        snapshot.State.Should().Be(TransferJobState.Completed);
+        snapshot.LaunchState.Should().Be(TransferLaunchState.Pending);
+        snapshot.LaunchedPath.Should().Be("/t/game.prg");
+    }
+
+    [Fact]
+    public void TryComplete_LaunchNotDue_CompletesWithNoLaunch()
+    {
+        var job = SealedJobSending("/t/game.prg");
+
+        job.TryComplete(launchDue: false).Should().BeTrue();
+
+        var snapshot = job.ToSnapshot();
+        snapshot.State.Should().Be(TransferJobState.Completed);
+        snapshot.LaunchState.Should().Be(TransferLaunchState.None);
+        snapshot.LaunchedPath.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryComplete_NoCandidate_NeverGoesPending()
+    {
+        var job = SealedJobSending("/t/a.d64");
+
+        job.TryComplete(launchDue: true).Should().BeTrue();
+
+        job.ToSnapshot().LaunchState.Should().Be(TransferLaunchState.None);
+    }
+
+    [Theory]
+    [InlineData(TransferJobState.Created)]
+    [InlineData(TransferJobState.Receiving)]
+    [InlineData(TransferJobState.Completed)]
+    [InlineData(TransferJobState.Cancelled)]
+    [InlineData(TransferJobState.Aborted)]
+    public void TryComplete_IllegalTransition_ChangesNothing(TransferJobState from)
+    {
+        var job = JobIn(from);
+        job.OnFileSent(new TransferFileCompleted(job.JobId, "game.prg", "/t/game.prg", true, null, 1));
+
+        job.TryComplete(launchDue: true).Should().BeFalse();
+
+        job.State.Should().Be(from);
+        job.ToSnapshot().LaunchState.Should().Be(TransferLaunchState.None);
+    }
+
+    [Fact]
+    public void CompleteLaunch_RecordsStateAndErrorOnTheSnapshotAndDto()
+    {
+        var job = SealedJobSending("/t/game.prg");
+        job.TryComplete(launchDue: true);
+
+        job.CompleteLaunch(TransferLaunchState.Failed, "no response");
+
+        var dto = TransferJobDto.From(job.ToSnapshot());
+        dto.LaunchState.Should().Be(TransferLaunchState.Failed);
+        dto.LaunchedPath.Should().Be("/t/game.prg");
+        dto.LaunchError.Should().Be("no response");
+    }
 }

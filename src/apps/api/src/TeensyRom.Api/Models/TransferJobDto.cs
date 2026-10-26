@@ -34,6 +34,9 @@ namespace TeensyRom.Api.Models
         [Required] public long ExpansionBytesWritten { get; set; }
         [Required] public long ExpansionBytesDeclared { get; set; }
         public int? ExpandedFileCount { get; set; }
+        [Required] public TransferLaunchState LaunchState { get; set; }
+        public string? LaunchedPath { get; set; }
+        public string? LaunchError { get; set; }
 
         /// <summary>
         /// Maps a domain snapshot to the wire shape. The only place a <see cref="TransferJobSnapshot"/>
@@ -63,7 +66,10 @@ namespace TeensyRom.Api.Models
             ExpandingArchive = snapshot.ExpandingArchive,
             ExpansionBytesWritten = snapshot.ExpansionBytesWritten,
             ExpansionBytesDeclared = snapshot.ExpansionBytesDeclared,
-            ExpandedFileCount = snapshot.ExpandedFileCount
+            ExpandedFileCount = snapshot.ExpandedFileCount,
+            LaunchState = snapshot.LaunchState,
+            LaunchedPath = snapshot.LaunchedPath,
+            LaunchError = snapshot.LaunchError
         };
     }
 }
