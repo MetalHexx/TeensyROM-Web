@@ -4,7 +4,7 @@ import { MidiSettingsPersistence } from '../midi-settings-persistence';
 import type { ControlMappingRecord } from '../ports';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { ownerLabel } from './mapping-labels';
-import { clampAmount, defaultStyle, isStyleAvailable } from './mapping-styles';
+import { clampAmount, defaultStyle, isStyleAvailableFor } from './mapping-styles';
 import {
   controlKey,
   isControlId,
@@ -117,7 +117,7 @@ export class MidiMappings {
     if (mapping === null || control === null) {
       return;
     }
-    if (!isStyleAvailable(control.nature, mapping.source.kind, style.kind)) {
+    if (!isStyleAvailableFor(control, mapping.source.kind, style.kind)) {
       logWarn(`MidiMappings: style ${style.kind} refused for ${controlKey(mapping.control)}.`);
       return;
     }
@@ -148,7 +148,7 @@ export class MidiMappings {
     const movedFrom = occupant !== null && occupant.id !== id ? this.take(occupant) : null;
 
     this.engine.releaseMapping(id);
-    const style = isStyleAvailable(control.nature, source.kind, current.style.kind)
+    const style = isStyleAvailableFor(control, source.kind, current.style.kind)
       ? current.style
       : this.usableStyle(control, source.kind, proposed);
     const mapping: ControlMapping = { ...current, source, style };
@@ -176,7 +176,7 @@ export class MidiMappings {
     sourceKind: MidiSourceKind,
     style: MappingStyle
   ): MappingStyle {
-    if (!isStyleAvailable(control.nature, sourceKind, style.kind)) {
+    if (!isStyleAvailableFor(control, sourceKind, style.kind)) {
       logWarn(
         `MidiMappings: style ${style.kind} is not available for ${controlKey(
           control.identity

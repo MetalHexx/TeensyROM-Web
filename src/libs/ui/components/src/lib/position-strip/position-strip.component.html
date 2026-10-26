@@ -10,6 +10,20 @@
   (input)="onInput($event)"
   (change)="onChange($event)"
 />
+@if (marks() !== null) {
+<div class="lane" aria-hidden="true">
+  @for (drawn of drawnMarks(); track drawn.mark.id) {
+  <span
+    class="mark"
+    [attr.data-kind]="drawn.mark.kind"
+    [attr.data-activity]="drawn.mark.activity"
+    [attr.data-selected]="drawn.mark.selected ? '' : null"
+    [style.left.%]="drawn.left"
+    [style.width.%]="drawn.width"
+  ></span>
+  }
+</div>
+}
 <div class="strip" [attr.data-state]="barState().kind" aria-hidden="true">
   <div class="track">
     @if (barState().kind !== 'analyzing') {

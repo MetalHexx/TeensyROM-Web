@@ -152,14 +152,56 @@ export interface MidiState {
   lastError: string | null;
 }
 
+/** One end of a marker: the frame the performer captured it at and the signed nudge applied to it.
+ *  The frame the engine jumps to is `max(0, frame + offsetFrames)`. */
+export interface DeckLoopBoundary {
+  readonly frame: number;
+  readonly offsetFrames: number;
+}
+
+/** One saved position in the tune: a cue when it has no end, a loop when it has one. */
+export interface DeckLoopMarker {
+  readonly id: string;
+  readonly start: DeckLoopBoundary;
+  readonly end: DeckLoopBoundary | null;
+  readonly voices: readonly number[];
+  /** Its resolved start frame is in the engine's `preparedFrames`: a jump to it lands instantly. */
+  readonly ready: boolean;
+}
+
+/** One deck's markers for the tune it holds, and where the performer is working in them. */
+export interface DeckLoopsState {
+  /** List order is the 'Item N' order. */
+  markers: readonly DeckLoopMarker[];
+  selectedId: string | null;
+  /** A marker loop the engine is running. */
+  runningId: string | null;
+  /** Queued in the engine, or waiting for readiness. */
+  queuedId: string | null;
+  selectionMovedWhileQueued: boolean;
+  /** Frames, ascending, from the tune index. */
+  detectedMoments: readonly number[];
+}
+
 export interface DjState {
   decks: Record<Slot, DeckState>;
   bindings: Record<Slot, DeckBindingState>;
   midi: MidiState;
   seen: Record<DjFileKey, TuneReference>;
   panel: Record<Slot, DeckPanelState>;
+  loops: Record<Slot, DeckLoopsState>;
   keyDisplayFormat: KeyDisplayFormat;
 }
+
+/** A deck holding no markers: its loop state while nothing is attached. */
+export const EMPTY_DECK_LOOPS: DeckLoopsState = {
+  markers: [],
+  selectedId: null,
+  runningId: null,
+  queuedId: null,
+  selectionMovedWhileQueued: false,
+  detectedMoments: [],
+};
 
 const initialDeckState: DeckState = {
   loaded: null,
@@ -198,6 +240,7 @@ const initialState: DjState = {
   midi: { accessState: 'idle', ports: [], lastError: null },
   seen: {},
   panel: { A: HOME_DECK_PANEL, B: HOME_DECK_PANEL },
+  loops: { A: EMPTY_DECK_LOOPS, B: EMPTY_DECK_LOOPS },
   keyDisplayFormat: 'camelot',
 };
 

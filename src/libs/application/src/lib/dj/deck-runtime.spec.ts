@@ -120,20 +120,21 @@ describe('DeckRuntime', () => {
     runtime = TestBed.inject(DeckRuntime);
   });
 
-  it('builds a slot once: a second build call does not rebuild its clock or replay thread', () => {
+  it('builds a slot once: a second build call does not rebuild its clock or replay threads', () => {
     runtime.build('A');
     runtime.build('A');
 
     expect(clockFactory).toHaveBeenCalledTimes(1);
-    expect(replayFactory).toHaveBeenCalledTimes(1);
+    expect(replayFactory).toHaveBeenCalledTimes(2);
   });
 
-  it('builds each slot its own clock and replay thread', () => {
+  it('builds each slot its own clock and its own pair of replay threads, one for jumps and one for prepared builds', () => {
     runtime.build('A');
     runtime.build('B');
 
     expect(clockFactory).toHaveBeenCalledTimes(2);
-    expect(replayFactory).toHaveBeenCalledTimes(2);
+    expect(replayFactory).toHaveBeenCalledTimes(4);
+    expect(new Set(replayRunners).size).toBe(4);
   });
 
   it('drops bytes with nothing bound, never reaching the MIDI access port lookup', () => {
@@ -227,12 +228,12 @@ describe('DeckRuntime', () => {
     });
   });
 
-  it('disposes the built player, releasing its replay thread', () => {
+  it('disposes the built player, releasing both of its replay threads', () => {
     runtime.build('A');
 
     runtime.dispose('A');
 
-    expect(replayRunners[0].disposed).toBe(true);
+    expect(replayRunners.map((runner) => runner.disposed)).toEqual([true, true]);
   });
 
   it("disposing one slot leaves the other slot's player untouched", () => {
@@ -241,8 +242,7 @@ describe('DeckRuntime', () => {
 
     runtime.dispose('A');
 
-    expect(replayRunners[0].disposed).toBe(true);
-    expect(replayRunners[1].disposed).toBe(false);
+    expect(replayRunners.map((runner) => runner.disposed)).toEqual([true, true, false, false]);
   });
 
   describe('engine controls', () => {
@@ -349,6 +349,49 @@ describe('DeckRuntime', () => {
         { muted: false, held: false },
         { muted: false, held: true },
       ]);
+    });
+
+    it('setJumpTargets declares the frames on the named slot only', () => {
+      const a = vi.spyOn(playerFor(0), 'setJumpTargets');
+      const b = vi.spyOn(playerFor(1), 'setJumpTargets');
+
+      runtime.setJumpTargets('A', [10, 250]);
+
+      expect(a).toHaveBeenCalledExactlyOnceWith([10, 250]);
+      expect(b).not.toHaveBeenCalled();
+    });
+
+    it('capturePosition answers null with nothing loaded', () => {
+      expect(runtime.capturePosition('A')).toBeNull();
+    });
+
+    it('capturePosition answers the frame the loaded tune is at', () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+
+      expect(runtime.capturePosition('A')).toBe(0);
+    });
+
+    it('setActiveLoop and queueJump pass their frames to the named slot only, and null clears', () => {
+      const loop = vi.spyOn(playerFor(0), 'setActiveLoop').mockImplementation(() => undefined);
+      const queue = vi.spyOn(playerFor(0), 'queueJump').mockImplementation(() => undefined);
+      const otherLoop = vi.spyOn(playerFor(1), 'setActiveLoop');
+
+      runtime.setActiveLoop('A', { startFrame: 100, endFrame: 400 });
+      runtime.setActiveLoop('A', null);
+      runtime.queueJump('A', { startFrame: 20, endFrame: null });
+      runtime.queueJump('A', null);
+
+      expect(loop.mock.calls).toEqual([[{ startFrame: 100, endFrame: 400 }], [null]]);
+      expect(queue.mock.calls).toEqual([[{ startFrame: 20, endFrame: null }], [null]]);
+      expect(otherLoop).not.toHaveBeenCalled();
+    });
+
+    it('seekToFrame seeks the named slot to that frame', async () => {
+      const seek = vi.spyOn(playerFor(0), 'seek').mockResolvedValue(undefined);
+
+      await runtime.seekToFrame('A', 320);
+
+      expect(seek).toHaveBeenCalledExactlyOnceWith(320);
     });
 
     it('throws for a slot that has not been built', () => {

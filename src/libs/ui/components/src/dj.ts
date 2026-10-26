@@ -14,3 +14,7 @@ export * from './lib/binding-plate/binding-plate.component';
 export * from './lib/hold-press/hold-press.directive';
 export * from './lib/voice-row/voice-row.component';
 export * from './lib/voice-panel/voice-panel.component';
+export * from './lib/loop-tile/loop-tile.component';
+export * from './lib/loop-tile-grid/loop-tile-grid.component';
+export * from './lib/loop-boundary/loop-boundary.component';
+export * from './lib/loop-selected-row/loop-selected-row.component';

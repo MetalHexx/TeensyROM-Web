@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { PositionStripComponent } from './position-strip.component';
+import { PositionStripComponent, type PositionMark } from './position-strip.component';
 
 const meta: Meta<PositionStripComponent> = {
   title: 'DJ/Position Strip',
@@ -26,6 +26,11 @@ const meta: Meta<PositionStripComponent> = {
     positionPercent: { description: '0–100: the live playhead, or the caller’s drag pin.' },
     accessibleName: { description: "The range's accessible name, e.g. 'Position deck A'." },
     valueText: { description: "The range's aria-valuetext, e.g. '01:23.4 of 03:12'." },
+    marks: {
+      description:
+        'Loop brackets and cue ticks in a lane above the strip. null reserves no lane; an array, ' +
+        'even an empty one, does. The lane takes no pointer or keyboard input.',
+    },
     scrubInput: { description: 'Every drag tick — a preview, never a seek.' },
     scrubCommit: { description: 'Release only — the one that seeks.' },
   },
@@ -37,6 +42,7 @@ type Story = StoryObj<PositionStripComponent>;
 const base = {
   accessibleName: 'Position deck A',
   valueText: '01:23.4 of 03:12',
+  marks: null as readonly PositionMark[] | null,
 };
 
 const wrapped: Story['render'] = (args) => ({
@@ -48,6 +54,7 @@ const wrapped: Story['render'] = (args) => ({
         [positionPercent]="positionPercent"
         [accessibleName]="accessibleName"
         [valueText]="valueText"
+        [marks]="marks"
       />
     </div>
   `,
@@ -88,6 +95,58 @@ export const MidDrag: Story = {
   render: wrapped,
 };
 
+function mark(id: string, overrides: Partial<PositionMark>): PositionMark {
+  return {
+    id,
+    kind: 'loop',
+    startPercent: 10,
+    endPercent: 22,
+    activity: 'idle',
+    selected: false,
+    ...overrides,
+  };
+}
+
+/** The marks lane reserved with nothing in it yet. */
+export const MarksEmptyLane: Story = {
+  args: { ...base, barState: { kind: 'loop', introPercent: 25 }, positionPercent: 40, marks: [] },
+  render: wrapped,
+};
+
+/** An idle loop and an idle cue. */
+export const MarksIdle: Story = {
+  args: {
+    ...base,
+    barState: { kind: 'loop', introPercent: 25 },
+    positionPercent: 40,
+    marks: [
+      mark('loop', { startPercent: 12, endPercent: 30 }),
+      mark('cue', { kind: 'cue', startPercent: 60, endPercent: null }),
+    ],
+  },
+  render: wrapped,
+};
+
+/** Every state at once: idle, selected, running, queued, and selected with running. */
+export const MarksEveryState: Story = {
+  args: {
+    ...base,
+    barState: { kind: 'loop', introPercent: 25 },
+    positionPercent: 40,
+    marks: [
+      mark('idle', { startPercent: 2, endPercent: 10 }),
+      mark('idle-cue', { kind: 'cue', startPercent: 14, endPercent: null }),
+      mark('selected', { startPercent: 18, endPercent: 28, selected: true }),
+      mark('selected-cue', { kind: 'cue', startPercent: 32, endPercent: null, selected: true }),
+      mark('running', { startPercent: 36, endPercent: 46, activity: 'running' }),
+      mark('queued', { startPercent: 50, endPercent: 60, activity: 'queued' }),
+      mark('queued-cue', { kind: 'cue', startPercent: 64, endPercent: null, activity: 'queued' }),
+      mark('both', { startPercent: 70, endPercent: 82, activity: 'running', selected: true }),
+    ],
+  },
+  render: wrapped,
+};
+
 /** A working scrubber: click or drag anywhere on the strip, or use the arrow keys, Home and End.
  *  The position follows every preview; the commit is the release. */
 export const Interactive: Story = {
@@ -109,6 +168,7 @@ export const Interactive: Story = {
           [positionPercent]="positionPercent"
           [accessibleName]="accessibleName"
           [valueText]="valueText"
+          [marks]="marks"
           (scrubInput)="onScrubInput($event)"
           (scrubCommit)="onScrubCommit($event)"
         />

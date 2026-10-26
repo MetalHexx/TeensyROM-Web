@@ -1,0 +1,33 @@
+:host {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 6px;
+  // Room for the selected tile's ring, which would otherwise be clipped by the scroll container.
+  padding: 2px;
+}
+
+.item {
+  display: block;
+  min-width: 0;
+}
+
+.item lib-loop-tile {
+  width: 100%;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--spacing-md);
+  color: var(--synth-display-dim);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.7rem;
+  text-align: center;
+}

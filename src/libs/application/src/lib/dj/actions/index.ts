@@ -18,6 +18,10 @@ import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
 import { setDeckTiming } from './set-deck-timing';
+import { setDeckLoops } from './set-deck-loops';
+import { setLoopMarkers } from './set-loop-markers';
+import { setLoopSelection } from './set-loop-selection';
+import { setLoopActivity } from './set-loop-activity';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -41,6 +45,10 @@ export function withDjActions() {
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),
       ...setDeckTiming(writableStore),
+      ...setDeckLoops(writableStore),
+      ...setLoopMarkers(writableStore),
+      ...setLoopSelection(writableStore),
+      ...setLoopActivity(writableStore),
     };
   });
 }

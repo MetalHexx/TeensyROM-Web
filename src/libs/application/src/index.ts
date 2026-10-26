@@ -13,6 +13,7 @@ export * from './lib/dj/ports';
 export * from './lib/dj/selectors/transport-summary';
 export * from './lib/dj/selectors/transport-time';
 export * from './lib/dj/selectors/binding-summary';
+export * from './lib/dj/selectors/loops-summary';
 export * from './lib/dj/cartridge-options';
 export * from './lib/dj/load-source';
 export * from './lib/dj/deck-runtime';

@@ -17,7 +17,7 @@ import {
   MidiMappings,
   MidiMappingStore,
   actionOf,
-  actionsFor,
+  actionsForControl,
   controlKey,
   defaultAmountFor,
   describeAction,
@@ -111,10 +111,27 @@ function toPercent(amount: number): number {
 }
 
 /** The amount field for a style that takes one, or `null`. The field works in percent, and the
- *  mapping keeps a fraction. */
-function amountField(kind: MappingStyleKind, amount: number | null): BindingRowAmount | null {
+ *  mapping keeps a fraction. A whole-step control moves one place whatever the amount, so a
+ *  relative style has none and a step style shows the amount only for its sign: the direction. */
+function amountField(
+  control: MappableControl,
+  kind: MappingStyleKind,
+  amount: number | null
+): BindingRowAmount | null {
   if (amount === null) {
     return null;
+  }
+  if (control.nature === 'value' && control.wholeSteps) {
+    return isStepKind(kind)
+      ? {
+          label: 'Direction (+ next, − previous)',
+          value: toPercent(amount),
+          min: -100,
+          max: 100,
+          step: 0.1,
+          suffix: '%',
+        }
+      : null;
   }
   if (isRelativeKind(kind)) {
     return {
@@ -334,7 +351,7 @@ export class DjBindingsPanelComponent {
     statuses: Readonly<Record<string, ControllerStatus>>,
     expandedId: string | null
   ): BindingRowView {
-    const actions = actionsFor(control.nature, mapping.source.kind);
+    const actions = actionsForControl(control, mapping.source.kind);
     const trigger = triggerOf(mapping.style.kind);
     const owner = ownerLabel(mapping.control.owner);
 
@@ -360,7 +377,7 @@ export class DjBindingsPanelComponent {
                 label: describeTrigger(edge, mapping.source.kind),
               })),
         selectedTriggerId: trigger,
-        amount: amountField(mapping.style.kind, mapping.style.amount),
+        amount: amountField(control, mapping.style.kind, mapping.style.amount),
         statusText: BINDING_STATUS_TEXT[statuses[mapping.source.controllerId] ?? 'missing'],
         editAccessibleName: `Edit ${control.name} binding, ${owner}`,
         deleteAccessibleName: `Delete ${control.name} binding, ${owner}`,

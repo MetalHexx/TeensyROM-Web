@@ -1,0 +1,39 @@
+<span class="tag">{{ model().tag }}</span>
+<lib-synth-key
+  data-part="snap-previous"
+  icon="chevron_left"
+  [accessibleName]="model().previousAccessibleName"
+  [disabled]="controlsDisabled() || model().previousDisabled"
+  (press)="snapPrevious.emit()"
+/>
+<div class="nudge">
+  <input
+    type="range"
+    [min]="-model().rangeFrames"
+    [max]="model().rangeFrames"
+    step="1"
+    [value]="shownOffset()"
+    [disabled]="stripDisabled()"
+    [attr.aria-label]="model().nudgeAccessibleName"
+    [attr.aria-valuetext]="readout()"
+    (input)="onInput($event)"
+    (change)="onChange($event)"
+  />
+  <div class="strip" aria-hidden="true">
+    <span class="centre"></span>
+    @if (!model().empty) { @for (percent of model().tickPercents; track $index) {
+    <span class="tick" [style.left.%]="percent"></span>
+    } @if (model().rangeFrames > 0) {
+    <span class="bar" [style.left.%]="barLeftPercent()" [style.width.%]="barWidthPercent()"></span>
+    <span class="cap" [style.left.%]="valuePercent()"></span>
+    } }
+  </div>
+</div>
+<lib-synth-key
+  data-part="snap-next"
+  icon="chevron_right"
+  [accessibleName]="model().nextAccessibleName"
+  [disabled]="controlsDisabled() || model().nextDisabled"
+  (press)="snapNext.emit()"
+/>
+<span class="readout" data-part="readout">{{ readout() }}</span>

@@ -17,12 +17,13 @@ import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports
 import type { Slot } from './slot';
 
 /** One deck slot's whole engine bundle: the core player, its ASID sink, the audio-graph clock
- *  driving it and the replay thread it jumps through. */
+ *  driving it and the two replay threads it uses — one for jumps, one for prepared builds. */
 export interface SlotRuntime {
   readonly player: SidPlayer;
   readonly sink: AsidSink;
   readonly clock: FrameClock;
   readonly replay: ReplayRunner;
+  readonly prepare: ReplayRunner;
 }
 
 /** The façade's mutable target: which port id a slot currently points at, and whether the
@@ -53,7 +54,7 @@ export class DeckRuntime {
   private readonly chipModels = new Map<Slot, SidModel>();
 
   /** Builds this slot's engine bundle, once. A second call is a no-op — the sink, the player, the
-   *  clock and the replay thread are never rebuilt for a slot already built. */
+   *  clock and the replay threads are never rebuilt for a slot already built. */
   build(slot: Slot): void {
     if (this.slots.has(slot)) {
       return;
@@ -66,9 +67,10 @@ export class DeckRuntime {
     const sink = createAsidSink(port);
     const clock = this.clockFactory();
     const replay = this.replayFactory();
-    const player = createSidPlayer({ sink, clock, replayRunner: replay });
+    const prepare = this.replayFactory();
+    const player = createSidPlayer({ sink, clock, replayRunner: replay, prepareRunner: prepare });
 
-    this.slots.set(slot, { player, sink, clock, replay });
+    this.slots.set(slot, { player, sink, clock, replay, prepare });
   }
 
   /** Re-targets this slot's port façade. The sink and player are never rebuilt — only the id the
@@ -198,6 +200,44 @@ export class DeckRuntime {
     return this.requireSlot(slot).player.getPosition();
   }
 
+  /** Declares the frames this slot may jump to instantly, replacing the previous set; the engine
+   *  prepares each off the main thread and publishes readiness in its snapshot. The engine clears
+   *  the set on a tune load and a subtune change. */
+  setJumpTargets(slot: Slot, targetFrames: readonly number[]): void {
+    this.requireSlot(slot).player.setJumpTargets(targetFrames.map((frame) => frames(frame)));
+  }
+
+  /** Captures the live position into the engine's image cache and returns its frame, or null with
+   *  nothing loaded. A declared frame is ready the moment this returns. */
+  capturePosition(slot: Slot): number | null {
+    return this.requireSlot(slot).player.capturePosition();
+  }
+
+  /** Runs a loop between two frames; null stops looping. */
+  setActiveLoop(slot: Slot, loop: { startFrame: number; endFrame: number } | null): void {
+    this.requireSlot(slot).player.setActiveLoop(
+      loop === null
+        ? null
+        : { startFrame: frames(loop.startFrame), endFrame: frames(loop.endFrame) }
+    );
+  }
+
+  /** Queues a jump for the end of the running loop's lap; null cancels. */
+  queueJump(slot: Slot, target: { startFrame: number; endFrame: number | null } | null): void {
+    this.requireSlot(slot).player.queueJump(
+      target === null
+        ? null
+        : {
+            startFrame: frames(target.startFrame),
+            endFrame: target.endFrame === null ? null : frames(target.endFrame),
+          }
+    );
+  }
+
+  seekToFrame(slot: Slot, frame: number): Promise<void> {
+    return this.requireSlot(slot).player.seek(frames(frame));
+  }
+
   subscribe(slot: Slot, listener: () => void): () => void {
     return this.requireSlot(slot).player.subscribe(listener);
   }
@@ -206,9 +246,9 @@ export class DeckRuntime {
     this.requireSlot(slot).sink.showText(text);
   }
 
-  /** Disposes this slot's player. Nothing else holds the clock's audio graph, the ASID session or
-   *  the replay thread — a player left running keeps streaming frames with no UI left to reach
-   *  `stop()`. */
+  /** Disposes this slot's player, which releases both replay threads. Nothing else holds the
+   *  clock's audio graph, the ASID session or the threads — a player left running keeps streaming
+   *  frames with no UI left to reach `stop()`. */
   dispose(slot: Slot): void {
     this.requireSlot(slot).player.dispose();
   }

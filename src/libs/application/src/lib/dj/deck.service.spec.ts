@@ -2,10 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { FakeClock, frames, replayToFrame } from '@sidablist/core';
+import { FakeClock, frames, milliseconds, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
-import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
+import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
+import type { LoopMarker, Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
 import type { TuneIndexRecord } from '@sidablist/analysis';
 import {
   FILE_CONTENT_SERVICE,
@@ -14,6 +15,7 @@ import {
   type IFileContentService,
 } from '@teensyrom-nx/domain';
 import { DeckService } from './deck.service';
+import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
@@ -21,7 +23,14 @@ import { MixerService } from './mixer.service';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, HOME_DECK_PANEL } from './dj-store';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  MIDI_ACCESS,
+  TUNE_INSERTER,
+  TUNE_RESOLVER,
+  LOOP_POSITIONS_STORE,
+} from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
 import { logWarn } from '@teensyrom-nx/utils';
@@ -41,7 +50,13 @@ class FakeReplayRunner implements ReplayRunner {
       return Promise.resolve({
         id: request.id,
         ok: true,
-        result: replayToFrame(request.file, request.subtune, request.targetFrame, request.mutes),
+        result: replayToFrame(
+          request.file,
+          request.subtune,
+          request.targetFrame,
+          request.mutes,
+          request.start
+        ),
       });
     } catch (error) {
       return Promise.resolve({
@@ -60,7 +75,7 @@ class FakeReplayRunner implements ReplayRunner {
  *  fixture builder, trimmed to the fields these specs vary. */
 function buildSidFileBytes(options: { name: string; songs?: number; startSong?: number }): Uint8Array {
   const headerSize = 0x7c;
-  const payload = [0xa9, 0x00, 0x60]; // LDA #0; RTS
+  const payload = [0xa9, 0x00, 0x60, 0x60]; // init: LDA #0; RTS — play: RTS
   const buffer = new Uint8Array(headerSize + payload.length);
   const view = new DataView(buffer.buffer);
   writeAscii(buffer, 0x00, 'PSID');
@@ -156,6 +171,7 @@ describe('DeckService', () => {
   let outputPortForMock: ReturnType<typeof vi.fn>;
   let byPath: Map<string, TuneFixture>;
   let bySidHash: Map<string, TuneFixture>;
+  let clocks: FakeClock[];
 
   function register(fixture: TuneFixture): TuneFixture {
     byPath.set(fixture.source.path, fixture);
@@ -195,6 +211,7 @@ describe('DeckService', () => {
     fixtureId = 0;
     byPath = new Map();
     bySidHash = new Map();
+    clocks = [];
 
     fileContentMock = vi.fn((deviceId: string, storageType: StorageType, path: string) => {
       const fixture = byPath.get(path);
@@ -239,12 +256,20 @@ describe('DeckService', () => {
         TuneLoader,
         DjStore,
         { provide: DeckBindings, useValue: fakeBindings },
-        { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
+        {
+          provide: FRAME_CLOCK_FACTORY,
+          useValue: (): FakeClock => {
+            const clock = new FakeClock();
+            clocks.push(clock);
+            return clock;
+          },
+        },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess((id) => outputPortForMock(id) as MidiOutputPort | null) },
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService },
         { provide: TUNE_INSERTER, useValue: { insert: insertMock } },
         { provide: TUNE_RESOLVER, useValue: { resolve: resolveMock } },
+        { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
       ],
     });
 
@@ -1573,6 +1598,483 @@ describe('DeckService', () => {
 
         expect(pending.size).toBe(1);
       });
+    });
+  });
+
+  describe('loop markers', () => {
+    const markersOf = (slot: 'A' | 'B') => store.loops()[slot].markers;
+
+    /** Moves the playhead of a loaded deck and marks it. */
+    async function markAt(slot: 'A' | 'B', frame: number): Promise<void> {
+      await runtime.seekToFrame(slot, frame);
+      service.addMarker(slot);
+    }
+
+    it("brings a tune's markers back when it is loaded again after another", async () => {
+      const first = register(makeFixture());
+      const second = register(makeFixture());
+      await loadAndWait('A', first);
+      await markAt('A', 100);
+      const saved = markersOf('A');
+      expect(saved).toHaveLength(1);
+
+      await loadAndWait('A', second);
+      expect(markersOf('A')).toEqual([]);
+
+      await loadAndWait('A', first);
+      expect(markersOf('A').map((marker) => marker.id)).toEqual(saved.map((marker) => marker.id));
+      expect(store.loops().A.selectedId).toBe(saved[0].id);
+    });
+
+    it("shows each subtune's own list when the subtune changes", async () => {
+      const fixture = register(makeFixture({ subtuneCount: 2 }));
+      await loadAndWait('A', fixture);
+      await markAt('A', 100);
+
+      await service.selectSubtune('A', 2);
+      expect(markersOf('A')).toEqual([]);
+      await markAt('A', 200);
+
+      await service.selectSubtune('A', 1);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([100]);
+      await service.selectSubtune('A', 2);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([200]);
+    });
+
+    it('shows an edit made on either deck on both when they hold the same tune', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await loadAndWait('B', fixture);
+
+      await markAt('A', 100);
+      expect(markersOf('B').map((marker) => marker.start.frame)).toEqual([100]);
+
+      await markAt('B', 200);
+      expect(markersOf('A').map((marker) => marker.start.frame)).toEqual([100, 200]);
+    });
+
+    it("turns a loaded tune's markers ready as the engine builds them", async () => {
+      const fixture = register(makeFixture());
+      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        { id: 'saved', start: { frame: 60, offsetFrames: 0 }, end: null, voices: [0, 1, 2] },
+      ]);
+
+      await loadAndWait('A', fixture);
+
+      await vi.waitFor(() => expect(markersOf('A').map((marker) => marker.ready)).toEqual([true]));
+    });
+
+    it('refuses every marker command while the deck has nothing shapeable loaded', async () => {
+      service.addMarker('A');
+      service.selectMarker('A', 'x');
+      service.moveMarkerSelection('A', 1);
+      service.selectMarkerAt('A', 0);
+      service.setMarkerEnd('A');
+      service.clearMarkerEnd('A');
+      service.deleteMarker('A');
+      await service.nudgeMarker('A', 'start', 5);
+      await service.snapMarker('A', 'start', 'next');
+      await service.toggleMarker('A');
+      service.stopMarkerLoop('A');
+
+      const refusals = vi
+        .mocked(logWarn)
+        .mock.calls.filter(([message]) => message.startsWith('DeckService'));
+      expect(refusals).toHaveLength(11);
+      expect(markersOf('A')).toEqual([]);
+    });
+
+    it('edits through the commands once a tune is loaded', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await markAt('A', 100);
+      await markAt('A', 300);
+
+      service.selectMarkerAt('A', 0);
+      await runtime.seekToFrame('A', 180);
+      service.setMarkerEnd('A');
+      await service.nudgeMarker('A', 'start', 7);
+      service.moveMarkerSelection('A', 1);
+      service.deleteMarker('A');
+
+      expect(markersOf('A')).toHaveLength(1);
+      expect(markersOf('A')[0]).toMatchObject({ end: { frame: 180 }, start: { offsetFrames: 7 } });
+      expect(store.loops().A.selectedId).toBe(markersOf('A')[0].id);
+    });
+  });
+
+  describe('performing markers', () => {
+    const loopMarker = (id: string, start: number, end: number): LoopMarker => ({
+      id,
+      start: { frame: start, offsetFrames: 0 },
+      end: { frame: end, offsetFrames: 0 },
+      voices: [0, 1, 2],
+    });
+    const cueMarker = (id: string, frame: number): LoopMarker => ({
+      id,
+      start: { frame, offsetFrames: 0 },
+      end: null,
+      voices: [0, 1, 2],
+    });
+    const loopsOf = (slot: 'A' | 'B') => store.loops()[slot];
+    const engineLoop = (slot: 'A' | 'B') => runtime.snapshot(slot).loop;
+    const engineQueue = (slot: 'A' | 'B') => runtime.snapshot(slot).tune?.queuedJump ?? null;
+    let tickCount = 0;
+
+    /** Fires frames of the deck's clock, one at a time. */
+    function tick(slot: 'A' | 'B', count = 1): void {
+      for (let i = 0; i < count; i++) {
+        clocks[slot === 'A' ? 0 : 1].tick(milliseconds(++tickCount));
+      }
+    }
+
+    function tickUntil(slot: 'A' | 'B', done: () => boolean, limit = 800): void {
+      for (let i = 0; i < limit && !done(); i++) {
+        tick(slot);
+      }
+      expect(done()).toBe(true);
+    }
+
+    /** Loads a tune carrying a loop at 100–120, a loop at 300–320 and a cue at 500, all ready. */
+    async function loadPlayable(slot: 'A' | 'B', detectedMoments: number[] = []): Promise<void> {
+      const fixture = register(makeFixture());
+      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        loopMarker('a', 100, 120),
+        loopMarker('b', 300, 320),
+        cueMarker('c', 500),
+      ]);
+      if (detectedMoments.length > 0) {
+        resolveMock.mockImplementation(async (identity: TuneIdentity) => {
+          const playable = playableOf(fixture, identity.subtune);
+          return {
+            ...playable,
+            index: {
+              ...playable.index,
+              detectedMoments: detectedMoments.map((frame) => ({ frame, strength: 1 })),
+            },
+          };
+        });
+      }
+      await loadAndWait(slot, fixture);
+      await vi.waitFor(() => expect(loopsOf(slot).markers.every((marker) => marker.ready)).toBe(true));
+    }
+
+    it('presses the selected marker when no id is given, and does nothing with none selected', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await service.toggleMarker('A');
+      expect(loopsOf('A').runningId).toBeNull();
+
+      await loadPlayable('A');
+      await service.toggleMarker('A');
+
+      expect(loopsOf('A').runningId).toBe('a');
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+    });
+
+    it('presses the marker it is given', async () => {
+      await loadPlayable('A');
+
+      await service.toggleMarker('A', 'b');
+
+      expect(loopsOf('A').runningId).toBe('b');
+      expect(loopsOf('A').selectedId).toBe('a');
+    });
+
+    it('queues behind a running loop, lands it at the end of the lap, and lets the loop go on Stop', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+      await service.toggleMarker('A', 'b');
+      expect(loopsOf('A').queuedId).toBe('b');
+
+      tickUntil('A', () => loopsOf('A').runningId === 'b');
+      expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+
+      service.stopMarkerLoop('A');
+      expect(loopsOf('A').runningId).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(store.loopsSummary('A')().canStop).toBe(false);
+    });
+
+    it('starts playback first when the deck is paused, then engages', async () => {
+      await loadPlayable('A');
+      await service.togglePlayPause('A');
+      expect(store.deck('A')().status).toBe('paused');
+
+      await service.toggleMarker('A', 'a');
+
+      expect(store.deck('A')().status).toBe('playing');
+      expect(loopsOf('A').runningId).toBe('a');
+    });
+
+    it('starts playback from the top first when the deck is stopped, then engages', async () => {
+      await loadPlayable('A');
+      service.stop('A');
+      expect(store.deck('A')().status).toBe('stopped');
+
+      await service.toggleMarker('A', 'a');
+      await vi.waitFor(() => expect(runtime.position('A')).toBeGreaterThanOrEqual(100));
+
+      expect(store.deck('A')().status).toBe('playing');
+      expect(loopsOf('A').runningId).toBe('a');
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+    });
+
+    it('does not start playback to let a running marker go', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+      await service.togglePlayPause('A');
+      expect(store.deck('A')().status).toBe('paused');
+      const play = vi.spyOn(runtime, 'play');
+
+      await service.toggleMarker('A', 'a');
+
+      expect(play).not.toHaveBeenCalled();
+      expect(store.deck('A')().status).toBe('paused');
+      expect(loopsOf('A').runningId).toBeNull();
+    });
+
+    it('clears the markers when the transport stops', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+      await service.toggleMarker('A', 'b');
+
+      service.stop('A');
+
+      expect(loopsOf('A').runningId).toBeNull();
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(loopsOf('A').selectedId).toBe('a');
+      expect(store.loopsSummary('A')().canStop).toBe(false);
+    });
+
+    it('drops a marker still waiting for its start to be ready when the transport stops', async () => {
+      await loadPlayable('A');
+      // The nudge moves the start to a frame the engine has yet to prepare, and its audition waits.
+      await service.nudgeMarker('A', 'start', 5);
+      expect(loopsOf('A').markers[0].ready).toBe(false);
+      expect(loopsOf('A').queuedId).toBe('a');
+
+      service.stop('A');
+      const stoppedAt = runtime.position('A');
+      await vi.waitFor(() => expect(loopsOf('A').markers.every((marker) => marker.ready)).toBe(true));
+
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(loopsOf('A').runningId).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(runtime.position('A')).toBe(stoppedAt);
+    });
+
+    it('disengages the marker loop on a scrub and leaves repeat alone', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+      await service.toggleMarker('A', 'b');
+      expect(store.deck('A')().repeat).toBe(true);
+
+      await service.seek('A', 50);
+
+      expect(loopsOf('A').runningId).toBeNull();
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(engineQueue('A')).toBeNull();
+      expect(store.deck('A')().repeat).toBe(true);
+      expect(runtime.snapshot('A').repeatTrack).toBe(true);
+    });
+
+    it('leaves the loops alone on a scrub when nothing is running or queued', async () => {
+      await loadPlayable('A');
+      const disengage = vi.spyOn(TestBed.inject(DeckLoops), 'disengage');
+
+      await service.seek('A', 50);
+
+      expect(disengage).not.toHaveBeenCalled();
+    });
+
+    describe('auditioning an edit', () => {
+      const refusalsFrom = (source: 'DeckLoops' | 'DeckService') =>
+        vi.mocked(logWarn).mock.calls.filter(([message]) => message.startsWith(`${source}:`));
+
+      it('engages the nudged start of an idle marker from its new position', async () => {
+        await loadPlayable('A');
+        service.selectMarker('A', 'b');
+
+        await service.nudgeMarker('A', 'start', 5);
+
+        await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        await vi.waitFor(() => expect(runtime.position('A')).toBe(305));
+      });
+
+      it('arms a nudged end and lands before it', async () => {
+        await loadPlayable('A');
+        service.selectMarker('A', 'b');
+
+        await service.nudgeMarker('A', 'end', 10);
+
+        await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 330 });
+      });
+
+      it('seeks a running loop to its nudged end without arming it again', async () => {
+        await loadPlayable('A');
+        await service.toggleMarker('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
+
+        await service.nudgeMarker('A', 'end', 10);
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(setActiveLoop).toHaveBeenCalledTimes(1);
+        expect(seek).toHaveBeenCalledTimes(1);
+        expect(seek).toHaveBeenCalledWith('A', 100);
+      });
+
+      it('seeks a running loop to its nudged start once that start is ready', async () => {
+        await loadPlayable('A');
+        await service.toggleMarker('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        await service.nudgeMarker('A', 'start', 5);
+
+        await vi.waitFor(() => expect(seek).toHaveBeenCalledWith('A', 105));
+        expect(seek).toHaveBeenCalledTimes(1);
+        expect(loopsOf('A').runningId).toBe('a');
+        expect(loopsOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120 });
+      });
+
+      it('auditions a snap on an idle marker', async () => {
+        await loadPlayable('A', [110]);
+
+        await service.snapMarker('A', 'start', 'next');
+
+        expect(loopsOf('A').markers[0].start.offsetFrames).toBe(10);
+        await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('a'));
+        await vi.waitFor(() => expect(runtime.position('A')).toBe(110));
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
+      });
+
+      it('auditions a snap that finds no moment in reach', async () => {
+        await loadPlayable('A');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        await service.snapMarker('A', 'start', 'next');
+
+        expect(loopsOf('A').markers[0].start.offsetFrames).toBe(0);
+        expect(loopsOf('A').runningId).toBe('a');
+        expect(seek).toHaveBeenCalledWith('A', 100);
+      });
+
+      it('starts a paused deck first, then auditions', async () => {
+        await loadPlayable('A');
+        await service.togglePlayPause('A');
+        expect(store.deck('A')().status).toBe('paused');
+
+        await service.nudgeMarker('A', 'end', 10);
+
+        expect(store.deck('A')().status).toBe('playing');
+        expect(loopsOf('A').runningId).toBe('a');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+      });
+
+      it('restarts a stopped deck from the top first, then auditions', async () => {
+        await loadPlayable('A');
+        service.stop('A');
+        expect(store.deck('A')().status).toBe('stopped');
+
+        await service.snapMarker('A', 'end', 'next');
+        await vi.waitFor(() => expect(runtime.position('A')).toBeGreaterThanOrEqual(100));
+
+        expect(store.deck('A')().status).toBe('playing');
+        expect(loopsOf('A').runningId).toBe('a');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      });
+
+      it('skips the audition when the selection moves while playback starts', async () => {
+        await loadPlayable('A');
+        await service.togglePlayPause('A');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        const edit = service.nudgeMarker('A', 'end', 10);
+        expect(loopsOf('A').markers[0].end?.offsetFrames).toBe(10);
+        service.selectMarker('A', 'b');
+        await edit;
+
+        expect(store.deck('A')().status).toBe('playing');
+        expect(loopsOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(seek).not.toHaveBeenCalled();
+      });
+
+      it('neither starts playback nor seeks for a refused edit on a paused deck', async () => {
+        await loadPlayable('A');
+        await service.togglePlayPause('A');
+        service.selectMarker('A', 'c');
+        const play = vi.spyOn(runtime, 'play');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        vi.mocked(logWarn).mockClear();
+
+        await service.nudgeMarker('A', 'end', 5);
+        await service.snapMarker('A', 'end', 'next');
+
+        expect(store.deck('A')().status).toBe('paused');
+        expect(play).not.toHaveBeenCalled();
+        expect(seek).not.toHaveBeenCalled();
+        expect(refusalsFrom('DeckLoops')).toHaveLength(2);
+        expect(refusalsFrom('DeckService')).toHaveLength(0);
+      });
+
+      it("never moves the other deck's playhead on a shared tune", async () => {
+        const fixture = register(makeFixture());
+        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+          loopMarker('a', 100, 120),
+        ]);
+        await loadAndWait('A', fixture);
+        await loadAndWait('B', fixture);
+        await vi.waitFor(() => expect(loopsOf('B').markers[0].ready).toBe(true));
+        await service.toggleMarker('B', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        await service.nudgeMarker('A', 'start', 5);
+        await service.nudgeMarker('A', 'end', 10);
+
+        await vi.waitFor(() => expect(seek).toHaveBeenCalledWith('A', 105));
+        await vi.waitFor(() => expect(engineLoop('B')).toEqual({ startFrame: 105, endFrame: 130 }));
+        expect(seek.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+      });
+    });
+
+    it('leaves the speed alone through a toggle, a landing and a stop', async () => {
+      await loadPlayable('A');
+      service.setSpeed('A', 1.25);
+      const speed = store.deck('A')().speed;
+      expect(speed).toBe(1.25);
+
+      await service.toggleMarker('A', 'a');
+      await service.toggleMarker('A', 'b');
+      tickUntil('A', () => loopsOf('A').runningId === 'b');
+      service.stopMarkerLoop('A');
+
+      expect(store.deck('A')().speed).toBe(speed);
+      expect(runtime.snapshot('A').tempo.multiplier).toBe(speed);
+    });
+
+    it("follows an edit made on the other deck's list through the same tune", async () => {
+      const fixture = register(makeFixture());
+      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        loopMarker('a', 100, 120),
+      ]);
+      await loadAndWait('A', fixture);
+      await loadAndWait('B', fixture);
+      await vi.waitFor(() => expect(loopsOf('B').markers[0].ready).toBe(true));
+      await service.toggleMarker('B', 'a');
+
+      await service.nudgeMarker('A', 'end', 10);
+      expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130 });
+
+      service.clearMarkerEnd('A');
+      expect(loopsOf('B').runningId).toBeNull();
+      expect(engineLoop('B')).toBeNull();
+      expect(store.loopsSummary('B')().canStop).toBe(false);
     });
   });
 

@@ -126,6 +126,9 @@ function createDjStoreStub() {
   return {
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
+    loopsSummary: () =>
+      signal({ hasTune: false, canAdd: false, canStop: false, items: [], selected: null }),
+    loopLapPercent: () => signal(0),
     bindings: signal({
       A: { device: null, portId: null, present: false, error: null },
       B: { device: null, portId: null, present: false, error: null },
@@ -272,17 +275,13 @@ function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] 
 
 describe('DjMixerViewComponent', () => {
   describe('the two fixed deck columns', () => {
-    // First test in the file to hit TestBed.createComponent, which pays the one-time cost of
-    // JIT-compiling this component and its deck columns' lifted panels. That cold compile can
-    // exceed the project's tight 2000ms testTimeout under CI load; every later test here reuses
-    // the compiled TestBed and stays fast, so only this test needs the extra headroom.
     it('renders exactly two deck columns, lettered A and B, and one SID panel with no enabled devices', () => {
       const { fixture } = render([]);
 
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
       expect(fixture.nativeElement.querySelectorAll('lib-dj-sid-panel').length).toBe(1);
-    }, 10000);
+    });
 
     it('still renders exactly two deck columns with one enabled device', () => {
       const { fixture } = render([device()]);
@@ -561,8 +560,6 @@ describe('DjMixerViewComponent', () => {
       expect(midi.controllers.setMappingMode).toHaveBeenCalledWith(false);
     });
 
-    // Renders the whole view twice, once per motion setting, so it costs about double any other test
-    // here: under CI load that has run past the project's tight 2000ms testTimeout.
     it('slides the panel in at 22.5rem, and with no duration for reduced motion', () => {
       const panel = (fixture: ComponentFixture<DjMixerViewComponent>) =>
         fixture.debugElement.query(By.directive(DjBindingsPanelComponent))
@@ -579,7 +576,7 @@ describe('DjMixerViewComponent', () => {
       press(reduced.fixture);
       expect(slot(reduced.fixture).animationDuration()).toBe(0);
       expect(panel(reduced.fixture).animationDuration()).toBe(0);
-    }, 10000);
+    });
 
     it('moves focus to the mapping mode switch when the panel opens', () => {
       const { fixture } = render([]);
@@ -621,7 +618,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(134);
+      expect(ALL_IDENTITIES).toHaveLength(154);
       expect(mismatched).toEqual([]);
     });
   });

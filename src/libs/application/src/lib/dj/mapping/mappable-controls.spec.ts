@@ -51,15 +51,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 67 controls per deck, 134 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(134);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(134);
+    it('holds 77 controls per deck, 154 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(154);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(154);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(67);
+        expect(ids).toHaveLength(77);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -306,6 +306,95 @@ describe('MappableControls', () => {
 
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith('B', ...extra);
+    });
+  });
+
+  describe('loop controls', () => {
+    it.each([
+      ['loop-toggle', 'toggleMarker', []],
+      ['loop-add', 'addMarker', []],
+      ['loop-stop', 'stopMarkerLoop', []],
+      ['loop-set-end', 'setMarkerEnd', []],
+      ['loop-clear-end', 'clearMarkerEnd', []],
+      ['loop-start-snap-previous', 'snapMarker', ['start', 'previous']],
+      ['loop-start-snap-next', 'snapMarker', ['start', 'next']],
+      ['loop-end-snap-previous', 'snapMarker', ['end', 'previous']],
+      ['loop-end-snap-next', 'snapMarker', ['end', 'next']],
+    ] as const)('%s fires deckService.%s for its own deck', (id, command, extra) => {
+      const spy = vi
+        .spyOn(h.deckService, command)
+        .mockImplementation(() => Promise.resolve() as never);
+
+      pick('B', id, 'trigger').fire();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('B', ...extra);
+    });
+
+    it('loop-toggle logs a rejected toggle instead of leaving it unhandled', async () => {
+      vi.spyOn(h.deckService, 'toggleMarker').mockRejectedValue(new Error('boom'));
+      vi.mocked(logWarn).mockClear();
+
+      pick('A', 'loop-toggle', 'trigger').fire();
+      await flush();
+
+      expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
+    });
+
+    it.each([
+      ['loop-start-snap-previous'],
+      ['loop-start-snap-next'],
+      ['loop-end-snap-previous'],
+      ['loop-end-snap-next'],
+    ] as const)('%s logs a rejected snap instead of leaving it unhandled', async (id) => {
+      vi.spyOn(h.deckService, 'snapMarker').mockRejectedValue(new Error('boom'));
+      vi.mocked(logWarn).mockClear();
+
+      pick('A', id, 'trigger').fire();
+      await flush();
+
+      expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
+    });
+
+    describe('loop-select', () => {
+      it('counts its range from the markers and reads the selected index, 0 when none', () => {
+        const select = pick('A', 'loop-select', 'value');
+        expect(select.max).toBe(0);
+
+        h.seedMarkers('A', 4, 2);
+        expect(select.max).toBe(3);
+        expect(select.read()).toBe(2);
+
+        h.seedMarkers('A', 4, null);
+        expect(select.read()).toBe(0);
+        expect(pick('B', 'loop-select', 'value').max).toBe(0);
+      });
+
+      it('selects the marker at an index through the deck service', () => {
+        h.makeShapeable('A');
+        h.seedMarkers('A', 4, 0);
+
+        pick('A', 'loop-select', 'value').set(3);
+
+        expect(h.djStore.deckLoops('A')().selectedId).toBe('marker-3');
+      });
+
+      it('offers only the relative and step styles and moves whole steps', () => {
+        const select = pick('A', 'loop-select', 'value');
+
+        expect(select.styles).toEqual([
+          'relative-offset',
+          'relative-signed',
+          'step',
+          'step-release',
+        ]);
+        expect(select.wholeSteps).toBe(true);
+        expect(select.defaults).toEqual({
+          ccStyle: 'relative-offset',
+          sensitivity: 1,
+          stepAmount: 1,
+        });
+      });
     });
   });
 

@@ -212,12 +212,21 @@ describe('PlayerContextService - play history', () => {
 
   describe('timeline integrity', () => {
     it('records only the compatible entries in launch order with strictly ascending timestamps', async () => {
-      const names = ['game1', 'game2', 'game3', 'game4', 'game5'];
-      for (const [i, name] of names.entries()) {
-        const isCompatible = i % 2 === 0;
-        const file = createTestFileItem({ path: `/games/${name}.prg`, name, isCompatible });
-        harness.playerService.launchFile = vi.fn(() => of(file));
-        await launch(file);
+      // Launches stamp themselves with Date.now() and these five run back to back, so two can land in
+      // the same millisecond on a fast machine. A clock that ticks once per read keeps the assertion
+      // about the history rather than the clock's resolution.
+      let tick = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => ++tick);
+      try {
+        const names = ['game1', 'game2', 'game3', 'game4', 'game5'];
+        for (const [i, name] of names.entries()) {
+          const isCompatible = i % 2 === 0;
+          const file = createTestFileItem({ path: `/games/${name}.prg`, name, isCompatible });
+          harness.playerService.launchFile = vi.fn(() => of(file));
+          await launch(file);
+        }
+      } finally {
+        clock.mockRestore();
       }
 
       const entries = harness.service.getPlayHistory(deviceId)()?.entries ?? [];

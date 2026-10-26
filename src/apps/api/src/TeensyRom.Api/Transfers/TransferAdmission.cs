@@ -58,7 +58,7 @@ namespace TeensyRom.Api.Transfers
                 }
                 else
                 {
-                    job.OnEntryExpanded();
+                    job.OnEntryAdmitted();
                 }
 
                 var staged = new StagedFile(job.JobId, stagingPath, relativePath, target, job.StorageType, actualBytes, effective);

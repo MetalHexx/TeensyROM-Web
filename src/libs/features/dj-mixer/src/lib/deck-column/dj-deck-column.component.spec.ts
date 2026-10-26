@@ -10,7 +10,10 @@ import {
   DjStore,
   type DeckBindingState,
   type DeckBindingSummary,
+  type DeckLoopsSummary,
   type DeckTransportSummary,
+  type LoopItemSummary,
+  type LoopSelectionSummary,
   type MidiPortOption,
   type Slot,
 } from '@teensyrom-nx/application';
@@ -23,10 +26,6 @@ import {
 import { DjDeckColumnComponent } from './dj-deck-column.component';
 import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
-
-// Loops/Cues stays on the inert placeholder; the transport, channel strip and binding plate are
-// wired live and covered by their own describe blocks below.
-const INERT_PANEL_TYPES = [LoopsCuesPlateComponent] as const;
 
 type Store = InstanceType<typeof DjStore>;
 type TuneReference = Parameters<Store['setDeckLoaded']>[0]['reference'];
@@ -51,6 +50,50 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
     subtuneDisabled: true,
     repeat: true,
     errors: [],
+    ...overrides,
+  };
+}
+
+function emptyLoopsSummary(overrides: Partial<DeckLoopsSummary> = {}): DeckLoopsSummary {
+  return { hasTune: false, canAdd: false, canStop: false, items: [], selected: null, ...overrides };
+}
+
+function loopItem(overrides: Partial<LoopItemSummary> = {}): LoopItemSummary {
+  return {
+    id: 'm1',
+    name: 'Item 1',
+    kind: 'loop',
+    lengthText: '7.8s',
+    activity: 'idle',
+    selected: false,
+    ready: true,
+    startPercent: 10,
+    endPercent: 30,
+    ...overrides,
+  };
+}
+
+function boundarySummary(overrides: Partial<LoopSelectionSummary['start']> = {}) {
+  return {
+    offsetFrames: 0,
+    rangeFrames: 50,
+    tickPercents: [25, 75],
+    canSnapPrevious: true,
+    canSnapNext: false,
+    ...overrides,
+  };
+}
+
+function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelectionSummary {
+  return {
+    id: 'm1',
+    name: 'Item 1',
+    kind: 'loop',
+    activity: 'idle',
+    ready: true,
+    spanText: '00:01.0–00:08.8',
+    start: boundarySummary(),
+    end: boundarySummary(),
     ...overrides,
   };
 }
@@ -85,6 +128,15 @@ function createDeckServiceStub() {
     setVoiceMuted: vi.fn(),
     setVoiceHeld: vi.fn(),
     setNudge: vi.fn(),
+    addMarker: vi.fn(),
+    stopMarkerLoop: vi.fn(),
+    toggleMarker: vi.fn().mockResolvedValue(undefined),
+    selectMarker: vi.fn(),
+    setMarkerEnd: vi.fn(),
+    clearMarkerEnd: vi.fn(),
+    deleteMarker: vi.fn(),
+    nudgeMarker: vi.fn(),
+    snapMarker: vi.fn(),
   };
 }
 
@@ -92,6 +144,7 @@ interface RenderOptions {
   dropActive?: boolean;
   transport?: Partial<DeckTransportSummary>;
   binding?: Partial<DeckBindingSummary>;
+  loops?: Partial<DeckLoopsSummary>;
   subtune?: number;
   devices?: Device[];
   outputs?: MidiPortOption[];
@@ -107,6 +160,8 @@ function boundTo(id: string, name: string): DeckBindingState {
 function render(deck: DeckRef, options: RenderOptions = {}) {
   const transportSummary = signal(idleTransportSummary(options.transport));
   const bindingSummary = signal(idleBindingSummary(options.binding));
+  const loopsSummary = signal(emptyLoopsSummary(options.loops));
+  const loopLapPercent = signal(0);
   const deckState = signal({
     subtune: options.subtune ?? 0,
     speed: 1,
@@ -142,6 +197,8 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
         useValue: {
           transportSummary: () => transportSummary,
           bindingSummary: () => bindingSummary,
+          loopsSummary: () => loopsSummary,
+          loopLapPercent: () => loopLapPercent,
           deck: () => deckState,
           canShape: () => signal(false),
           bindings,
@@ -158,7 +215,18 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   fixture.componentRef.setInput('dropActive', options.dropActive ?? false);
   fixture.detectChanges();
 
-  return { fixture, transportSummary, bindingSummary, deckState, deckService, devices, bindings, midi };
+  return {
+    fixture,
+    transportSummary,
+    bindingSummary,
+    loopsSummary,
+    loopLapPercent,
+    deckState,
+    deckService,
+    devices,
+    bindings,
+    midi,
+  };
 }
 
 /** Renders the column against a real `DjStore`, so the speed and voice models are built from
@@ -210,24 +278,15 @@ function dropEventWithPayload(payload: DjFileDragPayload | null): DragEvent {
   const event = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
   const dataTransfer = {
     types: payload ? [DJ_FILE_DRAG_TYPE] : [],
-    getData: (type: string) => (payload && type === DJ_FILE_DRAG_TYPE ? JSON.stringify(payload) : ''),
+    getData: (type: string) =>
+      payload && type === DJ_FILE_DRAG_TYPE ? JSON.stringify(payload) : '',
   } as unknown as DataTransfer;
   Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true });
   return event;
 }
 
 function gridAreas(fixture: ComponentFixture<DjDeckColumnComponent>): string[] {
-  return Array.from(fixture.nativeElement.children).map(
-    (el) => (el as HTMLElement).style.gridArea
-  );
-}
-
-/** Every output on a component instance, found by duck-typing Angular's `OutputEmitterRef`. */
-function outputsOf(instance: object): { emit: (value: unknown) => void }[] {
-  return Object.values(instance as Record<string, unknown>).filter(
-    (value): value is { emit: (value: unknown) => void } =>
-      !!value && typeof value === 'object' && typeof (value as { emit?: unknown }).emit === 'function'
-  );
+  return Array.from(fixture.nativeElement.children).map((el) => (el as HTMLElement).style.gridArea);
 }
 
 function transport(fixture: ComponentFixture<DjDeckColumnComponent>): DeckTransportComponent {
@@ -238,6 +297,11 @@ function transport(fixture: ComponentFixture<DjDeckColumnComponent>): DeckTransp
 function strip(fixture: ComponentFixture<DjDeckColumnComponent>): DeckChannelStripComponent {
   return fixture.debugElement.query(By.directive(DeckChannelStripComponent))
     .componentInstance as DeckChannelStripComponent;
+}
+
+function plate(fixture: ComponentFixture<DjDeckColumnComponent>): LoopsCuesPlateComponent {
+  return fixture.debugElement.query(By.directive(LoopsCuesPlateComponent))
+    .componentInstance as LoopsCuesPlateComponent;
 }
 
 function bindingPlate(fixture: ComponentFixture<DjDeckColumnComponent>): BindingPlateComponent {
@@ -270,27 +334,201 @@ describe('DjDeckColumnComponent', () => {
     expect(Array.from(stack.children)).toEqual(slots);
   });
 
-  it('feeds the inert Loops/Cues panel from the deck placeholders, letter-scoped', () => {
-    const { fixture } = render({ slot: 'B', letter: 'B', index: 1 });
-    const loopsCues = fixture.debugElement.query(By.directive(LoopsCuesPlateComponent))
-      .componentInstance as LoopsCuesPlateComponent;
+  describe('the loops and cues plate', () => {
+    const DECK_B: DeckRef = { slot: 'B', letter: 'B', index: 1 };
 
-    expect(loopsCues.model().accessibleName).toBe('Loops/Cues deck B');
-  });
+    it('reads an empty deck as a disabled plate that asks for a tune', () => {
+      const { fixture } = render(DECK_B);
+      const model = plate(fixture).model();
 
-  it('binds no output handlers on the inert Loops/Cues panel', () => {
-    const { fixture } = render({ slot: 'A', letter: 'A', index: 0 });
-    const before = fixture.nativeElement.textContent;
+      expect(model.accessibleName).toBe('Loops/Cues deck B');
+      expect(model.addAccessibleName).toBe('Add cue deck B');
+      expect(model.stopAccessibleName).toBe('Stop loop deck B');
+      expect(model.gridAccessibleName).toBe('Loops deck B');
+      expect(model.emptyText).toBe('Load a tune to add loops');
+      expect([model.addDisabled, model.stopDisabled]).toEqual([true, true]);
+      expect(model.tiles).toEqual([]);
+      expect(model.selected.empty).toBe(true);
+      expect(model.selected.setEndDisabled).toBe(true);
+      expect(model.selected.deleteDisabled).toBe(true);
+    });
 
-    expect(() => {
-      INERT_PANEL_TYPES.forEach((type) => {
-        const instance = fixture.debugElement.query(By.directive(type)).componentInstance;
-        outputsOf(instance).forEach((output) => output.emit(undefined));
+    it('asks for a cue once a tune is loaded without markers, and enables Add', () => {
+      const { fixture } = render(DECK_B, { loops: { hasTune: true, canAdd: true } });
+      const model = plate(fixture).model();
+
+      expect(model.emptyText).toBe('Add a cue at the playhead');
+      expect([model.addDisabled, model.stopDisabled]).toEqual([false, true]);
+    });
+
+    it('builds tiles with their spelled-out names from the summary', () => {
+      const { fixture } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          canAdd: true,
+          canStop: true,
+          items: [
+            loopItem({ activity: 'running', selected: true }),
+            loopItem({
+              id: 'm2',
+              name: 'Item 2',
+              kind: 'cue',
+              lengthText: 'CUE',
+              endPercent: null,
+            }),
+            loopItem({ id: 'm3', name: 'Item 3', activity: 'queued', ready: false }),
+          ],
+          selected: selection(),
+        },
       });
-    }).not.toThrow();
+      const model = plate(fixture).model();
 
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe(before);
+      expect(model.tiles.map((t) => t.triggerAccessibleName)).toEqual([
+        'Trigger Item 1 deck B',
+        'Trigger Item 2 deck B',
+        'Trigger Item 3 deck B',
+      ]);
+      expect(model.tiles.map((t) => t.selectAccessibleName)).toEqual([
+        'Item 1, loop, 7.8s, running, deck B',
+        'Item 2, cue, deck B',
+        'Item 3, loop, 7.8s, queued and not ready, deck B',
+      ]);
+      expect(model.tiles.map((t) => t.selected)).toEqual([true, false, false]);
+      expect(model.stopDisabled).toBe(false);
+    });
+
+    it('fills the selected row and applies the disabled rules', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
+      });
+      let row = plate(fixture).model().selected;
+
+      expect([row.empty, row.name, row.kindLabel, row.spanText]).toEqual([
+        false,
+        'Item 1',
+        'LOOP',
+        '00:01.0–00:08.8',
+      ]);
+      expect([row.setEndDisabled, row.clearEndDisabled, row.deleteDisabled]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+      expect([row.start.disabled, row.start.previousDisabled, row.start.nextDisabled]).toEqual([
+        false,
+        false,
+        true,
+      ]);
+      expect(row.start.nudgeAccessibleName).toBe('Nudge start deck B');
+      expect(row.triggerAccessibleName).toBe('Trigger Item 1 deck B');
+
+      loopsSummary.set(
+        emptyLoopsSummary({
+          hasTune: true,
+          items: [loopItem({ kind: 'cue', endPercent: null })],
+          selected: selection({
+            kind: 'cue',
+            end: null,
+            start: boundarySummary({ rangeFrames: 0 }),
+          }),
+        })
+      );
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+
+      expect(row.clearEndDisabled).toBe(true);
+      expect([row.end.empty, row.end.disabled]).toEqual([true, true]);
+      expect(row.start.disabled).toBe(true);
+    });
+
+    it('hands the transport the markers and the plate the lap, from the store', () => {
+      const { fixture, loopsSummary, loopLapPercent } = render(DECK_B);
+      const items = [loopItem({ activity: 'running' })];
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, items }));
+      loopLapPercent.set(42);
+      fixture.detectChanges();
+
+      expect(transport(fixture).model().marks).toEqual(items);
+      expect(plate(fixture).runningProgressPercent()).toBe(42);
+    });
+
+    it('does not rebuild the plate model when only the lap changes', () => {
+      const { fixture, loopLapPercent } = render(DECK_B, {
+        loops: { hasTune: true, items: [loopItem()] },
+      });
+      const before = fixture.componentInstance.plateModel();
+
+      loopLapPercent.set(77);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.plateModel()).toBe(before);
+    });
+
+    it.each([
+      ['addMarker', 'addMarker', undefined, ['B']],
+      ['stopLoop', 'stopMarkerLoop', undefined, ['B']],
+      ['toggleSelected', 'toggleMarker', undefined, ['B']],
+      ['triggerTile', 'toggleMarker', 'm2', ['B', 'm2']],
+      ['selectTile', 'selectMarker', 'm2', ['B', 'm2']],
+      ['setEnd', 'setMarkerEnd', undefined, ['B']],
+      ['clearEnd', 'clearMarkerEnd', undefined, ['B']],
+      ['deleteSelected', 'deleteMarker', undefined, ['B']],
+      ['snap', 'snapMarker', { boundary: 'end', direction: 'next' }, ['B', 'end', 'next']],
+    ] as const)(
+      'routes the plate output %s to DeckService.%s with the slot',
+      (output, method, payload, args) => {
+        const { fixture, deckService } = render(DECK_B);
+        (plate(fixture)[output] as { emit: (value: unknown) => void }).emit(payload);
+
+        expect(deckService[method]).toHaveBeenCalledWith(...args);
+      }
+    );
+
+    describe('the nudge pins', () => {
+      const withSelection = (id: string) =>
+        emptyLoopsSummary({
+          hasTune: true,
+          items: [loopItem({ id, selected: true })],
+          selected: selection({ id }),
+        });
+
+      it('follow the strip while it is dragged, per boundary', () => {
+        const { fixture } = render(DECK_B, { loops: withSelection('m1') });
+
+        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
+        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.startDragOffset()).toBe(12);
+        expect(fixture.componentInstance.endDragOffset()).toBe(-7);
+        expect(plate(fixture).startDragOffset()).toBe(12);
+        expect(plate(fixture).endDragOffset()).toBe(-7);
+      });
+
+      it('commit the nudge to the deck service and clear that pin only', () => {
+        const { fixture, deckService } = render(DECK_B, { loops: withSelection('m1') });
+        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
+        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
+
+        plate(fixture).nudgeCommit.emit({ boundary: 'start', offsetFrames: 12 });
+
+        expect(deckService.nudgeMarker).toHaveBeenCalledWith('B', 'start', 12);
+        expect(fixture.componentInstance.startDragOffset()).toBeNull();
+        expect(fixture.componentInstance.endDragOffset()).toBe(-7);
+      });
+
+      it('clear when the selection moves to another marker', () => {
+        const { fixture, loopsSummary } = render(DECK_B, { loops: withSelection('m1') });
+        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
+        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
+
+        loopsSummary.set(withSelection('m2'));
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.startDragOffset()).toBeNull();
+        expect(fixture.componentInstance.endDragOffset()).toBeNull();
+      });
+    });
   });
 
   describe('the transport', () => {
@@ -370,7 +608,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it("the toggle's showing follows the summary", () => {
-      const { fixture } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { showing: 'pause' } });
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { showing: 'pause' } }
+      );
 
       expect(fixture.componentInstance.transportModel().playPause.showing).toBe('pause');
       expect(transport(fixture).model().playPause.showing).toBe('pause');
@@ -392,7 +633,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('uses the drag pin for positionPercent while held, falling back to the summary otherwise', () => {
-      const { fixture } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { scrubPercent: 33 } });
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { scrubPercent: 33 } }
+      );
 
       expect(fixture.componentInstance.positionPercent()).toBe(33);
 
@@ -450,7 +694,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('pins the position on scrubCommit, dispatches seek, and releases the pin once it lands', async () => {
-      const { fixture, deckService } = render({ slot: 'A', letter: 'A', index: 0 }, { transport: { scrubPercent: 0 } });
+      const { fixture, deckService } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { scrubPercent: 0 } }
+      );
       let landSeek: () => void = () => undefined;
       deckService.seek.mockImplementation(
         () =>
@@ -517,12 +764,24 @@ describe('DjDeckColumnComponent', () => {
       const { fixture, store, deckService } = renderLive(DECK_B);
       const voices = store.decks().B.voices;
 
-      store.setDeckEngineControls({ slot: 'B', speed: 1.7, faderSpeed: 1.7, nudging: false, voices });
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 1.7,
+        faderSpeed: 1.7,
+        nudging: false,
+        voices,
+      });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(1.5);
       expect(strip(fixture).model().speedText).toBe('1.700×');
 
-      store.setDeckEngineControls({ slot: 'B', speed: 0.3, faderSpeed: 0.3, nudging: false, voices });
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 0.3,
+        faderSpeed: 0.3,
+        nudging: false,
+        voices,
+      });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(0.5);
       expect(strip(fixture).model().speedText).toBe('0.300×');
@@ -791,7 +1050,7 @@ describe('DjDeckColumnComponent', () => {
       expect(deckService.bindDevice).toHaveBeenCalledWith('B', null);
     });
 
-    it('dispatches enableMidi and identify with this deck\'s slot', () => {
+    it("dispatches enableMidi and identify with this deck's slot", () => {
       const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
       bindingPlate(fixture).enableMidi.emit();
@@ -843,8 +1102,11 @@ describe('DjDeckColumnComponent', () => {
       expect(el.classList.contains('drop-overlay--hot')).toBe(false);
     });
 
-    it('dispatches load with this deck\'s slot and the dropped payload', () => {
-      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+    it("dispatches load with this deck's slot and the dropped payload", () => {
+      const { fixture, deckService } = render(
+        { slot: 'B', letter: 'B', index: 1 },
+        { dropActive: true }
+      );
       const el = overlay(fixture) as HTMLElement;
       const payload: DjFileDragPayload = {
         deviceId: 'device-1',
@@ -859,7 +1121,10 @@ describe('DjDeckColumnComponent', () => {
     });
 
     it('dispatches nothing on a drop without the DJ file type', () => {
-      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+      const { fixture, deckService } = render(
+        { slot: 'B', letter: 'B', index: 1 },
+        { dropActive: true }
+      );
       const el = overlay(fixture) as HTMLElement;
 
       el.dispatchEvent(dropEventWithPayload(null));

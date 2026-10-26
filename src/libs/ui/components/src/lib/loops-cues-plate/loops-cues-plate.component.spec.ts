@@ -1,63 +1,116 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { LoopsCuesPanelModel } from '../loops-cues-panel/loops-cues-panel.component';
-import type { MarkerRowModel } from '../marker-row/marker-row.component';
-import type { MarkerSlotModel } from '../marker-slot/marker-slot.component';
-import { LoopsCuesPlateComponent } from './loops-cues-plate.component';
+import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
+import type { LoopSelectedRowModel } from '../loop-selected-row/loop-selected-row.component';
+import type { LoopTileModel } from '../loop-tile/loop-tile.component';
+import { LoopsCuesPlateComponent, type LoopsCuesPlateModel } from './loops-cues-plate.component';
 
-function slot(number: number, side: 'start' | 'end'): MarkerSlotModel {
+function boundary(tag: string, overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
+  const lower = tag.toLowerCase();
   return {
-    frameLabel: 'frame 460',
-    offsetLabel: '+0 fr',
-    nudgeValue: 0,
-    nudgeRange: 50,
-    tickOffsets: [],
+    tag,
+    empty: false,
+    disabled: false,
+    offsetFrames: 0,
+    rangeFrames: 50,
+    tickPercents: [],
     previousDisabled: false,
     nextDisabled: false,
-    nudgeAccessibleName: `Nudge marker ${number} ${side} deck A`,
-    previousAccessibleName: `Snap marker ${number} ${side} to previous moment deck A`,
-    nextAccessibleName: `Snap marker ${number} ${side} to next moment deck A`,
+    nudgeAccessibleName: `Nudge ${lower} deck A`,
+    previousAccessibleName: `Snap ${lower} to previous moment deck A`,
+    nextAccessibleName: `Snap ${lower} to next moment deck A`,
+    ...overrides,
   };
 }
 
-function row(number: number): MarkerRowModel {
+function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelectedRowModel {
   return {
-    number: String(number),
-    state: 'idle',
+    empty: false,
+    name: 'Item 1',
+    kindLabel: 'LOOP',
+    spanText: '02:39.4–02:47.5',
+    activity: 'idle',
+    ready: true,
     triggerDisabled: false,
+    setEndDisabled: false,
+    clearEndDisabled: false,
     deleteDisabled: false,
-    loopLengthLabel: null,
-    start: slot(number, 'start'),
-    end: null,
-    triggerAccessibleName: `Trigger marker ${number} deck A`,
-    setEndAccessibleName: `Set end for marker ${number} deck A`,
-    revertAccessibleName: `Revert marker ${number} to cue deck A`,
-    deleteAccessibleName: `Delete marker ${number} deck A`,
+    start: boundary('Start'),
+    end: boundary('End'),
+    triggerAccessibleName: 'Trigger selected deck A',
+    setEndAccessibleName: 'Set end deck A',
+    clearEndAccessibleName: 'Clear end deck A',
+    deleteAccessibleName: 'Delete selected deck A',
+    ...overrides,
   };
 }
 
-function model(rows: readonly MarkerRowModel[] = []): LoopsCuesPanelModel {
+function emptyRow(): LoopSelectedRowModel {
+  return selectedRow({
+    empty: true,
+    name: '',
+    kindLabel: '',
+    spanText: '',
+    end: boundary('End', { empty: true }),
+  });
+}
+
+function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
+  return {
+    id: `item-${number}`,
+    name: `Item ${number}`,
+    kind: 'loop',
+    lengthText: '7.8s',
+    activity: 'idle',
+    selected: false,
+    ready: true,
+    triggerAccessibleName: `Trigger Item ${number}`,
+    selectAccessibleName: `Select Item ${number}, loop`,
+    ...overrides,
+  };
+}
+
+function model(overrides: Partial<LoopsCuesPlateModel> = {}): LoopsCuesPlateModel {
   return {
     accessibleName: 'Loops/Cues deck A',
     addAccessibleName: 'Add marker deck A',
     stopAccessibleName: 'Stop loop deck A',
-    rows,
+    addDisabled: false,
+    stopDisabled: false,
+    gridAccessibleName: 'Loops and cues, deck A',
+    emptyText: null,
+    selected: selectedRow(),
+    tiles: [tile(1, { selected: true }), tile(2)],
+    ...overrides,
   };
 }
 
 describe('LoopsCuesPlateComponent', () => {
   let fixture: ComponentFixture<LoopsCuesPlateComponent>;
-  let component: LoopsCuesPlateComponent;
+  let emitted: unknown[];
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [LoopsCuesPlateComponent],
     }).compileComponents();
     fixture = TestBed.createComponent(LoopsCuesPlateComponent);
-    component = fixture.componentInstance;
+    const component = fixture.componentInstance;
+    emitted = [];
+    const plain = (name: string) => () => emitted.push(name);
+    const valued = (name: string) => (value: unknown) => emitted.push([name, value]);
+    component.addMarker.subscribe(plain('add'));
+    component.stopLoop.subscribe(plain('stop'));
+    component.toggleSelected.subscribe(plain('toggle'));
+    component.setEnd.subscribe(plain('setEnd'));
+    component.clearEnd.subscribe(plain('clearEnd'));
+    component.deleteSelected.subscribe(plain('delete'));
+    component.triggerTile.subscribe(valued('triggerTile'));
+    component.selectTile.subscribe(valued('selectTile'));
+    component.nudgeCommit.subscribe(valued('nudgeCommit'));
+    component.snap.subscribe(valued('snap'));
   });
 
-  function setModel(next: LoopsCuesPanelModel): void {
+  function setModel(next: LoopsCuesPlateModel): void {
     fixture.componentRef.setInput('model', next);
     fixture.detectChanges();
   }
@@ -66,50 +119,104 @@ describe('LoopsCuesPlateComponent', () => {
     return fixture.nativeElement.querySelector(`[aria-label="${name}"]`) as HTMLButtonElement;
   }
 
-  it('emits addMarker when the Add key is pressed', () => {
+  function control(id: string): HTMLElement | null {
+    return fixture.nativeElement.querySelector(`[data-control="${id}"]`);
+  }
+
+  it('anchors the Add and Stop keys and the tile grid with ids of their own', () => {
     setModel(model());
-    const emitted: void[] = [];
-    component.addMarker.subscribe(() => emitted.push(undefined));
 
-    byName('Add marker deck A').click();
-
-    expect(emitted.length).toBe(1);
+    expect(control('loop-add')?.contains(byName('Add marker deck A'))).toBe(true);
+    expect(control('loop-stop')?.contains(byName('Stop loop deck A'))).toBe(true);
+    expect(control('loop-select')?.tagName.toLowerCase()).toBe('lib-loop-tile-grid');
+    expect(control('stop')).toBeNull();
   });
 
-  it('emits stopLoop when the Stop key is pressed', () => {
-    setModel(model());
-    const emitted: void[] = [];
-    component.stopLoop.subscribe(() => emitted.push(undefined));
+  describe('outputs', () => {
+    beforeEach(() => setModel(model()));
 
-    byName('Stop loop deck A').click();
+    it('emits addMarker and stopLoop from the header keys', () => {
+      byName('Add marker deck A').click();
+      byName('Stop loop deck A').click();
 
-    expect(emitted.length).toBe(1);
+      expect(emitted).toEqual(['add', 'stop']);
+    });
+
+    it('re-emits each selected-row key as its own output', () => {
+      byName('Trigger selected deck A').click();
+      byName('Set end deck A').click();
+      byName('Clear end deck A').click();
+      byName('Delete selected deck A').click();
+
+      expect(emitted).toEqual(['toggle', 'setEnd', 'clearEnd', 'delete']);
+    });
+
+    it('re-emits a boundary snap tagged with the boundary and direction', () => {
+      byName('Snap start to next moment deck A').click();
+      byName('Snap end to previous moment deck A').click();
+
+      expect(emitted).toEqual([
+        ['snap', { boundary: 'start', direction: 'next' }],
+        ['snap', { boundary: 'end', direction: 'previous' }],
+      ]);
+    });
+
+    it('re-emits a committed nudge tagged with the boundary', () => {
+      const range = byName('Nudge end deck A') as unknown as HTMLInputElement;
+      range.value = '12';
+      range.dispatchEvent(new Event('change', { bubbles: true }));
+
+      expect(emitted).toEqual([['nudgeCommit', { boundary: 'end', offsetFrames: 12 }]]);
+    });
+
+    it('emits the tile id for a tile trigger and a tile select', () => {
+      byName('Trigger Item 2').click();
+      byName('Select Item 2, loop').click();
+
+      expect(emitted).toEqual([
+        ['triggerTile', 'item-2'],
+        ['selectTile', 'item-2'],
+      ]);
+    });
   });
 
-  it('renders no marker rows when the model has none', () => {
-    setModel(model([]));
+  describe('states', () => {
+    it('disables Add and Stop from the model', () => {
+      setModel(model({ addDisabled: true, stopDisabled: true }));
 
-    expect(fixture.nativeElement.querySelectorAll('lib-marker-row').length).toBe(0);
-  });
+      expect(byName('Add marker deck A').disabled).toBe(true);
+      expect(byName('Stop loop deck A').disabled).toBe(true);
+    });
 
-  it('renders one marker row per model row, in order', () => {
-    setModel(model([row(1), row(2)]));
+    it('shows the empty text, no tiles and a blank selected row when there is no tune', () => {
+      setModel(
+        model({
+          emptyText: 'Load a tune to add loops',
+          tiles: [],
+          selected: emptyRow(),
+          addDisabled: true,
+        })
+      );
 
-    expect(fixture.nativeElement.querySelectorAll('lib-marker-row').length).toBe(2);
-    expect(byName('Trigger marker 2 deck A')).toBeTruthy();
-  });
+      expect(fixture.nativeElement.textContent).toContain('Load a tune to add loops');
+      expect(fixture.nativeElement.querySelectorAll('lib-loop-tile').length).toBe(0);
+      expect(fixture.nativeElement.querySelector('lib-loop-selected-row[data-empty]')).toBeTruthy();
+    });
 
-  it('re-emits a row action carrying the row index it came from', () => {
-    setModel(model([row(1), row(2)]));
-    const emitted: unknown[] = [];
-    component.rowAction.subscribe((event) => emitted.push(event));
+    it('shows the empty text for a tune with no markers while Add stays available', () => {
+      setModel(model({ emptyText: 'No loops or cues yet', tiles: [], selected: emptyRow() }));
 
-    byName('Trigger marker 2 deck A').click();
-    byName('Delete marker 1 deck A').click();
+      expect(fixture.nativeElement.textContent).toContain('No loops or cues yet');
+      expect(byName('Add marker deck A').disabled).toBe(false);
+    });
 
-    expect(emitted).toEqual([
-      { index: 1, action: 'trigger', value: undefined },
-      { index: 0, action: 'delete', value: undefined },
-    ]);
+    it('renders one tile per model tile, in order', () => {
+      setModel(model({ tiles: [tile(1), tile(2), tile(3)] }));
+
+      const names = Array.from<HTMLElement>(
+        fixture.nativeElement.querySelectorAll('lib-loop-tile .name')
+      ).map((el) => el.textContent?.trim());
+      expect(names).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    });
   });
 });

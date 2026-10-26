@@ -17,7 +17,7 @@
   min-height: 0;
   // Pads by the scale's large step on every side, so the header's keys sit as far from the top and end
   // edges as the caption does from the start edge, and the corner screws (see the synth panel) clear
-  // the content. The plate fills its slot, so the extra height comes out of the cue list, never out of
+  // the content. The plate fills its slot, so the extra height comes out of the tile grid, never out of
   // the plate's size.
   padding: var(--spacing-lg);
   overflow: hidden;
@@ -54,14 +54,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  --synth-key-padding: 0 10px;
 }
 
-// Rows stack from the top and become the scroll container once they outgrow the plate.
-.rows {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  min-height: 0;
-  overflow-y: auto;
+// The selected row keeps its height; the tile grid (which sizes itself `flex: 1 1 auto`) takes
+// what is left and scrolls.
+lib-loop-selected-row {
+  flex: 0 0 auto;
 }

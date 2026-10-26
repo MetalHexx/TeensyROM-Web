@@ -3,6 +3,7 @@ import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DeckService } from '../deck.service';
 import { DjStore } from '../dj-store';
+import type { MappingStyleKind } from '../ports';
 import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
 import { PANEL_RANGES } from '../mixer/panel-ranges';
 import { NUDGE_DEFAULT_AMOUNT } from '../mixer/speed-excursion';
@@ -53,6 +54,11 @@ export type MappableControl =
       /** The smallest move, or `null` for a continuous control. */
       readonly step: number | null;
       readonly defaults: ValueDefaults;
+      /** The styles this control offers, when fewer than its nature's. */
+      readonly styles?: readonly MappingStyleKind[];
+      /** A selection that moves one place per tick or press: the engine ignores sensitivity, reads
+       *  a step amount only for its sign (the direction), and never applies `absolute`. */
+      readonly wholeSteps?: boolean;
       read(): number;
       set(value: number): void;
     });
@@ -204,6 +210,33 @@ function value(
   return { identity, name, nature: 'value', ...range, defaults, read, set };
 }
 
+/** A selection over `count()` places, from 0 to `count() − 1` (0 when there are none). It moves
+ *  one place per relative tick or step press and is never set to an absolute position. */
+function wholeStepValue(
+  identity: ControlIdentity,
+  name: string,
+  count: () => number,
+  read: () => number,
+  set: (index: number) => void
+): MappableControl {
+  return {
+    identity,
+    name,
+    nature: 'value',
+    min: 0,
+    get max() {
+      return Math.max(0, count() - 1);
+    },
+    home: 0,
+    step: 1,
+    defaults: { ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 },
+    styles: ['relative-offset', 'relative-signed', 'step', 'step-release'],
+    wholeSteps: true,
+    read,
+    set,
+  };
+}
+
 /**
  * Every control a MIDI source can drive, declared once: the transport, voice and SID panel
  * controls for each deck. Each entry reads from `DjStore` and commands through `DeckService` or
@@ -236,7 +269,16 @@ export class MappableControls {
     const deck = this.djStore.deck(slot);
     const panel = this.djStore.deckPanel(slot);
     const transport = this.djStore.transportSummary(slot);
+    const loops = this.djStore.deckLoops(slot);
     const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
+    const warnOnFailure = (what: string, command: Promise<void>): Promise<void> =>
+      command.catch((error: unknown) =>
+        logWarn(
+          `MappableControls: ${what} on deck ${slot} failed — ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      );
     const seek = this.coalescedSeek(slot);
 
     return [
@@ -274,6 +316,36 @@ export class MappableControls {
         'Nudge down',
         (held, amount) => decks.setNudge(slot, 'down', held, amount ?? NUDGE_DEFAULT_AMOUNT),
         NUDGE_DEFAULT_AMOUNT
+      ),
+      wholeStepValue(
+        id('loop-select'),
+        'Loop select',
+        () => loops().markers.length,
+        () =>
+          Math.max(
+            0,
+            loops().markers.findIndex((marker) => marker.id === loops().selectedId)
+          ),
+        (index) => decks.selectMarkerAt(slot, index)
+      ),
+      trigger(id('loop-toggle'), 'Loop toggle', () =>
+        warnOnFailure('loop toggle', decks.toggleMarker(slot))
+      ),
+      trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
+      trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
+      trigger(id('loop-set-end'), 'Set loop end', () => decks.setMarkerEnd(slot)),
+      trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
+      trigger(id('loop-start-snap-previous'), 'Snap loop start back', () =>
+        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'previous'))
+      ),
+      trigger(id('loop-start-snap-next'), 'Snap loop start forward', () =>
+        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'next'))
+      ),
+      trigger(id('loop-end-snap-previous'), 'Snap loop end back', () =>
+        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'previous'))
+      ),
+      trigger(id('loop-end-snap-next'), 'Snap loop end forward', () =>
+        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'next'))
       ),
       state(
         id('repeat'),

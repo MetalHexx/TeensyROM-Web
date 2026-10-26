@@ -20,6 +20,7 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const SPEED_B: ControlIdentity = { owner: 'B', control: 'speed' };
 const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
+const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
 const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
@@ -296,6 +297,15 @@ describe('MidiMappings', () => {
       expect(h.repository.save).not.toHaveBeenCalled();
     });
 
+    it('refuses absolute on the loop selection and keeps the style it had', async () => {
+      await h.mappings.hydrate();
+      const { mapping } = h.mappings.bind(ccSource(7), LOOP_SELECT_A, style('relative-offset', 1));
+
+      h.mappings.setStyle(mapping.id, style('absolute'));
+
+      expect(h.mappingStore.mappings()[0].style).toEqual(style('relative-offset', 1));
+    });
+
     it.each([
       ['latch-release', REPEAT_A, null],
       ['on-release', REPEAT_A, null],
@@ -359,6 +369,15 @@ describe('MidiMappings', () => {
       h.mappings.replaceSource(mapping.id, noteSource(36), style('step', 0.1));
 
       expect(h.mappingStore.mappings()[0].style).toEqual(style('step', 0.1));
+    });
+
+    it('swaps a style the loop selection does not offer for the proposed one on a new source', async () => {
+      await h.mappings.hydrate();
+      const { mapping } = h.mappings.bind(ccSource(7), LOOP_SELECT_A, style('relative-signed', 1));
+
+      h.mappings.replaceSource(mapping.id, noteSource(36), style('absolute'));
+
+      expect(h.mappingStore.mappings()[0].style).toEqual(style('step', 1));
     });
 
     it('applies the move rule: a source that drives another control is taken from it', async () => {

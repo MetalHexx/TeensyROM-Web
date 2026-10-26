@@ -1,0 +1,152 @@
+:host {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--spacing-sm) 0 var(--spacing-xs);
+  box-sizing: border-box;
+  border: 1px solid var(--synth-control-border);
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(
+    180deg,
+    var(--synth-control-face-top),
+    var(--synth-control-face-bottom)
+  );
+  box-shadow: inset 0 1px 0 rgba(var(--glassy-color), 0.05), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:host([data-selected]) {
+  border-color: var(--color-highlight);
+  box-shadow: 0 0 0 1px var(--color-highlight), 0 0 12px rgba(var(--color-highlight-rgb), 0.4),
+    inset 0 0 8px rgba(var(--color-highlight-rgb), 0.1);
+}
+
+.trigger {
+  flex: 0 0 auto;
+  --synth-key-height: 30px;
+  --synth-key-min-width: 30px;
+  --synth-key-padding: 0;
+  --synth-key-icon-size: 16px;
+}
+
+.select {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: start;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--synth-label);
+  font-size: 0.7rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.length {
+  margin-inline-start: auto;
+  color: var(--color-dimmed-light);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.625rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.length--cue {
+  color: var(--synth-legend);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.timeline {
+  position: relative;
+  flex: 0 0 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--synth-display-face);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 0 0 1px var(--synth-display-border);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: 2px;
+    background: rgba(var(--color-primary-bright-rgb), 0.22);
+  }
+}
+
+.timeline--cue::before {
+  top: 2px;
+  background: none;
+  border-top: 1px dashed rgba(var(--glassy-color), 0.14);
+}
+
+:host([data-ready='false']) .timeline {
+  opacity: 0.45;
+
+  &::before {
+    background: none;
+    border: 1px dashed var(--synth-legend);
+  }
+}
+
+.fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  max-width: calc(100% - 2px);
+  border-radius: 2px;
+  background: var(--color-highlight);
+  box-shadow: 0 0 6px rgba(var(--color-highlight-rgb), 0.6);
+}
+
+.playhead {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--synth-pointer);
+  box-shadow: 0 0 5px rgba(var(--glassy-color), 0.8);
+}
+
+.cue-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 1px;
+  width: 2px;
+  background: var(--color-primary-bright);
+  box-shadow: 0 0 5px rgba(var(--color-primary-bright-rgb), 0.9);
+}
