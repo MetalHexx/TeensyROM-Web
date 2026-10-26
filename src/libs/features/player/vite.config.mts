@@ -19,8 +19,10 @@ export default defineConfig(() => ({
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     setupFiles: ['src/test-setup.ts'],
     reporters: ['default', ['json', { outputFile: '../../../.test-timings/player.json' }]],
-    testTimeout: 2000,
-    hookTimeout: 5000,
+    // 2000ms flaked on loaded CI runners: a different TestBed spec timed out each run, at ~1s on an
+    // idle machine. See dj-mixer.
+    testTimeout: 10000,
+    hookTimeout: 10000,
     // Every spec in this project runs compileComponents() against the real descendant
     // component tree (see src/lib/player-view). Running all 29 files at the default
     // full-CPU thread concurrency causes worker processes to exceed their heap limit
