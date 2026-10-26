@@ -273,12 +273,6 @@ function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] 
   ) as string[];
 }
 
-// Every test here renders the whole mixer view, and the first also pays the one-time JIT compile of
-// this component and its deck columns' lifted panels. On a loaded CI runner a single render takes
-// 0.5-2.8s, so whichever test happens to run slowest overruns the project's tight 2000ms
-// testTimeout. The whole file gets the headroom rather than the slowest test of the last run.
-vi.setConfig({ testTimeout: 10_000 });
-
 describe('DjMixerViewComponent', () => {
   describe('the two fixed deck columns', () => {
     it('renders exactly two deck columns, lettered A and B, and one SID panel with no enabled devices', () => {
