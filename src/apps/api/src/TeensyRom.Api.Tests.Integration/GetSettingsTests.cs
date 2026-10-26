@@ -53,7 +53,7 @@ namespace TeensyRom.Api.Tests.Integration
             settings.PlayerSettings.StartupFilter.Should().BeDefined();
 
             // Verify FileTransferSettings structure
-            settings.FileTransferSettings.AutoTransferPath.Should().NotBeNull();
+            settings.FileTransferSettings.Should().NotBeNull();
 
             // Verify SearchSettings structure
             settings.SearchSettings.SearchWeights.Should().NotBeNull();

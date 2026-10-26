@@ -19,7 +19,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
 
         /// <summary>
-        /// File transfer, synchronization, and directory watching preferences.
+        /// File transfer and synchronization preferences.
         /// </summary>
         [Required] public FileTransferSettingsDto FileTransferSettings { get; set; } = null!;
 

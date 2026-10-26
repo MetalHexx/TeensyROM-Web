@@ -18,19 +18,15 @@ public class SettingsServiceTests : IDisposable
     private readonly IFixture _fixture;
     private readonly ILoggingService _mockLogger;
     private readonly string _settingsFilePath;
-    private readonly string _testWatchDirectory;
 
     public SettingsServiceTests()
     {
         _fixture = new Fixture();
         _mockLogger = Substitute.For<ILoggingService>();
-        
+
         // Get the actual path where the service will write
         _settingsFilePath = Path.Combine(TeensyRomHome.ApiPath, SettingsConstants.SettingsPath);
         
-        // Create a test watch directory that will exist for validation tests
-        _testWatchDirectory = Path.Combine(Path.GetTempPath(), "TeensyRomTests", "WatchDir");
-        Directory.CreateDirectory(_testWatchDirectory);
     }
 
     public void Dispose()
@@ -49,10 +45,6 @@ public class SettingsServiceTests : IDisposable
                 Directory.Delete(settingsDir!, false);
             }
 
-            if (Directory.Exists(_testWatchDirectory))
-            {
-                Directory.Delete(_testWatchDirectory, true);
-            }
         }
         catch
         {
@@ -92,7 +84,6 @@ public class SettingsServiceTests : IDisposable
         settings.KnownDevices.Should().NotBeNull();
         settings.PlayerSettings.Should().NotBeNull();
         settings.FileTransferSettings.Should().NotBeNull();
-        settings.FileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
         settings.SearchSettings.Should().NotBeNull();
         settings.SearchSettings.BannedDirectories.Should().NotBeEmpty();
         settings.AppSettings.Should().NotBeNull();
@@ -195,7 +186,6 @@ public class SettingsServiceTests : IDisposable
             },
             FileTransferSettings = new FileTransferSettings 
             { 
-                AutoFileCopyEnabled = true,
                 SyncFilesEnabled = true
             },
             SearchSettings = new SearchSettings 
@@ -215,9 +205,57 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         actualSettings.PlayerSettings.RepeatModeOnStartup.Should().Be(expectedSettings.PlayerSettings.RepeatModeOnStartup);
-        actualSettings.FileTransferSettings.AutoFileCopyEnabled.Should().Be(expectedSettings.FileTransferSettings.AutoFileCopyEnabled);
+        actualSettings.FileTransferSettings.SyncFilesEnabled.Should().Be(expectedSettings.FileTransferSettings.SyncFilesEnabled);
         actualSettings.SearchSettings.BannedFiles.Should().BeEquivalentTo(expectedSettings.SearchSettings.BannedFiles);
         actualSettings.AppSettings.FirstTimeSetup.Should().Be(expectedSettings.AppSettings.FirstTimeSetup);
+    }
+
+    [Fact]
+    public void GetSettings_ShouldLoadSettingsFile_ThatStillHasTheRemovedWatchDirectoryFields()
+    {
+        // Arrange
+        Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
+        File.WriteAllText(_settingsFilePath, """
+            {
+              "fileTransferSettings": {
+                "watchDirectoryLocation": "C:\\Users\\Old\\Downloads",
+                "autoTransferPath": "/auto-transfer/",
+                "autoFileCopyEnabled": true,
+                "autoLaunchOnCopyEnabled": false,
+                "navToDirOnLaunch": false,
+                "syncFilesEnabled": true
+              }
+            }
+            """);
+
+        // Act
+        var settings = new SettingsService(_mockLogger).GetSettings();
+
+        // Assert
+        settings.FileTransferSettings.AutoLaunchOnCopyEnabled.Should().BeFalse();
+        settings.FileTransferSettings.SyncFilesEnabled.Should().BeTrue();
+        settings.WatchFolders.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WatchFolders_ShouldSurviveSaveAndReload()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var folder = new WatchFolder
+        {
+            Id = "f1",
+            Path = Path.GetTempPath(),
+            Enabled = false,
+            Destinations = [new WatchFolderDestination { Id = "d1", DeviceId = "CHIP1", StorageType = TeensyRom.Core.Entities.Storage.TeensyStorageType.USB, Path = "/in/", Launch = true }]
+        };
+
+        // Act
+        service.UpdateSettings(s => s with { WatchFolders = [folder] });
+        var reloaded = new SettingsService(_mockLogger).GetSettings().WatchFolders;
+
+        // Assert
+        reloaded.Should().ContainSingle().Which.Should().BeEquivalentTo(folder);
     }
 
     #endregion
@@ -893,68 +931,6 @@ public class SettingsServiceTests : IDisposable
 
 
 
-    #region Provider Interface Tests - FileTransferSettings
-
-    [Fact]
-    public void GetFileTransferSettings_ShouldReturnFileTransferSettings()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-
-        // Act
-        var fileTransferSettings = service.GetFileTransferSettings();
-
-        // Assert
-        fileTransferSettings.Should().NotBeNull();
-        fileTransferSettings.Should().BeOfType<FileTransferSettings>();
-    }
-
-    [Fact]
-    public async Task FileTransferSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        FileTransferSettings? received = null;
-
-        // Act
-        await service.FileTransferSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task FileTransferSettings_Observable_ShouldEmit_WhenFileTransferSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<FileTransferSettings>();
-        var subscription = service.FileTransferSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            FileTransferSettings = settings.FileTransferSettings with
-            {
-                AutoFileCopyEnabled = !settings.FileTransferSettings.AutoFileCopyEnabled
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().AutoFileCopyEnabled.Should().Be(settings.FileTransferSettings.AutoFileCopyEnabled);
-    }
-
-    #endregion
-
     #region Provider Interface Tests - SearchSettings
 
     [Fact]
@@ -1078,83 +1054,6 @@ public class SettingsServiceTests : IDisposable
         subscription.Dispose();
         emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
         emittedValues.Last().FirstTimeSetup.Should().Be(settings.AppSettings.FirstTimeSetup);
-    }
-
-    #endregion
-
-    #region Validation Tests
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldReturnTrue_WhenWatchDirectoryExists()
-    {
-        // Arrange - Create service with existing watch directory pre-configured
-        if (File.Exists(_settingsFilePath))
-        {
-            File.Delete(_settingsFilePath);
-        }
-        
-        // Pre-create settings with our test watch directory
-        var initialSettings = new TeensySettings();
-        initialSettings.FileTransferSettings.WatchDirectoryLocation = _testWatchDirectory;
-        var json = System.Text.Json.JsonSerializer.Serialize(initialSettings, 
-            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
-        File.WriteAllText(_settingsFilePath, json);
-        
-        var mockLoggerForTest = Substitute.For<ILoggingService>();
-        var service = new SettingsService(mockLoggerForTest);
-        var settings = service.GetSettings();
-
-        // Act
-        var result = service.ValidateAndLogSettings(settings);
-
-        // Assert
-        result.Should().BeTrue();
-        // The service validates on initialization, so we clear and check only our explicit call
-        mockLoggerForTest.ClearReceivedCalls();
-        result = service.ValidateAndLogSettings(settings);
-        result.Should().BeTrue();
-        mockLoggerForTest.DidNotReceive().InternalError(Arg.Any<string>(), Arg.Any<string>());
-    }
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldReturnFalse_WhenWatchDirectoryDoesNotExist()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        _mockLogger.ClearReceivedCalls(); // Clear any calls from initialization
-        
-        var settings = service.GetSettings();
-        settings.FileTransferSettings.WatchDirectoryLocation = Path.Combine(Path.GetTempPath(), "NonExistentDir_" + Guid.NewGuid());
-
-        // Act
-        var result = service.ValidateAndLogSettings(settings);
-
-        // Assert
-        result.Should().BeFalse();
-        _mockLogger.Received(1).InternalError(
-            Arg.Is<string>(s => s.Contains("watch directory") && s.Contains("not found")),
-            Arg.Any<string>());
-    }
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldLogAppropriateMessage_ForMissingDirectory()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        _mockLogger.ClearReceivedCalls(); // Clear any calls from initialization
-        
-        var settings = service.GetSettings();
-        var missingPath = Path.Combine(Path.GetTempPath(), "MissingDirectory_" + Guid.NewGuid());
-        settings.FileTransferSettings.WatchDirectoryLocation = missingPath;
-
-        // Act
-        service.ValidateAndLogSettings(settings);
-
-        // Assert
-        _mockLogger.Received(1).InternalError(
-            Arg.Is<string>(s => s.Contains(missingPath)),
-            Arg.Any<string>());
     }
 
     #endregion
@@ -1493,12 +1392,9 @@ public class SettingsServiceTests : IDisposable
     {
         // Arrange & Act
         var service = new SettingsService(_mockLogger);
-        var fileTransferSettings = service.GetFileTransferSettings();
+        var fileTransferSettings = service.GetSettings().FileTransferSettings;
 
         // Assert
-        fileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
-        fileTransferSettings.AutoTransferPath.Should().NotBeNull();
-        fileTransferSettings.AutoFileCopyEnabled.Should().BeFalse();
         fileTransferSettings.AutoLaunchOnCopyEnabled.Should().BeTrue();
         fileTransferSettings.NavToDirOnLaunch.Should().BeTrue();
         fileTransferSettings.SyncFilesEnabled.Should().BeFalse();
@@ -1629,34 +1525,6 @@ public class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task FileTransferSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var fileTransferEmissions = new List<FileTransferSettings>();
-        var subscription = service.FileTransferSettings.Subscribe(fileTransferEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only SearchSettings (not FileTransferSettings)
-        settings = settings with
-        {
-            SearchSettings = settings.SearchSettings with
-            {
-                BannedFiles = new List<string> { "new-banned-file.sid" }
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings observable should not emit when only SearchSettings changes");
-    }
-
-    [Fact]
     public async Task SearchSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
     {
         // Arrange
@@ -1699,7 +1567,7 @@ public class SettingsServiceTests : IDisposable
         {
             FileTransferSettings = settings.FileTransferSettings with
             {
-                AutoFileCopyEnabled = !settings.FileTransferSettings.AutoFileCopyEnabled
+                SyncFilesEnabled = !settings.FileTransferSettings.SyncFilesEnabled
             }
         };
 
@@ -1726,7 +1594,7 @@ public class SettingsServiceTests : IDisposable
         
         var devicesSub = service.KnownDevices.Subscribe(knownDevicesEmissions.Add);
         var playerSub = service.PlayerSettings.Subscribe(playerEmissions.Add);
-        var fileSub = service.FileTransferSettings.Subscribe(fileTransferEmissions.Add);
+        var fileSub = service.Settings.Select(s => s.FileTransferSettings).DistinctUntilChanged().Subscribe(fileTransferEmissions.Add);
         var searchSub = service.SearchSettings.Subscribe(searchEmissions.Add);
         var appSub = service.AppSettings.Subscribe(appEmissions.Add);
 

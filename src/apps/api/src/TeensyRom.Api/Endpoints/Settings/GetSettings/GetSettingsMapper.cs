@@ -88,9 +88,6 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new FileTransferSettingsDto
             {
-                WatchDirectoryLocation = entity.WatchDirectoryLocation,
-                AutoTransferPath = entity.AutoTransferPath.ToString(),
-                AutoFileCopyEnabled = entity.AutoFileCopyEnabled,
                 AutoLaunchOnCopyEnabled = entity.AutoLaunchOnCopyEnabled,
                 NavToDirOnLaunch = entity.NavToDirOnLaunch,
                 SyncFilesEnabled = entity.SyncFilesEnabled

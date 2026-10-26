@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Api.Transfers.Archives;
+using TeensyRom.Api.WatchFolders;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -41,7 +42,6 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IDeviceSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IPlayerSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
-            services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IMidiSettingsService, MidiSettingsService>();
@@ -87,6 +87,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ITransferAutoLauncher, TransferAutoLauncher>();
             services.AddSingleton<TransferPump>();
             services.AddSingleton<ITransferJobService, TransferJobService>();
+            services.AddSingleton<IWatchFolderStore, WatchFolderStore>();
+            services.AddSingleton<IWatchFolderStatus, DirectoryWatchFolderStatus>();
             services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();
             services.AddSingleton<ArchiveExpansionService>();
             services.AddSingleton<ArchiveExpansionPump>();

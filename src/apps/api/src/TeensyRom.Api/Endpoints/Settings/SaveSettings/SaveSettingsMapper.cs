@@ -1,6 +1,5 @@
 using RadEndpoints;
 using TeensyRom.Core.Settings;
-using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 {
@@ -19,6 +18,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         /// Maps request to entity while preserving backend-managed fields from existing settings.
         /// Device entries are applied by ID onto the existing list: a request never adds or removes an entry,
         /// an entry the request omits is kept as-is, and an ID repeated in the request uses its first occurrence.
+        /// Watch folders are not part of the request and are preserved from the existing settings.
         /// </summary>
         public TeensySettings ToEntity(SaveSettingsRequest request)
         {
@@ -40,7 +40,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                 PlayerSettings = MapPlayerSettings(request.PlayerSettings),
                 FileTransferSettings = MapFileTransferSettings(request.FileTransferSettings),
                 SearchSettings = MapSearchSettings(request.SearchSettings),
-                AppSettings = MapAppSettings(request.AppSettings)
+                AppSettings = MapAppSettings(request.AppSettings),
+                WatchFolders = existingSettings.WatchFolders
             };
         }
 
@@ -109,9 +110,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             return new FileTransferSettings
             {
-                WatchDirectoryLocation = dto.WatchDirectoryLocation,
-                AutoTransferPath = new DirectoryPath(dto.AutoTransferPath),
-                AutoFileCopyEnabled = dto.AutoFileCopyEnabled,
                 AutoLaunchOnCopyEnabled = dto.AutoLaunchOnCopyEnabled,
                 NavToDirOnLaunch = dto.NavToDirOnLaunch,
                 SyncFilesEnabled = dto.SyncFilesEnabled

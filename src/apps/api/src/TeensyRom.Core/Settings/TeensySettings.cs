@@ -11,5 +11,6 @@ namespace TeensyRom.Core.Settings
     public SearchSettings SearchSettings { get; set; } = new();
     public AppSettings AppSettings { get; set; } = new();
     public List<DeviceSettings> KnownDevices { get; set; } = [];
+    public List<WatchFolder> WatchFolders { get; set; } = [];
   }
 }
