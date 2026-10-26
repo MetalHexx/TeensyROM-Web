@@ -49,10 +49,12 @@ export type DeckControlId =
   | 'speed-nudge-down'
   | 'loop-select'
   | 'loop-toggle'
+  | 'loop-play-now'
   | 'loop-add'
   | 'loop-stop'
   | 'loop-set-end'
   | 'loop-clear-end'
+  | 'loop-global'
   | 'loop-start-snap-previous'
   | 'loop-start-snap-next'
   | 'loop-end-snap-previous'
@@ -85,10 +87,12 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'speed-nudge-down',
   'loop-select',
   'loop-toggle',
+  'loop-play-now',
   'loop-add',
   'loop-stop',
   'loop-set-end',
   'loop-clear-end',
+  'loop-global',
   'loop-start-snap-previous',
   'loop-start-snap-next',
   'loop-end-snap-previous',

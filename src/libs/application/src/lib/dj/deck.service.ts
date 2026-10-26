@@ -487,6 +487,28 @@ export class DeckService {
     this.loops.toggle(slot, target);
   }
 
+  /**
+   * Jumps into a marker now — the selected one when `id` is omitted, and nothing when none is —
+   * without waiting for the lap, restarting it when it is the one running. A deck that is not
+   * playing is started first, through the same path as Play, as `toggleMarker` does.
+   */
+  async playMarkerNow(slot: Slot, id?: string): Promise<void> {
+    if (!this.canShape(slot, 'playMarkerNow')) {
+      return;
+    }
+    const target = id ?? this.store.loops()[slot].selectedId;
+    if (target === null) {
+      return;
+    }
+    if (this.store.deck(slot)().status !== 'playing') {
+      await this.togglePlayPause(slot);
+      if (this.store.deck(slot)().status !== 'playing') {
+        return;
+      }
+    }
+    this.loops.playNow(slot, target);
+  }
+
   /** Lets the running marker loop go and drops whatever is queued. The playhead never moves. */
   stopMarkerLoop(slot: Slot): void {
     if (this.canShape(slot, 'stopMarkerLoop')) {

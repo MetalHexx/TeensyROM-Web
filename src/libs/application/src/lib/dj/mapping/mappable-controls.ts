@@ -331,10 +331,14 @@ export class MappableControls {
       trigger(id('loop-toggle'), 'Loop toggle', () =>
         warnOnFailure('loop toggle', decks.toggleMarker(slot))
       ),
+      trigger(id('loop-play-now'), 'Play now', () =>
+        warnOnFailure('play now', decks.playMarkerNow(slot))
+      ),
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
       trigger(id('loop-set-end'), 'Set loop end', () => decks.setMarkerEnd(slot)),
       trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
+      trigger(id('loop-global'), 'Loop GBL', () => decks.toggleMarkerGlobal(slot)),
       trigger(id('loop-start-snap-previous'), 'Snap loop start back', () =>
         warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'previous'))
       ),

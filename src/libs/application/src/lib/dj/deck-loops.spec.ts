@@ -622,6 +622,18 @@ describe('DeckLoops', () => {
       expect(refusals()).toHaveLength(1);
     });
 
+    it('refuses to end a marker that already has an end, leaving the loop as it was', async () => {
+      await runtime.seekToFrame('A', 180);
+      loops.setEnd('A');
+      await runtime.seekToFrame('A', 190);
+
+      loops.setEnd('A');
+
+      expect(stateOf('A').markers[0].end).toEqual({ frame: 180, offsetFrames: 0 });
+      expect(refusals()).toHaveLength(1);
+      expect(await positions.load(TUNE_X)).toEqual([loopOf('a', 100, 180)]);
+    });
+
     it('turns a loop back into a cue, and does nothing to a cue', async () => {
       await runtime.seekToFrame('A', 180);
       loops.setEnd('A');
@@ -983,6 +995,134 @@ describe('DeckLoops', () => {
 
       it('refuses a marker the deck does not hold', async () => {
         loops.toggle('A', 'missing');
+
+        expect(refusals()).toHaveLength(1);
+        expect(stateOf('A').runningId).toBeNull();
+      });
+    });
+
+    describe('playing now', () => {
+      async function notReady(id: string): Promise<void> {
+        gates.A.holding = true;
+        loops.select('A', id);
+        loops.nudge('A', 'start', 5);
+      }
+
+      it('engages an idle marker at once, with nothing looping', async () => {
+        loops.playNow('A', 'a');
+        await flush();
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(runtime.position('A')).toBe(100);
+      });
+
+      it('takes over from a running loop instead of queuing behind it, dropping what was queued', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.playNow('A', 'wide');
+        await flush();
+
+        expect(stateOf('A').runningId).toBe('wide');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+        expect(runtime.position('A')).toBe(600);
+      });
+
+      it('lets a running loop go for a cue', async () => {
+        await engage('a');
+
+        loops.playNow('A', 'c');
+        await flush();
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(runtime.position('A')).toBe(500);
+      });
+
+      it('engages the queued marker at once', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+
+        loops.playNow('A', 'b');
+        await flush();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineQueue('A')).toBeNull();
+        expect(runtime.position('A')).toBe(300);
+      });
+
+      it('restarts the running marker from its start and leaves a marker queued behind it queued', async () => {
+        await engage('wide');
+        tick('A', 20);
+        loops.toggle('A', 'b');
+        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
+
+        loops.playNow('A', 'wide');
+        await flush();
+
+        expect(runtime.position('A')).toBe(600);
+        expect(setActiveLoop).not.toHaveBeenCalled();
+        expect(stateOf('A').runningId).toBe('wide');
+        expect(stateOf('A').queuedId).toBe('b');
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+      });
+
+      it('restarts the running marker on every press', async () => {
+        await engage('wide');
+
+        for (let press = 0; press < 3; press++) {
+          tick('A', 10);
+          loops.playNow('A', 'wide');
+          await flush();
+
+          expect(runtime.position('A')).toBe(600);
+          expect(stateOf('A').runningId).toBe('wide');
+        }
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+      });
+
+      it('waits for a marker whose start is not ready, replacing a queued one, then engages it', async () => {
+        await engage('a');
+        loops.toggle('A', 'c');
+        await notReady('b');
+
+        loops.playNow('A', 'b');
+        await flush();
+
+        expect(stateOf('A').queuedId).toBe('b');
+        expect(engineQueue('A')).toBeNull();
+        expect(stateOf('A').runningId).toBe('a');
+
+        await settle();
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(runtime.position('A')).toBe(305);
+      });
+
+      it('does not seek again to a changed start the running marker was still waiting for', async () => {
+        await engage('wide');
+        loops.select('A', 'wide');
+        gates.A.holding = true;
+        loops.nudge('A', 'start', 10);
+        loops.audition('A', 'start', 'wide');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.playNow('A', 'wide');
+        await flush();
+        await settle();
+
+        expect(seek).toHaveBeenCalledExactlyOnceWith('A', 600);
+        expect(stateOf('A').runningId).toBe('wide');
+      });
+
+      it('refuses a marker the deck does not hold', () => {
+        loops.playNow('A', 'missing');
 
         expect(refusals()).toHaveLength(1);
         expect(stateOf('A').runningId).toBeNull();
@@ -1969,6 +2109,50 @@ describe('DeckLoops', () => {
         expect(stateOf('A').settingsInPlayId).toBe('a');
         expect(stateOf('A').mainSettings).toEqual(main);
         expect(runtime.position('A')).toBe(100);
+      });
+
+      it('lands an independent marker its settings when played now', async () => {
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.playNow('A', 'a');
+        await flush();
+
+        expect(seek).toHaveBeenCalledWith(
+          'A',
+          100,
+          engineSettingsOf(SETTINGS_A.panel, SETTINGS_A.mutes)
+        );
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+      });
+
+      it("lands the main track's settings when played now from an independent marker into a sharing one", async () => {
+        tweak('A', 250);
+        const main = { panel: panelOn('A'), mutes: [false, false, false] };
+        await engage('A', 'a');
+
+        loops.playNow('A', 'c');
+        await flush();
+
+        expect(panelOn('A')).toBe(main.panel);
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(engineMutes('A')).toEqual(main.mutes);
+      });
+
+      it('carries the running independent marker its settings again when it restarts', async () => {
+        await engage('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.playNow('A', 'a');
+        await flush();
+
+        expect(seek).toHaveBeenCalledWith(
+          'A',
+          100,
+          engineSettingsOf(SETTINGS_A.panel, SETTINGS_A.mutes)
+        );
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').settingsInPlayId).toBe('a');
       });
 
       it('lands a cue the same way, with nothing looping', async () => {

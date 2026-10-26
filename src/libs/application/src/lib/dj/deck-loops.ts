@@ -305,6 +305,33 @@ export class DeckLoops {
     }
   }
 
+  /**
+   * Jumps into marker `id` now, without waiting for the lap. Any marker but the running one engages
+   * as `toggle`'s idle press does (now, or once its start is ready), replacing whatever was queued;
+   * it never queues behind a running loop and never lets a marker go. The running marker restarts
+   * from the start the engine holds, as a stab: the engine and a marker queued behind it are left
+   * as they are, and a start audition still waiting is dropped. A deck that is not playing is
+   * started by the caller first.
+   */
+  playNow(slot: Slot, id: string): void {
+    if (this.identityOf(slot, 'playNow') === null) {
+      return;
+    }
+    const { markers, runningId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (marker === undefined) {
+      this.refuse(slot, 'playNow', `has no marker ${id}`);
+      return;
+    }
+    const engaged = this.engaged[slot];
+    if (runningId === id && engaged !== null) {
+      this.pendingStart[slot] = null;
+      this.jumpInto(slot, marker, engaged.startFrame);
+    } else {
+      this.engageOrWait(slot, marker);
+    }
+  }
+
   /** Lets the running marker go, drops whatever is queued, and returns the deck to the main
    *  track's settings. The playhead never moves. */
   stop(slot: Slot): void {
@@ -404,11 +431,15 @@ export class DeckLoops {
     this.selectId(slot, markers[clamp(Math.round(index), 0, markers.length - 1)].id);
   }
 
-  /** Ends the selected marker at the playhead, making it a loop. Refused unless the playhead is
-   *  after the marker's start. */
+  /** Ends the selected cue at the playhead, making it a loop. Refused for a marker that already
+   *  has an end, and unless the playhead is after the marker's start. */
   setEnd(slot: Slot): void {
     const marker = this.selectedMarker(slot, 'setEnd');
     if (marker === null) {
+      return;
+    }
+    if (marker.end !== null) {
+      this.refuse(slot, 'setEnd', 'selected marker already has an end');
       return;
     }
     const position = this.runtime.position(slot);

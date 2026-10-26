@@ -1822,6 +1822,41 @@ describe('DeckService', () => {
       expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
     });
 
+    it('plays the selected marker now when no id is given, and does nothing with none selected', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await service.playMarkerNow('A');
+      expect(loopsOf('A').runningId).toBeNull();
+
+      await loadPlayable('A');
+      await service.playMarkerNow('A');
+
+      expect(loopsOf('A').runningId).toBe('a');
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+    });
+
+    it('plays a marker now over a running loop, without queuing behind it', async () => {
+      await loadPlayable('A');
+      await service.toggleMarker('A', 'a');
+
+      await service.playMarkerNow('A', 'b');
+
+      expect(loopsOf('A').runningId).toBe('b');
+      expect(loopsOf('A').queuedId).toBeNull();
+      expect(runtime.position('A')).toBe(300);
+    });
+
+    it('starts playback first when the deck is paused, then plays the marker now', async () => {
+      await loadPlayable('A');
+      await service.togglePlayPause('A');
+      expect(store.deck('A')().status).toBe('paused');
+
+      await service.playMarkerNow('A', 'a');
+
+      expect(store.deck('A')().status).toBe('playing');
+      expect(loopsOf('A').runningId).toBe('a');
+    });
+
     it('does not start playback to let a running marker go', async () => {
       await loadPlayable('A');
       await service.toggleMarker('A', 'a');
