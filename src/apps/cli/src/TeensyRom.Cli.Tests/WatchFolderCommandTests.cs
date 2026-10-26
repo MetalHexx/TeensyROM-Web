@@ -222,16 +222,140 @@ public sealed class WatchFolderCommandTests : IDisposable
     [InlineData("pause")]
     [InlineData("resume")]
     [InlineData("remove")]
+    [InlineData("set")]
     public async Task AnUnwatchedFolder_IsExitFive(string verb)
     {
         _watchFolders.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new CliException(CliExitCode.NotFound, "x isn't a watch folder."));
         var host = NewHost();
 
-        var exitCode = await host.RunAsync("watch-folder", verb, "x");
+        var exitCode = verb == "set"
+            ? await host.RunAsync("watch-folder", verb, "x", "--launch")
+            : await host.RunAsync("watch-folder", verb, "x");
 
         exitCode.Should().Be((int)CliExitCode.NotFound);
         host.Consoles.StdErr.Should().Contain("x isn't a watch folder.");
+    }
+
+    // ---- set ---------------------------------------------------------------------------------------------------------
+
+    private WatchFolderDto Changed(string path, bool launch)
+    {
+        var folder = Folder();
+        var destination = folder.Destinations.Single();
+        destination.Path = path;
+        destination.Launch = launch;
+        return folder;
+    }
+
+    [Fact]
+    public async Task Set_Launch_ChangesOnlyTheLaunchFlag_OfTheChosenDevice()
+    {
+        Watched(Folder());
+        _watchFolders.SetDeviceAsync("wf-1", Alpha.Id, null, true, Arg.Any<CancellationToken>()).Returns(Changed("/auto-transfer", launch: true));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "set", "roms", "--device", "Alpha", "--launch", "--json");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        await _chooser.Received(1).ChooseAsync("Alpha", DeviceScope.Known, Arg.Any<CancellationToken>());
+        var destination = Parse(host.Consoles.StdOut).GetProperty("destinations")[0];
+        destination.GetProperty("launch").GetBoolean().Should().BeTrue();
+        destination.GetProperty("path").GetString().Should().Be("/auto-transfer");
+    }
+
+    [Fact]
+    public async Task Set_PathAlone_SendsNoLaunchValue_AndNoLaunchSendsFalse()
+    {
+        Watched(Folder());
+        _watchFolders.SetDeviceAsync(default!, default!, default, default, default).ReturnsForAnyArgs(Folder());
+
+        var path = NewHost();
+        (await path.RunAsync("watch-folder", "set", "roms", "--path", "/games", "--json")).Should().Be(0, path.Consoles.StdErr);
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", Alpha.Id, "/games", null, Arg.Any<CancellationToken>());
+
+        var noLaunch = NewHost();
+        (await noLaunch.RunAsync("watch-folder", "set", "roms", "--no-launch", "--json")).Should().Be(0, noLaunch.Consoles.StdErr);
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", Alpha.Id, null, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Set_WithoutADevice_UsesTheOnlyDestination_WithoutAskingTheChooser()
+    {
+        Watched(Folder());
+        _watchFolders.SetDeviceAsync(default!, default!, default, default, default).ReturnsForAnyArgs(Folder());
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "set", "roms", "--launch", "--json");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", Alpha.Id, null, true, Arg.Any<CancellationToken>());
+        _chooser.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Set_WithoutADevice_OnAFolderWithSeveral_IsAUsageError_NamingThem()
+    {
+        var folder = Folder();
+        folder.Destinations.Add(new WatchFolderDestinationDto { Id = "d-2", DeviceId = "b-2", DeviceName = "Bravo", StorageType = Api.Generated.TeensyStorageType.USB, Path = "/x", Launch = false });
+        Watched(folder);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "set", "roms", "--launch");
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        host.Consoles.StdErr.Should().Contain("Alpha").And.Contain("Bravo");
+        await _watchFolders.DidNotReceiveWithAnyArgs().SetDeviceAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task Set_WithADeviceTrWebForgot_FallsBackToTheDestinationsDeviceId()
+    {
+        _chooser.ChooseAsync("gone-1", DeviceScope.Known, Arg.Any<CancellationToken>()).ThrowsAsync(new CliException(CliExitCode.NotFound, "No TeensyROM matches 'gone-1'."));
+        var folder = Folder();
+        folder.Destinations.Single().DeviceId = "gone-1";
+        Watched(folder);
+        _watchFolders.SetDeviceAsync(default!, default!, default, default, default).ReturnsForAnyArgs(folder);
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "set", "roms", "--device", "gone-1", "--launch", "--json");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", "gone-1", null, true, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("nothing to change")]
+    [InlineData("both launch flags")]
+    [InlineData("invalid path")]
+    public async Task Set_WithUnusableOptions_IsAUsageError_BeforeTheEngineOrTheService(string case_)
+    {
+        string[] options = case_ switch
+        {
+            "nothing to change" => [],
+            "both launch flags" => ["--launch", "--no-launch"],
+            _ => ["--path", "games"]
+        };
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync(["watch-folder", "set", "roms", .. options]);
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        await host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+        await _watchFolders.DidNotReceiveWithAnyArgs().SetDeviceAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task Set_OnAFolderTheEngineHasNoSuchDestinationFor_IsExitFive()
+    {
+        Watched(Folder());
+        _watchFolders.SetDeviceAsync(default!, default!, default, default, default)
+            .ThrowsAsyncForAnyArgs(new CliException(CliExitCode.NotFound, "Watch folder wf-1 has no destination for device a-1."));
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "set", "roms", "--launch");
+
+        exitCode.Should().Be((int)CliExitCode.NotFound);
     }
 
     // ---- remove ------------------------------------------------------------------------------------------------------

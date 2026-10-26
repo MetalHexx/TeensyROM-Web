@@ -3,6 +3,7 @@ using TeensyRom.Api.Endpoints.WatchFolders.AddWatchFolder;
 using TeensyRom.Api.Endpoints.WatchFolders.GetWatchFolders;
 using TeensyRom.Api.Endpoints.WatchFolders.RemoveWatchFolder;
 using TeensyRom.Api.Endpoints.WatchFolders.RemoveWatchFolderDevice;
+using TeensyRom.Api.Endpoints.WatchFolders.SetWatchFolderDevice;
 using TeensyRom.Api.Endpoints.WatchFolders.SetWatchFolderEnabled;
 using TeensyRom.Api.WatchFolders;
 using TeensyRom.Core.Entities.Storage;
@@ -158,6 +159,35 @@ namespace TeensyRom.Api.Tests.Integration.Transfers.WatchFolders
             remove.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
             removeDevice.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
             toggle.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+
+        [Fact]
+        public async Task SetDevice_ChangesThePathAndLaunch_AndIs404ForAnUnknownFolderOrDevice()
+        {
+            var added = await AddAsync<AddWatchFolderResponse>(NewFolder(), DeviceA, devicePath: "/music");
+            var id = added.Content.WatchFolder.Id;
+
+            var changed = await f.Client.PutAsync<SetWatchFolderDeviceEndpoint, SetWatchFolderDeviceRequest, SetWatchFolderDeviceResponse>(new()
+            {
+                WatchFolderId = id,
+                DeviceId = DeviceA,
+                Body = new SetWatchFolderDeviceBody { DevicePath = "/games", Launch = false }
+            });
+            changed.Should().BeSuccessful<SetWatchFolderDeviceResponse>().WithStatusCode(HttpStatusCode.OK);
+            var destination = changed.Content.WatchFolder.Destinations.Should().ContainSingle().Subject;
+            destination.Path.Should().Be("/games/");
+            destination.Launch.Should().BeFalse();
+
+            var emptyBody = await f.Client.PutAsync<SetWatchFolderDeviceEndpoint, SetWatchFolderDeviceRequest, ProblemDetails>(
+                new() { WatchFolderId = id, DeviceId = DeviceA, Body = new SetWatchFolderDeviceBody() });
+            emptyBody.Should().BeProblem().WithStatusCode(HttpStatusCode.BadRequest);
+
+            var unknownFolder = await f.Client.PutAsync<SetWatchFolderDeviceEndpoint, SetWatchFolderDeviceRequest, string>(
+                new() { WatchFolderId = "missing", DeviceId = DeviceA, Body = new SetWatchFolderDeviceBody { Launch = true } });
+            var unknownDevice = await f.Client.PutAsync<SetWatchFolderDeviceEndpoint, SetWatchFolderDeviceRequest, string>(
+                new() { WatchFolderId = id, DeviceId = DeviceB, Body = new SetWatchFolderDeviceBody { Launch = true } });
+            unknownFolder.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            unknownDevice.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
         }
 
         [Fact]

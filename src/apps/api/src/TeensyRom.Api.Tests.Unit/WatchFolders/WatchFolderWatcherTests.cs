@@ -362,5 +362,7 @@ internal sealed class FakeWatchFolderStore : IWatchFolderStore
 
     public WatchFolderRemoveDeviceResult RemoveDevice(string watchFolderId, string deviceId) => throw new NotSupportedException();
 
+    public WatchFolderSetDestinationResult SetDestination(string watchFolderId, string deviceId, string? devicePath, bool? launch) => throw new NotSupportedException();
+
     public WatchFolder? SetEnabled(string watchFolderId, bool enabled) => throw new NotSupportedException();
 }

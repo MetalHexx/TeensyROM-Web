@@ -80,7 +80,7 @@ namespace TeensyRom.Api.WatchFolders
                     if (existing.Destinations.Any(d => d.DeviceId == request.DeviceId))
                     {
                         outcome = Failed(WatchFolderAddError.DeviceAlreadyOnFolder,
-                            "This device already receives this folder. Remove that destination first to change it.");
+                            "This device already receives this folder. Change that destination instead of adding it again.");
                         return latest;
                     }
 
@@ -141,6 +141,51 @@ namespace TeensyRom.Api.WatchFolders
             return ConfirmSaved(saved, outcome);
         }
 
+        public WatchFolderSetDestinationResult SetDestination(string watchFolderId, string deviceId, string? devicePath, bool? launch)
+        {
+            if (devicePath is null && launch is null)
+            {
+                return SetFailed(WatchFolderSetDestinationError.NothingToChange, "Give a device path or a launch value to change.");
+            }
+
+            var parsedPath = string.Empty;
+            if (devicePath is not null && (string.IsNullOrWhiteSpace(devicePath) || !TryParseDevicePath(devicePath, out parsedPath)))
+            {
+                return SetFailed(WatchFolderSetDestinationError.InvalidDevicePath,
+                    "The device path must be a valid Unix-style directory path without '.' or '..' segments.");
+            }
+
+            WatchFolderSetDestinationResult? outcome = null;
+            var saved = settings.UpdateSettings(latest =>
+            {
+                var folder = latest.WatchFolders.FirstOrDefault(f => f.Id == watchFolderId);
+                var destination = folder?.Destinations.FirstOrDefault(d => d.DeviceId == deviceId);
+                if (folder is null || destination is null)
+                {
+                    outcome = SetFailed(WatchFolderSetDestinationError.NotFound,
+                        $"Watch folder {watchFolderId} has no destination for device {deviceId}.");
+                    return latest;
+                }
+
+                var changed = destination with
+                {
+                    Path = devicePath is null ? destination.Path : parsedPath,
+                    Launch = launch ?? destination.Launch
+                };
+                if (changed == destination)
+                {
+                    outcome = new WatchFolderSetDestinationResult(folder, null, null);
+                    return latest;
+                }
+
+                var updated = folder with { Destinations = [.. folder.Destinations.Select(d => ReferenceEquals(d, destination) ? changed : d)] };
+                outcome = new WatchFolderSetDestinationResult(updated, null, null);
+                return latest with { WatchFolders = [.. latest.WatchFolders.Select(f => ReferenceEquals(f, folder) ? updated : f)] };
+            });
+
+            return ConfirmSaved(saved, outcome!);
+        }
+
         public WatchFolder? SetEnabled(string watchFolderId, bool enabled)
         {
             WatchFolder? result = null;
@@ -182,6 +227,9 @@ namespace TeensyRom.Api.WatchFolders
 
         private static WatchFolderAddResult Failed(WatchFolderAddError error, string message) =>
             new(null, Created: false, error, message);
+
+        private static WatchFolderSetDestinationResult SetFailed(WatchFolderSetDestinationError error, string message) =>
+            new(null, error, message);
 
         private static string NewId() => Guid.NewGuid().ToString("N");
 

@@ -22,6 +22,9 @@ internal interface IWatchFolderService
     /// <summary>Removes the folder's destinations for one device; the folder goes with its last destination.</summary>
     Task<RemoveWatchFolderDeviceResponse> RemoveDeviceAsync(string watchFolderId, string deviceId, CancellationToken ct);
 
+    /// <summary>Changes the folder and/or launch flag of the device's destination on the watch folder, in place; null leaves a value as it is.</summary>
+    Task<WatchFolderDto> SetDeviceAsync(string watchFolderId, string deviceId, string? devicePath, bool? launch, CancellationToken ct);
+
     Task<WatchFolderDto> SetEnabledAsync(string watchFolderId, bool enabled, CancellationToken ct);
 
     /// <summary>

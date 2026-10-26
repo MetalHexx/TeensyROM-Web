@@ -27,6 +27,12 @@ namespace TeensyRom.Api.WatchFolders
         /// </summary>
         WatchFolderRemoveDeviceResult RemoveDevice(string watchFolderId, string deviceId);
 
+        /// <summary>
+        /// Changes the device folder and/or launch flag of the device's destination on the folder; a null argument leaves that value as it is.
+        /// Setting the values it already has succeeds and changes nothing.
+        /// </summary>
+        WatchFolderSetDestinationResult SetDestination(string watchFolderId, string deviceId, string? devicePath, bool? launch);
+
         /// <summary>The updated folder, or null when there is no such folder.</summary>
         WatchFolder? SetEnabled(string watchFolderId, bool enabled);
 
@@ -53,6 +59,16 @@ namespace TeensyRom.Api.WatchFolders
     /// <param name="Folder">The folder after the add; null on failure.</param>
     /// <param name="Created">True when a new folder was created, false when a destination joined an existing one.</param>
     public sealed record WatchFolderAddResult(WatchFolder? Folder, bool Created, WatchFolderAddError? Error, string? Message);
+
+    public enum WatchFolderSetDestinationError
+    {
+        NotFound,
+        InvalidDevicePath,
+        NothingToChange
+    }
+
+    /// <param name="Folder">The folder after the change; null on failure.</param>
+    public sealed record WatchFolderSetDestinationResult(WatchFolder? Folder, WatchFolderSetDestinationError? Error, string? Message);
 
     /// <param name="Found">False when the folder does not exist or has no destination for the device.</param>
     /// <param name="FolderRemoved">True when that was the folder's last destination and the folder was removed too.</param>

@@ -23,6 +23,9 @@ internal sealed class WatchFolderService(ITeensyRomApiClient api) : IWatchFolder
     public Task<RemoveWatchFolderDeviceResponse> RemoveDeviceAsync(string watchFolderId, string deviceId, CancellationToken ct) =>
         ApiErrors.Call(() => api.RemoveWatchFolderDeviceAsync(watchFolderId, deviceId, ct));
 
+    public async Task<WatchFolderDto> SetDeviceAsync(string watchFolderId, string deviceId, string? devicePath, bool? launch, CancellationToken ct) =>
+        (await ApiErrors.Call(() => api.SetWatchFolderDeviceAsync(watchFolderId, deviceId, new SetWatchFolderDeviceBody { DevicePath = devicePath, Launch = launch }, ct))).WatchFolder;
+
     public async Task<WatchFolderDto> SetEnabledAsync(string watchFolderId, bool enabled, CancellationToken ct) =>
         (await ApiErrors.Call(() => api.SetWatchFolderEnabledAsync(watchFolderId, new SetWatchFolderEnabledBody { Enabled = enabled }, ct))).WatchFolder;
 

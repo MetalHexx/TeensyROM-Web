@@ -302,6 +302,115 @@ public class WatchFolderStoreTests : IDisposable
         store.Get(id).Should().NotBeNull();
     }
 
+    private (WatchFolderStore Store, string Id) GivenFolderWithTwoDestinations()
+    {
+        GivenDevice(DeviceA);
+        GivenDevice(DeviceB);
+        var folder = Dir("games");
+        var store = NewStore();
+        var id = store.Add(Request(folder, devicePath: "/a")).Folder!.Id;
+        store.Add(Request(folder, DeviceB, devicePath: "/b"));
+        return (store, id);
+    }
+
+    [Fact]
+    public void SetDestination_PathOnly_ChangesThePathAndKeepsLaunch()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        var result = store.SetDestination(id, DeviceA, "/games", null);
+
+        result.Error.Should().BeNull();
+        var destination = store.Get(id)!.Destinations.Single(d => d.DeviceId == DeviceA);
+        destination.Path.Should().Be("/games/");
+        destination.Launch.Should().BeFalse();
+        result.Folder.Should().Be(store.Get(id));
+    }
+
+    [Fact]
+    public void SetDestination_LaunchOnly_ChangesLaunchAndKeepsThePath()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        store.SetDestination(id, DeviceA, null, true).Error.Should().BeNull();
+
+        var destination = store.Get(id)!.Destinations.Single(d => d.DeviceId == DeviceA);
+        destination.Launch.Should().BeTrue();
+        destination.Path.Should().Be("/a/");
+    }
+
+    [Fact]
+    public void SetDestination_Both_ChangesBoth()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        store.SetDestination(id, DeviceA, "/games", true).Error.Should().BeNull();
+
+        var destination = store.Get(id)!.Destinations.Single(d => d.DeviceId == DeviceA);
+        destination.Path.Should().Be("/games/");
+        destination.Launch.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetDestination_LeavesOtherDestinationsAndTheFolderUntouched()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+        var before = store.Get(id)!;
+
+        store.SetDestination(id, DeviceA, "/games", true);
+
+        var after = store.Get(id)!;
+        after.Destinations.Single(d => d.DeviceId == DeviceB).Should().Be(before.Destinations.Single(d => d.DeviceId == DeviceB));
+        after.Id.Should().Be(before.Id);
+        after.Path.Should().Be(before.Path);
+        after.Enabled.Should().Be(before.Enabled);
+        after.Destinations.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void SetDestination_ValuesItAlreadyHas_SucceedsWithoutSaving()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+        var before = store.Get(id)!;
+
+        var result = store.SetDestination(id, DeviceA, "/a", false);
+
+        result.Error.Should().BeNull();
+        result.Folder.Should().Be(before);
+        store.Get(id).Should().Be(before);
+    }
+
+    [Fact]
+    public void SetDestination_UnknownFolderOrDevice_IsNotFound()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        store.SetDestination("missing", DeviceA, "/x", null).Error.Should().Be(WatchFolderSetDestinationError.NotFound);
+        store.SetDestination(id, "CCCC3333", null, true).Error.Should().Be(WatchFolderSetDestinationError.NotFound);
+        store.Get(id)!.Destinations.Select(d => d.Path).Should().Equal("/a/", "/b/");
+    }
+
+    [Theory]
+    [InlineData("/a/../b")]
+    [InlineData("/a/./b")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void SetDestination_InvalidOrBlankPath_IsRefusedAndNeverBecomesTheDefault(string devicePath)
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        store.SetDestination(id, DeviceA, devicePath, null).Error.Should().Be(WatchFolderSetDestinationError.InvalidDevicePath);
+        store.Get(id)!.Destinations.Single(d => d.DeviceId == DeviceA).Path.Should().Be("/a/");
+    }
+
+    [Fact]
+    public void SetDestination_NothingGiven_IsRefused()
+    {
+        var (store, id) = GivenFolderWithTwoDestinations();
+
+        store.SetDestination(id, DeviceA, null, null).Error.Should().Be(WatchFolderSetDestinationError.NothingToChange);
+    }
+
     [Fact]
     public void SetEnabled_TogglesAndReportsMissingFolders()
     {
