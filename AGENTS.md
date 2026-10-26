@@ -195,7 +195,7 @@ pnpm nx build teensyrom-ui --configuration=production
 #### Media Management Features
 - **SID Music**: HVSC metadata integration with accurate timing
 - **Games**: OneLoad64 compatibility and rapid launching
-- **File Transfer**: Drag-drop and watch directory synchronization
+- **File Transfer**: Drag-drop uploads, auto-launch after a transfer, and watch folders that send new files to a TeensyROM
 - **Search**: Light search engine syntax with metadata querying
 
 #### Real-time Communication

@@ -140,10 +140,10 @@ libs/features/settings/src/lib/settings-view/
 | **Player** | `PlayerSettings` | `PlayerSettings` | Repeat mode, play timer, mute options, startup filter |
 | **Video** | `VideoSettings` | `VideoSettings` | Enable video capture component visibility |
 | **File Transfer** | `FileTransferSettings` | `FileTransferSettings` | Auto-launch after copy, navigate on launch, sync settings |
-
-`WatchFolders` are not a settings category. They live in `Settings.json` as `TeensySettings.WatchFolders`, but only the `/api/watch-folders` endpoints change them, and a whole-settings save preserves them. See `backend-architecture` (`references/FILE_TRANSFER.md`, Watched Folders).
 | **Search** | `SearchSettings` | `SearchSettings` | Field weights, stop words, banned dirs/files |
 | **App** | `AppSettings` | `AppSettings` | First-time setup flag |
+
+`WatchFolders` are not a settings category. They live in `Settings.json` as `TeensySettings.WatchFolders`, but only the `/api/watch-folders` endpoints change them, and a whole-settings save preserves them. See `backend-architecture` (`references/FILE_TRANSFER.md`, Watched Folders).
 
 ---
 
@@ -195,6 +195,12 @@ These settings exist in the model but have no implementation:
 | Setting | Intended Purpose | Status |
 |---------|-----------------|--------|
 | `connectionSettings.connectionType` | Toggle between Serial/TCP communication | TCP support not implemented; always uses Serial |
+
+#### **File Transfer Settings**
+| Setting | Intended Purpose | Status |
+|---------|-----------------|--------|
+| `fileTransferSettings.navToDirOnLaunch` | Navigate to the launched file's directory after a launch | Persisted but nothing acts on it |
+| `fileTransferSettings.syncFilesEnabled` | A future sync feature | Persisted but no sync feature exists |
 
 #### **Player Settings**
 | Setting | Intended Purpose | Status |
