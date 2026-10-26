@@ -14,7 +14,10 @@ namespace TeensyRom.Api.Endpoints.WatchFolders.SetWatchFolderEnabled
                 .ProducesProblem(StatusCodes.Status404NotFound)
                 .WithName("SetWatchFolderEnabled")
                 .WithSummary("Set Watch Folder Enabled")
-                .WithDescription("Turns a watch folder on or off without changing its destinations.")
+                .WithDescription(
+                    "Turns a watch folder on or off without changing its destinations.\n\n" +
+                    "- Files that land while the folder is off are not sent later, not even after it is turned back on."
+                )
                 .WithTags("WatchFolders");
         }
 

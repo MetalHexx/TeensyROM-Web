@@ -122,7 +122,7 @@ internal static class CliHost
             PublicVerb.Of<WatchFolderSetCommand, WatchFolderSetSettings>("set", "Change where a watch folder's files land on a TeensyROM (--path) and whether it launches them (--launch or --no-launch), without removing the destination. Name the TeensyROM with --device when the folder sends to several. Exits 5 when the folder or that destination isn't there.", ["watch-folder", "set", "./roms", "--device", "Bench", "--launch"]),
             PublicVerb.Of<WatchFolderRemoveCommand, WatchFolderRemoveSettings>("remove", "Stop watching a folder; with --device, only stop sending its files to that TeensyROM. Exits 5 when the folder isn't watched.", ["watch-folder", "remove", "./roms"]),
             PublicVerb.Of<WatchFolderListCommand, WatchFolderListSettings>("list", "List the watch folders, their state and where each one's files go. Needs no device.", ["watch-folder", "list"]),
-            PublicVerb.Of<WatchFolderEnabledCommand, WatchFolderSettings>("pause", "Stop sending a watch folder's files until it is resumed. Exits 5 when the folder isn't watched.", ["watch-folder", "pause", "./roms"]),
+            PublicVerb.Of<WatchFolderEnabledCommand, WatchFolderSettings>("pause", "Stop sending a watch folder's files until it is resumed. Files that land while it is paused are not sent later, not even after resume. Exits 5 when the folder isn't watched.", ["watch-folder", "pause", "./roms"]),
             PublicVerb.Of<WatchFolderEnabledCommand, WatchFolderSettings>(WatchFolderEnabledCommand.ResumeVerb, "Start sending a paused watch folder's files again. Exits 5 when the folder isn't watched.", ["watch-folder", "resume", "./roms"])
         ]),
         new("transfer", "See the transfers the engine is running.",

@@ -12,6 +12,8 @@ Some files are archives and require expansion (unzipping, extraction) before wri
 
 **Non-archive uploads** flow: **endpoint → capacity gate → staging → queue → pump → device**. **Archive uploads** flow: **endpoint → scratch → expansion → (expanded entries) → capacity gate → staging → queue → pump → device**. When the endpoint detects an archive, it bypasses the capacity gate and staging, writing the raw archive body directly to scratch. The expansion service then walks the archive tree; after all archives are expanded, every extracted entry (including those from nested archives) is admitted through the standard gate-and-staging pipeline, ensuring fair capacity accounting for expanded content.
 
+The pump resets the device before a job's first write unless the engine's record says the device is idle at the C64 menu with nothing launched on it (`SkipResetWhenIdle`); a device that proves busy is reset and the batch re-sent.
+
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 graph TB
@@ -147,7 +149,7 @@ stateDiagram-v2
 
 The serial port is single-threaded and locked for the duration of each command via `CommunicationPortBehavior`'s static per-command semaphore. This semaphore **has a five-minute stale-lock disposal** — if a thread acquires it and never releases (e.g. crashes), the lock is recycled automatically to prevent deadlock.
 
-A file transfer job must hold exclusive access to the device **across many serial commands** — reset, then multiple writes. Holding the semaphore itself across the entire job would violate the five-minute contract: the stale-lock cleanup could dispose the job's lock while work is still in progress.
+A file transfer job must hold exclusive access to the device **across many serial commands** — a reset when the device isn't idle, then multiple writes. Holding the semaphore itself across the entire job would violate the five-minute contract: the stale-lock cleanup could dispose the job's lock while work is still in progress.
 
 The `DeviceLeaseCoordinator` solves this by being a **separate, timer-less construct** above the port lock:
 - When a job starts, `ITransferJobService.Start` acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
@@ -279,7 +281,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 
 `WatchFolderWatcher` runs one loop that watches every enabled watch folder and sends what arrives in it to that folder's destinations. The loop owns all watch state. `FileSystemWatcher` callbacks, settings changes and the poll timer only post messages to its channel, so nothing starts or stops from a callback (a settings change arrives synchronously under the settings lock). The watcher reports each folder's state through `IWatchFolderStatus`: `Watching`, `Off` (turned off) or `Unavailable` (the folder is missing or its watch failed to start).
 
-Folders live in `TeensySettings.WatchFolders` (`Settings.json`). Only the `/api/watch-folders` endpoints change them, through `WatchFolderStore`: add, remove a folder, remove one device from a folder, and enable or disable. `WatchFolderStore` refuses a folder nested in another watched folder, a second destination for a device that already has one on the folder, and a device without a chip id. A whole-settings save keeps the folders.
+Folders live in `TeensySettings.WatchFolders` (`Settings.json`). Only the `/api/watch-folders` endpoints change them, through `WatchFolderStore`: add, remove a folder, remove one device from a folder, change a destination's device folder and launch flag in place (`PUT /api/watch-folders/{watchFolderId}/devices/{deviceId}`; a different device or storage is a different destination), and enable or disable. Files that land while a folder is disabled are never sent later. `WatchFolderStore` refuses a folder nested in another watched folder, a second destination for a device that already has one on the folder, and a device without a chip id. A whole-settings save keeps the folders.
 
 ### Arrival rules
 

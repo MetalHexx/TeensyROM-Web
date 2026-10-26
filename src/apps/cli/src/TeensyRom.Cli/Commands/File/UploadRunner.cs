@@ -109,7 +109,7 @@ internal sealed class UploadRunner(ITransferService transfers, ILastLaunchStore 
 
     /// <summary>
     /// Cancels a job that didn't end on its own, best effort: this runs while another failure may be on its way out. The
-    /// engine resets the device when the job's first file is admitted, which is after that file has finished staging and
+    /// engine resets the device (unless it believes the device is idle with nothing launched on it) when the job's first file is admitted, which is after that file has finished staging and
     /// before any send succeeds or fails. So once the last snapshot shows a file sent, failed or received (staged), the
     /// last-launch record must stop saying the device is playing; a first file cancelled mid-send leaves only "received".
     /// The snapshot's current file is not checked: the engine clears it again once a send finishes, so it is null while a file is on the wire.

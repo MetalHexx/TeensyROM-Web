@@ -22,7 +22,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                     "Starts a new file transfer job for a device's storage.\n\n" +
                     "- Acquires an exclusive lease on the device for the lifetime of the job - a device " +
                     "can only have one active transfer at a time.\n" +
-                    "- Issues no device traffic - the device reset happens on the first uploaded file."
+                    "- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file."
                 )
                 .WithTags("Transfers");
         }

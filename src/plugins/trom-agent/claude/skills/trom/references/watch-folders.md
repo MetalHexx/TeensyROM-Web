@@ -27,11 +27,15 @@ A folder can't sit inside another watched folder, or contain one.
 - `off`: the user paused it.
 - `unavailable`: it is on, but can't be watched right now, usually because the folder is gone. The engine retries on its own.
 
+## Changing a destination
+
+Confirm first. `trom watch-folder set "<folder>" --device <name> [--path "<device folder>"] [--launch | --no-launch] --json` changes the device folder and the launch flag of an existing destination. It needs `--device` unless the folder has just one destination. It changes nothing else: the device and storage stay, and a different storage is a remove and add. Give at least one of `--path`, `--launch` and `--no-launch`. It exits 5 when the folder or that destination isn't there. The change applies to the next files that land.
+
 ## Pausing, resuming and removing
 
 Confirm first, every time.
 
-- Pause: `trom watch-folder pause "<folder>" --json`. The folder stays on the list and sends nothing until resumed.
+- Pause: `trom watch-folder pause "<folder>" --json`. The folder stays on the list and sends nothing until resumed. Files that land while it is paused are never sent later, not even after resume, so check with the user before pausing while they are still adding files.
 - Resume: `trom watch-folder resume "<folder>" --json`.
 - Remove: `trom watch-folder remove "<folder>" --json` removes the whole folder. Add `--device <name>` to stop only that TeensyROM getting its files. The result is `{path, deviceId, folderRemoved}`, and `deviceId` is absent when the whole folder went.
 
@@ -39,7 +43,7 @@ Pause, resume and remove exit 5 when the folder isn't watched.
 
 ## One destination per device
 
-A folder sends to each TeensyROM once. To change a device's storage or folder, remove that device from the folder, then add it again.
+A folder sends to each TeensyROM once. To change a destination's device folder or launch, use `trom watch-folder set`. Only a different storage needs `remove --device` and then `add`.
 
 ## What lands
 
@@ -47,7 +51,7 @@ A folder sends to each TeensyROM once. To change a device's storage or folder, r
 - Only files that arrive after the folder is watched count. Files already there are not sent.
 - Files that arrive close together go as one transfer. The batch waits up to two minutes for any file still being written, so a normal download or copy goes as one transfer.
 - The engine copies each file and never deletes or moves it from the folder.
-- A file landing in a watched folder resets a running C64, the same as an upload does. That's by design. Say so before the user turns a folder on while they're playing.
+- A file landing in a watched folder resets the TeensyROM, the same as an upload does, unless the engine believes the device is idle with nothing launched on it. A reset stops whatever is running. That's by design. Say so before the user turns a folder on while they're playing.
 
 ## Skipped files
 

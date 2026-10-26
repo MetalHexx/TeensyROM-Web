@@ -7,8 +7,8 @@ import { logInfo, LogType } from '@teensyrom-nx/utils';
 /**
  * Suppresses player timers for any device with an active transfer job.
  *
- * The transfer pump resets the device server-side before the first file arrives, so playback is
- * already stopped there. This reacts to `TransferStore` state alone — never to the drop flow — so
+ * The engine resets the device server-side before the first file arrives, unless it believes the
+ * device is idle with nothing launched on it, so playback is already stopped there. This reacts to `TransferStore` state alone — never to the drop flow — so
  * it also covers a job this client did not start (the busy pre-check finding a foreign job). It
  * issues no device command at any point; `reflectTransferStopped` is a local-only status write.
  */

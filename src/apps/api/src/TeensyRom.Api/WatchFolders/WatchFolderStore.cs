@@ -59,7 +59,7 @@ namespace TeensyRom.Api.WatchFolders
             if (device.GetStorage(request.StorageType) is null)
             {
                 return Failed(WatchFolderAddError.StorageUnavailable,
-                    $"The device has no {request.StorageType} storage available.");
+                    $"The storage {request.StorageType} is not available.");
             }
 
             var destination = new WatchFolderDestination

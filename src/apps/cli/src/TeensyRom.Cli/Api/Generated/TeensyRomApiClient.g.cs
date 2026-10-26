@@ -36,6 +36,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Turns a watch folder on or off without changing its destinations.
+        /// <br/>
+        /// <br/>- Files that land while the folder is off are not sent later, not even after it is turned back on.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -211,7 +213,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Starts a new file transfer job for a device's storage.
         /// <br/>
         /// <br/>- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.
-        /// <br/>- Issues no device traffic - the device reset happens on the first uploaded file.
+        /// <br/>- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -647,6 +649,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Turns a watch folder on or off without changing its destinations.
+        /// <br/>
+        /// <br/>- Files that land while the folder is off are not sent later, not even after it is turned back on.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -1879,7 +1883,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Starts a new file transfer job for a device's storage.
         /// <br/>
         /// <br/>- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.
-        /// <br/>- Issues no device traffic - the device reset happens on the first uploaded file.
+        /// <br/>- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>

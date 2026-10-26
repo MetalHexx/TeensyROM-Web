@@ -23,7 +23,7 @@ Copy between this computer and the TeensyROM with `trom file upload` and `trom f
 - Ask where files go when the user hasn't said: the device folder for an upload, the folder on the computer for a download. Your own working folder is wherever this session started, which is rarely where the user wants files.
 - Before any copy, confirm what goes where. A copy replaces a same-named file at the destination.
 - Never pass `--yes`. It sends the whole current folder, which is rarely what the user means; ask for the files instead.
-- An upload resets the TeensyROM, which stops whatever is playing. Say so when you confirm, and don't copy during a timed set unless the user wants the set to end.
+- An upload resets the TeensyROM unless the engine believes it is idle with nothing launched on it, and a reset stops whatever is playing. Say so when you confirm, and don't copy during a timed set unless the user wants the set to end.
 - When the "Auto-launch after copy" setting is on, an upload also launches one file once it lands: games first, never `.trh`. Say so when you confirm a copy.
 - Report the summary, and each failure in plain words.
 - A busy device means "try again when the other transfer finishes".
