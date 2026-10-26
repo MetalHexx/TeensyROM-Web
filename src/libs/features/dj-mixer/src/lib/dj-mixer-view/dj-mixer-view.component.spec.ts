@@ -613,6 +613,9 @@ describe('DjMixerViewComponent', () => {
       DECK_CONTROL_IDS.map((control): ControlIdentity => ({ owner, control }))
     );
 
+    // Renders the whole view, then runs one anchor query per mappable control across the grid. With
+    // the loop controls that is 154 queries over a heavier grid: under CI load it has run past the
+    // project's tight 2000ms testTimeout.
     it('finds every mappable control as exactly one element in the rendered grid', () => {
       const { fixture } = render([]);
       const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
@@ -626,7 +629,7 @@ describe('DjMixerViewComponent', () => {
 
       expect(ALL_IDENTITIES).toHaveLength(154);
       expect(mismatched).toEqual([]);
-    });
+    }, 10000);
   });
 
   describe('the mapping overlays', () => {
