@@ -9,7 +9,17 @@ import type { LoopMarker, Playable, TuneIdentity } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
-import { DjStore } from './dj-store';
+import {
+  DjStore,
+  HOME_DECK_PANEL,
+  type DeckLoopMarker,
+  type DeckMixerSettings,
+  type DeckPanelState,
+} from './dj-store';
+import { MixerApplier } from './mixer-applier';
+import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
+import { engineSettingsOf } from './mixer/engine-settings';
+import { voicePitchMultiplier } from './mixer/pitch';
 import {
   FRAME_CLOCK_FACTORY,
   LOOP_POSITIONS_STORE,
@@ -154,6 +164,11 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+/** A home panel with its Key and Cutoff moved, a stand-in for a shaped one. */
+function panelOf(keySemitones: number, cutoff = 0): DeckPanelState {
+  return { ...HOME_DECK_PANEL, keySemitones, cutoff };
+}
+
 const TUNE_X: TuneIdentity = { sidHash: 'tune-x', subtune: 1 };
 const TUNE_Y: TuneIdentity = { sidHash: 'tune-y', subtune: 1 };
 
@@ -209,11 +224,35 @@ describe('DeckLoops', () => {
     loops = TestBed.inject(DeckLoops);
     for (const slot of ['A', 'B'] as const) {
       runtime.build(slot);
-      // What `DeckService` does for every engine notification.
-      runtime.subscribe(slot, () => loops.reflect(slot));
+      // What `DeckService` does for every engine notification: mirror the engine's controls
+      // first, so the store's voices follow it before the markers reflect it.
+      runtime.subscribe(slot, () => {
+        mirrorEngineControls(slot);
+        loops.reflect(slot);
+      });
     }
     clockOf = { A: clocks[0], B: clocks[1] };
   });
+
+  /** Writes the engine's tempo and voices to the store, only on a difference. */
+  function mirrorEngineControls(slot: Slot): void {
+    const { tempo, voices } = runtime.snapshot(slot);
+    const deck = store.decks()[slot];
+    const sameVoices =
+      deck.voices.length === voices.length &&
+      deck.voices.every(
+        (voice, i) => voice.muted === voices[i].muted && voice.held === voices[i].held
+      );
+    if (deck.speed !== tempo.multiplier || !sameVoices) {
+      store.setDeckEngineControls({
+        slot,
+        speed: tempo.multiplier,
+        faderSpeed: deck.faderSpeed,
+        nudging: deck.nudging,
+        voices,
+      });
+    }
+  }
 
   /** Replays what `DeckService.load` does around the markers: detach, hand the tune to the engine,
    *  attach. */
@@ -1688,6 +1727,890 @@ describe('DeckLoops', () => {
 
       expect(multiplier).toBe(1.25);
       expect(runtime.snapshot('A').tempo.multiplier).toBe(multiplier);
+    });
+  });
+
+  describe('marker settings', () => {
+    const SETTINGS_A: DeckMixerSettings = { panel: panelOf(3), mutes: [true, false, false] };
+    const SETTINGS_B: DeckMixerSettings = { panel: panelOf(-2), mutes: [false, true, false] };
+    const SETTINGS_E: DeckMixerSettings = { panel: panelOf(5, 100), mutes: [false, false, true] };
+
+    /** The marker as it is stored once GBL is unlatched. */
+    function owning(marker: LoopMarker, settings: DeckMixerSettings): LoopMarker {
+      return { ...marker, settings: encodeMixerSettings(settings), usesOwnSettings: true };
+    }
+
+    const engineMutes = (slot: Slot) => runtime.snapshot(slot).voices.map((voice) => voice.muted);
+    const storeMutes = (slot: Slot) => store.decks()[slot].voices.map((voice) => voice.muted);
+    const panelOn = (slot: Slot) => store.panel()[slot];
+
+    function markerOf(slot: Slot, id: string): DeckLoopMarker {
+      const marker = stateOf(slot).markers.find((candidate) => candidate.id === id);
+      if (marker === undefined) {
+        throw new Error(`deck ${slot} holds no marker ${id}`);
+      }
+      return marker;
+    }
+
+    /** A performer's panel edit: what `MixerService` does after a knob moves. */
+    function tweak(slot: Slot, cutoff: number): void {
+      store.setDeckPanel({ slot, patch: { cutoff } });
+      loops.saveSettingsInPlay(slot);
+    }
+
+    /** A performer's mute, in the order `DeckService.setVoiceMuted` runs it. */
+    function mute(slot: Slot, voice: number, muted: boolean): void {
+      runtime.setVoiceMuted(slot, voice, muted);
+      loops.saveSettingsInPlay(slot);
+    }
+
+    async function engage(slot: Slot, id: string): Promise<void> {
+      loops.toggle(slot, id);
+      await flush();
+    }
+
+    async function startDeckB(): Promise<void> {
+      await loadOn('B', TUNE_X);
+      await settle();
+      await runtime.play('B');
+    }
+
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [
+        owning(loopOf('a', 100, 120), SETTINGS_A),
+        owning(loopOf('b', 300, 320), SETTINGS_B),
+        cue('c', 500),
+        loopOf('d', 600, 620),
+        owning(cue('e', 700), SETTINGS_E),
+        owning(loopOf('w', 800, 1000), SETTINGS_B),
+      ]);
+      await loadOn('A', TUNE_X);
+      await settle();
+      await runtime.play('A');
+    });
+
+    describe('the stored form', () => {
+      it("brings back each marker's settings and GBL state, with the main track at home", () => {
+        expect(stateOf('A').markers.map((marker) => marker.ownSettings)).toEqual([
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+        ]);
+        expect(markerOf('A', 'a').settings).toEqual(SETTINGS_A);
+        expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
+        expect(markerOf('A', 'c').settings).toBeNull();
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(stateOf('A').mainSettings).toBeNull();
+        expect(panelOn('A')).toBe(HOME_DECK_PANEL);
+      });
+
+      it("keeps a latched marker's copy through a save and a reload on the other deck", async () => {
+        loops.select('A', 'a');
+
+        loops.toggleGlobal('A');
+        await flush();
+        await loadOn('B', TUNE_X);
+
+        expect(markerOf('B', 'a').ownSettings).toBe(false);
+        expect(markerOf('B', 'a').settings).toEqual(SETTINGS_A);
+        expect(markerOf('B', 'b').ownSettings).toBe(true);
+        expect(panelOn('B')).toBe(HOME_DECK_PANEL);
+        const savedA = (await positions.load(TUNE_X)).find((marker) => marker.id === 'a');
+        expect(savedA?.usesOwnSettings).toBeUndefined();
+        expect(savedA?.settings).toBeDefined();
+      });
+
+      it('loads settings it cannot read, and a GBL flag without them, as sharing the main track', async () => {
+        await positions.save(TUNE_Y, [
+          { ...cue('x', 10), settings: { v: 9 } as never, usesOwnSettings: true },
+          { ...cue('y', 20), usesOwnSettings: true },
+        ]);
+
+        await loadOn('B', TUNE_Y);
+
+        expect(stateOf('B').markers.map((marker) => [marker.settings, marker.ownSettings])).toEqual(
+          [
+            [null, false],
+            [null, false],
+          ]
+        );
+      });
+    });
+
+    describe('GBL', () => {
+      it('unlatches a marker that is not running into a copy of what is sounding, and lets the sound alone', () => {
+        store.setDeckPanel({ slot: 'A', patch: { cutoff: 250 } });
+        mute('A', 1, true);
+        loops.select('A', 'c');
+
+        loops.toggleGlobal('A');
+
+        const marker = markerOf('A', 'c');
+        expect(marker.ownSettings).toBe(true);
+        expect(marker.settings).toEqual({ panel: panelOn('A'), mutes: [false, true, false] });
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(engineMutes('A')).toEqual([false, true, false]);
+      });
+
+      it('latches again keeping the copy, and unlatches into the kept copy rather than a new one', () => {
+        loops.select('A', 'c');
+        loops.toggleGlobal('A');
+        const kept = markerOf('A', 'c').settings;
+        store.setDeckPanel({ slot: 'A', patch: { cutoff: 999 } });
+
+        loops.toggleGlobal('A');
+        expect(markerOf('A', 'c')).toMatchObject({ ownSettings: false, settings: kept });
+
+        loops.toggleGlobal('A');
+        expect(markerOf('A', 'c')).toMatchObject({ ownSettings: true });
+        expect(markerOf('A', 'c').settings).toBe(kept);
+      });
+
+      it('changes only the list entry of a marker that is neither running nor in play', async () => {
+        await engage('A', 'd');
+        loops.select('A', 'b');
+        const panel = panelOn('A');
+
+        loops.toggleGlobal('A');
+
+        expect(markerOf('A', 'b')).toMatchObject({ ownSettings: false, settings: SETTINGS_B });
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(panelOn('A')).toBe(panel);
+        expect(engineMutes('A')).toEqual([false, false, false]);
+      });
+
+      it('refuses with the house warning when no marker is selected', async () => {
+        await loadOn('B', TUNE_Y);
+
+        loops.toggleGlobal('B');
+
+        expect(refusals()).toHaveLength(1);
+        expect(refusals()[0][0]).toContain('toggleGlobal refused');
+      });
+
+      it('makes the running marker the one in play at once, holding the main track aside', async () => {
+        tweak('A', 250);
+        const main = { panel: panelOn('A'), mutes: [false, false, false] };
+        await engage('A', 'd');
+        loops.select('A', 'd');
+
+        loops.toggleGlobal('A');
+
+        expect(stateOf('A').settingsInPlayId).toBe('d');
+        expect(stateOf('A').mainSettings).toEqual(main);
+        expect(markerOf('A', 'd')).toMatchObject({ ownSettings: true, settings: main });
+        tweak('A', 300);
+        expect(markerOf('A', 'd').settings?.panel.cutoff).toBe(300);
+        expect(stateOf('A').mainSettings?.panel.cutoff).toBe(250);
+      });
+
+      it('goes from stab to latch to unlatch on a running marker, the kept copy reaching the engine', async () => {
+        await engage('A', 'a');
+        loops.select('A', 'a');
+        runtime.setVoiceHeld('A', 0, true);
+        runtime.setVoiceHeld('A', 0, false);
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+
+        loops.toggleGlobal('A');
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(panelOn('A')).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('A')).toEqual([false, false, false]);
+        expect(markerOf('A', 'a')).toMatchObject({ ownSettings: false, settings: SETTINGS_A });
+        expect(stateOf('A').runningId).toBe('a');
+
+        const setVoicePitch = vi.spyOn(runtime, 'setVoicePitch');
+        loops.toggleGlobal('A');
+
+        expect(markerOf('A', 'a').ownSettings).toBe(true);
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        expect(setVoicePitch).toHaveBeenCalledWith('A', 0, voicePitchMultiplier(3, 0, 0));
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(storeMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(runtime.snapshot('A').voices.map((voice) => voice.held)).toEqual([
+          false,
+          false,
+          false,
+        ]);
+      });
+
+      it('lets a latched marker in play go at once while it keeps running', async () => {
+        await engage('A', 'a');
+        loops.select('A', 'a');
+
+        loops.toggleGlobal('A');
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').mainSettings).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      });
+    });
+
+    describe('an immediate jump', () => {
+      it('lands an independent marker with its settings, the main track held aside', async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        const main = { panel: panelOn('A'), mutes: [false, false, true] };
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        await engage('A', 'a');
+
+        expect(seek).toHaveBeenCalledWith(
+          'A',
+          100,
+          engineSettingsOf(SETTINGS_A.panel, SETTINGS_A.mutes)
+        );
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        expect(storeMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+        expect(stateOf('A').mainSettings).toEqual(main);
+        expect(runtime.position('A')).toBe(100);
+      });
+
+      it('lands a cue the same way, with nothing looping', async () => {
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        await engage('A', 'e');
+
+        expect(seek).toHaveBeenCalledWith(
+          'A',
+          700,
+          engineSettingsOf(SETTINGS_E.panel, SETTINGS_E.mutes)
+        );
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').settingsInPlayId).toBe('e');
+        expect(engineMutes('A')).toEqual(SETTINGS_E.mutes);
+      });
+
+      it('seeks plainly into a marker sharing the main track while the main track is in play', async () => {
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        const panel = panelOn('A');
+
+        await engage('A', 'c');
+
+        expect(seek).toHaveBeenCalledExactlyOnceWith('A', 500);
+        expect(panelOn('A')).toBe(panel);
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+      });
+
+      it("lands the main track's settings from a jump out of an independent marker into a sharing one", async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        const main = { panel: panelOn('A'), mutes: [false, false, true] };
+        await engage('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        loops.select('A', 'c');
+
+        loops.audition('A', 'start', 'c');
+        await flush();
+
+        expect(seek).toHaveBeenCalledWith('A', 500, engineSettingsOf(main.panel, main.mutes));
+        expect(panelOn('A')).toBe(main.panel);
+        expect(engineMutes('A')).toEqual(main.mutes);
+        expect(storeMutes('A')).toEqual(main.mutes);
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(stateOf('A').mainSettings).toBeNull();
+      });
+
+      it('moves between two independent markers keeping the one main track aside', async () => {
+        tweak('A', 250);
+        const main = { panel: panelOn('A'), mutes: [false, false, false] };
+        await engage('A', 'a');
+        loops.select('A', 'b');
+
+        loops.audition('A', 'start', 'b');
+        await flush();
+
+        expect(stateOf('A').settingsInPlayId).toBe('b');
+        expect(stateOf('A').mainSettings).toEqual(main);
+        expect(panelOn('A')).toEqual(SETTINGS_B.panel);
+        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
+      });
+
+      it('brings the copy again into the marker already in play, carrying a change the other deck made', async () => {
+        await startDeckB();
+        await engage('A', 'a');
+        await engage('B', 'a');
+        tweak('B', 321);
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        expect(markerOf('A', 'a').settings?.panel.cutoff).toBe(321);
+
+        loops.select('A', 'a');
+        loops.audition('A', 'start', 'a');
+        await flush();
+
+        expect(panelOn('A').cutoff).toBe(321);
+        expect(stateOf('A').mainSettings?.panel).toBe(HOME_DECK_PANEL);
+      });
+
+      it('puts the settings in at the press for a target that is not prepared, and seeks without them', async () => {
+        loops.select('A', 'w');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+
+        loops.audition('A', 'end', 'w');
+
+        expect(seek).toHaveBeenCalledExactlyOnceWith('A', 900);
+        expect(panelOn('A')).toEqual(SETTINGS_B.panel);
+        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
+        expect(stateOf('A').settingsInPlayId).toBe('w');
+        await flush();
+        expect(runtime.position('A')).toBe(900);
+        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
+      });
+
+      it('keeps the store and the engine together when a let-go comes before the replay lands', async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        const main = { panel: panelOn('A'), mutes: [false, false, true] };
+        loops.select('A', 'w');
+
+        loops.audition('A', 'end', 'w');
+        loops.stop('A');
+        await flush();
+
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(panelOn('A')).toBe(main.panel);
+        expect(storeMutes('A')).toEqual(main.mutes);
+        expect(engineMutes('A')).toEqual(main.mutes);
+      });
+
+      it('waits for a start that is not ready, then lands the settings with it', async () => {
+        gates.A.holding = true;
+        loops.select('A', 'b');
+        loops.nudge('A', 'start', 5);
+
+        loops.audition('A', 'start', 'b');
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(engineMutes('A')).toEqual([false, false, false]);
+
+        await settle();
+
+        expect(stateOf('A').settingsInPlayId).toBe('b');
+        expect(panelOn('A')).toEqual(SETTINGS_B.panel);
+        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
+      });
+    });
+
+    describe('a queued jump', () => {
+      /** Queues `id` behind a running sharing loop and lets it land. */
+      async function queueAndLand(id: string): Promise<void> {
+        await engage('A', 'd');
+        loops.toggle('A', id);
+        tickUntil('A', () => handOffsOf('A') === 1);
+      }
+
+      it('carries an independent marker settings with the queue and swaps them in as it lands', async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        const main = { panel: panelOn('A'), mutes: [false, false, true] };
+        await engage('A', 'd');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.toggle('A', 'a');
+
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 100,
+          endFrame: 120,
+          settings: engineSettingsOf(SETTINGS_A.panel, SETTINGS_A.mutes),
+        });
+        expect(panelOn('A')).toBe(main.panel);
+        expect(engineMutes('A')).toEqual(main.mutes);
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+        expect(stateOf('A').mainSettings).toEqual(main);
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        expect(storeMutes('A')).toEqual(SETTINGS_A.mutes);
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+      });
+
+      it("carries the main track's settings into a sharing marker behind an independent one", async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        const main = { panel: panelOn('A'), mutes: [false, false, true] };
+        await engage('A', 'a');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.toggle('A', 'd');
+
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 600,
+          endFrame: 620,
+          settings: engineSettingsOf(main.panel, main.mutes),
+        });
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('d');
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(stateOf('A').mainSettings).toBeNull();
+        expect(panelOn('A')).toBe(main.panel);
+        expect(engineMutes('A')).toEqual(main.mutes);
+        expect(storeMutes('A')).toEqual(main.mutes);
+      });
+
+      it('queues a sharing marker with nothing while the main track is in play', async () => {
+        await engage('A', 'd');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.toggle('A', 'c');
+
+        expect(queue).toHaveBeenLastCalledWith('A', { startFrame: 500, endFrame: null });
+      });
+
+      it('lands a cue with its settings and leaves no engine queue behind', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        await queueAndLand('e');
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').settingsInPlayId).toBe('e');
+        expect(panelOn('A')).toEqual(SETTINGS_E.panel);
+        expect(engineMutes('A')).toEqual(SETTINGS_E.mutes);
+        expect(engineQueue('A')).toBeNull();
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('no loop running'));
+        warn.mockRestore();
+      });
+
+      it('lands a loop with its settings and leaves no engine queue behind', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        await queueAndLand('b');
+        tick('A', 60);
+
+        expect(engineQueue('A')).toBeNull();
+        expect(queue.mock.calls.filter(([, target]) => target !== null)).toHaveLength(1);
+        expect(handOffsOf('A')).toBe(1);
+        expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('no loop running'));
+        warn.mockRestore();
+      });
+
+      it("follows an edit to the queued marker's copy made on the other deck", async () => {
+        await startDeckB();
+        await engage('B', 'b');
+        await engage('A', 'd');
+        loops.toggle('A', 'b');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        tweak('B', 444);
+
+        const target = queue.mock.calls.at(-1)?.[1];
+        expect(target).toMatchObject({ startFrame: 300, endFrame: 320 });
+        expect(target?.settings?.fieldOffsets).toContainEqual({
+          field: { name: 'cutoff' },
+          amount: 444,
+        });
+        tickUntil('A', () => handOffsOf('A') === 1);
+        expect(panelOn('A').cutoff).toBe(444);
+      });
+
+      it('follows the queued marker flipping its GBL, in both directions', async () => {
+        await engage('A', 'd');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.toggleGlobal('A');
+        expect(queue).toHaveBeenLastCalledWith('A', { startFrame: 300, endFrame: 320 });
+
+        loops.toggleGlobal('A');
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 300,
+          endFrame: 320,
+          settings: engineSettingsOf(SETTINGS_B.panel, SETTINGS_B.mutes),
+        });
+        expect(stateOf('A').queuedId).toBe('b');
+      });
+
+      it('re-syncs a sharing marker queued behind the running one when its GBL flips, both ways', async () => {
+        tweak('A', 250);
+        const mainPanel = panelOn('A');
+        await engage('A', 'a');
+        loops.toggle('A', 'd');
+        loops.select('A', 'a');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.toggleGlobal('A');
+        expect(queue).toHaveBeenLastCalledWith('A', { startFrame: 600, endFrame: 620 });
+        expect(stateOf('A').queuedId).toBe('d');
+
+        loops.toggleGlobal('A');
+        expect(stateOf('A').mainSettings?.panel).not.toEqual(SETTINGS_A.panel);
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 600,
+          endFrame: 620,
+          settings: engineSettingsOf(mainPanel, [false, false, false]),
+        });
+      });
+    });
+
+    describe('letting go', () => {
+      let main: DeckMixerSettings;
+
+      beforeEach(async () => {
+        tweak('A', 250);
+        mute('A', 2, true);
+        main = { panel: panelOn('A'), mutes: [false, false, true] };
+        await engage('A', 'a');
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+      });
+
+      function expectMain(): void {
+        expect(stateOf('A').settingsInPlayId).toBeNull();
+        expect(stateOf('A').mainSettings).toBeNull();
+        expect(panelOn('A')).toBe(main.panel);
+        expect(storeMutes('A')).toEqual(main.mutes);
+        expect(engineMutes('A')).toEqual(main.mutes);
+      }
+
+      it('returns the main track on Stop', () => {
+        loops.stop('A');
+        expectMain();
+      });
+
+      it('returns the main track on toggling the running marker off', () => {
+        loops.toggle('A', 'a');
+        expectMain();
+      });
+
+      it('returns the main track on a scrub or a transport stop dropping the marker', () => {
+        loops.disengage('A');
+        expectMain();
+      });
+
+      it('returns the main track when the engine disarms its loop', () => {
+        runtime.stop('A');
+        expectMain();
+      });
+
+      it('returns the main track when the marker in play is deleted', () => {
+        loops.select('A', 'a');
+        loops.remove('A');
+        expectMain();
+      });
+
+      it('returns the main track from a cue in play, which runs nothing', async () => {
+        loops.stop('A');
+        await engage('A', 'e');
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').settingsInPlayId).toBe('e');
+        expect(store.loopsSummary('A')().canStop).toBe(true);
+
+        loops.stop('A');
+
+        expectMain();
+        expect(store.loopsSummary('A')().canStop).toBe(false);
+      });
+
+      it('returns the main track from a cue in play when it is deleted', async () => {
+        loops.stop('A');
+        await engage('A', 'e');
+        loops.select('A', 'e');
+
+        loops.remove('A');
+
+        expectMain();
+      });
+
+      it('leaves the playhead where it was', () => {
+        tick('A', 5);
+        const position = runtime.position('A');
+
+        loops.stop('A');
+
+        expect(runtime.position('A')).toBe(position);
+      });
+
+      it('does nothing a second time, once the main track is back', () => {
+        loops.stop('A');
+        const setVoiceMuted = vi.spyOn(runtime, 'setVoiceMuted');
+
+        loops.stop('A');
+
+        expect(setVoiceMuted).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('edits', () => {
+      it('reach the copy of the marker in play, and not the main track held aside', async () => {
+        await engage('A', 'a');
+        const main = stateOf('A').mainSettings;
+
+        tweak('A', 77);
+        mute('A', 2, true);
+
+        expect(markerOf('A', 'a').settings?.panel.cutoff).toBe(77);
+        expect(markerOf('A', 'a').settings?.mutes).toEqual([true, false, true]);
+        expect(markerOf('A', 'b').settings).toEqual(SETTINGS_B);
+        expect(stateOf('A').mainSettings).toBe(main);
+        expect(panelOn('A').cutoff).toBe(77);
+      });
+
+      it('are saved with the marker', async () => {
+        await engage('A', 'a');
+
+        tweak('A', 77);
+        await flush();
+
+        const saved = (await positions.load(TUNE_X)).find((marker) => marker.id === 'a');
+        expect(saved?.usesOwnSettings).toBe(true);
+        expect(decodeMixerSettings(saved?.settings)?.panel.cutoff).toBe(77);
+      });
+
+      it('go to the main track alone while it is in play, writing no marker', () => {
+        loops.select('A', 'a');
+        const markers = stateOf('A').markers;
+
+        tweak('A', 77);
+        mute('A', 0, true);
+
+        expect(stateOf('A').markers).toBe(markers);
+        expect(panelOn('A').cutoff).toBe(77);
+      });
+
+      it('change nothing in a selected marker that is not running', () => {
+        loops.select('A', 'b');
+        const markers = stateOf('A').markers;
+
+        tweak('A', 77);
+
+        expect(stateOf('A').markers).toBe(markers);
+        expect(markerOf('A', 'b').settings).toEqual(SETTINGS_B);
+      });
+
+      it('write nothing when what is sounding already is the copy', async () => {
+        await engage('A', 'a');
+        const markers = stateOf('A').markers;
+        const save = vi.spyOn(positions, 'save');
+
+        loops.saveSettingsInPlay('A');
+
+        expect(stateOf('A').markers).toBe(markers);
+        expect(save).not.toHaveBeenCalled();
+      });
+
+      it('take Panic home in the copy and leave the marker independent, with mutes untouched', async () => {
+        await engage('A', 'a');
+
+        store.resetDeckPanel({ slot: 'A', reason: 'panic' });
+        loops.saveSettingsInPlay('A');
+
+        expect(markerOf('A', 'a').settings?.panel).toBe(HOME_DECK_PANEL);
+        expect(markerOf('A', 'a').settings?.mutes).toEqual(SETTINGS_A.mutes);
+        expect(markerOf('A', 'a').ownSettings).toBe(true);
+        expect(stateOf('A').settingsInPlayId).toBe('a');
+      });
+
+      it('are left alone by Set End, Clear End and a nudge', async () => {
+        await runtime.seekToFrame('A', 750);
+        loops.select('A', 'e');
+        loops.setEnd('A');
+        expect(markerOf('A', 'e')).toMatchObject({ ownSettings: true });
+        expect(markerOf('A', 'e').end).not.toBeNull();
+        expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
+
+        loops.nudge('A', 'start', 4);
+        expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
+
+        loops.clearEnd('A');
+        expect(markerOf('A', 'e')).toMatchObject({ ownSettings: true, end: null });
+        expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
+
+        loops.select('A', 'c');
+        await runtime.seekToFrame('A', 560);
+        loops.setEnd('A');
+        expect(markerOf('A', 'c')).toMatchObject({ ownSettings: false, settings: null });
+      });
+    });
+
+    describe('a settings-only edit', () => {
+      it('declares nothing to the engine and does not wake a start audition waiting on the other deck', async () => {
+        await startDeckB();
+        await engage('B', 'd');
+        gates.B.holding = true;
+        loops.select('B', 'd');
+        loops.nudge('B', 'start', 5);
+        loops.audition('B', 'start', 'd');
+        await engage('A', 'a');
+        const declare = vi.spyOn(runtime, 'setJumpTargets');
+
+        tweak('A', 61);
+        mute('A', 1, true);
+
+        expect(declare).not.toHaveBeenCalled();
+        gates.B.holding = false;
+        await settle();
+        expect(runtime.position('B')).toBe(605);
+        expect(engineLoop('B')).toEqual({ startFrame: 605, endFrame: 620 });
+      });
+
+      it('cancels a start audition waiting on the other deck when a position edit comes from this one', async () => {
+        await startDeckB();
+        await engage('B', 'd');
+        gates.B.holding = true;
+        loops.select('B', 'd');
+        loops.nudge('B', 'start', 5);
+        loops.audition('B', 'start', 'd');
+        loops.select('A', 'b');
+
+        loops.nudge('A', 'start', 3);
+        gates.B.holding = false;
+        await settle();
+
+        expect(runtime.position('B')).not.toBe(605);
+      });
+    });
+
+    describe('the same tune on both decks', () => {
+      beforeEach(startDeckB);
+
+      it("shows an edit on the other deck's list and sound only at its next jump", async () => {
+        await engage('A', 'a');
+        await engage('B', 'a');
+        const soundOnB = { panel: panelOn('B'), mutes: engineMutes('B') };
+
+        tweak('A', 123);
+
+        expect(markerOf('B', 'a').settings?.panel.cutoff).toBe(123);
+        expect(panelOn('B')).toBe(soundOnB.panel);
+        expect(engineMutes('B')).toEqual(soundOnB.mutes);
+      });
+
+      it('lets the other deck go back to Main when it deletes the cue in play there', async () => {
+        await engage('B', 'e');
+        expect(stateOf('B').settingsInPlayId).toBe('e');
+        loops.select('A', 'e');
+
+        loops.remove('A');
+
+        expect(stateOf('B').settingsInPlayId).toBeNull();
+        expect(stateOf('B').mainSettings).toBeNull();
+        expect(panelOn('B')).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('B')).toEqual([false, false, false]);
+        expect(store.settingsInPlay('B')()).toEqual({ markerId: null, name: 'Main' });
+      });
+
+      it('lets the other deck go when the loop in play there is deleted', async () => {
+        await engage('B', 'a');
+        loops.select('A', 'a');
+
+        loops.remove('A');
+
+        expect(stateOf('B').runningId).toBeNull();
+        expect(stateOf('B').settingsInPlayId).toBeNull();
+        expect(panelOn('B')).toBe(HOME_DECK_PANEL);
+      });
+
+      it('leaves the other deck playing the settings of a marker latched here, its edits still reaching the copy', async () => {
+        await engage('B', 'a');
+        loops.select('A', 'a');
+
+        loops.toggleGlobal('A');
+
+        expect(markerOf('B', 'a').ownSettings).toBe(false);
+        expect(stateOf('B').settingsInPlayId).toBe('a');
+        expect(panelOn('B')).toEqual(SETTINGS_A.panel);
+        expect(engineMutes('B')).toEqual(SETTINGS_A.mutes);
+
+        tweak('B', 88);
+
+        expect(markerOf('B', 'a').settings?.panel.cutoff).toBe(88);
+        expect(markerOf('A', 'a').settings?.panel.cutoff).toBe(88);
+        expect(markerOf('A', 'a').ownSettings).toBe(false);
+        expect(stateOf('B').settingsInPlayId).toBe('a');
+      });
+
+      it('brings a latched marker back to the main track at the next jump into it on the other deck', async () => {
+        await engage('B', 'a');
+        loops.select('A', 'a');
+        loops.toggleGlobal('A');
+        loops.select('B', 'a');
+
+        loops.audition('B', 'start', 'a');
+        await flush();
+
+        expect(stateOf('B').settingsInPlayId).toBeNull();
+        expect(panelOn('B')).toBe(HOME_DECK_PANEL);
+        expect(engineMutes('B')).toEqual([false, false, false]);
+      });
+    });
+
+    describe('with the mixer applier installed', () => {
+      let setVoicePitch: MockInstance<DeckRuntime['setVoicePitch']>;
+
+      beforeEach(() => {
+        TestBed.inject(MixerApplier).install();
+        TestBed.flushEffects();
+        setVoicePitch = vi.spyOn(runtime, 'setVoicePitch');
+      });
+
+      it('does not re-apply a panel a prepared jump just landed, but applies the next edit', async () => {
+        await engage('A', 'a');
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        TestBed.flushEffects();
+        expect(setVoicePitch).not.toHaveBeenCalled();
+
+        tweak('A', 5);
+        TestBed.flushEffects();
+
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+      });
+
+      it('does not re-apply a panel a queued landing swapped in', async () => {
+        await engage('A', 'd');
+        loops.toggle('A', 'b');
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        TestBed.flushEffects();
+
+        expect(panelOn('A')).toEqual(SETTINGS_B.panel);
+        expect(setVoicePitch).not.toHaveBeenCalled();
+      });
+
+      it('applies a let-go at once and does not apply it twice', async () => {
+        await engage('A', 'a');
+        TestBed.flushEffects();
+
+        loops.stop('A');
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+        expect(setVoicePitch).toHaveBeenLastCalledWith('A', 2, 1);
+
+        TestBed.flushEffects();
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+      });
+
+      it('applies a kept copy brought back by a GBL unlatch once, synchronously', async () => {
+        await engage('A', 'a');
+        loops.select('A', 'a');
+        loops.toggleGlobal('A');
+        TestBed.flushEffects();
+        setVoicePitch.mockClear();
+
+        loops.toggleGlobal('A');
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+        expect(setVoicePitch).toHaveBeenCalledWith('A', 0, voicePitchMultiplier(3, 0, 0));
+
+        TestBed.flushEffects();
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+      });
+
+      it('applies a non-prepared jump synchronously and not again from the effect', () => {
+        loops.select('A', 'w');
+
+        loops.audition('A', 'end', 'w');
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+
+        TestBed.flushEffects();
+        expect(setVoicePitch).toHaveBeenCalledTimes(3);
+      });
     });
   });
 

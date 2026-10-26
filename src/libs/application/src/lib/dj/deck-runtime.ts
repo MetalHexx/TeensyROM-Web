@@ -7,6 +7,7 @@ import type {
   Frames,
   FrameClock,
   ReplayRunner,
+  JumpSettings,
   SidField,
   SidModel,
 } from '@sidablist/core';
@@ -222,20 +223,29 @@ export class DeckRuntime {
     );
   }
 
-  /** Queues a jump for the end of the running loop's lap; null cancels. */
-  queueJump(slot: Slot, target: { startFrame: number; endFrame: number | null } | null): void {
+  /** Queues a jump for the end of the running loop's lap; null cancels. Its `settings` land with
+   *  the jump. */
+  queueJump(
+    slot: Slot,
+    target: { startFrame: number; endFrame: number | null; settings?: JumpSettings } | null
+  ): void {
     this.requireSlot(slot).player.queueJump(
       target === null
         ? null
         : {
             startFrame: frames(target.startFrame),
             endFrame: target.endFrame === null ? null : frames(target.endFrame),
+            ...(target.settings === undefined ? {} : { settings: target.settings }),
           }
     );
   }
 
-  seekToFrame(slot: Slot, frame: number): Promise<void> {
-    return this.requireSlot(slot).player.seek(frames(frame));
+  /** Seeks to `frame`; any `settings` land with the jump. */
+  seekToFrame(slot: Slot, frame: number, settings?: JumpSettings): Promise<void> {
+    const { player } = this.requireSlot(slot);
+    return settings === undefined
+      ? player.seek(frames(frame))
+      : player.seek(frames(frame), settings);
   }
 
   subscribe(slot: Slot, listener: () => void): () => void {

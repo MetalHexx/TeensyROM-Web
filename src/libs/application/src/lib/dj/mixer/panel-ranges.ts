@@ -1,3 +1,4 @@
+import { clamp } from '@sidablist/core';
 import { KEY_SEMITONE_RANGE } from './pitch';
 
 /** One panel knob's travel. A knob's position is its raw offset in the field's own units, so full
@@ -24,3 +25,11 @@ export const PANEL_RANGES = {
   resonance: { min: -15, max: 15, home: 0, step: 1 },
   key: { min: -KEY_SEMITONE_RANGE, max: KEY_SEMITONE_RANGE, home: 0, step: 1 },
 } as const satisfies Record<string, PanelRange>;
+
+/** A knob value as stored: snapped to a whole number when the knob is stepped, then clamped to
+ *  the knob's travel. */
+export function bounded(range: PanelRange, value: number): number {
+  const snapped = range.step === null ? value : Math.round(value);
+  // + 0 turns a −0 from rounding into 0.
+  return clamp(snapped, range.min, range.max) + 0;
+}

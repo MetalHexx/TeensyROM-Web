@@ -6,6 +6,7 @@ import type { ReplayRunner } from '@sidablist/core';
 import type { TuneReference } from '@sidablist/tunes';
 import { logInfo, logWarn } from '@teensyrom-nx/utils';
 import { MixerService } from './mixer.service';
+import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, HOME_DECK_PANEL, type DeckDetectedKey } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
@@ -63,6 +64,7 @@ describe('MixerService', () => {
   let service: MixerService;
   let store: InstanceType<typeof DjStore>;
   let readRegisters: MockInstance<DeckRuntime['readRegisters']>;
+  let saveSettingsInPlay: MockInstance<DeckLoops['saveSettingsInPlay']>;
 
   /** Puts a tune on the slot at a settled status, which is what makes its controls live. */
   function makeShapeable(slot: Slot): void {
@@ -83,11 +85,13 @@ describe('MixerService', () => {
   beforeEach(() => {
     vi.mocked(logInfo).mockClear();
     vi.mocked(logWarn).mockClear();
+    saveSettingsInPlay = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess() },
+        { provide: DeckLoops, useValue: { saveSettingsInPlay } },
       ],
     });
     service = TestBed.inject(MixerService);
@@ -329,6 +333,56 @@ describe('MixerService', () => {
       expect(deck.voices.map((voice) => voice.held)).toEqual([false, true, false]);
       expect(logInfo).toHaveBeenCalledTimes(1);
       expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck A panel reset (panic)');
+    });
+  });
+
+  describe('writing back to the settings in play', () => {
+    beforeEach(() => makeShapeable('A'));
+
+    it.each([
+      ['a voice knob', (): void => service.setVoiceKnob('A', 0, 'coarse', 3)],
+      ['a filter knob', (): void => service.setFilterKnob('A', 'cutoff', 3)],
+      ['the key', (): void => service.setKeySemitones('A', 3)],
+      ['a waveform press', (): void => service.pressWaveform('A', 0, 'pulse')],
+      ['a waveform lock', (): void => service.setWaveformLocked('A', 0, 'pulse', true)],
+      ['a filter-mode press', (): void => service.pressFilterMode('A', 'low-pass')],
+      ['a filter-mode lock', (): void => service.setFilterModeLocked('A', 'low-pass', true)],
+      ['a switch press', (): void => service.pressSwitch('A', 0, 'ring')],
+      ['a switch lock', (): void => service.setSwitchLocked('A', 0, 'sync', true)],
+      ['panic', (): void => service.panic('A')],
+    ])('follows %s with one write-back for the deck', (_name, act) => {
+      act();
+
+      expect(saveSettingsInPlay).toHaveBeenCalledExactlyOnceWith('A');
+    });
+
+    it('writes back only once the write is in the store', () => {
+      saveSettingsInPlay.mockImplementation(() => {
+        expect(store.deckPanel('A')().voices[0].coarse).toBe(3);
+      });
+
+      service.setVoiceKnob('A', 0, 'coarse', 3);
+
+      expect(saveSettingsInPlay).toHaveBeenCalledOnce();
+    });
+
+    it('writes back after a panic, which is accepted on a deck with nothing loaded', () => {
+      service.panic('B');
+
+      expect(saveSettingsInPlay).toHaveBeenCalledExactlyOnceWith('B');
+    });
+
+    it('does not write back for a refused or ignored write, or the key display format', () => {
+      service.setVoiceKnob('A', 0, 'coarse', Number.NaN);
+      service.setVoiceKnob('A', 3, 'coarse', 1);
+      service.setWaveformLocked('A', 0, 'pulse', false);
+      service.setFilterModeLocked('A', 'low-pass', false);
+      service.setKeyDisplayFormat('note');
+      service.setFilterKnob('B', 'cutoff', 3);
+      service.setSwitchLocked('B', 0, 'sync', true);
+
+      expect(saveSettingsInPlay).not.toHaveBeenCalledWith('A');
+      expect(saveSettingsInPlay).not.toHaveBeenCalledWith('B');
     });
   });
 

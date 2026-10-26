@@ -378,13 +378,15 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** Latches or unlatches a voice's mute. Refused while the deck has nothing shapeable loaded. */
+  /** Latches or unlatches a voice's mute, and keeps it in the marker whose own settings are in
+   *  play. Refused while the deck has nothing shapeable loaded. */
   setVoiceMuted(slot: Slot, voice: number, muted: boolean): void {
     if (!this.canShape(slot, 'setVoiceMuted')) {
       return;
     }
     this.runtime.setVoiceMuted(slot, voice, muted);
     this.reflectEngineControls(slot);
+    this.loops.saveSettingsInPlay(slot);
   }
 
   /** Holds or releases a voice. A release is always honoured — a hold must never be left stuck
@@ -440,6 +442,14 @@ export class DeckService {
   deleteMarker(slot: Slot): void {
     if (this.canShape(slot, 'deleteMarker')) {
       this.loops.remove(slot);
+    }
+  }
+
+  /** Flips the selected marker's GBL: unlatched it keeps its own settings, latched it shares the
+   *  main track's. On the marker running or in play it applies at once. */
+  toggleMarkerGlobal(slot: Slot): void {
+    if (this.canShape(slot, 'toggleMarkerGlobal')) {
+      this.loops.toggleGlobal(slot);
     }
   }
 
@@ -626,11 +636,12 @@ export class DeckService {
     this.loops.audition(slot, boundary, edited);
   }
 
-  /** Drops the marker loop and anything queued behind it or waiting for readiness; a no-op while
-   *  neither is set, so the repeat setting and the engine are left alone. */
+  /** Drops the marker loop, anything queued behind it or waiting for readiness, and a marker's
+   *  own settings in play; a no-op while none is set, so the repeat setting and the engine are
+   *  left alone. */
   private releaseMarkers(slot: Slot): void {
-    const { runningId, queuedId } = this.store.loops()[slot];
-    if (runningId !== null || queuedId !== null) {
+    const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
+    if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {
       this.loops.disengage(slot);
     }
   }

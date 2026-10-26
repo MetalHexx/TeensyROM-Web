@@ -26,6 +26,8 @@ export interface LoopItemSummary {
   readonly activity: LoopActivity;
   readonly selected: boolean;
   readonly ready: boolean;
+  /** GBL unlatched: the marker plays with its own mixer settings. */
+  readonly ownSettings: boolean;
   /** Of the tune's length, for the strip. */
   readonly startPercent: number;
   /** Null for a cue. */
@@ -48,6 +50,8 @@ export interface LoopSelectionSummary {
   readonly kind: 'loop' | 'cue';
   readonly activity: LoopActivity;
   readonly ready: boolean;
+  /** GBL latched: the marker shares the main track's mixer settings. */
+  readonly sharesGlobal: boolean;
   /** 'start–end' elapsed times for a loop, the start alone for a cue. */
   readonly spanText: string;
   readonly start: LoopBoundarySummary;
@@ -97,7 +101,8 @@ export function loopsSummary(store: WritableStore<DjState>) {
       const loops = store.loops[slot];
 
       return computed<DeckLoopsSummary>(() => {
-        const { markers, selectedId, runningId, queuedId, detectedMoments } = loops();
+        const { markers, selectedId, runningId, queuedId, detectedMoments, settingsInPlayId } =
+          loops();
         const lengthFrames = deck.lengthFrames();
         const intervalUs = deck.playCallIntervalUs();
         const loaded = deck.loaded();
@@ -118,6 +123,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
             activity: activityOf(marker),
             selected: marker.id === selectedId,
             ready: marker.ready,
+            ownSettings: marker.ownSettings,
             startPercent: percentOf(start, lengthFrames),
             endPercent: kind === 'loop' && end !== null ? percentOf(end, lengthFrames) : null,
           };
@@ -136,6 +142,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
             kind,
             activity: activityOf(marker),
             ready: marker.ready,
+            sharesGlobal: !marker.ownSettings,
             spanText:
               kind === 'loop' && marker.end !== null
                 ? `${startText}–${formatElapsed(resolvedFrame(marker.end), intervalUs)}`
@@ -148,7 +155,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
         return {
           hasTune: loaded !== null,
           canAdd: isShapeable({ loaded, switching: deck.switching(), status: deck.status() }),
-          canStop: runningId !== null || queuedId !== null,
+          canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
           items,
           selected,
         };

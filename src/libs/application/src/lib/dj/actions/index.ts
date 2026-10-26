@@ -22,6 +22,7 @@ import { setDeckLoops } from './set-deck-loops';
 import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
 import { setLoopActivity } from './set-loop-activity';
+import { setSettingsInPlay } from './set-settings-in-play';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -49,6 +50,7 @@ export function withDjActions() {
       ...setLoopMarkers(writableStore),
       ...setLoopSelection(writableStore),
       ...setLoopActivity(writableStore),
+      ...setSettingsInPlay(writableStore),
     };
   });
 }

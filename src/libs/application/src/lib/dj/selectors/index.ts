@@ -8,6 +8,7 @@ import { canShape, deckPanel, keyReadout } from './mixer';
 import { deckLoops } from './deck-loops';
 import { loopsSummary } from './loops-summary';
 import { loopLapPercent } from './loop-lap';
+import { settingsInPlay } from './settings-in-play';
 
 export function withDjSelectors() {
   return withMethods((store) => {
@@ -23,6 +24,7 @@ export function withDjSelectors() {
       ...deckLoops(writableStore),
       ...loopsSummary(writableStore),
       ...loopLapPercent(writableStore),
+      ...settingsInPlay(writableStore),
     };
   });
 }
