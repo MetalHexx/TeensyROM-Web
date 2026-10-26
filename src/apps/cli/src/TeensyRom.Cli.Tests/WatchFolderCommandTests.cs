@@ -151,7 +151,22 @@ public sealed class WatchFolderCommandTests : IDisposable
         var exitCode = await host.RunAsync("watch-folder", "add", "roms");
 
         exitCode.Should().Be(0, host.Consoles.StdErr);
-        host.Consoles.StdOut.Should().Contain("watching").And.Contain("Alpha").And.Contain("/auto-transfer");
+        host.Consoles.StdOut.Should().Contain("watching").And.Contain("Device").And.Contain("Alpha").And.Contain("Send to")
+            .And.Contain("/auto-transfer").And.Contain("Launch").And.NotContain("Destinations");
+    }
+
+    [Fact]
+    public async Task Add_Plain_KeepsTheSingleDestinationsLine()
+    {
+        _watchFolders.AddAsync(default!, default!, default, default, default, default)
+            .ReturnsForAnyArgs(new AddWatchFolderResponse { Created = true, WatchFolder = Folder() });
+        var host = NewHost();
+
+        var exitCode = await host.RunAsync("watch-folder", "add", "roms");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        host.Consoles.StdOut.Trim().ReplaceLineEndings("\n").Should()
+            .Be($"Folder: {RomsPath}\nState: watching\nDestinations: Alpha: sd /auto-transfer (launches)");
     }
 
     // ---- list --------------------------------------------------------------------------------------------------------
@@ -185,13 +200,14 @@ public sealed class WatchFolderCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task List_Human_ShowsATableOfFolderStateAndDestinations_AndPlainShowsPaths()
+    public async Task List_Human_ShowsATableWithARowPerDestination_AndPlainShowsPaths()
     {
         _watchFolders.ListAsync(Arg.Any<CancellationToken>()).Returns([Folder()]);
 
         var human = NewHost(terminal: true);
         (await human.RunAsync("watch-folder", "list")).Should().Be(0);
-        human.Consoles.StdOut.Should().Contain("Folder").And.Contain("State").And.Contain("Destinations").And.Contain(RomsPath).And.Contain("Alpha");
+        human.Consoles.StdOut.Should().Contain("Folder").And.Contain("State").And.Contain("Device").And.Contain("Storage")
+            .And.Contain("Send to").And.Contain("Launch").And.Contain("Watching").And.Contain("Alpha").And.Contain("SD");
 
         var plain = NewHost();
         (await plain.RunAsync("watch-folder", "list")).Should().Be(0);

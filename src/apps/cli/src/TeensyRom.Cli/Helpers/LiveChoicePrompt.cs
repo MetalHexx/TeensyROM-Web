@@ -11,6 +11,9 @@ internal static class LiveChoicePrompt
 {
     private static readonly TimeSpan KeyPoll = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>A spacer that renders a line; an empty <see cref="Markup"/> renders no lines at all.</summary>
+    internal static readonly IRenderable BlankLine = new Text(" ");
+
     /// <summary>
     /// Shows <paramref name="refreshHeader"/>'s header, then "? <paramref name="title"/>" and the choices under one live
     /// display, rebuilding the header every <paramref name="refreshInterval"/> while waiting. Up and Down move the cursor
@@ -31,7 +34,7 @@ internal static class LiveChoicePrompt
 
         IRenderable Render(string? answer = null)
         {
-            var rows = new List<IRenderable> { state.Current, new Markup(string.Empty) };
+            var rows = new List<IRenderable> { state.Current, BlankLine };
 
             if (answer is not null)
             {

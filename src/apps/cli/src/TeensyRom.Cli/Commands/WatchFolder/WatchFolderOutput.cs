@@ -1,7 +1,5 @@
-using Spectre.Console;
 using System.Text.Json;
 using TeensyRom.Cli.Api.Generated;
-using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Output;
 
 namespace TeensyRom.Cli.Commands.WatchFolder;
@@ -38,12 +36,23 @@ internal static class WatchFolderOutput
             output.Json(folder);
             return;
         }
-        output.Fields(
-        [
-            ("Folder", folder.Path),
-            ("State", folder.State),
-            ("Destinations", Destinations(folder, ", "))
-        ]);
+        var fields = new List<(string Label, string Value)> { ("Folder", folder.Path), ("State", folder.State) };
+
+        if (output.Mode == OutputMode.Plain)
+        {
+            fields.Add(("Destinations", Destinations(folder)));
+        }
+        else
+        {
+            foreach (var destination in folder.Destinations)
+            {
+                fields.Add(("Device", destination.DeviceName ?? destination.DeviceId));
+                fields.Add(("Storage", destination.Storage.ToUpperInvariant()));
+                fields.Add(("Send to", destination.Path));
+                fields.Add(("Launch", destination.Launch ? "Yes" : "No"));
+            }
+        }
+        output.Fields(fields);
     }
 
     public static void ShowList(ICliOutput output, IReadOnlyList<WatchFolderJson> folders)
@@ -62,21 +71,13 @@ internal static class WatchFolderOutput
                     output.Notice("No watch folders.");
                     break;
                 }
-                var table = new Table().BorderColor(RadHelper.Theme.Secondary.Color).Border(TableBorder.Rounded);
-
-                table.AddColumn("Folder");
-                table.AddColumn("State");
-                table.AddColumn("Destinations");
-
-                foreach (var folder in folders) table.AddRow(new Text(folder.Path), new Text(folder.State), new Text(Destinations(folder, "\n")));
-
-                output.Out.Write(table);
+                output.Out.Write(WatchFolderTable.Build(folders));
                 break;
         }
     }
 
-    private static string Destinations(WatchFolderJson folder, string separator) =>
-        string.Join(separator, folder.Destinations.Select(destination =>
+    private static string Destinations(WatchFolderJson folder) =>
+        string.Join(", ", folder.Destinations.Select(destination =>
             $"{destination.DeviceName ?? destination.DeviceId}: {destination.Storage} {destination.Path}{(destination.Launch ? " (launches)" : string.Empty)}"));
 
     private static WatchFolderJson ToJson(string id, string path, bool enabled, WatchFolderState state, IEnumerable<WatchFolderDestinationDto> destinations) =>

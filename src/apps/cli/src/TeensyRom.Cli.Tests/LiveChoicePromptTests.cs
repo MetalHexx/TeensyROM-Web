@@ -41,6 +41,22 @@ public sealed class LiveChoicePromptTests
     }
 
     [Fact]
+    public async Task ABlankLine_SeparatesTheHeaderFromTheAnsweredLine()
+    {
+        var console = NewConsole();
+        console.Input.PushKey(ConsoleKey.Enter);
+
+        await Show(console, _ => Task.FromResult<IRenderable>(new Markup("header")));
+
+        var lines = console.Output.ReplaceLineEndings("\n").Split('\n');
+        var index = Array.FindIndex(lines, line => line.Contains("Choose wisely: "));
+
+        index.Should().BeGreaterThan(1);
+        lines[index - 1].Should().BeNullOrWhiteSpace();
+        lines[index - 2].Should().Contain("header");
+    }
+
+    [Fact]
     public async Task UpFromTheFirstChoice_WrapsToTheLast()
     {
         var console = NewConsole();

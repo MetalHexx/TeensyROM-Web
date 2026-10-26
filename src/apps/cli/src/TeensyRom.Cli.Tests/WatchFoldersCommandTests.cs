@@ -12,17 +12,18 @@ namespace TeensyRom.Cli.Tests;
 
 /// <summary>
 /// The Watch Folders screen over substituted services, driven by keys and answers queued on an interactive console.
-/// Back is the sixth choice, so every script ends by picking it.
+/// Back is the seventh choice, so every script ends by picking it.
 /// </summary>
 [Collection(ConsoleCollection.Name)]
 public sealed class WatchFoldersCommandTests : IDisposable
 {
     private const int AddFolder = 0;
     private const int AddDestination = 1;
-    private const int RemoveDestination = 2;
-    private const int ToggleFolder = 3;
-    private const int RemoveFolder = 4;
-    private const int Back = 5;
+    private const int EditDestination = 2;
+    private const int RemoveDestination = 3;
+    private const int ToggleFolder = 4;
+    private const int RemoveFolder = 5;
+    private const int Back = 6;
 
     private static readonly DeviceSummary Alpha = new("a-1", "Alpha", true, "USB COM3", "Connected", SdAvailable: true);
 
@@ -53,6 +54,8 @@ public sealed class WatchFoldersCommandTests : IDisposable
     }
 
     private string Screen => _host.Consoles.StdOut;
+
+    private string[] ScreenLines => Screen.ReplaceLineEndings("\n").Split('\n');
 
     /// <summary>Queues what the user would press and type, in order.</summary>
     private sealed class Keys(TestConsoleInput input)
@@ -116,7 +119,7 @@ public sealed class WatchFoldersCommandTests : IDisposable
 
         await Run();
 
-        Screen.Should().Contain("Watching").And.Contain("Alpha (SD) /auto-transfer")
+        Screen.Should().Contain("Watching").And.Contain("Alpha").And.Contain("SD").And.Contain("/auto-transfer").And.Contain("Yes")
             .And.Contain("3 of 5").And.Contain("Sending")
             .And.Contain("0 of 1").And.Contain("Receiving").And.Contain("upload")
             .And.NotContain("9 of 9").And.NotContain("Nothing is being sent.");
@@ -234,6 +237,121 @@ public sealed class WatchFoldersCommandTests : IDisposable
 
         Screen.Should().Contain("No watch folders yet.");
         await _watchFolders.DidNotReceiveWithAnyArgs().SetEnabledAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task AFolderWithTwoDestinations_GetsOneRowEach()
+    {
+        HasFolders(Watched(true, "a-1", "b-1"));
+        _keys.Pick(Back);
+
+        await Run();
+
+        Screen.Should().Contain("Send to").And.Contain("Storage").And.Contain("Alpha").And.Contain("b-1");
+        ScreenLines.Count(line => line.Contains("/auto-transfer")).Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task TheSections_AreSeparatedByBlankLines()
+    {
+        HasFolders(Watched());
+        _keys.Pick(Back);
+
+        await Run();
+
+        var lines = ScreenLines;
+        PrecededByBlank(lines, "Running transfers");
+        PrecededByBlank(lines, "Choose wisely: ");
+        PrecededByBlank(lines, "Launch", linesAbove: 2);
+    }
+
+    [Fact]
+    public async Task TheEmptyList_IsSeparatedFromTheHeaderAndTheTransfers()
+    {
+        _keys.Pick(Back);
+
+        await Run();
+
+        PrecededByBlank(ScreenLines, "No watch folders yet.");
+        PrecededByBlank(ScreenLines, "Running transfers");
+    }
+
+    private static void PrecededByBlank(string[] lines, string marker, int linesAbove = 1)
+    {
+        var found = Enumerable.Range(0, lines.Length).Where(i => lines[i].Contains(marker)).ToList();
+
+        found.Should().NotBeEmpty($"the screen should show {marker}");
+        foreach (var i in found) lines[i - linesAbove].Should().BeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task EditDestination_ChangingTheDeviceFolder_SendsOnlyThePath()
+    {
+        HasFolders(Watched());
+        _keys.Pick(EditDestination).Enter().Text("/games").Enter().Pick(Back);
+
+        await Run();
+
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", "a-1", "/games", null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EditDestination_ChangingLaunch_SendsOnlyTheFlag()
+    {
+        HasFolders(Watched());
+        _keys.Pick(EditDestination).Enter().Enter().Pick(1).Pick(Back);
+
+        await Run();
+
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", "a-1", null, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EditDestination_ChangingBoth_MakesOneCall()
+    {
+        HasFolders(Watched());
+        _keys.Pick(EditDestination).Enter().Text("/games").Pick(1).Pick(Back);
+
+        await Run();
+
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", "a-1", "/games", false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EditDestination_ChangingNothing_MakesNoCall()
+    {
+        HasFolders(Watched());
+        _keys.Pick(EditDestination).Enter().Enter().Enter().Pick(Back);
+
+        await Run();
+
+        Screen.Should().Contain("Nothing changed.");
+        await _watchFolders.DidNotReceiveWithAnyArgs().SetDeviceAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task EditDestination_WithSeveralDestinations_AsksWhichOne()
+    {
+        HasFolders(Watched(true, "a-1", "b-1"));
+        _keys.Pick(EditDestination).Enter().Pick(1).Text("/x").Enter().Pick(Back);
+
+        await Run();
+
+        await _watchFolders.Received(1).SetDeviceAsync("wf-1", "b-1", "/x", null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EditDestination_ShowsTheEnginesError_AndTheScreenReturns()
+    {
+        HasFolders(Watched());
+        _watchFolders.SetDeviceAsync(default!, default!, default, default, default)
+            .ThrowsAsyncForAnyArgs(new TeensyApiException("tr-web refused the change."));
+        _keys.Pick(EditDestination).Enter().Text("/games").Enter().Pick(Back);
+
+        var exitCode = await Run();
+
+        exitCode.Should().Be(0);
+        Screen.Should().Contain("tr-web refused the change.");
     }
 
     [Fact]

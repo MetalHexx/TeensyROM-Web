@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 using Spectre.Console.Rendering;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
+using TeensyRom.Cli.Commands.WatchFolder;
 using TeensyRom.Cli.Helpers;
 using TeensyRom.Cli.Services;
 using TeensyStorageType = TeensyRom.Cli.Storage.Entities.TeensyStorageType;
@@ -18,6 +19,7 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
 {
     private const string AddFolder = "Add Watch Folder";
     private const string AddDestination = "Add Destination";
+    private const string EditDestination = "Edit Destination";
     private const string RemoveDestination = "Remove Destination";
     private const string ToggleFolder = "Turn Folder On/Off";
     private const string RemoveFolder = "Remove Watch Folder";
@@ -27,7 +29,7 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
 
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
 
-    private static readonly string[] Choices = [AddFolder, AddDestination, RemoveDestination, ToggleFolder, RemoveFolder, Back];
+    private static readonly string[] Choices = [AddFolder, AddDestination, EditDestination, RemoveDestination, ToggleFolder, RemoveFolder, Back];
 
     public override async Task<int> ExecuteAsync(CommandContext context, WatchFoldersSettings settings)
     {
@@ -43,6 +45,7 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
                 {
                     case AddFolder: await AddFolderAsync(); break;
                     case AddDestination: await AddDestinationAsync(); break;
+                    case EditDestination: await EditDestinationAsync(); break;
                     case RemoveDestination: await RemoveDestinationAsync(); break;
                     case ToggleFolder: await ToggleFolderAsync(); break;
                     case RemoveFolder: await RemoveFolderAsync(); break;
@@ -73,8 +76,9 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
         var rows = new List<IRenderable>
         {
             RadHelper.BuildMenu("Watch Folders", "Send files that land in a folder to your TeensyROM."),
+            LiveChoicePrompt.BlankLine,
             FoldersTable(folders),
-            new Markup(string.Empty),
+            LiveChoicePrompt.BlankLine,
             new Markup($"[{RadHelper.Theme.Primary}]Running transfers[/]"),
             running.Count == 0 ? new Markup("Nothing is being sent.") : TransfersTable(running, names)
         };
@@ -85,16 +89,7 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
     {
         if (folders.Count == 0) return new Markup(NoFolders);
 
-        var table = NewTable("Folder", "State", "Destinations");
-
-        foreach (var folder in folders)
-        {
-            table.AddRow(
-                new Text(folder.Path),
-                new Text(folder.State.ToString()),
-                new Text(string.Join("\n", folder.Destinations.Select(Describe))));
-        }
-        return table;
+        return WatchFolderTable.Build(folders.Select(WatchFolderOutput.ToJson));
     }
 
     private static IRenderable TransfersTable(IReadOnlyList<TransferJobDto> jobs, IReadOnlyDictionary<string, string> names)
@@ -121,9 +116,6 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
     }
 
     private static string Storage(WatchFolderDestinationDto destination) => destination.StorageType.ToString().ToUpperInvariant();
-
-    private static string Describe(WatchFolderDestinationDto destination) =>
-        $"{destination.DeviceName ?? destination.DeviceId} ({Storage(destination)}) {destination.Path}{(destination.Launch ? "   launch" : string.Empty)}";
 
     // ---- the actions -------------------------------------------------------------------------------------------------
 
@@ -180,21 +172,54 @@ internal class WatchFoldersCommand(IWatchFolderService watchFolders, ITransferSe
         await watchFolders.AddAsync(folder, device.Id, storage.Value, devicePath, launch, CancellationToken.None);
     }
 
+    private async Task EditDestinationAsync()
+    {
+        var folder = await PickFolderAsync();
+
+        if (folder is null) return;
+
+        var byDevice = DestinationsByDevice(folder);
+
+        if (byDevice.Count == 0)
+        {
+            RadHelper.WriteLine("That folder has no destinations.");
+            return;
+        }
+        var chosen = byDevice.Count == 1 ? byDevice.Values.Single() : byDevice[PromptHelper.FilePrompt("Edit destination", byDevice.Keys.ToList())];
+        var current = chosen.First();
+
+        var devicePath = PromptHelper.DefaultValueTextPrompt("Device folder", 1, current.Path).Trim();
+        var launch = PromptHelper.Confirm("Launch files sent here?", current.Launch);
+
+        var newPath = devicePath == current.Path ? null : devicePath;
+        bool? newLaunch = launch == current.Launch ? null : launch;
+
+        if (newPath is null && newLaunch is null)
+        {
+            RadHelper.WriteLine("Nothing changed.");
+            return;
+        }
+        await watchFolders.SetDeviceAsync(folder.Id, current.DeviceId, newPath, newLaunch, CancellationToken.None);
+    }
+
     private async Task RemoveDestinationAsync()
     {
         var folder = await PickFolderAsync();
 
         if (folder is null) return;
 
-        var byDevice = folder.Destinations
-            .GroupBy(destination => destination.DeviceId)
-            .ToDictionary(
-                group => $"{group.First().DeviceName ?? group.Key} ({string.Join(", ", group.Select(destination => $"{Storage(destination)} {destination.Path}"))})",
-                group => group.Key);
+        var byDevice = DestinationsByDevice(folder);
         var label = PromptHelper.FilePrompt("Remove destination", byDevice.Keys.ToList());
 
-        await watchFolders.RemoveDeviceAsync(folder.Id, byDevice[label], CancellationToken.None);
+        await watchFolders.RemoveDeviceAsync(folder.Id, byDevice[label].First().DeviceId, CancellationToken.None);
     }
+
+    /// <summary>The folder's destinations grouped by device, keyed by the label a person picks from.</summary>
+    private static Dictionary<string, List<WatchFolderDestinationDto>> DestinationsByDevice(WatchFolderDto folder) => folder.Destinations
+        .GroupBy(destination => destination.DeviceId)
+        .ToDictionary(
+            group => $"{group.First().DeviceName ?? group.Key} ({string.Join(", ", group.Select(destination => $"{Storage(destination)} {destination.Path}"))})",
+            group => group.ToList());
 
     private async Task ToggleFolderAsync()
     {
