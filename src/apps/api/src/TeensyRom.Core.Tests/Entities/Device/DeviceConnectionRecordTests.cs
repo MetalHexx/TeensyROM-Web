@@ -99,6 +99,54 @@ public class DeviceConnectionRecordTests
     }
 
     [Fact]
+    public void MarkLaunchedInMenu_FromBusyWithBootPending_SetsIdleAndPresumesPlayback()
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+        sut.MarkMenuBootPending();
+        sut.MarkBusy();
+
+        sut.MarkLaunchedInMenu();
+
+        sut.Mode.Should().Be(DeviceMode.FullIdle);
+        sut.MenuBootPending.Should().BeFalse();
+        sut.PlaybackPresumed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void PlaybackPresumed_DefaultsToFalse_AndConfirmLeavesItUnchanged()
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.PlaybackPresumed.Should().BeFalse();
+
+        sut.MarkLaunchedInMenu();
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+
+        sut.PlaybackPresumed.Should().BeTrue();
+    }
+
+    public static TheoryData<Action<DeviceConnectionRecord>> MarksThatClearPlayback => new()
+    {
+        record => record.MarkIdle(),
+        record => record.MarkBusy(),
+        record => record.MarkMenuBootPending(),
+        record => record.MarkUnreachable()
+    };
+
+    [Theory]
+    [MemberData(nameof(MarksThatClearPlayback))]
+    public void MarkingWhatTheDeviceIsDoingNow_ClearsPlaybackPresumed(Action<DeviceConnectionRecord> mark)
+    {
+        var sut = new DeviceConnectionRecord("chip-1");
+        sut.Confirm(ConnectionType.Serial, "COM12", DeviceMode.FullIdle);
+        sut.MarkLaunchedInMenu();
+
+        mark(sut);
+
+        sut.PlaybackPresumed.Should().BeFalse();
+    }
+
+    [Fact]
     public void MarkUnreachable_ClearsTransportInUse_ButKeepsEndpointsAndLastConfirmed()
     {
         var sut = new DeviceConnectionRecord("chip-1");

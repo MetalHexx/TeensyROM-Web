@@ -143,6 +143,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+            device.Connection.PlaybackPresumed.Should().BeTrue("the SID is playing in the menu, which a transfer must still reset");
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
         }
 
@@ -313,6 +314,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             device.Connection.Mode.Should().Be(DeviceMode.FullBusy, "a running program owns the IO handler, as a cart does");
+            device.Connection.PlaybackPresumed.Should().BeFalse("busy already makes the next transfer reset");
             port.Unread.Should().Be("next command's reply".Length, "a launch from the menu owes no reset line, so nothing is waited for");
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
@@ -365,6 +367,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+            device.Connection.PlaybackPresumed.Should().BeTrue();
             port.Unread.Should().Be(0);
             _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());

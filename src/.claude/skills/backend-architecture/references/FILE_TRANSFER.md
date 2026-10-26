@@ -362,6 +362,7 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `MaxExpansionDepth` | 32 | Maximum nesting depth for archives within archives; prevents zip-bomb-style attacks and stack exhaustion |
 | `MaxExpandedBytesPerArchive` | 2 GB | Maximum total size an archive is allowed to expand to; checked before expansion begins and rejected if exceeded |
 | `BatchSize` | 25 | Number of staged files the pump batches into a single device write command |
+| `SkipResetWhenIdle` | true | The pump skips a job's pre-transfer device reset when the engine's record says the device is idle at the C64 menu with no boot pending and nothing launched on it; a device that proves busy is reset and the batch re-sent. `false` resets before every job |
 | `RecentCompletionsBound` | 5 | Number of most-recent completed files (success or failure) a job retains for the live feed |
 | `RetainedFailuresBound` | 50 | Number of most-recent failures a job retains; `FilesFailed` itself stays an unbounded lifetime counter |
 | `RateWindow` | 10 seconds | Sliding window used to compute rolling transfer throughput |

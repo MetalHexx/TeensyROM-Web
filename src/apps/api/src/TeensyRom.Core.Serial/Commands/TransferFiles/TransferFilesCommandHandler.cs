@@ -40,7 +40,7 @@ namespace TeensyRom.Core.Commands
                     continue;
                 }
 
-                var (outcome, deviceLost) = await SendFileAsync(port, file, command.DeviceId, ct);
+                var (outcome, deviceLost) = await SendFileAsync(port, file, command.DeviceId, busyMayEscape: result.Outcomes.Count == 0, ct);
 
                 result.Outcomes.Add(outcome);
                 await command.OnFileCompleted(outcome, ct);
@@ -66,10 +66,13 @@ namespace TeensyRom.Core.Commands
         /// <see cref="_retryLimit"/> times. The second tuple element is true only when the port itself
         /// appears to have gone away (<see cref="ICommunicationPort.IsOpen"/> is false after an
         /// exception) rather than the file simply being bad - the caller stops the batch in that case
-        /// instead of moving on to the next file.
+        /// instead of moving on to the next file. A <see cref="TeensyBusyException"/> on the first attempt
+        /// propagates instead of being retried when <paramref name="busyMayEscape"/> is set - only while
+        /// no outcome has been reported, so the pipeline's reset-and-re-send of the whole command repeats
+        /// nothing a caller has already counted. Every other busy reply is retried like any failure.
         /// </summary>
         private async Task<(TransferFileOutcome Outcome, bool DeviceLost)> SendFileAsync(
-            ICommunicationPort port, StreamedFileTransfer file, string? deviceId, CancellationToken ct)
+            ICommunicationPort port, StreamedFileTransfer file, string? deviceId, bool busyMayEscape, CancellationToken ct)
         {
             var buffer = new byte[_chunkSize];
             var retry = 0;
@@ -121,6 +124,10 @@ namespace TeensyRom.Core.Commands
                 {
                     // A cancel can now surface from inside an acknowledgement; without this it would be
                     // counted as a failed attempt before the retry delay threw it back out anyway.
+                    throw;
+                }
+                catch (TeensyBusyException) when (busyMayEscape && retry == 0)
+                {
                     throw;
                 }
                 catch (Exception ex)

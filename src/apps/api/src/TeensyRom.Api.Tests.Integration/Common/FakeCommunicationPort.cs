@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reactive;
+using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Serial;
@@ -15,7 +16,8 @@ namespace TeensyRom.Api.Tests.Integration.Common
     /// <summary>
     /// A hardware-free <see cref="ICommunicationPort"/> that speaks just enough of the wire protocol to
     /// satisfy the SendFile / DeleteFile handshake, recording every file it "receives" for test
-    /// assertions.
+    /// assertions. It also plays a healthy device through a reset - the menu's boot token, then a version
+    /// reply reporting the boot complete - and counts the resets it was sent (<see cref="ResetCount"/>).
     /// </summary>
     public sealed class FakeCommunicationPort : ICommunicationPort
     {
@@ -41,6 +43,9 @@ namespace TeensyRom.Api.Tests.Integration.Common
         /// </summary>
         private bool _hasUnreadResponse;
 
+        private readonly Queue<byte> _replyText = new();
+        private int _resetCount;
+
         /// <summary>Applied while a file body is being written - the knob the concurrency proof turns.</summary>
         public TimeSpan PerFileDelay { get; set; } = TimeSpan.Zero;
 
@@ -57,8 +62,30 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public IReadOnlyList<FakeReceivedFile> Received => [.. _received];
 
+        /// <summary>How many reset tokens the device has been sent, whoever sent them - the pump or the command gate.</summary>
+        public int ResetCount
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _resetCount;
+                }
+            }
+        }
+
         public bool IsOpen => !SimulateDeviceLoss;
-        public int BytesToRead => _hasUnreadResponse ? 2 : 0;
+
+        public int BytesToRead
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _hasUnreadResponse ? 2 : _replyText.Count;
+                }
+            }
+        }
 
         public void ClearBuffers() { }
 
@@ -79,6 +106,25 @@ namespace TeensyRom.Api.Tests.Integration.Common
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.Ping.Value)
                 {
+                    return;
+                }
+                if (numBytes == 2 && intToSend == TeensyToken.Reset.Value)
+                {
+                    _resetCount++;
+                    _nextTwoByteResponse = TeensyToken.GoodSIDToken.Value;
+                    _hasUnreadResponse = true;
+                    return;
+                }
+                if (numBytes == 2 && intToSend == TeensyToken.VersionInfo.Value)
+                {
+                    _nextTwoByteResponse = TeensyToken.Ack.Value;
+                    _hasUnreadResponse = true;
+
+                    foreach (var textByte in Encoding.Latin1.GetBytes("Boot: complete\r\n"))
+                    {
+                        _replyText.Enqueue(textByte);
+                    }
+
                     return;
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.SendFile.Value)
@@ -186,6 +232,18 @@ namespace TeensyRom.Api.Tests.Integration.Common
             ushort response;
             lock (_gate)
             {
+                if (!_hasUnreadResponse && _replyText.Count > 0)
+                {
+                    var taken = 0;
+
+                    while (taken < count && _replyText.Count > 0)
+                    {
+                        buffer[offset + taken++] = _replyText.Dequeue();
+                    }
+
+                    return taken;
+                }
+
                 response = _nextTwoByteResponse;
                 _hasUnreadResponse = false;
             }

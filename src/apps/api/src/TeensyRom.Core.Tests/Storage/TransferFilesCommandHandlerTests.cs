@@ -361,6 +361,91 @@ public class TransferFilesCommandHandlerTests : IDisposable
         port.Received.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Handle_BusyAckOnFirstHandshakeOfFirstFile_ThrowsWithoutReportingAnOutcome()
+    {
+        var file = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/busy.prg"), TeensyStorageType.SD);
+        var port = new RecordingCommunicationPort
+        {
+            ExceptionForAckCall = ackCallNumber => ackCallNumber == 1 ? new TeensyBusyException("busy") : null
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+        var outcomes = new List<TransferFileOutcome>();
+
+        Func<Task> act = () => handler.Handle(new TransferFilesCommand
+        {
+            Files = [file],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = (outcome, _) =>
+            {
+                outcomes.Add(outcome);
+                return Task.CompletedTask;
+            }
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<TeensyBusyException>();
+
+        outcomes.Should().BeEmpty();
+        port.AttemptCount.Should().Be(1);
+        port.Received.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_BusyAckOnSecondFile_RetriesItLikeAnyOtherFailure()
+    {
+        var file1 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/first.prg"), TeensyStorageType.SD);
+        var file2 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/second.prg"), TeensyStorageType.SD);
+
+        // A successful file reads three acks, so the second file's handshake starts at ack 4.
+        var port = new RecordingCommunicationPort
+        {
+            ExceptionForAckCall = ackCallNumber => ackCallNumber >= 4 ? new TeensyBusyException("busy") : null
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+
+        var result = await handler.Handle(new TransferFilesCommand
+        {
+            Files = [file1, file2],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = NoOp
+        }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Outcomes[0].Saved.Should().BeTrue();
+        result.Outcomes[1].Saved.Should().BeFalse();
+        result.Outcomes[1].Attempted.Should().BeTrue();
+        port.AttemptCount.Should().Be(1 + 3);
+    }
+
+    [Fact]
+    public async Task Handle_BusyAckOnARetryOfTheFirstFile_RetriesInsteadOfThrowing()
+    {
+        var file = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/retried.prg"), TeensyStorageType.SD);
+        var port = new RecordingCommunicationPort
+        {
+            ExceptionForAckCall = ackCallNumber => ackCallNumber switch
+            {
+                1 => new IOException("first attempt fails"),
+                2 => new TeensyBusyException("busy"),
+                _ => null
+            }
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+
+        var result = await handler.Handle(new TransferFilesCommand
+        {
+            Files = [file],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = NoOp
+        }, CancellationToken.None);
+
+        result.Outcomes.Should().ContainSingle(o => o.Saved);
+        port.AttemptCount.Should().Be(3);
+    }
+
     private (string Path, byte[] Bytes) WriteTestFile(int size)
     {
         var bytes = new byte[size];

@@ -330,8 +330,10 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		/// firmware's IO handler, and the firmware then answers <c>Busy!</c> to every non-always-available
 		/// command until something resets it, so its record is marked busy and the gate resets before the
 		/// next non-launch command. A SID, an image or text stays with the C64 menu under the TeensyROM
-		/// handler, which keeps answering, so it is idle. The item's type decides this rather than what the
-		/// port echoed: the firmware's "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
+		/// handler, which keeps answering, so it is idle - but it may still be playing, which the record
+		/// keeps as <see cref="DeviceConnectionRecord.PlaybackPresumed"/> so a transfer still resets it. The
+		/// item's type decides this rather than what the port echoed: the firmware's "Loading IO handler:"
+		/// text is USB-serial-only and never arrives over TCP.
 		/// </summary>
 		private static void MarkLaunched(TeensyRomDevice? device, LaunchableItem item)
 		{
@@ -342,7 +344,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 			if (StaysInMenu(item.FileType))
 			{
-				device.MarkIdle();
+				device.MarkLaunchedInMenu();
 				return;
 			}
 

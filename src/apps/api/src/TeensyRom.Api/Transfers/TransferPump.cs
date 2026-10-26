@@ -139,7 +139,8 @@ namespace TeensyRom.Api.Transfers
         /// <see cref="TransferFilesCommand"/> whose per-file callback still does the four things that
         /// must stay per file: gate release, staging delete, cache upsert, and job counters.
         /// <paramref name="resetJobIds"/> is shared across every batch this worker ever processes, so a
-        /// job's device reset still fires once, before its first file, never per batch.
+        /// job's reset-or-skip decision (<see cref="CanSkipReset"/>) is made once, before its first file,
+        /// never per batch.
         /// </summary>
         private async Task ProcessBatchAsync(List<StagedFile> batch, HashSet<string> resetJobIds, CancellationToken ct)
         {
@@ -175,7 +176,14 @@ namespace TeensyRom.Api.Transfers
 
                 if (resetJobIds.Add(job.JobId))
                 {
-                    await ResetDeviceAsync(job, device, ct);
+                    if (CanSkipReset(device))
+                    {
+                        log.Internal($"TransferPump: device is idle at the menu with nothing launched; not resetting it before job '{job.JobId}'", job.DeviceId);
+                    }
+                    else if (await ResetDeviceAsync(job, device, ct))
+                    {
+                        device.MarkIdle();
+                    }
                 }
 
                 touchedJobs.Add(job);
@@ -395,22 +403,44 @@ namespace TeensyRom.Api.Transfers
             job.OnFileDropped();
         }
 
-        private async Task ResetDeviceAsync(TransferJob job, TeensyRomDevice device, CancellationToken ct)
+        /// <summary>
+        /// The reset a transfer may skip only when the engine's own record shows nothing to stop: the
+        /// device idle at the menu, its boot not pending, and nothing launched on it that may still be
+        /// playing. A device the record cannot vouch for - and one running something the engine never
+        /// launched - still gets the reset, or fails the first file's handshake with <c>Busy!</c> and
+        /// is reset and re-sent by the command pipeline (see <see cref="TransferFilesCommandHandler"/>).
+        /// </summary>
+        private bool CanSkipReset(TeensyRomDevice device) =>
+            options.SkipResetWhenIdle
+            && device.Connection.Mode == DeviceMode.FullIdle
+            && !device.Connection.MenuBootPending
+            && !device.Connection.PlaybackPresumed;
+
+        /// <summary>Resets the device through the command pipeline; true when the reset succeeded. A failure is logged, never thrown.</summary>
+        private async Task<bool> ResetDeviceAsync(TransferJob job, TeensyRomDevice device, CancellationToken ct)
         {
             try
             {
                 using var scope = scopeFactory.CreateScope();
                 var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-                await mediator.Send(new ResetCommand
+                var result = await mediator.Send(new ResetCommand
                 {
                     DeviceId = job.DeviceId,
                     CommunicationPort = device.CommunicationPort
                 }, ct);
+
+                if (!result.IsSuccess)
+                {
+                    log.InternalWarning($"TransferPump: reset command failed for device '{job.DeviceId}': {result.Error}");
+                }
+
+                return result.IsSuccess;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 log.InternalWarning($"TransferPump: reset command failed for device '{job.DeviceId}': {ex.Message}");
+                return false;
             }
         }
 

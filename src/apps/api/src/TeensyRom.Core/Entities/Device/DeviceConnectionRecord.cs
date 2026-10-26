@@ -46,6 +46,15 @@ namespace TeensyRom.Core.Entities.Device
         /// </summary>
         public bool MenuBootPending { get; private set; }
 
+        /// <summary>
+        /// The engine launched something that stays with the C64 menu (a SID, an image or text) and nothing
+        /// has reset the device since, so it may still be playing. The device is
+        /// <see cref="DeviceMode.FullIdle"/> either way; this is what keeps a transfer from skipping the
+        /// reset that stops that playback. Cleared by every mark that says what the device is doing now;
+        /// <see cref="Confirm"/> leaves it alone, since confirming a link says nothing about playback.
+        /// </summary>
+        public bool PlaybackPresumed { get; private set; }
+
         public DeviceConnectionRecord(string chipId)
         {
             ChipId = chipId;
@@ -80,6 +89,7 @@ namespace TeensyRom.Core.Entities.Device
         {
             Mode = DeviceMode.FullBusy;
             MenuBootPending = false;
+            PlaybackPresumed = false;
         }
 
         /// <summary>After a busy device is reset or a command succeeds.</summary>
@@ -87,6 +97,7 @@ namespace TeensyRom.Core.Entities.Device
         {
             Mode = DeviceMode.FullIdle;
             MenuBootPending = false;
+            PlaybackPresumed = false;
         }
 
         /// <summary>See <see cref="MenuBootPending"/>.</summary>
@@ -94,6 +105,15 @@ namespace TeensyRom.Core.Entities.Device
         {
             Mode = DeviceMode.FullIdle;
             MenuBootPending = true;
+            PlaybackPresumed = false;
+        }
+
+        /// <summary>A launch that stays with the C64 menu succeeded; see <see cref="PlaybackPresumed"/>.</summary>
+        public void MarkLaunchedInMenu()
+        {
+            Mode = DeviceMode.FullIdle;
+            MenuBootPending = false;
+            PlaybackPresumed = true;
         }
 
         /// <summary>
@@ -104,6 +124,7 @@ namespace TeensyRom.Core.Entities.Device
         {
             Mode = DeviceMode.Unreachable;
             MenuBootPending = false;
+            PlaybackPresumed = false;
             TransportInUse = null;
         }
 
