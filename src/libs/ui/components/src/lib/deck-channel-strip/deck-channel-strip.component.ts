@@ -54,11 +54,10 @@ export interface DeckChannelStripModel {
 
 /**
  * One deck's voice-and-speed channel strip on a single faceplate: a sign naming whose settings are
- * in play, three voice pairs (a latching
- * mute key over a Kill/Punch hold pad), the speed display, a hardware-drawn speed fader that is
- * still a native range, the speed-nudge pads and the jump keys. Purely presentational — it keeps
- * no state and the caller feeds every value back through `model`. It is sized for the roughly 88px
- * voice-and-speed column and fills that column's height.
+ * in play, three voice pairs (a latching mute key over a Kill/Punch hold pad), the speed display, a
+ * hardware-drawn speed fader that is still a native range, the speed-nudge pads and the jump keys.
+ * Purely presentational — it keeps no state and the caller feeds every value back through
+ * `model`. It is sized for the roughly 88px voice-and-speed column and fills that column's height.
  *
  * @example
  * ```html

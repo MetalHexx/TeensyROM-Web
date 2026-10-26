@@ -56,9 +56,11 @@ lib-synth-key[data-control='loop-delete'] {
   --synth-key-min-width: 32px;
 }
 
-// GBL takes the mockup's width, which leaves room for its lamp; the shared key draws none.
+// GBL takes the mockup's width; its lamp is the key's icon at a lamp's size.
 .global {
   --synth-key-min-width: 44px;
+  --synth-key-padding: 0 6px;
+  --synth-key-icon-size: 10px;
 }
 
 .display {

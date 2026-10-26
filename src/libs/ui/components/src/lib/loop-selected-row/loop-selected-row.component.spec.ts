@@ -116,10 +116,15 @@ describe('LoopSelectedRowComponent', () => {
     const gbl = (): HTMLButtonElement => button('[data-control="loop-global"]');
     expect(gbl().getAttribute('aria-pressed')).toBe('true');
     expect(gbl().hasAttribute('data-lit')).toBe(true);
+    const litLamp = gbl().querySelector('.icon')?.textContent?.trim();
     expect(display().getAttribute('aria-label')).not.toContain('own settings');
     setModel({ sharesGlobal: false });
     expect(gbl().getAttribute('aria-pressed')).toBe('false');
     expect(gbl().hasAttribute('data-lit')).toBe(false);
+    const unlitLamp = gbl().querySelector('.icon')?.textContent?.trim();
+    expect(litLamp).toBeTruthy();
+    expect(unlitLamp).toBeTruthy();
+    expect(unlitLamp).not.toBe(litLamp);
     expect(display().getAttribute('aria-label')).toContain('own settings');
   });
 
@@ -194,5 +199,6 @@ describe('LoopSelectedRowComponent', () => {
     expect(controls.length).toBeGreaterThan(0);
     expect(controls.every((control) => control.disabled)).toBe(true);
     expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
+    expect(button('[data-control="loop-global"]').hasAttribute('aria-pressed')).toBe(false);
   });
 });

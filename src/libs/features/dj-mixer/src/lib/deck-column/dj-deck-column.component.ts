@@ -42,6 +42,7 @@ import {
 } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import type { DeckRef } from '../deck-ref';
+import { settingsSignModel } from '../settings-sign-model';
 
 const STATE_LABELS: Record<DeckTransportState, string> = {
   playing: 'Play',
@@ -164,6 +165,7 @@ export class DjDeckColumnComponent {
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
   private readonly binding = computed(() => this.djStore.bindingSummary(this.deck().slot)());
   private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
+  private readonly settingsInPlay = computed(() => this.djStore.settingsInPlay(this.deck().slot)());
   private readonly canShape = computed(() => this.djStore.canShape(this.deck().slot)());
 
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
@@ -283,13 +285,8 @@ export class DjDeckColumnComponent {
   readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
     const { speed, faderSpeed, nudging, voices } = this.deckState();
-    const { markerId, name } = this.djStore.settingsInPlay(this.deck().slot)();
     return {
-      settingsSign: {
-        text: name,
-        own: markerId !== null,
-        accessibleName: `Settings in play deck ${letter}: ${name}`,
-      },
+      settingsSign: settingsSignModel(this.deck(), this.settingsInPlay()),
       voiceAccessibleName: `Voice deck ${letter}`,
       speedAccessibleName: `Speed deck ${letter}`,
       voices: voices.map(({ muted }, i) => {

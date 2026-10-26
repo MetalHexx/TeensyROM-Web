@@ -64,12 +64,17 @@ const OWN_SETTINGS = 'own settings';
 const SET_END_LABEL = 'Set End';
 const SET_END_ICON = 'last_page';
 const SET_END_CONTROL = 'loop-set-end';
+const GLOBAL_LAMP_ON = 'radio_button_checked';
+const GLOBAL_LAMP_OFF = 'radio_button_unchecked';
 
 /**
  * The selected loop or cue, across both columns of the plate: a trigger key, a small display of the
  * name, kind and span, a play-now key, the GBL switch, the Clear End and Delete keys, and beneath
- * them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key. Purely presentational: it computes no time or snap target and holds no
- * drag value. The caller supplies every label and the drag offsets.
+ * them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key.
+ * The GBL switch draws a lamp beside its label, a ringed dot while the marker shares the main
+ * track's settings and an empty ring while it has its own, and is a plain disabled key (no pressed
+ * state) with nothing selected. Purely presentational: it computes no time or snap target and holds
+ * no drag value. The caller supplies every label and the drag offsets.
  *
  * With `model.empty` the display is blank and every key and boundary is disabled. The display's
  * accessible text carries the running, queued, not-ready and own-settings state in words.
@@ -138,6 +143,17 @@ export class LoopSelectedRowComponent {
         return 'off';
     }
   });
+
+  /** GBL's pressed state: `null` with nothing selected, as no setting is in play to report. */
+  protected readonly globalLatched = computed(() => {
+    const model = this.model();
+    return model.empty ? null : model.sharesGlobal;
+  });
+
+  /** GBL's lamp icon; its shape, not only its colour, tells shared from own settings. */
+  protected readonly globalLamp = computed(() =>
+    this.globalLatched() === true ? GLOBAL_LAMP_ON : GLOBAL_LAMP_OFF
+  );
 
   /** The display read aloud: the name and kind, then the state in words, then the span. */
   protected readonly displayText = computed(() => {

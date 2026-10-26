@@ -23,6 +23,7 @@ import {
   controlKey,
   type ControlIdentity,
   type DeckBindingSummary,
+  type DeckLoopsSummary,
   type DeckTransportSummary,
   type MappableControl,
 } from '@teensyrom-nx/application';
@@ -122,12 +123,57 @@ function idleBindingSummary(): DeckBindingSummary {
   };
 }
 
-function createDjStoreStub() {
+const NO_LOOPS: DeckLoopsSummary = {
+  hasTune: false,
+  canAdd: false,
+  canStop: false,
+  items: [],
+  selected: null,
+};
+
+/** A deck with one cue, selected: the only state that renders the Set End key. */
+const SELECTED_CUE: DeckLoopsSummary = {
+  hasTune: true,
+  canAdd: true,
+  canStop: false,
+  items: [
+    {
+      id: 'm1',
+      name: 'Item 1',
+      kind: 'cue',
+      lengthText: '',
+      activity: 'idle',
+      selected: true,
+      ready: true,
+      ownSettings: false,
+      startPercent: 10,
+      endPercent: null,
+    },
+  ],
+  selected: {
+    id: 'm1',
+    name: 'Item 1',
+    kind: 'cue',
+    activity: 'idle',
+    ready: true,
+    sharesGlobal: true,
+    spanText: '00:01.0',
+    start: {
+      offsetFrames: 0,
+      rangeFrames: 0,
+      tickPercents: [],
+      canSnapPrevious: false,
+      canSnapNext: false,
+    },
+    end: null,
+  },
+};
+
+function createDjStoreStub(loops: DeckLoopsSummary = NO_LOOPS) {
   return {
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
-    loopsSummary: () =>
-      signal({ hasTune: false, canAdd: false, canStop: false, items: [], selected: null }),
+    loopsSummary: () => signal(loops),
     loopLapPercent: () => signal(0),
     settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
     bindings: signal({
@@ -224,7 +270,10 @@ function createMidiStubs() {
 function render(
   devices: unknown[],
   storageStoreOverrides: Record<string, unknown> = {},
-  { reducedMotion = false } = {}
+  {
+    reducedMotion = false,
+    loops = NO_LOOPS,
+  }: { reducedMotion?: boolean; loops?: DeckLoopsSummary } = {}
 ) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
   const midi = createMidiStubs();
@@ -237,7 +286,7 @@ function render(
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices), usableDevices } },
       { provide: StorageStore, useValue: storageStore },
-      { provide: DjStore, useValue: createDjStoreStub() },
+      { provide: DjStore, useValue: createDjStoreStub(loops) },
       { provide: DeckService, useValue: createDeckServiceStub() },
       { provide: MixerService, useValue: createMixerServiceStub() },
       { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
@@ -605,9 +654,9 @@ describe('DjMixerViewComponent', () => {
 
   describe('the control anchors', () => {
     // Set End lives in a selected cue's End slot, so no element exists with nothing or a loop selected.
-    const NOT_YET_RENDERED: readonly string[] = ['loop-set-end'];
+    const ONLY_WITH_A_CUE: readonly string[] = ['loop-set-end'];
     const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
-      DECK_CONTROL_IDS.filter((control) => !NOT_YET_RENDERED.includes(control)).map(
+      DECK_CONTROL_IDS.filter((control) => !ONLY_WITH_A_CUE.includes(control)).map(
         (control): ControlIdentity => ({ owner, control })
       )
     );
@@ -625,6 +674,17 @@ describe('DjMixerViewComponent', () => {
 
       expect(ALL_IDENTITIES).toHaveLength(156);
       expect(mismatched).toEqual([]);
+    });
+
+    it("finds each deck's Set End key as exactly one element once a cue is selected", () => {
+      const { fixture } = render([], {}, { loops: SELECTED_CUE });
+      const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
+
+      const matches = DECK_SLOTS.map(
+        (owner) => grid.querySelectorAll(anchorFor({ owner, control: 'loop-set-end' })).length
+      );
+
+      expect(matches).toEqual([1, 1]);
     });
   });
 

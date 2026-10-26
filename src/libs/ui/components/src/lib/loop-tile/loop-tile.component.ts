@@ -28,8 +28,9 @@ export interface LoopTileModel {
 
 /**
  * A compact loop or cue tile: a trigger key whose state light shows idle, queued or running, a
- * one-shot play-now key, and a select button over the name, the length and the tile's own small timeline. Purely presentational:
- * it computes no time or percentage and the caller supplies every label.
+ * one-shot play-now key, and a select button over the name, the length and the tile's own small
+ * timeline. Purely presentational: it computes no time or percentage and the caller supplies every
+ * label.
  *
  * A loop's timeline fills to `progressPercent` with a playhead while running; a cue draws a single
  * magenta tick. A selected tile carries `aria-current` and a cyan ring. A small lit dot beside the

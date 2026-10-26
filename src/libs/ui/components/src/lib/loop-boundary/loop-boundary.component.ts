@@ -67,7 +67,6 @@ const EMPTY_READOUT = '—';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[attr.data-empty]': 'model().empty ? "" : null',
-    '[attr.data-action]': 'action() ? "" : null',
   },
 })
 export class LoopBoundaryComponent {

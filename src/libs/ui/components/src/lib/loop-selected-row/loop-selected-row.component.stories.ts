@@ -123,12 +123,12 @@ const cue: LoopSelectedRowModel = {
   globalAccessibleName: 'GBL Item 4',
 };
 
-/** A selected loop sharing the main track's settings: GBL lit and pressed in, both boundaries nudged. */
+/** A selected loop sharing the main track's settings: GBL lit with a ringed-dot lamp, both boundaries nudged. */
 export const LoopSharingGlobal: Story = {
   args: { model: loop, startDragOffset: null, endDragOffset: null },
 };
 
-/** A loop with its own settings: GBL unlit and out, and the display says "own settings" to assistive tech. */
+/** A loop with its own settings: GBL unlit with an empty-ring lamp, and the display says "own settings" to assistive tech. */
 export const LoopOwnSettings: Story = {
   args: { model: { ...loop, sharesGlobal: false }, startDragOffset: null, endDragOffset: null },
 };

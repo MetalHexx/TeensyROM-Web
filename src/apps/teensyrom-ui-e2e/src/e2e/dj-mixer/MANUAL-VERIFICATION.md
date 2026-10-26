@@ -352,9 +352,10 @@ line below 24rem. After:
 The 4 px in the row, display and tile is the synth panel's padding, as the Loops and cues table
 records. The channel strip's column is 8 px wider than the mockup's, so its V1 and sign are as well;
 both fill the strip. The label sits first and the sign after it on both decks, as the mockup draws
-them. One difference stays: the mockup's GBL key draws a lamp dot beside its label, and the shared
-key has none, so the view shows lit as cyan text, border and glow with the pressed look, and unlit
-as plain dim text. The span text is fully readable at 474 px and when narrow.
+them. The mockup's GBL lamp is drawn as the key's icon: a ringed dot when lit, an empty ring when
+unlit, so the two states differ in shape as well as in cyan text, border and glow (checked in
+Storybook: `dj-loop-selected-row--loop-sharing-global`, key 44 x 26). With nothing selected GBL is
+a plain disabled key with no pressed state. The span text is fully readable at 474 px and when narrow.
 
 **Narrow width (bindings panel open).** The plate is 288 px. The top line wraps its keys above the
 display, which takes a line of its own: its text is whole (display scroll width equals client width,

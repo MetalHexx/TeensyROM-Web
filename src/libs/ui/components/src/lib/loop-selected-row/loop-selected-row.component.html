@@ -27,9 +27,9 @@
     class="global"
     data-control="loop-global"
     label="GBL"
+    [icon]="globalLamp()"
     [accessibleName]="model().globalAccessibleName"
-    [latched]="model().sharesGlobal"
-    [lit]="model().sharesGlobal"
+    [latched]="globalLatched()"
     [disabled]="model().empty || model().globalDisabled"
     (press)="toggleGlobal.emit()"
   />

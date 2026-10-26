@@ -50,6 +50,7 @@ import {
   type DeckSettingsSignModel,
 } from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
+import { settingsSignModel } from '../settings-sign-model';
 
 const KEY_FORMAT_OPTIONS: readonly SegmentedControlOption[] = [
   { id: 'camelot', label: 'Camelot' },
@@ -160,11 +161,7 @@ function buildDeckPanel(
     },
     lowerOrder: deck.index % 2 === 0 ? ['filter', 'key'] : ['key', 'filter'],
     panicName: `${name} panic: return the panel to home`,
-    sign: {
-      text: settingsInPlay.name,
-      own: settingsInPlay.markerId !== null,
-      accessibleName: `Settings in play deck ${deck.letter}: ${settingsInPlay.name}`,
-    },
+    sign: settingsSignModel(deck, settingsInPlay),
   };
 }
 
