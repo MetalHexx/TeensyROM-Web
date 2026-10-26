@@ -175,6 +175,7 @@ internal static class CliHost
         (typeof(PlayerCommand), typeof(PlayerSettings)),
         (typeof(IndexCommand), typeof(IndexSettings)),
         (typeof(PortListCommand), typeof(PortListSettings)),
+        (typeof(WatchFoldersCommand), typeof(WatchFoldersSettings)),
         (typeof(SettingsCommand), typeof(SettingsCommandSettings)),
         (typeof(CreditsCommand), typeof(CreditsSettings))
     ];
@@ -368,6 +369,7 @@ internal static class CliHost
             config.AddCommand<PortListCommand>("ports");
             config.AddCommand<GeneratePresetsCommand>("chipsynth");
             config.AddCommand<SettingsCommand>("settings").IsHidden();
+            config.AddCommand<WatchFoldersCommand>("watch-folders").IsHidden();
             config.AddCommand<CreditsCommand>("credits");
         });
 

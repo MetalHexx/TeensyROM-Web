@@ -193,6 +193,15 @@ namespace TeensyRom.Cli.Helpers
 
         public static void WriteMenu(string title, string description, params string[] bullets) 
         {
+            AnsiConsole.Write(BuildMenu(title, description, bullets));
+            AnsiConsole.WriteLine();
+        }
+
+        /// <summary>
+        /// Builds the title block <see cref="WriteMenu"/> writes, for screens that render it themselves.
+        /// </summary>
+        public static Table BuildMenu(string title, string description, params string[] bullets)
+        {
             var table = new Table()
                .BorderColor(Theme.Secondary.Color)
                .Border(TableBorder.Rounded)
@@ -209,8 +218,7 @@ namespace TeensyRom.Cli.Helpers
                     table.AddRow($"* {AddHighlights(bullet)}");
                 }                
             }
-            AnsiConsole.Write(table);
-            AnsiConsole.WriteLine();
+            return table;
         }
 
         public static Table WriteHelpTable((string Header1, string Header2) headers, List<(string Key, string Value)> rows) 
