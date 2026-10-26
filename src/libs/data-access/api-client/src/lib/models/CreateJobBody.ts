@@ -31,6 +31,12 @@ export interface CreateJobBody {
      * @memberof CreateJobBody
      */
     expectedArchiveCount?: number;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof CreateJobBody
+     */
+    launch?: boolean;
 }
 
 /**
@@ -52,6 +58,7 @@ export function CreateJobBodyFromJSONTyped(json: any, ignoreDiscriminator: boole
         
         'destinationDirectory': json['destinationDirectory'] == null ? undefined : json['destinationDirectory'],
         'expectedArchiveCount': json['expectedArchiveCount'] == null ? undefined : json['expectedArchiveCount'],
+        'launch': json['launch'] == null ? undefined : json['launch'],
     };
 }
 
@@ -68,6 +75,7 @@ export function CreateJobBodyToJSONTyped(value?: CreateJobBody | null, ignoreDis
         
         'destinationDirectory': value['destinationDirectory'],
         'expectedArchiveCount': value['expectedArchiveCount'],
+        'launch': value['launch'],
     };
 }
 

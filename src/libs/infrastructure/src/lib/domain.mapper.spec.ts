@@ -919,18 +919,12 @@ describe('DomainMapper (Settings)', () => {
 
     it('should map file transfer settings correctly', () => {
       const dto = createMockGetSettingsResponse({
-        watchDirectoryLocation: '/watch',
-        autoTransferPath: '/transfer',
-        autoFileCopyEnabled: true,
         autoLaunchOnCopyEnabled: false,
         navToDirOnLaunch: true,
         syncFilesEnabled: false,
       });
       const result = DomainMapper.toSettings(dto);
 
-      expect(result.fileTransferSettings.watchDirectoryLocation).toBe('/watch');
-      expect(result.fileTransferSettings.autoTransferPath).toBe('/transfer');
-      expect(result.fileTransferSettings.autoFileCopyEnabled).toBe(true);
       expect(result.fileTransferSettings.autoLaunchOnCopyEnabled).toBe(false);
       expect(result.fileTransferSettings.navToDirOnLaunch).toBe(true);
       expect(result.fileTransferSettings.syncFilesEnabled).toBe(false);
@@ -1169,9 +1163,6 @@ interface MockSettingsOverrides {
   startupFilter?: string | null;
   startupLaunchEnabled?: boolean;
   startupLaunchRandom?: boolean;
-  watchDirectoryLocation?: string;
-  autoTransferPath?: string;
-  autoFileCopyEnabled?: boolean;
   autoLaunchOnCopyEnabled?: boolean;
   navToDirOnLaunch?: boolean;
   syncFilesEnabled?: boolean;
@@ -1211,9 +1202,6 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
   };
 
   const fileTransferSettings: FileTransferSettingsDto = {
-    watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',
-    autoTransferPath: overrides.autoTransferPath ?? '',
-    autoFileCopyEnabled: overrides.autoFileCopyEnabled ?? false,
     autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
     navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
     syncFilesEnabled: overrides.syncFilesEnabled ?? false,
@@ -1279,9 +1267,6 @@ interface MockDomainSettingsOverrides {
   startupFilter?: PlayerFilterType;
   startupLaunchEnabled?: boolean;
   startupLaunchRandom?: boolean;
-  watchDirectoryLocation?: string;
-  autoTransferPath?: string;
-  autoFileCopyEnabled?: boolean;
   autoLaunchOnCopyEnabled?: boolean;
   navToDirOnLaunch?: boolean;
   syncFilesEnabled?: boolean;
@@ -1305,9 +1290,6 @@ function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): 
       startupLaunchRandom: overrides.startupLaunchRandom ?? false,
     },
     fileTransferSettings: {
-      watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',
-      autoTransferPath: overrides.autoTransferPath ?? '',
-      autoFileCopyEnabled: overrides.autoFileCopyEnabled ?? false,
       autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
       navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
       syncFilesEnabled: overrides.syncFilesEnabled ?? false,

@@ -8,8 +8,11 @@ apis/PlayerApi.ts
 apis/SettingsApi.ts
 apis/TransfersApi.ts
 apis/VersionApi.ts
+apis/WatchFoldersApi.ts
 apis/index.ts
 index.ts
+models/AddWatchFolderBody.ts
+models/AddWatchFolderResponse.ts
 models/AppSettingsDto.ts
 models/AudioDeviceDto.ts
 models/AudioSettingsDto.ts
@@ -40,6 +43,7 @@ models/GetJobResponse.ts
 models/GetMidiSettingsResponse.ts
 models/GetSettingsResponse.ts
 models/GetVersionResponse.ts
+models/GetWatchFoldersResponse.ts
 models/HardwareVariant.ts
 models/HttpValidationProblemDetails.ts
 models/IndexAllResponse.ts
@@ -50,6 +54,7 @@ models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
 models/LiftBanResponse.ts
 models/ListDevicesResponse.ts
+models/ListJobsResponse.ts
 models/MachineType.ts
 models/MidiControlMappingDto.ts
 models/MidiMappingStyleDto.ts
@@ -60,6 +65,8 @@ models/PlayerSettingsDto.ts
 models/ProblemDetails.ts
 models/ReconnectDeviceResponse.ts
 models/RemoveFavoriteResponse.ts
+models/RemoveWatchFolderDeviceResponse.ts
+models/RemoveWatchFolderResponse.ts
 models/RenameDeviceBody.ts
 models/RenameDeviceResponse.ts
 models/ResetDeviceResponse.ts
@@ -72,6 +79,8 @@ models/SealJobResponse.ts
 models/SearchResponse.ts
 models/SearchSettingsDto.ts
 models/SearchWeightsDto.ts
+models/SetWatchFolderEnabledBody.ts
+models/SetWatchFolderEnabledResponse.ts
 models/StopEngineResponse.ts
 models/StorageCacheDto.ts
 models/TeensyFilterType.ts
@@ -81,10 +90,17 @@ models/TransferFileCompleted.ts
 models/TransferJobDto.ts
 models/TransferJobDto2.ts
 models/TransferJobState.ts
+models/TransferLaunchState.ts
+models/TransferOriginDto.ts
+models/TransferOriginKind.ts
 models/UploadFileResponse.ts
 models/VideoSettingsDto.ts
 models/VideoStandard.ts
 models/ViewableItemImageDto.ts
+models/WatchFolderDestinationDto.ts
+models/WatchFolderDto.ts
+models/WatchFolderDto2.ts
+models/WatchFolderState.ts
 models/YouTubeVideoDto.ts
 models/index.ts
 runtime.ts

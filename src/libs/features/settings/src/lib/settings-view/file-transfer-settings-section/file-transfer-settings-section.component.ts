@@ -1,14 +1,12 @@
 import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
 /**
  * Presentational component for file transfer settings section.
- * Displays directory paths, auto-copy toggles, and synchronization options.
+ * Displays the launch and synchronization toggles.
  *
  * @example
  * ```html
@@ -22,8 +20,6 @@ import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-to
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatFormFieldModule,
-    MatInputModule,
     ScalingCardComponent,
     SettingsToggleItemComponent,
   ],
@@ -33,9 +29,6 @@ import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-to
 export class FileTransferSettingsSectionComponent {
   /**
    * FormGroup containing file transfer settings controls:
-   * - watchDirectoryLocation: FormControl<string> (absolute path or empty)
-   * - autoTransferPath: FormControl<string> (required)
-   * - autoFileCopyEnabled: FormControl<boolean>
    * - autoLaunchOnCopyEnabled: FormControl<boolean>
    * - navToDirOnLaunch: FormControl<boolean>
    * - syncFilesEnabled: FormControl<boolean>

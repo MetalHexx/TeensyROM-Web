@@ -21,24 +21,6 @@ import { mapValues } from '../runtime';
 export interface FileTransferSettingsDto {
     /**
      * 
-     * @type {string}
-     * @memberof FileTransferSettingsDto
-     */
-    watchDirectoryLocation: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof FileTransferSettingsDto
-     */
-    autoTransferPath: string;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof FileTransferSettingsDto
-     */
-    autoFileCopyEnabled: boolean;
-    /**
-     * 
      * @type {boolean}
      * @memberof FileTransferSettingsDto
      */
@@ -61,9 +43,6 @@ export interface FileTransferSettingsDto {
  * Check if a given object implements the FileTransferSettingsDto interface.
  */
 export function instanceOfFileTransferSettingsDto(value: object): value is FileTransferSettingsDto {
-    if (!('watchDirectoryLocation' in value) || value['watchDirectoryLocation'] === undefined) return false;
-    if (!('autoTransferPath' in value) || value['autoTransferPath'] === undefined) return false;
-    if (!('autoFileCopyEnabled' in value) || value['autoFileCopyEnabled'] === undefined) return false;
     if (!('autoLaunchOnCopyEnabled' in value) || value['autoLaunchOnCopyEnabled'] === undefined) return false;
     if (!('navToDirOnLaunch' in value) || value['navToDirOnLaunch'] === undefined) return false;
     if (!('syncFilesEnabled' in value) || value['syncFilesEnabled'] === undefined) return false;
@@ -80,9 +59,6 @@ export function FileTransferSettingsDtoFromJSONTyped(json: any, ignoreDiscrimina
     }
     return {
         
-        'watchDirectoryLocation': json['watchDirectoryLocation'],
-        'autoTransferPath': json['autoTransferPath'],
-        'autoFileCopyEnabled': json['autoFileCopyEnabled'],
         'autoLaunchOnCopyEnabled': json['autoLaunchOnCopyEnabled'],
         'navToDirOnLaunch': json['navToDirOnLaunch'],
         'syncFilesEnabled': json['syncFilesEnabled'],
@@ -100,9 +76,6 @@ export function FileTransferSettingsDtoToJSONTyped(value?: FileTransferSettingsD
 
     return {
         
-        'watchDirectoryLocation': value['watchDirectoryLocation'],
-        'autoTransferPath': value['autoTransferPath'],
-        'autoFileCopyEnabled': value['autoFileCopyEnabled'],
         'autoLaunchOnCopyEnabled': value['autoLaunchOnCopyEnabled'],
         'navToDirOnLaunch': value['navToDirOnLaunch'],
         'syncFilesEnabled': value['syncFilesEnabled'],

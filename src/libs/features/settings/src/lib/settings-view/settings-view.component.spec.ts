@@ -75,9 +75,6 @@ describe('SettingsViewComponent', () => {
       startupLaunchRandom: false,
     },
     fileTransferSettings: {
-      watchDirectoryLocation: '',
-      autoTransferPath: '/teensyrom/files',
-      autoFileCopyEnabled: false,
       autoLaunchOnCopyEnabled: false,
       navToDirOnLaunch: false,
       syncFilesEnabled: false,
@@ -183,12 +180,6 @@ describe('SettingsViewComponent', () => {
         startupLaunchRandom: [mockSettings.playerSettings.startupLaunchRandom],
       }),
       fileTransferSettings: fb.group({
-        watchDirectoryLocation: [mockSettings.fileTransferSettings.watchDirectoryLocation],
-        autoTransferPath: [
-          mockSettings.fileTransferSettings.autoTransferPath,
-          Validators.required,
-        ],
-        autoFileCopyEnabled: [mockSettings.fileTransferSettings.autoFileCopyEnabled],
         autoLaunchOnCopyEnabled: [mockSettings.fileTransferSettings.autoLaunchOnCopyEnabled],
         navToDirOnLaunch: [mockSettings.fileTransferSettings.navToDirOnLaunch],
         syncFilesEnabled: [mockSettings.fileTransferSettings.syncFilesEnabled],

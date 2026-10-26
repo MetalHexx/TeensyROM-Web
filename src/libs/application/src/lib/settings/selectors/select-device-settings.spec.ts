@@ -21,9 +21,6 @@ describe('selectDeviceSettings', () => {
       startupLaunchRandom: false,
     },
     fileTransferSettings: {
-      watchDirectoryLocation: '',
-      autoTransferPath: '',
-      autoFileCopyEnabled: false,
       autoLaunchOnCopyEnabled: false,
       navToDirOnLaunch: false,
       syncFilesEnabled: false,

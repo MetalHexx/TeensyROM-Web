@@ -20,9 +20,6 @@ const createTestSettings = (overrides: Partial<Settings['playerSettings']> = {})
     ...overrides,
   },
   fileTransferSettings: {
-    watchDirectoryLocation: '',
-    autoTransferPath: '',
-    autoFileCopyEnabled: false,
     autoLaunchOnCopyEnabled: false,
     navToDirOnLaunch: false,
     syncFilesEnabled: false,

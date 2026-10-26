@@ -9,3 +9,4 @@ export * from './PlayerApiService';
 export * from './SettingsApiService';
 export * from './TransfersApiService';
 export * from './VersionApiService';
+export * from './WatchFoldersApiService';

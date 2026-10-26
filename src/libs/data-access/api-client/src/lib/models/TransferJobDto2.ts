@@ -27,6 +27,20 @@ import {
     TransferJobStateToJSON,
     TransferJobStateToJSONTyped,
 } from './TransferJobState';
+import type { TransferOriginDto } from './TransferOriginDto';
+import {
+    TransferOriginDtoFromJSON,
+    TransferOriginDtoFromJSONTyped,
+    TransferOriginDtoToJSON,
+    TransferOriginDtoToJSONTyped,
+} from './TransferOriginDto';
+import type { TransferLaunchState } from './TransferLaunchState';
+import {
+    TransferLaunchStateFromJSON,
+    TransferLaunchStateFromJSONTyped,
+    TransferLaunchStateToJSON,
+    TransferLaunchStateToJSONTyped,
+} from './TransferLaunchState';
 import type { TransferFileCompleted } from './TransferFileCompleted';
 import {
     TransferFileCompletedFromJSON,
@@ -109,6 +123,12 @@ export interface TransferJobDto2 {
     currentFile?: string | null;
     /**
      * 
+     * @type {TransferOriginDto}
+     * @memberof TransferJobDto2
+     */
+    origin: TransferOriginDto;
+    /**
+     * 
      * @type {Date}
      * @memberof TransferJobDto2
      */
@@ -173,6 +193,24 @@ export interface TransferJobDto2 {
      * @memberof TransferJobDto2
      */
     expandedFileCount?: number | null;
+    /**
+     * 
+     * @type {TransferLaunchState}
+     * @memberof TransferJobDto2
+     */
+    launchState: TransferLaunchState;
+    /**
+     * 
+     * @type {string}
+     * @memberof TransferJobDto2
+     */
+    launchedPath?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof TransferJobDto2
+     */
+    launchError?: string | null;
 }
 
 
@@ -190,6 +228,7 @@ export function instanceOfTransferJobDto2(value: object): value is TransferJobDt
     if (!('filesSent' in value) || value['filesSent'] === undefined) return false;
     if (!('filesFailed' in value) || value['filesFailed'] === undefined) return false;
     if (!('bytesSent' in value) || value['bytesSent'] === undefined) return false;
+    if (!('origin' in value) || value['origin'] === undefined) return false;
     if (!('startedUtc' in value) || value['startedUtc'] === undefined) return false;
     if (!('lastActivityUtc' in value) || value['lastActivityUtc'] === undefined) return false;
     if (!('failures' in value) || value['failures'] === undefined) return false;
@@ -198,6 +237,7 @@ export function instanceOfTransferJobDto2(value: object): value is TransferJobDt
     if (!('filesPerSecond' in value) || value['filesPerSecond'] === undefined) return false;
     if (!('expansionBytesWritten' in value) || value['expansionBytesWritten'] === undefined) return false;
     if (!('expansionBytesDeclared' in value) || value['expansionBytesDeclared'] === undefined) return false;
+    if (!('launchState' in value) || value['launchState'] === undefined) return false;
     return true;
 }
 
@@ -222,6 +262,7 @@ export function TransferJobDto2FromJSONTyped(json: any, ignoreDiscriminator: boo
         'bytesSent': json['bytesSent'],
         'totalFiles': json['totalFiles'] == null ? undefined : json['totalFiles'],
         'currentFile': json['currentFile'] == null ? undefined : json['currentFile'],
+        'origin': TransferOriginDtoFromJSON(json['origin']),
         'startedUtc': (new Date(json['startedUtc'])),
         'lastActivityUtc': (new Date(json['lastActivityUtc'])),
         'error': json['error'] == null ? undefined : json['error'],
@@ -233,6 +274,9 @@ export function TransferJobDto2FromJSONTyped(json: any, ignoreDiscriminator: boo
         'expansionBytesWritten': json['expansionBytesWritten'],
         'expansionBytesDeclared': json['expansionBytesDeclared'],
         'expandedFileCount': json['expandedFileCount'] == null ? undefined : json['expandedFileCount'],
+        'launchState': TransferLaunchStateFromJSON(json['launchState']),
+        'launchedPath': json['launchedPath'] == null ? undefined : json['launchedPath'],
+        'launchError': json['launchError'] == null ? undefined : json['launchError'],
     };
 }
 
@@ -258,6 +302,7 @@ export function TransferJobDto2ToJSONTyped(value?: TransferJobDto2 | null, ignor
         'bytesSent': value['bytesSent'],
         'totalFiles': value['totalFiles'],
         'currentFile': value['currentFile'],
+        'origin': TransferOriginDtoToJSON(value['origin']),
         'startedUtc': ((value['startedUtc']).toISOString()),
         'lastActivityUtc': ((value['lastActivityUtc']).toISOString()),
         'error': value['error'],
@@ -269,6 +314,9 @@ export function TransferJobDto2ToJSONTyped(value?: TransferJobDto2 | null, ignor
         'expansionBytesWritten': value['expansionBytesWritten'],
         'expansionBytesDeclared': value['expansionBytesDeclared'],
         'expandedFileCount': value['expandedFileCount'],
+        'launchState': TransferLaunchStateToJSON(value['launchState']),
+        'launchedPath': value['launchedPath'],
+        'launchError': value['launchError'],
     };
 }
 
