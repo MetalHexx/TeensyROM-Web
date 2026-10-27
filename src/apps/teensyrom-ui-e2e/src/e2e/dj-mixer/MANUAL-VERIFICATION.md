@@ -521,6 +521,16 @@ bench list for real hardware. `dj-mixer-sets.cy.ts` now commits the peek case (i
   corner, which the mockup frames A to C show but the requirements do not ask for; the set card takes
   the room. Choosing a storage unfolds it, choosing a set does not, and below the phone breakpoint
   there is no handle and nothing folds. Also the operator's request after bench testing.
+- **No light on the loaded set (supersedes R5).** R5 asks for a light on the loaded set in the tree.
+  The Sets branch shows none: the loaded set is the highlighted row (`aria-selected="true"`), which
+  the dot only repeated. The operator dropped the clause after bench testing. The save lamp in the
+  set header is unchanged.
+- **A chevron and "Files" on the listing's fold (supersedes Amendment 01).** The amendment and its
+  wireframe draw an X in the open listing's corner and the words "File listing" on the folded strip.
+  The handle is a left-pointing chevron open and a right-pointing one folded, and the strip reads
+  "Files", centred on the strip both ways with the chevron kept at the top. The accessible names
+  ("Collapse the file listing", "Expand the file listing") are unchanged. The operator's request
+  after bench testing.
 - **Band height 430.2 against 371.5.** The grid's top row is sized by the decks' and the SID panel's
   real content (555.8) and the band takes what remains; the mockup draws that row at 614.5. That row
   is not this phase's to change; the band's width, its gaps and its bottom edge match.

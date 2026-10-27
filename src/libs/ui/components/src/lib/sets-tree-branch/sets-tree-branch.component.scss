@@ -26,12 +26,3 @@
   margin-left: var(--spacing-lg);
   min-width: 0;
 }
-
-.light {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-success);
-  box-shadow: 0 0 6px var(--color-success);
-}

@@ -96,9 +96,9 @@ describe('SetsTreeBranchComponent', () => {
     );
   });
 
-  it('marks the loaded set selected and lights it, and names every row', () => {
+  it('marks the loaded set selected without a light, and names every row', () => {
     expect(setRows().map((r) => r.getAttribute('aria-selected'))).toEqual(['true', 'false']);
-    expect(setRows().map((r) => r.querySelector('.light') !== null)).toEqual([true, false]);
+    expect(el().querySelector('.light')).toBeNull();
     expect(setRows().map((r) => r.getAttribute('aria-label'))).toEqual([
       'Set Friday warm-up, loaded',
       'Set Hubbard only',

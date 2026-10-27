@@ -9,11 +9,11 @@ const meta: Meta<FoldHandleComponent> = {
     docs: {
       description: {
         component:
-          'The fold control of a card that collapses into a vertical strip. Open, it is a close ' +
-          'button in the card’s top-right corner; folded, the same button becomes a chevron on the ' +
-          'strip with the card’s label rotated beneath it, reading bottom to top. It fills its ' +
-          'positioned parent, so the card must be `position: relative`; the caller sets the strip ' +
-          'width with `--fold-strip-width` (default 44px). The caller owns the state: ' +
+          'The fold control of a card that collapses into a vertical strip. Open, it is a ' +
+          'left-pointing chevron button in the card’s top-right corner; folded, the same button ' +
+          'becomes a right-pointing chevron at the top of the strip, with the card’s label rotated ' +
+          'and centred on it, reading bottom to top. It fills its positioned parent, so the card ' +
+          'must be `position: relative`; the caller sizes the folded card. The caller owns the state: ' +
           '`foldedChange` is a request. Set `animationDuration` to 0 for reduced motion.',
       },
     },
@@ -31,7 +31,7 @@ const meta: Meta<FoldHandleComponent> = {
     foldedChange: { description: 'The request to fold (true) or unfold (false); carries the new state.' },
   },
   args: {
-    label: 'File listing',
+    label: 'Files',
     foldAccessibleName: 'Collapse the file listing',
     unfoldAccessibleName: 'Expand the file listing',
     animationDuration: 400,
@@ -41,7 +41,7 @@ const meta: Meta<FoldHandleComponent> = {
 export default meta;
 type Story = StoryObj<FoldHandleComponent>;
 
-/** Open: a close button in the card's corner. */
+/** Open: a left-pointing chevron button in the card's corner. */
 export const Open: Story = {
   args: { folded: false },
   render: (args) => ({

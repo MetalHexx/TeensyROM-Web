@@ -2,7 +2,7 @@
   class="fold-button"
   size="medium"
   variant="standard"
-  [icon]="folded() ? 'chevron_right' : 'close'"
+  [icon]="folded() ? 'chevron_right' : 'chevron_left'"
   [ariaLabel]="folded() ? unfoldAccessibleName() : foldAccessibleName()"
   [ariaExpanded]="!folded()"
   (buttonClick)="onPress()"

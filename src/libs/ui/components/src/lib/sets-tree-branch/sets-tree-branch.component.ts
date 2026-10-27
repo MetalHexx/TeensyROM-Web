@@ -7,7 +7,7 @@ import { DirectoryTreeNodeComponent } from '../directory-tree/directory-tree-nod
 export interface SetsTreeBranchSet {
   readonly id: string;
   readonly name: string;
-  /** This is the set the DJ view has loaded: selected, with a light. */
+  /** This is the set the DJ view has loaded: shown selected. */
   readonly loaded: boolean;
   /** e.g. 'Set Friday warm-up, loaded'. */
   readonly accessibleName: string;
@@ -22,7 +22,7 @@ export interface SetsTreeBranchModel {
 
 /**
  * The Sets branch of the DJ browse tree: a branch row (icon, chevron, `aria-expanded`) over a
- * group of the saved sets, with a light on the loaded one. It has the same treeitem semantics as
+ * group of the saved sets, with the loaded one selected. It has the same treeitem semantics as
  * `lib-browse-tree` — Enter and Space activate a row, as a click does — and draws its rows with
  * `lib-directory-tree-node` so it matches the tree around it. Purely presentational.
  *

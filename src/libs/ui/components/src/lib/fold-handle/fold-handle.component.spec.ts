@@ -11,7 +11,7 @@ describe('FoldHandleComponent', () => {
     fixture = TestBed.createComponent(FoldHandleComponent);
     emitted = [];
     fixture.componentInstance.foldedChange.subscribe((v) => emitted.push(v));
-    fixture.componentRef.setInput('label', 'File listing');
+    fixture.componentRef.setInput('label', 'Files');
     fixture.componentRef.setInput('foldAccessibleName', 'Collapse the file listing');
     fixture.componentRef.setInput('unfoldAccessibleName', 'Expand the file listing');
     setFolded(false);
@@ -42,7 +42,7 @@ describe('FoldHandleComponent', () => {
   it('names the button, picks its icon and discloses state from folded', () => {
     expect(button().getAttribute('aria-label')).toBe('Collapse the file listing');
     expect(button().getAttribute('aria-expanded')).toBe('true');
-    expect(button().querySelector('mat-icon')?.textContent?.trim()).toBe('close');
+    expect(button().querySelector('mat-icon')?.textContent?.trim()).toBe('chevron_left');
 
     setFolded(true);
 
@@ -56,7 +56,7 @@ describe('FoldHandleComponent', () => {
 
     setFolded(true);
 
-    expect(label()?.textContent?.trim()).toBe('File listing');
+    expect(label()?.textContent?.trim()).toBe('Files');
     expect(label()?.getAttribute('aria-hidden')).toBe('true');
   });
 

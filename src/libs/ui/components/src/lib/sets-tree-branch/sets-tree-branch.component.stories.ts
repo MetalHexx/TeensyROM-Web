@@ -47,7 +47,7 @@ export const Expanded: Story = { args: { model, expanded: true } };
 
 export const Collapsed: Story = { args: { model, expanded: false } };
 
-/** The loaded set is selected and carries a light. */
+/** The loaded set is the selected row. */
 export const WithALoadedSet: Story = {
   args: {
     model: {

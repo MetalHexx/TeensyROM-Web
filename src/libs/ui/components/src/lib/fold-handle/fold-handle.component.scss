@@ -13,13 +13,10 @@
 
 .strip-label {
   position: absolute;
-  top: 56px;
-  right: 0;
-  width: var(--fold-strip-width, 44px);
-  display: flex;
-  justify-content: center;
+  top: 50%;
+  left: 50%;
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  transform: translate(-50%, -50%) rotate(180deg);
   white-space: nowrap;
   font-size: var(--font-size-sm);
   letter-spacing: 0.08em;

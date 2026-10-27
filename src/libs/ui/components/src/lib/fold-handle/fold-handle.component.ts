@@ -2,22 +2,22 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 
 /**
- * The fold control of a card that can collapse into a vertical strip. Open, it is a close button
- * in the card's top-right corner; folded, the same button becomes a chevron on the strip, with the
- * card's `label` rotated beneath it so it reads bottom to top.
+ * The fold control of a card that can collapse into a vertical strip. Open, it is a left-pointing
+ * chevron button in the card's top-right corner; folded, the same button becomes a right-pointing
+ * chevron at the top of the strip, with the card's `label` rotated and centred on the strip so it
+ * reads bottom to top.
  *
  * It fills its positioned parent (the card) and does not intercept pointer events outside the
- * button, so the card must be `position: relative`, and the caller sets the strip's width through
- * `--fold-strip-width` (default `44px`). The caller owns the state and every word: `foldedChange`
- * is a request, answered by flipping `folded`. The button is one element in both states, so
- * keyboard focus stays on it across a fold.
+ * button, so the card must be `position: relative`; the caller sizes the folded card. The caller
+ * owns the state and every word: `foldedChange` is a request, answered by flipping `folded`. The
+ * button is one element in both states, so keyboard focus stays on it across a fold.
  *
  * @example
  * ```html
- * <section class="card" [style.--fold-strip-width]="'44px'">
+ * <section class="card">
  *   <lib-fold-handle
  *     [folded]="folded()"
- *     label="File listing"
+ *     label="Files"
  *     foldAccessibleName="Collapse the file listing"
  *     unfoldAccessibleName="Expand the file listing"
  *     (foldedChange)="folded.set($event)"
@@ -35,7 +35,7 @@ import { IconButtonComponent } from '../icon-button/icon-button.component';
 export class FoldHandleComponent {
   /** Whether the card it sits on is folded into its strip. */
   readonly folded = input.required<boolean>();
-  /** The vertical label shown on the strip while folded, e.g. 'File listing'. */
+  /** The vertical label shown on the strip while folded, e.g. 'Files'. */
   readonly label = input.required<string>();
   /** The button's accessible name while the card is open ('Collapse the file listing'). */
   readonly foldAccessibleName = input.required<string>();
