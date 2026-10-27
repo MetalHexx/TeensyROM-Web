@@ -780,11 +780,15 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 gate.Current == (0, 0));
         }
 
-        /// <summary>The pump's "not resetting" line for this job - the only Internal line it writes that names a job.</summary>
+        /// <summary>
+        /// The pump's "not resetting it before job" line for this job. Matched by its text because the
+        /// stamped reset and file-batch commands log the job id too.
+        /// </summary>
         private IEnumerable<LoggedLine> SkipLines(TransferJob job) =>
             f.Log.Lines.Where(line =>
                 line.Level == nameof(ILoggingService.Internal) &&
                 line.DeviceId == job.DeviceId &&
+                line.Message.Contains("not resetting it before job", StringComparison.Ordinal) &&
                 line.Message.Contains(job.JobId, StringComparison.Ordinal));
 
         private async Task EnqueueFileAsync(TransferJob job, string deviceId, string relativePath, FilePath targetPath, byte[] bytes)

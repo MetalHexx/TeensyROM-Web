@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Tests.Unit.Endpoints;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.GetFile;
 using TeensyRom.Core.Entities.Storage;
@@ -26,7 +27,8 @@ public class StorageServiceReadFileBytesTests
         _log,
         _sidMetadata,
         _gameMetadata,
-        _port);
+        _port,
+        LeaseDoubles.Free());
 
     [Fact]
     public async Task ReadFileBytes_SendsGetFileCommandWithSettingsAndPort()

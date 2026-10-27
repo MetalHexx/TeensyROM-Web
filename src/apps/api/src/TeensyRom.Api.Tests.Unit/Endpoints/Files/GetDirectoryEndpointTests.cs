@@ -69,6 +69,19 @@ public class GetDirectoryEndpointTests
     }
 
     [Fact]
+    public async Task Handle_DirectoryServedWhileDeviceBusy_SendsOkWithTheListing()
+    {
+        var endpoint = GivenDevice(LeaseDoubles.Busy());
+        var item = new StorageCacheItem { Path = new DirectoryPath("/music/"), Directories = [], Files = [] };
+        _sdStorage.ReadDirectory(Arg.Any<DirectoryPath>()).Returns(DirectoryReadResult.Found(item));
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
+        endpoint.Response!.StorageItem.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Handle_ReadFailedWhileDeviceBusy_SendsTheSharedConflictNotBadGateway()
     {
         var endpoint = GivenDevice(LeaseDoubles.Busy());

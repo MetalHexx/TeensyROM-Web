@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Tests.Unit.Endpoints;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
@@ -44,7 +45,8 @@ public class StorageBanFilteringTests
                 Substitute.For<ILoggingService>(),
                 sidMetadata,
                 Substitute.For<IGameMetadataService>(),
-                Substitute.For<ICommunicationPort>());
+                Substitute.For<ICommunicationPort>(),
+                LeaseDoubles.Free());
         }
 
         private static StorageCacheItem CachedMusicDirectory() => new()
@@ -191,7 +193,8 @@ public class StorageBanFilteringTests
                 Substitute.For<IGameMetadataService>(),
                 _sidMetadata,
                 Substitute.For<ILoggingService>(),
-                _settingsProvider);
+                _settingsProvider,
+                LeaseDoubles.Free());
 
             _service = factory.Create(_cart, Substitute.For<ICommunicationPort>());
             return _service;

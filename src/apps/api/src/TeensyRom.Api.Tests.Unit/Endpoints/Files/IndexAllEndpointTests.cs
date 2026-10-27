@@ -76,6 +76,22 @@ public class IndexAllEndpointTests
     }
 
     [Fact]
+    public async Task Handle_DeviceLeasedWhileIndexing_IsReportedBusyNotAsAnIndexingFailure()
+    {
+        _freeSd.CacheAll(Arg.Any<CancellationToken>()).Returns(false);
+        _lease.GetActiveJobId(FreeDeviceId).Returns((string?)null, LeaseDoubles.JobId);
+        var endpoint = NewEndpoint(Device(FreeDeviceId, _freeSd));
+
+        await endpoint.Handle(CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        var problem = endpoint.GetProblem<ProblemHttpResult>();
+        problem.ShouldBeDeviceBusy(FreeDeviceId);
+        problem.ProblemDetails.Detail.Should().BeNull();
+        problem.ProblemDetails.Extensions["busyDeviceIds"].Should().BeEquivalentTo(new[] { FreeDeviceId });
+    }
+
+    [Fact]
     public async Task Handle_NoBusyDevice_IndexesEverythingAndSendsOk()
     {
         var endpoint = NewEndpoint(Device(FreeDeviceId, _freeSd));

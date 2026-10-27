@@ -100,9 +100,7 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
                 _settingsProvider.SaveDeviceSettings(deviceSettings);
             }
 
-            var busyDeviceIds = busy.Select(b => b.Device.DeviceId).ToArray();
-
-            var failedItems = sdTasks
+            var failed = sdTasks
                 .Where(t => !t.Task.Result)
                 .Concat(usbTasks.Where(t => !t.Task.Result))
                 .Select(t => new
@@ -111,6 +109,18 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
                     t.StorageType
                 })
                 .ToList();
+
+            // A device that took a transfer lease while the others were being indexed was refused with its
+            // cache untouched: it is busy, not broken.
+            foreach (var deviceId in failed.Select(f => f.DeviceId).Distinct())
+            {
+                if (lease.GetActiveJobId(deviceId) is { } jobId)
+                {
+                    busy.Add((available.First(d => d.DeviceId == deviceId), jobId));
+                }
+            }
+            var failedItems = failed.Where(f => lease.GetActiveJobId(f.DeviceId) is null).ToList();
+            var busyDeviceIds = busy.Select(b => b.Device.DeviceId).ToArray();
 
             if (failedItems.Count > 0)
             {
@@ -142,7 +152,7 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
                     first.Device.DeviceId,
                     first.Device.Cart.Name,
                     first.JobId!,
-                    detail: devices.Count > 0 ? "The other devices were indexed." : null);
+                    detail: devices.Any(d => busy.All(b => b.Device.DeviceId != d.DeviceId)) ? "The other devices were indexed." : null);
                 problem.ProblemDetails.Extensions["busyDeviceIds"] = busyDeviceIds;
                 SendProblem(problem);
                 return;

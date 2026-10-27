@@ -37,7 +37,7 @@ namespace TeensyRom.Core.Storage
             return new BanLists(search.BannedDirectories, search.BannedFiles);
         }
     }
-    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort) : IStorageService
+    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort, IDeviceTransferLease transferLease) : IStorageService
     {
         private readonly ICommunicationPort _communicationPort = communicationPort;
         public async Task<FileItem?> GetFile(FilePath path) => (await LookupFile(path)).File;
@@ -159,8 +159,19 @@ namespace TeensyRom.Core.Storage
         {
             return await Cache(new DirectoryPath(StorageHelper.Remote_Path_Root), ct);
         }
+        /// <summary>
+        /// Re-reads <paramref name="path"/> and everything below it into the cache. Returns false, with the
+        /// cache untouched, when a transfer holds the device - the check sits here, immediately before the
+        /// clear, because callers can wait minutes between their own lease check and this call.
+        /// </summary>
         public async Task<bool> Cache(DirectoryPath path, CancellationToken ct)
         {
+            if (transferLease.GetActiveJobId(settings.CartStorage.DeviceId) is { } activeJobId)
+            {
+                log.InternalWarning($"Not indexing {path}: the device is busy with transfer job '{activeJobId}'.", settings.CartStorage.DeviceId);
+                return false;
+            }
+
             if (path.Equals(new DirectoryPath(StorageHelper.Remote_Path_Root)))
             {
                 ClearCache();

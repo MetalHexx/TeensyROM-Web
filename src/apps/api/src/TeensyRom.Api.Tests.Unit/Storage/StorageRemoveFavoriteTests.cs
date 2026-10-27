@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Tests.Unit.Endpoints;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Commands.DeleteFile;
@@ -29,7 +30,8 @@ public class StorageRemoveFavoriteTests
         Substitute.For<ILoggingService>(),
         Substitute.For<ISidMetadataService>(),
         Substitute.For<IGameMetadataService>(),
-        Substitute.For<ICommunicationPort>());
+        Substitute.For<ICommunicationPort>(),
+        LeaseDoubles.Free());
 
     private static LaunchableItem Tune(string path) =>
         new() { Name = new FilePath(path).FileName, Path = new FilePath(path), Size = 10, IsFavorite = true };

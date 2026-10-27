@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Tests.Unit.Endpoints;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
@@ -29,7 +30,8 @@ public class StorageServiceReadDirectoryTests
         Substitute.For<ILoggingService>(),
         Substitute.For<ISidMetadataService>(),
         Substitute.For<IGameMetadataService>(),
-        Substitute.For<ICommunicationPort>());
+        Substitute.For<ICommunicationPort>(),
+        LeaseDoubles.Free());
 
     private void GivenCommandResult(GetDirectoryRecursiveResult result) =>
         _mediator.Send(Arg.Any<GetDirectoryRecursiveCommand>(), Arg.Any<CancellationToken>()).Returns(result);
