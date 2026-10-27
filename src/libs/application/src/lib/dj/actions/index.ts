@@ -23,6 +23,17 @@ import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
 import { setLoopActivity } from './set-loop-activity';
 import { setSettingsInPlay } from './set-settings-in-play';
+import { setSetsLibrary } from './set-sets-library';
+import { putOpenSet } from './put-open-set';
+import { closeOpenSets } from './close-open-sets';
+import { setCurrentSet } from './set-current-set';
+import { removeSetSummary } from './remove-set-summary';
+import { setDeckHolding } from './set-deck-holding';
+import { selectSetRow } from './select-set-row';
+import { setPendingRows } from './set-pending-rows';
+import { setRowPrep } from './set-row-prep';
+import { setSetsSaveStatus } from './set-sets-save-status';
+import { announceSets } from './announce-sets';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -51,6 +62,17 @@ export function withDjActions() {
       ...setLoopSelection(writableStore),
       ...setLoopActivity(writableStore),
       ...setSettingsInPlay(writableStore),
+      ...setSetsLibrary(writableStore),
+      ...putOpenSet(writableStore),
+      ...closeOpenSets(writableStore),
+      ...setCurrentSet(writableStore),
+      ...removeSetSummary(writableStore),
+      ...setDeckHolding(writableStore),
+      ...selectSetRow(writableStore),
+      ...setPendingRows(writableStore),
+      ...setRowPrep(writableStore),
+      ...setSetsSaveStatus(writableStore),
+      ...announceSets(writableStore),
     };
   });
 }

@@ -1,11 +1,19 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { LOOP_POSITIONS_STORE, TUNE_INSERTER, TUNE_RESOLVER } from '@teensyrom-nx/application';
-import { ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import {
+  DJ_LIBRARY_STATE_REPOSITORY,
+  LOOP_POSITIONS_STORE,
+  SET_STORE,
+  TUNE_INSERTER,
+  TUNE_MEMORY_STORE,
+  TUNE_RESOLVER,
+} from '@teensyrom-nx/application';
+import { ALERT_SERVICE, API_CONFIG, IAlertService } from '@teensyrom-nx/domain';
 import { DjDatabase, DJ_DATABASE_NAME } from './database/dj-database';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
-import { DJ_ENGINE_PROVIDERS } from './providers';
+import { ApiDjLibraryStateRepository, ApiSetStore, ApiTuneMemoryStore } from './dj-library';
+import { DJ_ENGINE_PROVIDERS, DJ_STORAGE_PROVIDERS } from './providers';
 
 const PSID_HEADER_SIZE = 0x7c;
 
@@ -118,5 +126,23 @@ describe('DJ_ENGINE_PROVIDERS composition', () => {
 
     expect(await store.load(identity)).toEqual(markers);
     expect(await store.load({ sidHash: 'tune', subtune: 2 })).toEqual([]);
+  });
+});
+
+describe('DJ_STORAGE_PROVIDERS composition', () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ...DJ_STORAGE_PROVIDERS,
+        { provide: API_CONFIG, useValue: { basePath: 'http://localhost:5000' } },
+      ],
+    });
+  });
+
+  it('binds the three library ports to their API adapters', () => {
+    expect(TestBed.inject(SET_STORE)).toBeInstanceOf(ApiSetStore);
+    expect(TestBed.inject(TUNE_MEMORY_STORE)).toBeInstanceOf(ApiTuneMemoryStore);
+    expect(TestBed.inject(DJ_LIBRARY_STATE_REPOSITORY)).toBeInstanceOf(ApiDjLibraryStateRepository);
   });
 });

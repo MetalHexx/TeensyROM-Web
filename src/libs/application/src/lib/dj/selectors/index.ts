@@ -9,6 +9,7 @@ import { deckLoops } from './deck-loops';
 import { loopsSummary } from './loops-summary';
 import { loopLapPercent } from './loop-lap';
 import { settingsInPlay } from './settings-in-play';
+import { deckHolding, deckSetSummary, setCardSummary, setTreeSummary } from './sets';
 
 export function withDjSelectors() {
   return withMethods((store) => {
@@ -25,6 +26,10 @@ export function withDjSelectors() {
       ...loopsSummary(writableStore),
       ...loopLapPercent(writableStore),
       ...settingsInPlay(writableStore),
+      ...setCardSummary(writableStore),
+      ...setTreeSummary(writableStore),
+      ...deckHolding(writableStore),
+      ...deckSetSummary(writableStore),
     };
   });
 }

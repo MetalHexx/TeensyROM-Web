@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
 import type { TuneIndexRecord } from '@sidablist/analysis';
 import {
@@ -297,5 +297,101 @@ describe('TuneLoader', () => {
 
     expect(result?.reference.identity).toEqual(identity);
     expect(phases).toEqual([]);
+  });
+  describe('fetchReference', () => {
+    it('fetches, inserts and marks the file seen, without touching a slot', async () => {
+      const reference = tuneReference();
+      fileContentService.getFileContent.mockReturnValue(of(fileContentFor('a.sid')));
+      inserter.insert.mockResolvedValue(reference);
+
+      const source = loadSource();
+      const result = await loader.fetchReference(source);
+
+      expect(result).toEqual(reference);
+      expect(fileContentService.getFileContent).toHaveBeenCalledWith(
+        source.deviceId,
+        source.storageType,
+        source.path
+      );
+      const key = DjFileKeyUtil.create(source.deviceId, source.storageType, source.path);
+      expect(store.seen()[key]).toEqual(reference);
+      expect(resolver.resolve).not.toHaveBeenCalled();
+    });
+
+    it('returns a file seen this session without fetching it again', async () => {
+      const reference = tuneReference({ title: 'Already Seen' });
+      const source = loadSource();
+      store.markSeen({
+        key: DjFileKeyUtil.create(source.deviceId, source.storageType, source.path),
+        reference,
+      });
+
+      const result = await loader.fetchReference(source);
+
+      expect(result).toEqual(reference);
+      expect(fileContentService.getFileContent).not.toHaveBeenCalled();
+      expect(inserter.insert).not.toHaveBeenCalled();
+    });
+
+    it('is not superseded by a load on a slot', async () => {
+      const setReference = tuneReference({ identity: { sidHash: 'hash-set', subtune: 1 } });
+      const deckReference = tuneReference({ identity: { sidHash: 'hash-deck', subtune: 1 } });
+      const setFetch = new Subject<FileContent>();
+      fileContentService.getFileContent.mockImplementation(
+        (_deviceId: string, _storageType: StorageType, path: string) =>
+          path === '/set.sid' ? setFetch.asObservable() : of(fileContentFor('deck.sid'))
+      );
+      inserter.insert.mockImplementation(async (bytes: Uint8Array) =>
+        bytes[0] === 9 ? setReference : deckReference
+      );
+      resolver.resolve.mockResolvedValue(playableFor(deckReference));
+
+      const pending = loader.fetchReference(loadSource({ path: '/set.sid' }));
+      await loader.load('A', loadSource({ path: '/deck.sid' }), onPhase);
+      setFetch.next({ bytes: new Uint8Array([9]).buffer, byteLength: 1, fileName: 'set.sid' });
+      setFetch.complete();
+
+      await expect(pending).resolves.toEqual(setReference);
+    });
+
+    it('lets a failed fetch propagate', async () => {
+      fileContentService.getFileContent.mockReturnValue(throwError(() => new Error('offline')));
+
+      await expect(loader.fetchReference(loadSource())).rejects.toThrow('offline');
+    });
+  });
+
+  describe('analyze', () => {
+    it('resolves the identity, reporting a real scan through onScanStart', async () => {
+      const identity: TuneIdentity = { sidHash: 'hash-a', subtune: 2 };
+      const onScanStart = vi.fn();
+      resolver.resolve.mockImplementation(async (_identity: TuneIdentity, options?: { onScanStart?: () => void }) => {
+        options?.onScanStart?.();
+        return playableFor(tuneReference({ identity }));
+      });
+
+      const result = await loader.analyze(identity, onScanStart);
+
+      expect(result.reference.identity).toEqual(identity);
+      expect(onScanStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not report a scan for a lookup hit', async () => {
+      const identity: TuneIdentity = { sidHash: 'hash-a', subtune: 1 };
+      const onScanStart = vi.fn();
+      resolver.resolve.mockResolvedValue(playableFor(tuneReference({ identity })));
+
+      await loader.analyze(identity, onScanStart);
+
+      expect(onScanStart).not.toHaveBeenCalled();
+    });
+
+    it('throws when the bytes are gone', async () => {
+      resolver.resolve.mockResolvedValue(null);
+
+      await expect(loader.analyze({ sidHash: 'hash-a', subtune: 1 }, vi.fn())).rejects.toThrow(
+        'tune bytes are no longer available — drop it again'
+      );
+    });
   });
 });

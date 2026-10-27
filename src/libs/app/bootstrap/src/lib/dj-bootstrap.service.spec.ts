@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   DeckService,
+  DjSets,
   MidiControllers,
   MidiInputRouter,
   MixerApplier,
@@ -19,6 +20,7 @@ describe('DjBootstrapService', () => {
   let installMock: ReturnType<typeof vi.fn>;
   let mappingsHydrateMock: ReturnType<typeof vi.fn>;
   let routerStartMock: ReturnType<typeof vi.fn>;
+  let setsHydrateMock: ReturnType<typeof vi.fn>;
 
   function configure(): DjBootstrapService {
     TestBed.configureTestingModule({
@@ -28,6 +30,7 @@ describe('DjBootstrapService', () => {
         { provide: MixerApplier, useValue: { install: installMock } },
         { provide: MidiControllers, useValue: { hydrate: mappingsHydrateMock } },
         { provide: MidiInputRouter, useValue: { start: routerStartMock } },
+        { provide: DjSets, useValue: { hydrate: setsHydrateMock } },
       ],
     });
     return TestBed.inject(DjBootstrapService);
@@ -38,6 +41,7 @@ describe('DjBootstrapService', () => {
     installMock = vi.fn();
     mappingsHydrateMock = vi.fn().mockResolvedValue(undefined);
     routerStartMock = vi.fn();
+    setsHydrateMock = vi.fn().mockResolvedValue(undefined);
     vi.mocked(logWarn).mockClear();
   });
 
@@ -85,6 +89,15 @@ describe('DjBootstrapService', () => {
     service.init();
 
     expect(mappingsHydrateMock).toHaveBeenCalledTimes(1);
+    expect(hydrateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('init hydrates the DJ library once, alongside the bindings', () => {
+    const service = configure();
+
+    service.init();
+
+    expect(setsHydrateMock).toHaveBeenCalledTimes(1);
     expect(hydrateMock).toHaveBeenCalledTimes(1);
   });
 

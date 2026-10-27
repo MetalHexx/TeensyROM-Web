@@ -10,7 +10,7 @@ import type {
 } from '@sidablist/tunes';
 import { FILE_CONTENT_SERVICE, type IFileContentService } from '@teensyrom-nx/domain';
 import { DjStore } from './dj-store';
-import { DjFileKeyUtil } from './dj-file-key.util';
+import { DjFileKeyUtil, type DjFileKey } from './dj-file-key.util';
 import { TUNE_INSERTER, TUNE_RESOLVER } from './ports';
 import type { Slot } from './slot';
 import type { LoadSource } from './load-source';
@@ -21,6 +21,8 @@ import type { LoadSource } from './load-source';
  *  fires only when the resolver actually starts a scan; a lookup hit resolves silently, reporting
  *  neither phase. */
 export type LoadPhase = (phase: 'loading' | 'indexing', reference: TuneReference | null) => void;
+
+const BYTES_GONE_MESSAGE = 'tune bytes are no longer available — drop it again';
 
 /**
  * Turns a drop into a playable: fetch on first sight, insert, resolve — the POC's
@@ -50,19 +52,15 @@ export class TuneLoader {
     if (reference === undefined) {
       onPhase('loading', null);
 
-      const content = await firstValueFrom(
-        this.fileContent.getFileContent(source.deviceId, source.storageType, source.path)
+      const fetched = await this.fetchAndInsert(
+        source,
+        key,
+        () => this.generation[slot] !== myGeneration
       );
-      if (this.generation[slot] !== myGeneration) {
+      if (fetched === null) {
         return null;
       }
-
-      reference = await this.inserter.insert(new Uint8Array(content.bytes));
-      if (this.generation[slot] !== myGeneration) {
-        return null;
-      }
-
-      this.store.markSeen({ key, reference });
+      reference = fetched;
     }
 
     const options: ResolveOptions = { onScanStart: () => onPhase('indexing', reference) };
@@ -71,7 +69,24 @@ export class TuneLoader {
       return null;
     }
     if (playable === null) {
-      throw new Error('tune bytes are no longer available — drop it again');
+      throw new Error(BYTES_GONE_MESSAGE);
+    }
+    return playable;
+  }
+
+  /** Fetches (unless seen this session) and inserts the file; for set rows, so no slot and no
+   *  generation. */
+  async fetchReference(source: LoadSource): Promise<TuneReference> {
+    const key = DjFileKeyUtil.create(source.deviceId, source.storageType, source.path);
+    return this.store.seen()[key] ?? (await this.fetchAndInsert(source, key));
+  }
+
+  /** Resolves `identity`, scanning when its index is not cached; `onScanStart` fires only for a real
+   *  scan. Throws when the bytes are gone. */
+  async analyze(identity: TuneIdentity, onScanStart: () => void): Promise<Playable> {
+    const playable = await this.resolver.resolve(identity, { onScanStart });
+    if (playable === null) {
+      throw new Error(BYTES_GONE_MESSAGE);
     }
     return playable;
   }
@@ -90,8 +105,37 @@ export class TuneLoader {
       return null;
     }
     if (playable === null) {
-      throw new Error('tune bytes are no longer available — drop it again');
+      throw new Error(BYTES_GONE_MESSAGE);
     }
     return playable;
+  }
+
+  /** The one fetch-insert-`markSeen` step. With `isStale`, checked after each await, a superseded
+   *  call stops and resolves null. */
+  private fetchAndInsert(source: LoadSource, key: DjFileKey): Promise<TuneReference>;
+  private fetchAndInsert(
+    source: LoadSource,
+    key: DjFileKey,
+    isStale: () => boolean
+  ): Promise<TuneReference | null>;
+  private async fetchAndInsert(
+    source: LoadSource,
+    key: DjFileKey,
+    isStale: () => boolean = () => false
+  ): Promise<TuneReference | null> {
+    const content = await firstValueFrom(
+      this.fileContent.getFileContent(source.deviceId, source.storageType, source.path)
+    );
+    if (isStale()) {
+      return null;
+    }
+
+    const reference = await this.inserter.insert(new Uint8Array(content.bytes));
+    if (isStale()) {
+      return null;
+    }
+
+    this.store.markSeen({ key, reference });
+    return reference;
   }
 }
