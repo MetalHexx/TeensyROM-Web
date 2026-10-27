@@ -131,7 +131,7 @@ internal sealed class WatchFolderAddCommand(
 
     protected override async Task<int> RunAsync(CommandContext context, WatchFolderAddSettings settings, CancellationToken ct)
     {
-        var added = await watchFolders.AddAsync(_folder, devices.RequireDeviceId(), storage.StorageType, settings.Path, settings.Launch, ct);
+        var added = await watchFolders.AddAsync(_folder, Devices.RequireDeviceId(), Storage.StorageType, settings.Path, settings.Launch, ct);
         var folder = WatchFolderOutput.ToJson(added.WatchFolder);
 
         if (Output.Mode == OutputMode.Json) Output.Json(new WatchFolderAddJson(added.Created, folder));

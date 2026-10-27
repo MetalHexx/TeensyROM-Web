@@ -42,7 +42,11 @@ namespace TeensyRom.Api.WatchFolders
         IObservable<IReadOnlyList<WatchFolder>> Changed { get; }
     }
 
+    /// <param name="FolderPath">The folder on this computer to watch.</param>
+    /// <param name="DeviceId">The TeensyROM that receives what lands in the folder.</param>
+    /// <param name="StorageType">The storage on that TeensyROM the files go to.</param>
     /// <param name="DevicePath">Directory on the device storage; null means <c>/auto-transfer</c>.</param>
+    /// <param name="Launch">True to launch one file after each completed transfer, even when the auto-launch setting is off.</param>
     public sealed record WatchFolderAdd(string FolderPath, string DeviceId, TeensyStorageType StorageType, string? DevicePath, bool Launch);
 
     public enum WatchFolderAddError
@@ -58,6 +62,8 @@ namespace TeensyRom.Api.WatchFolders
 
     /// <param name="Folder">The folder after the add; null on failure.</param>
     /// <param name="Created">True when a new folder was created, false when a destination joined an existing one.</param>
+    /// <param name="Error">Why the add failed; null on success.</param>
+    /// <param name="Message">A message for the person explaining the failure; null on success.</param>
     public sealed record WatchFolderAddResult(WatchFolder? Folder, bool Created, WatchFolderAddError? Error, string? Message);
 
     public enum WatchFolderSetDestinationError
@@ -68,6 +74,8 @@ namespace TeensyRom.Api.WatchFolders
     }
 
     /// <param name="Folder">The folder after the change; null on failure.</param>
+    /// <param name="Error">Why the change failed; null on success.</param>
+    /// <param name="Message">A message for the person explaining the failure; null on success.</param>
     public sealed record WatchFolderSetDestinationResult(WatchFolder? Folder, WatchFolderSetDestinationError? Error, string? Message);
 
     /// <param name="Found">False when the folder does not exist or has no destination for the device.</param>
