@@ -22,9 +22,6 @@ namespace TeensyRom.Core.Settings
         public IObservable<PlayerSettings> PlayerSettings => 
             _settings.Select(s => s.PlayerSettings).DistinctUntilChanged();
         
-        public IObservable<FileTransferSettings> FileTransferSettings => 
-            _settings.Select(s => s.FileTransferSettings).DistinctUntilChanged();
-        
         public IObservable<SearchSettings> SearchSettings => 
             _settings.Select(s => s.SearchSettings).DistinctUntilChanged();
         
@@ -64,14 +61,11 @@ namespace TeensyRom.Core.Settings
                     _currentSettings = InitDefaultSettings();
                     WriteSettings(_currentSettings);
                 }
-                ValidateAndLogSettings(_currentSettings);
-
                 return _currentSettings with { };
             }
         }
 
         public PlayerSettings GetPlayerSettings() => GetSettings().PlayerSettings;
-        public FileTransferSettings GetFileTransferSettings() => GetSettings().FileTransferSettings;
         public SearchSettings GetSearchSettings() => GetSettings().SearchSettings;
         public AppSettings GetAppSettings() => GetSettings().AppSettings;
 
@@ -191,15 +185,6 @@ namespace TeensyRom.Core.Settings
             File.WriteAllText(_settingsFilePath, LaunchableItemSerializer.Serialize(settings));
         }
 
-        public bool ValidateAndLogSettings(TeensySettings settings)
-        {
-            if (!Directory.Exists(settings.FileTransferSettings.WatchDirectoryLocation))
-            {
-                _log.InternalError($"The watch directory '{settings.FileTransferSettings.WatchDirectoryLocation}' was not found.  Please go create it.");
-                return false;
-            }
-            return true;
-        }
 
         public bool SaveSettings(TeensySettings settings)
         {

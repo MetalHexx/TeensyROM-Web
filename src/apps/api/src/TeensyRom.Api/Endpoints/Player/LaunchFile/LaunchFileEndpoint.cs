@@ -1,12 +1,10 @@
-using MediatR;
-using TeensyRom.Core.Abstractions;
+using TeensyRom.Api.Services;
 using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.Serial.Commands.LaunchFile;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Player.LaunchFile
 {
-    public class LaunchFileEndpoint(IMediator mediator, IDeviceConnectionManager deviceManager) : RadEndpoint<LaunchFileRequest, LaunchFileResponse>
+    public class LaunchFileEndpoint(IFileLaunchService launcher) : RadEndpoint<LaunchFileRequest, LaunchFileResponse>
     {
         public override void Configure()
         {
@@ -23,85 +21,38 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
 
         public override async Task Handle(LaunchFileRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetAvailableDevice(r.DeviceId);
+            var outcome = await launcher.LaunchAsync(r.DeviceId, r.StorageType, new FilePath(r.FilePath), ct);
 
-            if (device is null)
+            switch (outcome.Status)
             {
-                SendNotFound($"The device {r.DeviceId} was not found.");
-                return;
-            }
+                case FileLaunchStatus.DeviceNotFound:
+                case FileLaunchStatus.StorageUnavailable:
+                    SendNotFound(outcome.Message);
+                    break;
+                case FileLaunchStatus.FileNotFound:
+                    SendNotFound($"The file {r.FilePath} was not found.");
+                    break;
+                case FileLaunchStatus.NotLaunchable:
+                    SendValidationError($"The file {r.FilePath} is not launchable.");
+                    break;
+                case FileLaunchStatus.LookupFailed:
+                case FileLaunchStatus.LaunchFailed:
+                    SendExternalError(outcome.Message);
+                    break;
+                default:
+                    // Launched, or launched but not compatible with TeensyROM hardware - both are successes.
+                    var isCompatible = outcome.Status is FileLaunchStatus.Launched;
+                    var fileDto = FileItemDto.FromLaunchable(outcome.Item!);
+                    fileDto.IsCompatible = isCompatible;
 
-            IStorageService storage = null!;
-
-            if (r.StorageType is TeensyStorageType.SD) 
-            {
-                if (!device.Cart.SdStorage.Available)
-                {
-                    SendNotFound($"The device {r.DeviceId} does not have an SD card.");
-                    return;
-                }
-                storage = device.SdStorage;
-
-            }
-            else if (r.StorageType is TeensyStorageType.USB)
-            {
-                if (!device.Cart.UsbStorage.Available)
-                {
-                    SendNotFound($"The device {r.DeviceId} does not have USB storage.");
-                    return;
-                }
-                storage = device.UsbStorage;
-            }
-
-            var lookup = await storage.LookupFile(new FilePath(r.FilePath));
-
-            if (lookup.Failure is not null)
-            {
-                SendExternalError(lookup.Failure);
-                return;
-            }
-
-            var file = lookup.File;
-
-            if (file is null) 
-            {
-                SendNotFound($"The file {r.FilePath} was not found.");
-                return;
-            }
-
-            if(file is not LaunchableItem launchItem)
-            {
-                SendValidationError($"The file {r.FilePath} is not launchable.");
-                return;
-            }
-			            
-			var result = await mediator.Send(new LaunchFileCommand
-			{
-				StorageType = r.StorageType,
-				LaunchItem = launchItem,
-				DeviceId = r.DeviceId,
-				CommunicationPort = device.CommunicationPort
-			});
-
-			// Check if this was a successful launch or compatibility issue vs actual system error
-			if (result.IsSuccess || result.IsCompatible == false)
-            {
-                // Either successful launch or compatibility issue - return success with appropriate message and IsCompatible flag
-                var fileDto = FileItemDto.FromLaunchable(launchItem);
-                fileDto.IsCompatible = result.IsCompatible; // Set compatibility based on launch result
-
-                Response = new()
-                {
-                    LaunchedFile = fileDto,
-                    IsCompatible = result.IsCompatible,
-                    Message = result.IsCompatible ? "Success!" : "File launched but is not compatible with TeensyROM hardware."
-                };
-                Send();
-            }
-            else
-            {
-                // Actual system error (Network, NoResponse, Disconnected, etc.)
-                SendExternalError(result.Error);
+                    Response = new()
+                    {
+                        LaunchedFile = fileDto,
+                        IsCompatible = isCompatible,
+                        Message = outcome.Message
+                    };
+                    Send();
+                    break;
             }
         }
     }

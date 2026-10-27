@@ -61,6 +61,12 @@ namespace TeensyRom.Cli.Services
         Task<LaunchOutcome> LaunchOnceAsync(ILaunchableItem item);
 
         /// <summary>
+        /// Records a launch tr-web made on its own, such as an upload's: the player ends as <see cref="LaunchOnceAsync"/> leaves
+        /// it, without sending a launch. <see cref="LaunchStatus.Launched"/> is playing and announced; anything else stops.
+        /// </summary>
+        void RecordLaunched(ILaunchableItem item, LaunchStatus status);
+
+        /// <summary>
         /// Has tr-web pick and launch a random file in random mode and adds a launched pick to the history. A file the
         /// unit can't run is reported, not skipped. When there are no files to pick from, the player and its record stay as
         /// they were.

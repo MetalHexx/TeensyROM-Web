@@ -2,41 +2,13 @@
   <form [formGroup]="formGroup()">
     <!-- Responsive Grid for Groups -->
     <div class="settings-grid">
-      <!-- Directory Paths Group -->
+      <!-- Launch Settings Group -->
       <div class="settings-group">
-        <h3 class="group-title">Directory Paths</h3>
-
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Watch Directory Location</mat-label>
-          <input matInput formControlName="watchDirectoryLocation" placeholder="C:\path\to\watch" />
-          <mat-hint>Optional: absolute path to monitor for file changes</mat-hint>
-          @if (formGroup().get('watchDirectoryLocation')?.hasError('pattern') && formGroup().get('watchDirectoryLocation')?.touched) {
-            <mat-error>Must be an absolute path or empty</mat-error>
-          }
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Auto Transfer Path</mat-label>
-          <input matInput formControlName="autoTransferPath" placeholder="/teensyrom/files" />
-          <mat-hint>Destination path for automatic file transfers</mat-hint>
-          @if (formGroup().get('autoTransferPath')?.hasError('required') && formGroup().get('autoTransferPath')?.touched) {
-            <mat-error>Auto transfer path is required</mat-error>
-          }
-        </mat-form-field>
-      </div>
-
-      <!-- Auto-Copy Settings Group -->
-      <div class="settings-group">
-        <h3 class="group-title">Auto-Copy Behavior</h3>
-
-        <lib-settings-toggle-item
-          label="Enable automatic file copying"
-          description="Automatically copy detected files from watch directory to transfer path"
-          [control]="formGroup().controls['autoFileCopyEnabled']" />
+        <h3 class="group-title">Launching</h3>
 
         <lib-settings-toggle-item
           label="Auto-launch after copy"
-          description="Automatically launch files after they are copied to the device"
+          description="Launch one file on the TeensyROM when a transfer finishes"
           [control]="formGroup().controls['autoLaunchOnCopyEnabled']" />
 
         <lib-settings-toggle-item
@@ -51,7 +23,7 @@
 
         <lib-settings-toggle-item
           label="Enable file synchronization"
-          description="Keep files synchronized between watch directory and device"
+          description="Keep files synchronized between this computer and the device"
           [control]="formGroup().controls['syncFilesEnabled']" />
       </div>
     </div>

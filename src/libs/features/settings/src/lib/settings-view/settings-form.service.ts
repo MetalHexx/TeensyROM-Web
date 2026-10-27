@@ -218,9 +218,6 @@ export class SettingsFormService {
         startupLaunchRandom: [settings.playerSettings.startupLaunchRandom],
       }),
       fileTransferSettings: this.fb.group({
-        watchDirectoryLocation: [settings.fileTransferSettings.watchDirectoryLocation],
-        autoTransferPath: [settings.fileTransferSettings.autoTransferPath, Validators.required],
-        autoFileCopyEnabled: [settings.fileTransferSettings.autoFileCopyEnabled],
         autoLaunchOnCopyEnabled: [settings.fileTransferSettings.autoLaunchOnCopyEnabled],
         navToDirOnLaunch: [settings.fileTransferSettings.navToDirOnLaunch],
         syncFilesEnabled: [settings.fileTransferSettings.syncFilesEnabled],
@@ -355,9 +352,6 @@ export class SettingsFormService {
         startupLaunchRandom: settings.playerSettings.startupLaunchRandom,
       },
       fileTransferSettings: {
-        watchDirectoryLocation: settings.fileTransferSettings.watchDirectoryLocation,
-        autoTransferPath: settings.fileTransferSettings.autoTransferPath,
-        autoFileCopyEnabled: settings.fileTransferSettings.autoFileCopyEnabled,
         autoLaunchOnCopyEnabled: settings.fileTransferSettings.autoLaunchOnCopyEnabled,
         navToDirOnLaunch: settings.fileTransferSettings.navToDirOnLaunch,
         syncFilesEnabled: settings.fileTransferSettings.syncFilesEnabled,
@@ -411,9 +405,6 @@ export class SettingsFormService {
         startupLaunchRandom: formValue.playerSettings.startupLaunchRandom,
       },
       fileTransferSettings: {
-        watchDirectoryLocation: formValue.fileTransferSettings.watchDirectoryLocation,
-        autoTransferPath: formValue.fileTransferSettings.autoTransferPath,
-        autoFileCopyEnabled: formValue.fileTransferSettings.autoFileCopyEnabled,
         autoLaunchOnCopyEnabled: formValue.fileTransferSettings.autoLaunchOnCopyEnabled,
         navToDirOnLaunch: formValue.fileTransferSettings.navToDirOnLaunch,
         syncFilesEnabled: formValue.fileTransferSettings.syncFilesEnabled,

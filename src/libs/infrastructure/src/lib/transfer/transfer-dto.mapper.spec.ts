@@ -3,6 +3,8 @@ import {
   TransferJobDto,
   TransferJobDto2,
   TransferJobState as ApiTransferJobState,
+  TransferLaunchState,
+  TransferOriginKind,
   TeensyStorageType,
 } from '@teensyrom-nx/data-access/api-client';
 import { StorageType, TransferJobState } from '@teensyrom-nx/domain';
@@ -21,6 +23,7 @@ describe('TransferDtoMapper', () => {
     bytesSent: 4096,
     totalFiles: 5,
     currentFile: 'game.prg',
+    origin: { kind: TransferOriginKind.Upload },
     startedUtc: new Date('2026-01-01T00:00:00Z'),
     lastActivityUtc: new Date('2026-01-01T00:01:00Z'),
     error: 'partial failure',
@@ -50,6 +53,7 @@ describe('TransferDtoMapper', () => {
     expansionBytesWritten: 512000,
     expansionBytesDeclared: 1024000,
     expandedFileCount: 42,
+    launchState: TransferLaunchState.None,
   };
 
   it('normalizes TransferJobDto (create/seal/cancel envelope) into the domain snapshot', () => {

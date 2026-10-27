@@ -36,11 +36,22 @@ public sealed class TransferServiceTests : IDisposable
         _api.CreateTransferJobAsync(DeviceId, ApiStorageType.USB, Arg.Do<CreateJobBody>(b => body = b), Arg.Any<CancellationToken>())
             .Returns(new CreateJobResponse { JobId = "job-1", Job = Job() });
 
-        var job = await _sut.CreateAsync(TeensyStorageType.USB, "/games", 2, CancellationToken.None);
+        var job = await _sut.CreateAsync(TeensyStorageType.USB, "/games", 2, launch: true, CancellationToken.None);
 
         job.JobId.Should().Be("job-1");
         body!.DestinationDirectory.Should().Be("/games");
         body.ExpectedArchiveCount.Should().Be(2);
+        body.Launch.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task List_ReturnsEveryJobTheEngineKnows()
+    {
+        _api.ListTransferJobsAsync(Arg.Any<CancellationToken>()).Returns(new ListJobsResponse { Jobs = [Job(), Job(TransferJobState.Receiving)] });
+
+        var jobs = await _sut.ListAsync(CancellationToken.None);
+
+        jobs.Select(job => job.State).Should().Equal(TransferJobState.Created, TransferJobState.Receiving);
     }
 
     [Fact]
@@ -49,7 +60,7 @@ public sealed class TransferServiceTests : IDisposable
         _api.CreateTransferJobAsync(default!, default, default!, default)
             .ThrowsAsyncForAnyArgs(ApiTestSupport.ApiFailure(409, """{"title":"Device already has an active transfer."}"""));
 
-        var act = () => _sut.CreateAsync(TeensyStorageType.SD, "/x", 0, CancellationToken.None);
+        var act = () => _sut.CreateAsync(TeensyStorageType.SD, "/x", 0, false, CancellationToken.None);
 
         var error = (await act.Should().ThrowAsync<CliException>()).Which;
         error.Code.Should().Be(CliExitCode.Failed);
@@ -62,7 +73,7 @@ public sealed class TransferServiceTests : IDisposable
         _api.CreateTransferJobAsync(default!, default, default!, default)
             .ThrowsAsyncForAnyArgs(ApiTestSupport.ApiFailure(404, """{"title":"The storage SD is not available."}"""));
 
-        var act = () => _sut.CreateAsync(TeensyStorageType.SD, "/x", 0, CancellationToken.None);
+        var act = () => _sut.CreateAsync(TeensyStorageType.SD, "/x", 0, false, CancellationToken.None);
 
         var error = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
         error.StatusCode.Should().Be(404);

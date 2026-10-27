@@ -20,6 +20,7 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
     private static readonly MenuEntry[] Menu =
     [
         new("Launch", "launch", NeedsEngine: true),
+        new("Watch Folders", "watch-folders", NeedsEngine: true),
         new("Settings", "settings", NeedsEngine: true),
         new("Index Files", "index", NeedsEngine: true),
         new("Devices", "ports", NeedsEngine: true),

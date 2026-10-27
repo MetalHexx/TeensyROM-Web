@@ -20,7 +20,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
 
         /// <summary>
-        /// File transfer, synchronization, and directory watching preferences.
+        /// File transfer and synchronization preferences.
         /// </summary>
         [Required] public FileTransferSettingsDto FileTransferSettings { get; set; } = null!;
 
@@ -62,8 +62,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                 .SetValidator(new PlayerSettingsValidator());
 
             RuleFor(x => x.FileTransferSettings)
-                .NotNull().WithMessage("File transfer settings are required.")
-                .SetValidator(new FileTransferSettingsValidator());
+                .NotNull().WithMessage("File transfer settings are required.");
 
             RuleFor(x => x.SearchSettings)
                 .NotNull().WithMessage("Search settings are required.")
@@ -104,19 +103,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             // EnableVideo is bool with [Required] - no additional validation needed for MVP
             // Future properties (quality, resolution, etc.) would add rules here
-        }
-    }
-
-    public class FileTransferSettingsValidator : AbstractValidator<FileTransferSettingsDto>
-    {
-        public FileTransferSettingsValidator()
-        {
-            RuleFor(x => x.WatchDirectoryLocation)
-                .Must(path => string.IsNullOrEmpty(path) || Path.IsPathFullyQualified(path))
-                .WithMessage("Watch directory location must be empty or a valid absolute directory path.");
-
-            RuleFor(x => x.AutoTransferPath)
-                .NotNull().WithMessage("Auto transfer path is required.");
         }
     }
 

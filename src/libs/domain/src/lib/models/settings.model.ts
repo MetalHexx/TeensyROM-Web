@@ -36,15 +36,9 @@ export interface SearchSettings {
 }
 
 /**
- * File transfer and watch folder settings
+ * File transfer settings
  */
 export interface FileTransferSettings {
-  /** Directory location to watch for file changes */
-  watchDirectoryLocation: string;
-  /** Path where files should be auto-transferred */
-  autoTransferPath: string;
-  /** Whether automatic file copying is enabled */
-  autoFileCopyEnabled: boolean;
   /** Whether to auto-launch files after copying */
   autoLaunchOnCopyEnabled: boolean;
   /** Whether to navigate to directory on launch */
@@ -140,7 +134,7 @@ export interface DeviceSettings {
 export interface Settings {
   /** Player-related settings */
   playerSettings: PlayerSettings;
-  /** File transfer and watch folder settings */
+  /** File transfer settings */
   fileTransferSettings: FileTransferSettings;
   /** Search configuration settings */
   searchSettings: SearchSettings;

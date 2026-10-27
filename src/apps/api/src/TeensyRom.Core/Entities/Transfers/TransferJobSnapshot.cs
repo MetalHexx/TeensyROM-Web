@@ -15,6 +15,7 @@ namespace TeensyRom.Core.Entities.Transfers
         public required long BytesSent { get; init; }
         public int? TotalFiles { get; init; }               // null until sealed; then FilesReceived
         public string? CurrentFile { get; init; }            // relative path being written, or null
+        public required TransferOrigin Origin { get; init; }
         public required DateTime StartedUtc { get; init; }
         public required DateTime LastActivityUtc { get; init; }
         public string? Error { get; init; }                  // set on Aborted
@@ -43,5 +44,13 @@ namespace TeensyRom.Core.Entities.Transfers
         public long ExpansionBytesWritten { get; init; }
         public long ExpansionBytesDeclared { get; init; }
         public int? ExpandedFileCount { get; init; }          // null until every archive has finished
+
+        /// <summary>Outcome of the launch a completed transfer triggers; None when no launch was due or no file qualified.</summary>
+        public TransferLaunchState LaunchState { get; init; }
+
+        /// <summary>The device path being launched (Pending) or launched; null when None.</summary>
+        public string? LaunchedPath { get; init; }
+
+        public string? LaunchError { get; init; }
     }
 }

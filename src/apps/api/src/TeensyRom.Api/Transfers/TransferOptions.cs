@@ -16,6 +16,10 @@ namespace TeensyRom.Api.Transfers
         /// Number of staged files the pump batches into a single device write command.
         public int BatchSize { get; set; } = 25;
 
+        /// When true, the pump skips a job's pre-transfer device reset if the engine's own record says the
+        /// device is idle at the C64 menu with nothing launched on it. Set false to reset before every job.
+        public bool SkipResetWhenIdle { get; set; } = true;
+
         /// Number of most-recently completed files a job retains for progress reporting.
         public int RecentCompletionsBound { get; set; } = 5;
 

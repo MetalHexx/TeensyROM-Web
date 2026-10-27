@@ -806,6 +806,47 @@ public class CommunicationPortBehaviorTests
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
     }
 
+    /// <summary>A reset the caller asked for ends any presumed playback, so the next transfer can skip its own reset.</summary>
+    [Fact]
+    public async Task Handle_ResetCommandSucceeds_ClearsThePlaybackPresumption()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkLaunchedInMenu();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+
+        device.Connection.PlaybackPresumed.Should().BeTrue();
+
+        await behavior.Handle(command, () => Task.FromResult(new ResetResult()), CancellationToken.None);
+
+        device.Connection.PlaybackPresumed.Should().BeFalse();
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+    }
+
+    /// <summary>A reset that failed proves nothing about what is playing.</summary>
+    [Fact]
+    public async Task Handle_ResetCommandFails_KeepsThePlaybackPresumption()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkLaunchedInMenu();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<ResetCommand, ResetResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>(), new ConnectionOptions());
+        var command = new ResetCommand { DeviceId = deviceId, CommunicationPort = port };
+
+        await behavior.Handle(command, () => Task.FromResult(new ResetResult { IsSuccess = false }), CancellationToken.None);
+
+        device.Connection.PlaybackPresumed.Should().BeTrue();
+    }
+
     /// <summary>An idle device is not touched by the gate: the handler performs the one reset, as before.</summary>
     [Fact]
     public async Task Handle_FullIdleRecordResetCommand_GateSendsNoReset_HandlerRuns()

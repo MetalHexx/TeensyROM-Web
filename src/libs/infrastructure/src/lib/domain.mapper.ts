@@ -530,9 +530,6 @@ export class DomainMapper {
 
   private static toFileTransferSettings(dto: FileTransferSettingsDto): FileTransferSettings {
     return {
-      watchDirectoryLocation: dto.watchDirectoryLocation,
-      autoTransferPath: dto.autoTransferPath,
-      autoFileCopyEnabled: dto.autoFileCopyEnabled,
       autoLaunchOnCopyEnabled: dto.autoLaunchOnCopyEnabled,
       navToDirOnLaunch: dto.navToDirOnLaunch,
       syncFilesEnabled: dto.syncFilesEnabled,
@@ -543,9 +540,6 @@ export class DomainMapper {
     settings: FileTransferSettings
   ): FileTransferSettingsDto {
     return {
-      watchDirectoryLocation: settings.watchDirectoryLocation,
-      autoTransferPath: settings.autoTransferPath,
-      autoFileCopyEnabled: settings.autoFileCopyEnabled,
       autoLaunchOnCopyEnabled: settings.autoLaunchOnCopyEnabled,
       navToDirOnLaunch: settings.navToDirOnLaunch,
       syncFilesEnabled: settings.syncFilesEnabled,

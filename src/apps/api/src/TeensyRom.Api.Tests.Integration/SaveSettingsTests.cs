@@ -39,9 +39,6 @@ namespace TeensyRom.Api.Tests.Integration
                 },
                 FileTransferSettings = new FileTransferSettingsDto
                 {
-                    WatchDirectoryLocation = @"C:\Users\Test\Downloads",
-                    AutoTransferPath = "auto-transfer",
-                    AutoFileCopyEnabled = false,
                     AutoLaunchOnCopyEnabled = true,
                     NavToDirOnLaunch = true,
                     SyncFilesEnabled = false
@@ -193,20 +190,6 @@ namespace TeensyRom.Api.Tests.Integration
         //    // Assert
         //    r.Should().BeSuccessful<SaveSettingsResponse>();
         //}
-
-        [Fact]
-        public async Task SaveSettings_WithEmptyWatchDirectory_IsValid()
-        {
-            // Arrange - Empty watch directory is valid (not configured)
-            var request = CreateValidRequest();
-            request.FileTransferSettings.WatchDirectoryLocation = string.Empty;
-
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(request);
-
-            // Assert
-            r.Should().BeSuccessful<SaveSettingsResponse>();
-        }
 
         [Fact]
         public async Task SaveSettings_WithEmptyLists_IsValid()

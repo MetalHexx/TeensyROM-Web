@@ -1,10 +1,9 @@
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
-using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.SealJob
 {
-    public class SealJobEndpoint(ITransferJobRegistry registry, TransferPump pump) : RadEndpoint<SealJobRequest, SealJobResponse>
+    public class SealJobEndpoint(ITransferJobRegistry registry, ITransferJobService jobs) : RadEndpoint<SealJobRequest, SealJobResponse>
     {
         public override void Configure()
         {
@@ -33,26 +32,13 @@ namespace TeensyRom.Api.Endpoints.Transfers.SealJob
                 return Task.CompletedTask;
             }
 
-            if (job.State != TransferJobState.Sealed)
+            var result = jobs.Seal(job);
+
+            if (!result.Sealed)
             {
-                // TransferJob's legal-transition table only has an edge from Receiving to Sealed - a
-                // job that never received a file (still Created) has to pass through Receiving first,
-                // in the same request, to reach Sealed.
-                if (job.State == TransferJobState.Created)
-                {
-                    job.TryTransitionTo(TransferJobState.Receiving);
-                }
-
-                if (!job.TryTransitionTo(TransferJobState.Sealed))
-                {
-                    SendValidationError($"Job {r.JobId} cannot be sealed from its current state ({job.State}).");
-                    return Task.CompletedTask;
-                }
+                SendValidationError(result.Error!);
+                return Task.CompletedTask;
             }
-
-            // Finalizes immediately in case the queue is already empty - no worker will ever wake to
-            // drain a job that never had anything enqueued.
-            pump.TryFinalize(job);
 
             Response = new() { Job = TransferJobDto.From(job.ToSnapshot()) };
             Send();

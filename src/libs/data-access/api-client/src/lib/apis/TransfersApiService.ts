@@ -20,6 +20,7 @@ import type {
   CreateJobResponse,
   GetActiveJobResponse,
   GetJobResponse,
+  ListJobsResponse,
   ProblemDetails,
   SealJobResponse,
   TeensyStorageType,
@@ -36,6 +37,8 @@ import {
     GetActiveJobResponseToJSON,
     GetJobResponseFromJSON,
     GetJobResponseToJSON,
+    ListJobsResponseFromJSON,
+    ListJobsResponseToJSON,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
     SealJobResponseFromJSON,
@@ -114,7 +117,7 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
+     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset, when the device isn\'t idle, happens on the first uploaded file.
      * Create Transfer Job
      */
     async createTransferJobRaw(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreateJobResponse>> {
@@ -157,7 +160,7 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
+     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset, when the device isn\'t idle, happens on the first uploaded file.
      * Create Transfer Job
      */
     async createTransferJob(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CreateJobResponse> {
@@ -232,6 +235,34 @@ export class TransfersApiService extends runtime.BaseAPI {
      */
     async getTransferJob(requestParameters: GetTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetJobResponse> {
         const response = await this.getTransferJobRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Lists every transfer job the engine knows about, whatever its origin.  - Newest first. - Returns 200 with an empty list when there are no jobs.
+     * List Transfer Jobs
+     */
+    async listTransferJobsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ListJobsResponse>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/transfers`,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ListJobsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Lists every transfer job the engine knows about, whatever its origin.  - Newest first. - Returns 200 with an empty list when there are no jobs.
+     * List Transfer Jobs
+     */
+    async listTransferJobs(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ListJobsResponse> {
+        const response = await this.listTransferJobsRaw(initOverrides);
         return await response.value();
     }
 

@@ -101,4 +101,16 @@ public class SaveSettingsMapperTests
 
         entity.KnownDevices.Select(d => d.DeviceId).Should().Equal("CCCC", "AAAA", "BBBB");
     }
+
+    [Fact]
+    public void ToEntity_KeepsTheExistingWatchFolders()
+    {
+        var watchFolders = new List<WatchFolder> { new() { Id = "f1", Path = "/watched" } };
+        _settingsService.GetSettings().Returns(new TeensySettings { WatchFolders = watchFolders });
+        var mapper = new SaveSettingsMapper(_settingsService);
+
+        var entity = mapper.ToEntity(GivenRequest());
+
+        entity.WatchFolders.Should().BeSameAs(watchFolders);
+    }
 }

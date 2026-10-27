@@ -12,6 +12,8 @@ Some files are archives and require expansion (unzipping, extraction) before wri
 
 **Non-archive uploads** flow: **endpoint → capacity gate → staging → queue → pump → device**. **Archive uploads** flow: **endpoint → scratch → expansion → (expanded entries) → capacity gate → staging → queue → pump → device**. When the endpoint detects an archive, it bypasses the capacity gate and staging, writing the raw archive body directly to scratch. The expansion service then walks the archive tree; after all archives are expanded, every extracted entry (including those from nested archives) is admitted through the standard gate-and-staging pipeline, ensuring fair capacity accounting for expanded content.
 
+The pump resets the device before a job's first write unless the engine's record says the device is idle at the C64 menu with nothing launched on it (`SkipResetWhenIdle`); a device that proves busy is reset and the batch re-sent.
+
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 graph TB
@@ -137,15 +139,21 @@ stateDiagram-v2
 
 ---
 
+## Starting a Job
+
+`ITransferJobService` owns the engine-side lifecycle of a job: `Start`, `AddFileAsync` and `Seal`. It does not depend on how the request arrived. `CreateJobEndpoint` and `WatchFolderDelivery` both call it, so the lease, destination checks and sealing live in one place. `Start` returns a `TransferStartError` (`DeviceNotFound`, `StorageUnavailable`, `InvalidDestination` or `DeviceBusy`) when it cannot create the job. `Seal` is idempotent once a job is Sealed.
+
+---
+
 ## Device Lease vs. Port Lock
 
 The serial port is single-threaded and locked for the duration of each command via `CommunicationPortBehavior`'s static per-command semaphore. This semaphore **has a five-minute stale-lock disposal** — if a thread acquires it and never releases (e.g. crashes), the lock is recycled automatically to prevent deadlock.
 
-A file transfer job must hold exclusive access to the device **across many serial commands** — reset, then multiple writes. Holding the semaphore itself across the entire job would violate the five-minute contract: the stale-lock cleanup could dispose the job's lock while work is still in progress.
+A file transfer job must hold exclusive access to the device **across many serial commands** — a reset when the device isn't idle, then multiple writes. Holding the semaphore itself across the entire job would violate the five-minute contract: the stale-lock cleanup could dispose the job's lock while work is still in progress.
 
 The `DeviceLeaseCoordinator` solves this by being a **separate, timer-less construct** above the port lock:
-- When a job starts (CreateJobEndpoint), it acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
-- `CreateJobEndpoint` is the sole exclusivity gate: at job-creation time, `TryAcquire` atomically claims the lease only if the device is unheld, rejecting a second job for an already-leased device with a `409 Conflict` carrying the holding job's id as the `activeJobId` extension. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
+- When a job starts, `ITransferJobService.Start` acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
+- `Start` is the sole exclusivity gate, and both `CreateJobEndpoint` and the watch-folder delivery call it. `TryAcquire` atomically claims the lease only if the device is unheld. On a conflict `Start` removes the new job and returns `DeviceBusy` with the holding job's id as `ActiveJobId`; `CreateJobEndpoint` answers that as a `409 Conflict` carrying it as the `activeJobId` extension. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
 - When the job reaches a terminal state, the lease is released.
 - No stale-lock cleanup: the lease is held in-memory and released explicitly by the pump.
 
@@ -191,6 +199,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | POST | `/api/transfers/{jobId}/files` | UploadTransferFile | Stream one file to staging |
 | POST | `/api/transfers/{jobId}/seal` | SealTransferJob | Stop accepting uploads; let pump drain |
 | GET | `/api/transfers/{jobId}` | GetTransferJob | Query job snapshot |
+| GET | `/api/transfers` | ListTransferJobs | Every job the registry holds, as snapshots |
 | GET | `/api/devices/{deviceId}/transfers/active` | GetActiveTransferJob | Get the job currently holding device lease |
 | POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition straight to Cancelled, releasing device/staging/scratch; pump discards remaining files |
 
@@ -198,7 +207,11 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 
 - **Subscribe(jobId)** → Joins the caller to the job's broadcast group, returns current snapshot. Active subscription counts as liveness for abandonment detection.
 - **Unsubscribe(jobId)** → Removes the caller from the group.
+- **SubscribeAll()** → Joins the caller to the all-transfers group and returns every current job, newest first.
+- **UnsubscribeAll()** → Removes the caller from the all-transfers group.
 - **OnDisconnectedAsync()** → Cleans up all subscriptions for the dropped connection.
+
+`SubscribeAll` and `UnsubscribeAll` do not count as liveness. They bypass the subscription tracker and `Touch`, so watching every transfer never keeps a job alive or delays its abandonment.
 
 **Events** (broadcast to job's group):
 - **JobSnapshot** → Throttled (250ms) snapshot of job state, sent by pump as files complete and by sweeper on state transitions. The snapshot is authoritative and self-contained — there is no separate per-file event; per-file outcomes ride inside the snapshot's `recentCompletions`/`failures` lists.
@@ -224,6 +237,10 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
   "expansionBytesWritten": 134217728,
   "expansionBytesDeclared": 268435456,
   "expandedFileCount": 42,
+  "origin": { "kind": "Upload", "watchFolderId": null, "watchFolderPath": null },
+  "launchState": "None",
+  "launchedPath": null,
+  "launchError": null,
   "failures": [],
   "recentCompletions": [
     {
@@ -242,9 +259,63 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 
 `expandingArchive` (string, nullable) — the filename of the archive currently being expanded; `null` if none. `expansionBytesWritten` (long) — bytes written to scratch so far in the current expansion. `expansionBytesDeclared` (long) — total bytes the archive claims it will expand to; compared against `MaxScratchBytes` to pre-reject expansion. `expandedFileCount` (int, nullable) — count of files extracted from the archive; the browser may compose this into per-entry progress UI.
 
+`origin` (object) — where the job came from. `kind` is `Upload` or `WatchFolder`; for a watch folder, `watchFolderId` and `watchFolderPath` name it. `launchState` is `None`, `Pending`, `Launched`, `Incompatible` or `Failed` (see Auto-Launch). `launchedPath` is the device path of the file chosen to launch, and `launchError` says why a launch failed. The enum values are PascalCase on the HTTP and SignalR wire; the CLI's `--json` camel-cases them.
+
 `failures` and `recentCompletions` are both bounded, most-recent-first lists of the same `TransferFileCompleted` shape — `failures` holds only failed files (oldest-evicted once `RetainedFailuresBound` is exceeded; `filesFailed` itself stays an unbounded lifetime counter), while `recentCompletions` holds the last `RecentCompletionsBound` outcomes of either kind, for a live feed. `bytesPerSecond`/`filesPerSecond` are a rolling rate over `RateWindow` while the job is active, falling back to a lifetime average once terminal and to zero after a quiet window.
 
 **Snapshots are authoritative**, not incremental: each broadcast is a complete job state. The client never needs to merge or track deltas — the latest snapshot is the ground truth. This buys simplicity and resilience: late subscribers and disconnected clients that reconnect both get a correct state immediately without needing to replay events.
+
+---
+
+## Auto-Launch
+
+`TransferPump.TryFinalize` makes the launch decision once a job has sent its last file. `ITransferAutoLauncher.ShouldLaunch` decides whether a launch is due. `TryComplete` then moves the job to `Completed`, leaving a due launch `Pending`, so a poller never sees `Completed` with the launch undecided. The lease is released, staging and scratch are purged, and only then does `StartLaunch` run the launch in the background. Its outcome arrives on a later snapshot as `launchState`, `launchedPath` and `launchError`.
+
+- **Who launches.** An upload launches when `FileTransferSettings.AutoLaunchOnCopyEnabled` is on or the job's `LaunchRequested` is set (`trom file upload --launch`). A watch-folder job launches only when both the setting and its destination's `launch` flag are set.
+- **Which file.** As each file completes, `LaunchCandidateRanker.IsBetter` keeps the best candidate so far. Games (`Prg`, `Crt`, `P00`) rank 0, `Sid` 1, images and text (`Kla`, `Koa`, `Art`, `Aas`, `Hpi`, `Seq`, `Txt`) 2, `Hex` 3. A tie goes to the earlier file name, then the earlier full device path. `.trh` never launches. Neither do `D64`, `Zip`, `Nfo` or any other unranked type, such as `.reu`, `.d71`, `.d81`, `.md`, `.ocp` and `.pic`.
+- **Failures.** A failed or incompatible launch is logged as a warning and recorded as `launchState` `Failed` or `Incompatible`. The job stays `Completed`.
+
+---
+
+## Watched Folders
+
+`WatchFolderWatcher` runs one loop that watches every enabled watch folder and sends what arrives in it to that folder's destinations. The loop owns all watch state. `FileSystemWatcher` callbacks, settings changes and the poll timer only post messages to its channel, so nothing starts or stops from a callback (a settings change arrives synchronously under the settings lock). The watcher reports each folder's state through `IWatchFolderStatus`: `Watching`, `Off` (turned off) or `Unavailable` (the folder is missing or its watch failed to start).
+
+Folders live in `TeensySettings.WatchFolders` (`Settings.json`). Only the `/api/watch-folders` endpoints change them, through `WatchFolderStore`: add, remove a folder, remove one device from a folder, change a destination's device folder and launch flag in place (`PUT /api/watch-folders/{watchFolderId}/devices/{deviceId}`; a different device or storage is a different destination), and enable or disable. Files that land while a folder is disabled are never sent later. `WatchFolderStore` refuses a folder nested in another watched folder, a second destination for a device that already has one on the folder, and a device without a chip id. A whole-settings save keeps the folders.
+
+### Arrival rules
+
+- Only files that arrive after the folder is watched count. Files already there are ignored. A new subfolder is walked, and its files count.
+- Only transferable types and archives count: `TransferableFileTypes`, and `IArchiveReader.IsArchiveExtension` for archives. A file renamed from a name the TeensyROM does not take to one it does arrives on the rename, which is how a browser's partial download counts.
+- A file is settled once its size and readability hold still for `SettleTime`. Settled files that arrive within `GroupingWindow` of one another form one set. A set closes after a `GroupingWindow` with nothing new settling. While files are still being written, the set waits, for at most `MaxSetHold` from when it opened.
+
+### Delivery
+
+`WatchFolderDelivery` sends each closed set to every destination the folder has at that moment: one `TransferJob` per destination, all in parallel. Each job starts through `ITransferJobService.Start` with origin `WatchFolder` and the destination's `launch` flag. Each file is opened read-only from the watched folder and passed to `AddFileAsync`, archives first. The job is then sealed. Nothing is retried or kept for later. A destination that cannot start is logged and skipped, and a file that fails is logged. Neither holds up another destination. Watched files are never handed to anything that deletes its input.
+
+### Skip log lines
+
+These are engine warnings, so they reach the engine log. The main ones:
+
+- `Watch folder skipped {file or N files} from {folder} for {device} ({storage} {path}): {reason}.` The reason is `not connected`, `storage missing`, `already transferring`, `invalid destination path`, or `could not start`.
+- `Watch folder {folder}: {file} was not sent to {device}: {error}.` The job refused the file.
+- `Watch folder {folder}: {file} could not be sent to {device}: {message}.` The file threw.
+- `Watch folder {folder}: could not seal its transfer to {device}: {error}.`
+- `Watch folder {folder}: delivery to {device} failed: {message}.` An unexpected failure.
+- `Watch folder {folder}: skipped {file}, it could not be read as an archive ({message}).`
+
+### WatchFolderOptions
+
+Bound from the `WatchFolders` configuration section by `WatchFolderOptionsBinder`. It is a singleton, and every property is settable so tests can override it.
+
+| Option | Default | Purpose |
+|--------|---------|---------|
+| `SettleTime` | 2 s | How long a file's size and readability must hold still before it counts as arrived |
+| `PollInterval` | 500 ms | How often pending files are probed |
+| `GroupingWindow` | 3 s | The quiet gap, with nothing new settling, that closes a set |
+| `MaxSetHold` | 2 min | The longest a set waits on files still being written, counted from when it opened |
+| `UnavailableRetryInterval` | 10 s | How often an unwatchable folder is retried, and a watched folder is checked for being gone |
+| `EventBufferBytes` | 64 KB | `InternalBufferSize` of each `FileSystemWatcher` |
 
 ---
 
@@ -272,6 +343,13 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | **Serial Command** | `apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommand.cs`<br/>`apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommandHandler.cs` |
 | **DTO** | `apps/api/src/TeensyRom.Api/Models/TransferJobDto.cs` |
 | **Options** | `apps/api/src/TeensyRom.Api/Transfers/TransferOptions.cs` |
+| **Job Service** (Start, AddFile, Seal) | `apps/api/src/TeensyRom.Api/Transfers/ITransferJobService.cs`<br/>`apps/api/src/TeensyRom.Api/Transfers/TransferJobService.cs` |
+| **Auto-Launch** | `apps/api/src/TeensyRom.Api/Transfers/TransferAutoLauncher.cs`<br/>`apps/api/src/TeensyRom.Api/Transfers/LaunchCandidateRanker.cs`<br/>`apps/api/src/TeensyRom.Api/Transfers/TransferableFileTypes.cs` |
+| **Origin and Launch State** | `apps/api/src/TeensyRom.Core/Entities/Transfers/TransferOrigin.cs`<br/>`apps/api/src/TeensyRom.Core/Entities/Transfers/TransferLaunchState.cs` |
+| **List Endpoint** | `apps/api/src/TeensyRom.Api/Endpoints/Transfers/ListJobs/` |
+| **Watched Folders** | `apps/api/src/TeensyRom.Api/WatchFolders/` (`WatchFolderWatcher.cs`, `ArrivalTracker.cs`, `WatchFolderDelivery.cs`, `WatchFolderStore.cs`, `WatchFolderPaths.cs`, `WatchFolderOptions.cs`, `WatchFolderOptionsBinder.cs`, `WatchedFileSystem.cs`, `FileSystemFolderWatchFactory.cs`) |
+| **Watch Folder Endpoints** | `apps/api/src/TeensyRom.Api/Endpoints/WatchFolders/` |
+| **Watch Folder Settings** | `apps/api/src/TeensyRom.Core/Settings/WatchFolder.cs` (in `TeensySettings.WatchFolders`) |
 
 ---
 
@@ -286,6 +364,7 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `MaxExpansionDepth` | 32 | Maximum nesting depth for archives within archives; prevents zip-bomb-style attacks and stack exhaustion |
 | `MaxExpandedBytesPerArchive` | 2 GB | Maximum total size an archive is allowed to expand to; checked before expansion begins and rejected if exceeded |
 | `BatchSize` | 25 | Number of staged files the pump batches into a single device write command |
+| `SkipResetWhenIdle` | true | The pump skips a job's pre-transfer device reset when the engine's record says the device is idle at the C64 menu with no boot pending and nothing launched on it; a device that proves busy is reset and the batch re-sent. `false` resets before every job |
 | `RecentCompletionsBound` | 5 | Number of most-recent completed files (success or failure) a job retains for the live feed |
 | `RetainedFailuresBound` | 50 | Number of most-recent failures a job retains; `FilesFailed` itself stays an unbounded lifetime counter |
 | `RateWindow` | 10 seconds | Sliding window used to compute rolling transfer throughput |
@@ -294,8 +373,8 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `SnapshotThrottle` | 250 ms | Min interval between progress broadcasts |
 | `TerminalJobRetention` | 5 minutes | How long a completed job stays queryable |
 | `DeviceChunkSize` | 16 KB | Chunk size for device write loop |
-| `StagingRoot` | `{AppDir}/staging` | Directory for staged uploads |
-| `ScratchRoot` | `{AppDir}/scratch` | Directory for archive expansion temporary storage |
+| `StagingRoot` | `~/.teensyrom/api/staging` (`TeensyRomHome.ApiPath`) | Directory for staged uploads |
+| `ScratchRoot` | `~/.teensyrom/api/scratch` (`TeensyRomHome.ApiPath`) | Directory for archive expansion temporary storage |
 
 ---
 

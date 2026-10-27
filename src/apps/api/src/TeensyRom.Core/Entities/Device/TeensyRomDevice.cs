@@ -73,6 +73,12 @@ namespace TeensyRom.Core.Entities.Device
             Cart.IsMinimalFirmware = false;
         }
 
+        public void MarkLaunchedInMenu()
+        {
+            Connection.MarkLaunchedInMenu();
+            Cart.IsMinimalFirmware = false;
+        }
+
         public void MarkUnreachable() => Connection.MarkUnreachable();
 
         public void MarkMenuBootPending()

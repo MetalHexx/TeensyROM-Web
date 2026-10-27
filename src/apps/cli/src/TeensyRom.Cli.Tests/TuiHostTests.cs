@@ -14,9 +14,9 @@ namespace TeensyRom.Cli.Tests;
 [Collection(ConsoleCollection.Name)]
 public sealed class TuiHostTests : IDisposable
 {
-    private const int Credits = 5;
-    private const int Devices = 3;
-    private const int Leave = 6;
+    private const int Credits = 6;
+    private const int Devices = 4;
+    private const int Leave = 7;
 
     private readonly TestHost _host;
 
@@ -47,7 +47,7 @@ public sealed class TuiHostTests : IDisposable
 
         exitCode.Should().Be(0);
         var screen = Screen;
-        new[] { "Launch", "Settings", "Index Files", "Devices", "Generate ASID Patches", "Credits", "Leave" }
+        new[] { "Launch", "Watch Folders", "Settings", "Index Files", "Devices", "Generate ASID Patches", "Credits", "Leave" }
             .Aggregate(-1, (previous, label) =>
             {
                 var at = screen.IndexOf(label, previous + 1, StringComparison.Ordinal);

@@ -809,6 +809,23 @@ namespace TeensyRom.Cli.Services
             return outcome;
         }
 
+        public void RecordLaunched(ILaunchableItem item, LaunchStatus status)
+        {
+            EnsureRestored();
+            _state = _state with
+            {
+                CurrentItem = item,
+                PlayState = status is LaunchStatus.Launched ? PlayState.Playing : PlayState.Stopped,
+                PlayMode = PlayMode.CurrentDirectory,
+                FilterType = TeensyFilterType.All,
+                ScopePath = item.Path.GetUnixParentPath(),
+                SearchQuery = null
+            };
+            if (status is LaunchStatus.Launched) Announce(item);
+
+            Persist();
+        }
+
         public async Task<LaunchOutcome> RandomOnceAsync(StorageScope scope, string startingDirectory, TeensyFilterType filter)
         {
             EnsureRestored();

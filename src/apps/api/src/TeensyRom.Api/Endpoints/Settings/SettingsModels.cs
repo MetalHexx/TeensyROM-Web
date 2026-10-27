@@ -163,25 +163,10 @@ namespace TeensyRom.Api.Endpoints.Settings
     }
 
     /// <summary>
-    /// File transfer, synchronization, and directory watching preferences.
+    /// File transfer and synchronization preferences.
     /// </summary>
     public record FileTransferSettingsDto
     {
-        /// <summary>
-        /// Directory to watch for new files (e.g., Downloads folder).
-        /// </summary>
-        [Required] public string WatchDirectoryLocation { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Target directory path on TeensyROM device for auto-transferred files.
-        /// </summary>
-        [Required] public string AutoTransferPath { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Automatically copy files from watch directory to device.
-        /// </summary>
-        [Required] public bool AutoFileCopyEnabled { get; set; }
-
         /// <summary>
         /// Automatically launch files after copying them.
         /// </summary>

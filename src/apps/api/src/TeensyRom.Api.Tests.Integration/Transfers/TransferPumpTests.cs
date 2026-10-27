@@ -1,8 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Api.Tests.Integration.Common;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Entities.Transfers;
+using TeensyRom.Core.Logging;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Tests.Integration.Transfers
@@ -587,6 +590,202 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 port.SimulateDeviceLoss = false;
             }
         }
+
+        [Fact]
+        public async Task Pump_IdleDeviceWithNothingLaunched_SkipsTheResetAndSaysSo()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var resetsBefore = port.ResetCount;
+
+            var job = StartJob(device);
+            var target = new FilePath("/games/reset-skipped.prg");
+
+            await EnqueueFileAsync(job, device.DeviceId, "reset-skipped.prg", target, [1, 2, 3]);
+            await WaitUntilAsync(() => port.Received.Any(r => r.Path == target.Value));
+            await CompleteJobAsync(job);
+
+            port.ResetCount.Should().Be(resetsBefore);
+            SkipLines(job).Should().ContainSingle();
+            job.ToSnapshot().FilesSent.Should().Be(1);
+        }
+
+        public static TheoryData<string, Action<TeensyRomDevice>> DevicesThatMayBeRunningSomething => new()
+        {
+            { "busy", device => device.MarkBusy() },
+            { "menu boot pending", device => device.MarkMenuBootPending() },
+            { "launch presumed playing", device => device.MarkLaunchedInMenu() }
+        };
+
+        [Theory]
+        [MemberData(nameof(DevicesThatMayBeRunningSomething))]
+        public async Task Pump_DeviceThatMayBeRunningSomething_IsResetOnceThenRecordedIdle(string scenario, Action<TeensyRomDevice> arrange)
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var resetsBefore = port.ResetCount;
+
+            try
+            {
+                arrange(device);
+
+                var job = StartJob(device);
+                var target = new FilePath($"/games/reset-{scenario.Replace(' ', '-')}.prg");
+
+                await EnqueueFileAsync(job, device.DeviceId, "reset.prg", target, [1, 2, 3]);
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == target.Value));
+                await CompleteJobAsync(job);
+
+                port.ResetCount.Should().Be(resetsBefore + 1);
+                SkipLines(job).Should().BeEmpty();
+                job.ToSnapshot().FilesSent.Should().Be(1);
+                device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+                device.Connection.MenuBootPending.Should().BeFalse();
+                device.Connection.PlaybackPresumed.Should().BeFalse();
+            }
+            finally
+            {
+                device.MarkIdle();
+            }
+        }
+
+        [Fact]
+        public async Task Pump_SkipResetWhenIdleSwitchedOff_ResetsAnIdleDevice()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var resetsBefore = port.ResetCount;
+
+            f.Options.SkipResetWhenIdle = false;
+
+            try
+            {
+                var job = StartJob(device);
+                var target = new FilePath("/games/reset-switch-off.prg");
+
+                await EnqueueFileAsync(job, device.DeviceId, "reset-switch-off.prg", target, [1, 2, 3]);
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == target.Value));
+                await CompleteJobAsync(job);
+
+                port.ResetCount.Should().Be(resetsBefore + 1);
+                SkipLines(job).Should().BeEmpty();
+            }
+            finally
+            {
+                f.Options.SkipResetWhenIdle = true;
+            }
+        }
+
+        [Fact]
+        public async Task Pump_MinimalDevice_IsNotSkipped()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var resetsBefore = port.ResetCount;
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+
+            // The fixture's recovery never brings a device back to full firmware, so the command gate
+            // fails every command it meets on a minimal device; what this proves is that the pump still
+            // sent the reset rather than skipping it.
+            device.Confirm(ConnectionType.Tcp, "FAKE0", DeviceMode.Minimal);
+
+            try
+            {
+                var job = StartJob(device);
+
+                await EnqueueFileAsync(job, device.DeviceId, "reset-minimal.prg", new FilePath("/games/reset-minimal.prg"), [1, 2, 3]);
+
+                await WaitUntilAsync(() =>
+                    job.State == TransferJobState.Aborted &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0));
+
+                port.ResetCount.Should().BeGreaterThan(resetsBefore);
+                SkipLines(job).Should().BeEmpty();
+            }
+            finally
+            {
+                device.MarkIdle();
+            }
+        }
+
+        [Fact]
+        public async Task Pump_PresumedPlayback_IsResetOncePerJobNotPerBatch()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var resetsBefore = port.ResetCount;
+
+            try
+            {
+                device.MarkLaunchedInMenu();
+
+                var job = StartJob(device);
+                var first = new FilePath("/games/reset-once-1.prg");
+                var second = new FilePath("/games/reset-once-2.prg");
+
+                await EnqueueFileAsync(job, device.DeviceId, "reset-once-1.prg", first, [1, 2, 3]);
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == first.Value));
+
+                // The first file has fully landed, so this one reaches the pump as a batch of its own.
+                await EnqueueFileAsync(job, device.DeviceId, "reset-once-2.prg", second, [4, 5, 6]);
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == second.Value));
+                await CompleteJobAsync(job);
+
+                port.ResetCount.Should().Be(resetsBefore + 1);
+                SkipLines(job).Should().BeEmpty();
+
+                // The reset cleared the presumption, so the next job finds nothing to stop.
+                var nextJob = StartJob(device);
+                var third = new FilePath("/games/reset-once-3.prg");
+
+                await EnqueueFileAsync(nextJob, device.DeviceId, "reset-once-3.prg", third, [7, 8, 9]);
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == third.Value));
+                await CompleteJobAsync(nextJob);
+
+                port.ResetCount.Should().Be(resetsBefore + 1);
+                SkipLines(nextJob).Should().ContainSingle();
+            }
+            finally
+            {
+                device.MarkIdle();
+            }
+        }
+
+        private TransferJob StartJob(TeensyRomDevice device)
+        {
+            var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+
+            var job = registry.Create(device.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(device.DeviceId, job.JobId).Should().BeTrue();
+            job.TryTransitionTo(TransferJobState.Receiving);
+
+            return job;
+        }
+
+        private async Task CompleteJobAsync(TransferJob job)
+        {
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+            var pump = f.Services.GetRequiredService<TransferPump>();
+
+            job.TryTransitionTo(TransferJobState.Sealed);
+            pump.TryFinalize(job);
+
+            await WaitUntilAsync(() =>
+                job.State == TransferJobState.Completed &&
+                leaseCoordinator.GetHolder(job.DeviceId) is null &&
+                gate.Current == (0, 0));
+        }
+
+        /// <summary>The pump's "not resetting" line for this job - the only Internal line it writes that names a job.</summary>
+        private IEnumerable<LoggedLine> SkipLines(TransferJob job) =>
+            f.Log.Lines.Where(line =>
+                line.Level == nameof(ILoggingService.Internal) &&
+                line.DeviceId == job.DeviceId &&
+                line.Message.Contains(job.JobId, StringComparison.Ordinal));
 
         private async Task EnqueueFileAsync(TransferJob job, string deviceId, string relativePath, FilePath targetPath, byte[] bytes)
         {

@@ -29,9 +29,6 @@ describe('SettingsFormService', () => {
       startupLaunchRandom: false,
     },
     fileTransferSettings: {
-      watchDirectoryLocation: '',
-      autoTransferPath: '/teensyrom/files',
-      autoFileCopyEnabled: false,
       autoLaunchOnCopyEnabled: false,
       navToDirOnLaunch: false,
       syncFilesEnabled: false,
@@ -232,7 +229,7 @@ describe('SettingsFormService', () => {
       const saveSpy = vi.spyOn(service, 'saveSettings');
 
       // Make form invalid by clearing required field
-      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
+      form.get('playerSettings.startupFilter')?.setValue(null);
       tick(1000);
 
       expect(saveSpy).not.toHaveBeenCalled();
@@ -330,7 +327,7 @@ describe('SettingsFormService', () => {
       expect(service.canSave()).toBe(true);
 
       // Flip the form invalid directly, without writing to isSavingSignal or settingsSignal.
-      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
+      form.get('playerSettings.startupFilter')?.setValue(null);
       expect(form.valid).toBe(false);
 
       expect(service.canSave()).toBe(false);
@@ -406,7 +403,7 @@ describe('SettingsFormService', () => {
     it('getFileTransferSettings should return typed FormGroup', () => {
       const formGroup = service.getFileTransferSettings();
       expect(formGroup).toBeTruthy();
-      expect(formGroup.get('autoTransferPath')).toBeTruthy();
+      expect(formGroup.get('autoLaunchOnCopyEnabled')).toBeTruthy();
     });
 
     it('getSearchSettings should return typed FormGroup', () => {
@@ -438,8 +435,8 @@ describe('SettingsFormService', () => {
       if (!form) return;
 
       // Make form invalid
-      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
-      form.get('fileTransferSettings.autoTransferPath')?.markAsTouched();
+      form.get('playerSettings.startupFilter')?.setValue(null);
+      form.get('playerSettings.startupFilter')?.markAsTouched();
 
       await service.saveSettings();
 

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Api.Transfers.Archives;
+using TeensyRom.Api.WatchFolders;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -41,7 +43,6 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IDeviceSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IPlayerSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
-            services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IMidiSettingsService, MidiSettingsService>();
@@ -83,7 +84,18 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
             services.AddSingleton<TransferProgressNotifier>();
             services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
+            services.AddSingleton<IFileLaunchService, FileLaunchService>();
+            services.AddSingleton<ITransferAutoLauncher, TransferAutoLauncher>();
             services.AddSingleton<TransferPump>();
+            services.AddSingleton<ITransferJobService, TransferJobService>();
+            services.AddSingleton<IWatchFolderStore, WatchFolderStore>();
+            services.AddSingleton(sp => WatchFolderOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<IFolderWatchFactory, FileSystemFolderWatchFactory>();
+            services.AddSingleton<IWatchedFileSystem, WatchedFileSystem>();
+            services.AddSingleton<WatchFolderDelivery>();
+            services.AddSingleton<WatchFolderWatcher>();
+            services.AddSingleton<IWatchFolderStatus>(sp => sp.GetRequiredService<WatchFolderWatcher>());
             services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();
             services.AddSingleton<ArchiveExpansionService>();
             services.AddSingleton<ArchiveExpansionPump>();
@@ -96,6 +108,7 @@ namespace TeensyRom.Api.Startup
             services.AddHostedService(sp => sp.GetRequiredService<TransferPump>());
             services.AddHostedService(sp => sp.GetRequiredService<ArchiveExpansionPump>());
             services.AddHostedService<TransferJobSweeper>();
+            services.AddHostedService(sp => sp.GetRequiredService<WatchFolderWatcher>());
 
             return services;
         }

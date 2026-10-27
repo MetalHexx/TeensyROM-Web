@@ -159,6 +159,12 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					writtenAtSend = port.BytesWritten;
 					var response = await next();
 
+					// A reset the caller asked for leaves the menu up with nothing playing.
+					if (request is ResetCommand && response.IsSuccess)
+					{
+						device?.MarkIdle();
+					}
+
 					// A launch owns its own end state - a handler-swapping launch deliberately leaves the
 					// record busy - so only a non-launch command's success proves the device is idle again.
 					if (device?.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)

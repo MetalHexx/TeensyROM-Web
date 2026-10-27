@@ -82,8 +82,9 @@ namespace TeensyRom.Api.Transfers
 
                 try
                 {
-                    await hubContext.Clients.Group(GroupName(jobId))
-                        .SendAsync("JobSnapshot", TransferJobDto.From(job.ToSnapshot()), ct);
+                    var snapshot = TransferJobDto.From(job.ToSnapshot());
+                    await hubContext.Clients.Group(TransferHubGroups.Job(jobId)).SendAsync("JobSnapshot", snapshot, ct);
+                    await hubContext.Clients.Group(TransferHubGroups.All).SendAsync("JobSnapshot", snapshot, ct);
                 }
                 catch (Exception ex)
                 {
@@ -91,7 +92,5 @@ namespace TeensyRom.Api.Transfers
                 }
             }
         }
-
-        private static string GroupName(string jobId) => $"job-{jobId}";
     }
 }

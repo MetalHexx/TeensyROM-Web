@@ -80,7 +80,7 @@ apps/api/src/
     ├── ConnectionSettings.cs       # Device connectivity
     ├── PlayerSettings.cs           # Playback behavior
     ├── VideoSettings.cs            # Video capture toggle
-    ├── FileTransferSettings.cs     # Watch folder + auto-copy
+    ├── FileTransferSettings.cs     # Auto-launch after copy, sync
     ├── SearchSettings.cs           # Search weights + exclusions
     ├── SearchWeights.cs            # Field weight configuration
     └── AppSettings.cs              # Application lifecycle state
@@ -105,7 +105,7 @@ libs/features/settings/src/lib/settings-view/
 ├── connection-settings-section/    # Connection type toggle
 ├── player-settings-section/        # Player behavior toggles
 ├── video-settings-section/         # Video capture toggle
-├── file-transfer-settings-section/ # Watch folder settings
+├── file-transfer-settings-section/ # Auto-launch and sync settings
 └── search-settings-section/        # Search weights + exclusions
 ```
 
@@ -139,9 +139,11 @@ libs/features/settings/src/lib/settings-view/
 | **Connection** | `ConnectionSettings` | `ConnectionSettings` | Serial/TCP connection type, auto-connect toggle |
 | **Player** | `PlayerSettings` | `PlayerSettings` | Repeat mode, play timer, mute options, startup filter |
 | **Video** | `VideoSettings` | `VideoSettings` | Enable video capture component visibility |
-| **File Transfer** | `FileTransferSettings` | `FileTransferSettings` | Watch folder, auto-copy, sync settings |
+| **File Transfer** | `FileTransferSettings` | `FileTransferSettings` | Auto-launch after copy, navigate on launch, sync settings |
 | **Search** | `SearchSettings` | `SearchSettings` | Field weights, stop words, banned dirs/files |
 | **App** | `AppSettings` | `AppSettings` | First-time setup flag |
+
+`WatchFolders` are not a settings category. They live in `Settings.json` as `TeensySettings.WatchFolders`, but only the `/api/watch-folders` endpoints change them, and a whole-settings save preserves them. See `backend-architecture` (`references/FILE_TRANSFER.md`, Watched Folders).
 
 ---
 
@@ -156,6 +158,11 @@ These settings are actively affecting business logic in the application:
 |---------|-----------|----------------------|
 | `connectionSettings.autoConnectEnabled` | [ApplicationBootstrapService.cs](../../../../apps/api/src/TeensyRom.Api/Services/ApplicationBootstrapService.cs) | Controls whether devices auto-connect when the API starts; if false, skips `deviceManager.FindDevices()` |
 | `connectionSettings.autoConnectEnabled` | [FindDevicesEndpoint.cs](../../../../apps/api/src/TeensyRom.Api/Endpoints/Serial/FindDevices/FindDevicesEndpoint.cs) | Passed to `deviceManager.FindDevices(autoConnect)` to control whether discovered devices should auto-connect |
+
+#### **File Transfer Settings (Backend)**
+| Setting | Where Used | Business Logic Impact |
+|---------|-----------|----------------------|
+| `fileTransferSettings.autoLaunchOnCopyEnabled` | [TransferAutoLauncher.cs](../../../../apps/api/src/TeensyRom.Api/Transfers/TransferAutoLauncher.cs) | Launches one transferred file after an upload when on; a watch-folder job also needs its destination's `launch` flag |
 
 #### **Player Behavior (Frontend)**
 | Setting | Where Used | Business Logic Impact |
@@ -189,17 +196,18 @@ These settings exist in the model but have no implementation:
 |---------|-----------------|--------|
 | `connectionSettings.connectionType` | Toggle between Serial/TCP communication | TCP support not implemented; always uses Serial |
 
+#### **File Transfer Settings**
+| Setting | Intended Purpose | Status |
+|---------|-----------------|--------|
+| `fileTransferSettings.navToDirOnLaunch` | Navigate to the launched file's directory after a launch | Persisted but nothing acts on it |
+| `fileTransferSettings.syncFilesEnabled` | A future sync feature | Persisted but no sync feature exists |
+
 #### **Player Settings**
 | Setting | Intended Purpose | Status |
 |---------|-----------------|--------|
 | `playerSettings.repeatModeOnStartup` | Initialize player repeat mode on app launch | Not consumed during player initialization |
 | `playerSettings.muteFastForward` | Mute audio during fast forward operations | Fast forward feature not implemented |
 | `playerSettings.muteRandomSeek` | Mute audio during random seek operations | Random seek feature not implemented |
-
-#### **File Transfer Settings**
-| Setting | Intended Purpose | Status |
-|---------|-----------------|--------|
-| `fileTransferSettings.*` | Monitor watch folder and auto-copy files to device | FileWatchService commented out in backend; feature inactive |
 
 #### **App Settings**
 | Setting | Intended Purpose | Status |

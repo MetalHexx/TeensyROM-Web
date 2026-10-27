@@ -2,16 +2,12 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
-using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.ValueObjects;
+using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
 {
-    public class CreateJobEndpoint(
-        IDeviceConnectionManager deviceManager,
-        ITransferJobRegistry registry,
-        IDeviceLeaseCoordinator leases) : RadEndpoint<CreateJobRequest, CreateJobResponse>
+    public class CreateJobEndpoint(ITransferJobService jobs) : RadEndpoint<CreateJobRequest, CreateJobResponse>
     {
         public override void Configure()
         {
@@ -26,58 +22,41 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                     "Starts a new file transfer job for a device's storage.\n\n" +
                     "- Acquires an exclusive lease on the device for the lifetime of the job - a device " +
                     "can only have one active transfer at a time.\n" +
-                    "- Issues no device traffic - the device reset happens on the first uploaded file."
+                    "- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file."
                 )
                 .WithTags("Transfers");
         }
 
         public override Task Handle(CreateJobRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetAvailableDevice(r.DeviceId);
+            var result = jobs.Start(new TransferJobStart(
+                r.DeviceId, r.StorageType, r.Body.DestinationDirectory, r.Body.ExpectedArchiveCount, TransferOrigin.Upload, r.Body.Launch));
 
-            if (device is null)
+            if (!result.Started)
             {
-                SendNotFound($"The device {r.DeviceId} was not found.");
+                switch (result.Error)
+                {
+                    case TransferStartError.DeviceNotFound:
+                    case TransferStartError.StorageUnavailable:
+                        SendNotFound(result.Message!);
+                        break;
+                    case TransferStartError.InvalidDestination:
+                        SendValidationError(result.Message!);
+                        break;
+                    default:
+                        SendProblem(TypedResults.Problem(
+                            title: "Device already has an active transfer.",
+                            statusCode: StatusCodes.Status409Conflict,
+                            detail: result.Message,
+                            extensions: new Dictionary<string, object?> { ["activeJobId"] = result.ActiveJobId }
+                        ));
+                        break;
+                }
+
                 return Task.CompletedTask;
             }
 
-            var storage = device.GetStorage(r.StorageType);
-
-            if (storage is null)
-            {
-                var message = r.StorageType is TeensyStorageType.SD
-                    ? $"The device {r.DeviceId} does not have an SD card."
-                    : $"The device {r.DeviceId} does not have USB storage.";
-                SendNotFound(message);
-                return Task.CompletedTask;
-            }
-
-            DirectoryPath destination;
-
-            try
-            {
-                destination = new DirectoryPath(r.Body.DestinationDirectory);
-            }
-            catch (ArgumentException ex)
-            {
-                SendValidationError(ex.Message);
-                return Task.CompletedTask;
-            }
-
-            var job = registry.Create(r.DeviceId, r.StorageType, destination, r.Body.ExpectedArchiveCount);
-
-            if (!leases.TryAcquire(r.DeviceId, job.JobId))
-            {
-                var holder = leases.GetHolder(r.DeviceId);
-                registry.Remove(job.JobId);
-                SendProblem(TypedResults.Problem(
-                    title: "Device already has an active transfer.",
-                    statusCode: StatusCodes.Status409Conflict,
-                    detail: $"Device {r.DeviceId} already has an active transfer (job {holder}).",
-                    extensions: new Dictionary<string, object?> { ["activeJobId"] = holder }
-                ));
-                return Task.CompletedTask;
-            }
+            var job = result.Job!;
 
             try
             {
@@ -92,8 +71,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
             {
                 // The lease is only safe to hold once the job is actually returned to the caller - if
                 // anything blows up finishing the response, release it so a failed create cannot leak it.
-                leases.Release(r.DeviceId, job.JobId);
-                registry.Remove(job.JobId);
+                jobs.Discard(job);
                 throw;
             }
 

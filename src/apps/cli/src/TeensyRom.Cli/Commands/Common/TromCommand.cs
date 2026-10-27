@@ -61,6 +61,9 @@ internal abstract class DeviceCommand<T>(
     IStorageService storage,
     ISettingsService settingsService) : EngineCommand<T>(output, engine) where T : DeviceSettings
 {
+    protected IDeviceService Devices => devices;
+    protected IStorageService Storage => storage;
+
     /// <exception cref="CliException"><see cref="CliExitCode.NoDevice"/> or <see cref="CliExitCode.NotFound"/> when no device can be chosen.</exception>
     protected override async Task PrepareAsync(T settings, CancellationToken ct)
     {

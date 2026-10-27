@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Entities.Transfers;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Transfers
@@ -8,9 +9,9 @@ namespace TeensyRom.Api.Transfers
     {
         private readonly ConcurrentDictionary<string, TransferJob> _jobs = new();
 
-        public TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination, int expectedArchiveCount = 0)
+        public TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination, int expectedArchiveCount = 0, TransferOrigin? origin = null, bool launchRequested = false)
         {
-            var job = new TransferJob(deviceId, storageType, destination, options, expectedArchiveCount: expectedArchiveCount);
+            var job = new TransferJob(deviceId, storageType, destination, options, expectedArchiveCount: expectedArchiveCount, origin: origin, launchRequested: launchRequested);
             _jobs[job.JobId] = job;
             return job;
         }

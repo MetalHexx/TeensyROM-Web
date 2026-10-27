@@ -40,9 +40,6 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
     startupLaunchRandom: false,
   } as PlayerSettingsDto,
   fileTransferSettings: {
-    watchDirectoryLocation: '/test/watch',
-    autoTransferPath: '/test/transfer',
-    autoFileCopyEnabled: true,
     autoLaunchOnCopyEnabled: true,
     navToDirOnLaunch: false,
     syncFilesEnabled: false,
@@ -78,9 +75,6 @@ const createDomainSettings = (): Settings => ({
     startupLaunchRandom: false,
   },
   fileTransferSettings: {
-    watchDirectoryLocation: '/test/watch',
-    autoTransferPath: '/test/transfer',
-    autoFileCopyEnabled: true,
     autoLaunchOnCopyEnabled: true,
     navToDirOnLaunch: false,
     syncFilesEnabled: false,
@@ -159,8 +153,6 @@ describe('SettingsService', () => {
       expect(result.playerSettings.repeatModeOnStartup).toBe(true);
       expect(result.playerSettings.playTimerEnabled).toBe(true);
       expect(result.playerSettings.startupLaunchEnabled).toBe(true);
-      expect(result.fileTransferSettings.autoFileCopyEnabled).toBe(true);
-      expect(result.fileTransferSettings.watchDirectoryLocation).toBe('/test/watch');
       expect(result.searchSettings.weights.titleWeight).toBe(10);
       expect(result.searchSettings.stopWords).toEqual(['the', 'and', 'or']);
       expect(result.appSettings.setupCompleted).toBe(true);
@@ -277,9 +269,7 @@ describe('SettingsService', () => {
       expect(requestDto.playerSettings.startupLaunchEnabled).toBe(true);
 
       // Verify file transfer settings mapping
-      expect(requestDto.fileTransferSettings.autoFileCopyEnabled).toBe(true);
       expect(requestDto.fileTransferSettings.autoLaunchOnCopyEnabled).toBe(true);
-      expect(requestDto.fileTransferSettings.watchDirectoryLocation).toBe('/test/watch');
 
       // Verify search settings mapping
       expect(requestDto.searchSettings.searchWeights.title).toBe(10);
@@ -376,7 +366,6 @@ describe('SettingsService', () => {
     it('should handle empty arrays in settings', async () => {
       const responseDto = createGetSettingsResponseDto();
       responseDto.searchSettings.searchStopWords = [];
-      responseDto.fileTransferSettings.watchDirectoryLocation = '';
       responseDto.searchSettings.bannedDirectories = [];
       responseDto.searchSettings.bannedFiles = [];
 
@@ -392,7 +381,6 @@ describe('SettingsService', () => {
       expect(result.searchSettings.stopWords).toEqual([]);
       expect(result.searchSettings.bannedDirectories).toEqual([]);
       expect(result.searchSettings.bannedFiles).toEqual([]);
-      expect(result.fileTransferSettings.watchDirectoryLocation).toBe('');
     });
   });
 });

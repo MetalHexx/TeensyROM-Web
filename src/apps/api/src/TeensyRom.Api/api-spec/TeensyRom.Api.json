@@ -5,6 +5,330 @@
     "version": "1.0.0-alpha.8"
   },
   "paths": {
+    "/api/watch-folders/{watchFolderId}/enabled": {
+      "put": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Set Watch Folder Enabled",
+        "description": "Turns a watch folder on or off without changing its destinations.\n\n- Files that land while the folder is off are not sent later, not even after it is turned back on.",
+        "operationId": "SetWatchFolderEnabled",
+        "parameters": [
+          {
+            "name": "watchFolderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWatchFolderEnabledBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetWatchFolderEnabledResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watch-folders/{watchFolderId}/devices/{deviceId}": {
+      "put": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Set Watch Folder Device",
+        "description": "Changes the device folder and/or the launch flag of a device's destination on a watch folder.\n\n- A null or absent value is left as it is; at least one must be given.\n- Only the device folder and launch flag change. A different device or storage is a different destination.\n- Setting the values it already has succeeds and changes nothing.\n- The change applies to the next set of files delivered.",
+        "operationId": "SetWatchFolderDevice",
+        "parameters": [
+          {
+            "name": "watchFolderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWatchFolderDeviceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetWatchFolderDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Remove Watch Folder Device",
+        "description": "Stops sending a watch folder's files to a device.\n\n- Removes every destination of that device on the folder.\n- Removing the last destination removes the folder too.\n- Never touches the folder on disk or anything on a device.",
+        "operationId": "RemoveWatchFolderDevice",
+        "parameters": [
+          {
+            "name": "watchFolderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveWatchFolderDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watch-folders/{watchFolderId}": {
+      "delete": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Remove Watch Folder",
+        "description": "Stops watching a folder and removes all its destinations.\n\n- Never touches the folder on disk or anything on a device.",
+        "operationId": "RemoveWatchFolder",
+        "parameters": [
+          {
+            "name": "watchFolderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveWatchFolderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watch-folders": {
+      "get": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Get Watch Folders",
+        "description": "Lists every watch folder with its destinations and what it is doing right now.\n\n- A watch folder is a folder on the engine's machine; its destinations are device storages that receive its files.",
+        "operationId": "GetWatchFolders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWatchFoldersResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "WatchFolders"
+        ],
+        "summary": "Add Watch Folder",
+        "description": "Sends the files of a folder on the engine's machine to a device storage.\n\n- Adding a folder that is already watched adds a destination for another device to it.\n- A device receives a folder through one destination only; a second one is refused with 409.\n- A folder nested inside a watched folder, or containing one, is refused with 400.\n- The device must be connected and report its chip id, and the storage must be available.",
+        "operationId": "AddWatchFolder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddWatchFolderBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddWatchFolderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/version": {
       "get": {
         "tags": [
@@ -149,6 +473,28 @@
         }
       }
     },
+    "/api/transfers": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "List Transfer Jobs",
+        "description": "Lists every transfer job the engine knows about, whatever its origin.\n\n- Newest first.\n- Returns 200 with an empty list when there are no jobs.",
+        "operationId": "ListTransferJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListJobsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transfers/{jobId}": {
       "get": {
         "tags": [
@@ -249,7 +595,7 @@
           "Transfers"
         ],
         "summary": "Create Transfer Job",
-        "description": "Starts a new file transfer job for a device's storage.\n\n- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.\n- Issues no device traffic - the device reset happens on the first uploaded file.",
+        "description": "Starts a new file transfer job for a device's storage.\n\n- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.\n- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.",
         "operationId": "CreateTransferJob",
         "parameters": [
           {
@@ -381,7 +727,7 @@
           "Settings"
         ],
         "summary": "Save User Settings",
-        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-copy and directory watching configuration\n  - Watch directory location, auto-transfer path, and sync flags\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Watch directory must be empty or a valid absolute path\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
+        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n  - Auto-launch, navigate-on-launch, and sync flags\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
         "operationId": "SaveSettings",
         "requestBody": {
           "content": {
@@ -431,7 +777,7 @@
           "Settings"
         ],
         "summary": "Get User Settings",
-        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-copy and directory watching configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
+        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
         "operationId": "GetSettings",
         "responses": {
           "200": {
@@ -1844,6 +2190,42 @@
   },
   "components": {
     "schemas": {
+      "AddWatchFolderBody": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "storageType": {
+            "$ref": "#/components/schemas/TeensyStorageType"
+          },
+          "devicePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launch": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AddWatchFolderResponse": {
+        "required": [
+          "watchFolder",
+          "created"
+        ],
+        "type": "object",
+        "properties": {
+          "watchFolder": {
+            "$ref": "#/components/schemas/WatchFolderDto"
+          },
+          "created": {
+            "type": "boolean"
+          }
+        }
+      },
       "AppSettingsDto": {
         "required": [
           "firstTimeSetup"
@@ -2119,6 +2501,9 @@
           "expectedArchiveCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "launch": {
+            "type": "boolean"
           }
         }
       },
@@ -2383,24 +2768,12 @@
       },
       "FileTransferSettingsDto": {
         "required": [
-          "watchDirectoryLocation",
-          "autoTransferPath",
-          "autoFileCopyEnabled",
           "autoLaunchOnCopyEnabled",
           "navToDirOnLaunch",
           "syncFilesEnabled"
         ],
         "type": "object",
         "properties": {
-          "watchDirectoryLocation": {
-            "type": "string"
-          },
-          "autoTransferPath": {
-            "type": "string"
-          },
-          "autoFileCopyEnabled": {
-            "type": "boolean"
-          },
           "autoLaunchOnCopyEnabled": {
             "type": "boolean"
           },
@@ -2541,6 +2914,20 @@
         "properties": {
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "GetWatchFoldersResponse": {
+        "required": [
+          "watchFolders"
+        ],
+        "type": "object",
+        "properties": {
+          "watchFolders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchFolderDto"
+            }
           }
         }
       },
@@ -2721,6 +3108,20 @@
           }
         }
       },
+      "ListJobsResponse": {
+        "required": [
+          "jobs"
+        ],
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferJobDto"
+            }
+          }
+        }
+      },
       "MachineType": {
         "enum": [
           "Unknown",
@@ -2894,6 +3295,31 @@
         }
       },
       "RemoveFavoriteResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "RemoveWatchFolderDeviceResponse": {
+        "required": [
+          "folderRemoved"
+        ],
+        "type": "object",
+        "properties": {
+          "folderRemoved": {
+            "type": "boolean"
+          },
+          "watchFolder": {
+            "$ref": "#/components/schemas/WatchFolderDto2"
+          }
+        }
+      },
+      "RemoveWatchFolderResponse": {
         "required": [
           "message"
         ],
@@ -3161,6 +3587,49 @@
           }
         }
       },
+      "SetWatchFolderDeviceBody": {
+        "type": "object",
+        "properties": {
+          "devicePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launch": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "SetWatchFolderDeviceResponse": {
+        "required": [
+          "watchFolder"
+        ],
+        "type": "object",
+        "properties": {
+          "watchFolder": {
+            "$ref": "#/components/schemas/WatchFolderDto"
+          }
+        }
+      },
+      "SetWatchFolderEnabledBody": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SetWatchFolderEnabledResponse": {
+        "required": [
+          "watchFolder"
+        ],
+        "type": "object",
+        "properties": {
+          "watchFolder": {
+            "$ref": "#/components/schemas/WatchFolderDto"
+          }
+        }
+      },
       "StopEngineResponse": {
         "required": [
           "message"
@@ -3271,6 +3740,7 @@
           "filesSent",
           "filesFailed",
           "bytesSent",
+          "origin",
           "startedUtc",
           "lastActivityUtc",
           "failures",
@@ -3278,7 +3748,8 @@
           "bytesPerSecond",
           "filesPerSecond",
           "expansionBytesWritten",
-          "expansionBytesDeclared"
+          "expansionBytesDeclared",
+          "launchState"
         ],
         "type": "object",
         "properties": {
@@ -3321,6 +3792,9 @@
           "currentFile": {
             "type": "string",
             "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/TransferOriginDto"
           },
           "startedUtc": {
             "type": "string",
@@ -3369,6 +3843,17 @@
           "expandedFileCount": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "launchState": {
+            "$ref": "#/components/schemas/TransferLaunchState"
+          },
+          "launchedPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchError": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -3384,6 +3869,7 @@
           "filesSent",
           "filesFailed",
           "bytesSent",
+          "origin",
           "startedUtc",
           "lastActivityUtc",
           "failures",
@@ -3391,7 +3877,8 @@
           "bytesPerSecond",
           "filesPerSecond",
           "expansionBytesWritten",
-          "expansionBytesDeclared"
+          "expansionBytesDeclared",
+          "launchState"
         ],
         "type": "object",
         "properties": {
@@ -3434,6 +3921,9 @@
           "currentFile": {
             "type": "string",
             "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/TransferOriginDto"
           },
           "startedUtc": {
             "type": "string",
@@ -3483,6 +3973,17 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "launchState": {
+            "$ref": "#/components/schemas/TransferLaunchState"
+          },
+          "launchedPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchError": {
+            "type": "string",
+            "nullable": true
           }
         },
         "nullable": true
@@ -3496,6 +3997,40 @@
           "Cancelled",
           "Abandoned",
           "Aborted"
+        ]
+      },
+      "TransferLaunchState": {
+        "enum": [
+          "None",
+          "Pending",
+          "Launched",
+          "Incompatible",
+          "Failed"
+        ]
+      },
+      "TransferOriginDto": {
+        "required": [
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TransferOriginKind"
+          },
+          "watchFolderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "watchFolderPath": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TransferOriginKind": {
+        "enum": [
+          "Upload",
+          "WatchFolder"
         ]
       },
       "UploadFileResponse": {
@@ -3563,6 +4098,105 @@
           }
         }
       },
+      "WatchFolderDestinationDto": {
+        "required": [
+          "id",
+          "deviceId",
+          "storageType",
+          "path",
+          "launch"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageType": {
+            "$ref": "#/components/schemas/TeensyStorageType"
+          },
+          "path": {
+            "type": "string"
+          },
+          "launch": {
+            "type": "boolean"
+          }
+        }
+      },
+      "WatchFolderDto": {
+        "required": [
+          "id",
+          "path",
+          "enabled",
+          "state",
+          "destinations"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WatchFolderState"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchFolderDestinationDto"
+            }
+          }
+        }
+      },
+      "WatchFolderDto2": {
+        "required": [
+          "id",
+          "path",
+          "enabled",
+          "state",
+          "destinations"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WatchFolderState"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchFolderDestinationDto"
+            }
+          }
+        },
+        "nullable": true
+      },
+      "WatchFolderState": {
+        "enum": [
+          "Watching",
+          "Off",
+          "Unavailable"
+        ]
+      },
       "YouTubeVideoDto": {
         "required": [
           "videoId",
@@ -3590,6 +4224,9 @@
     }
   },
   "tags": [
+    {
+      "name": "WatchFolders"
+    },
     {
       "name": "Version"
     },
