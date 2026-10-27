@@ -119,6 +119,8 @@ namespace TeensyRom.Api.Tests.Integration.Transfers.WatchFolders
             var again = await AddAsync<ProblemDetails>(path, DeviceA, TeensyStorageType.USB);
 
             again.Should().BeProblem().WithStatusCode(HttpStatusCode.Conflict);
+            again.Content.Title.Should().Contain("Change that destination instead");
+            again.Content.Detail.Should().Be(again.Content.Title);
         }
 
         [Fact]

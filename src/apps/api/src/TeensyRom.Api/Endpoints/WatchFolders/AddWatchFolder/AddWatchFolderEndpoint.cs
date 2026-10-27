@@ -44,8 +44,9 @@ namespace TeensyRom.Api.Endpoints.WatchFolders.AddWatchFolder
                     SendNotFound(result.Message!);
                     break;
                 case WatchFolderAddError.DeviceAlreadyOnFolder:
+                    // Clients print the title and fall back to the detail, so both carry the store's guidance.
                     SendProblem(TypedResults.Problem(
-                        title: "The device already receives this folder.",
+                        title: result.Message,
                         statusCode: StatusCodes.Status409Conflict,
                         detail: result.Message));
                     break;
