@@ -20,6 +20,7 @@ import {
   StorageType,
   ALERT_SERVICE,
   IAlertService,
+  DeviceBusyError,
   API_CONFIG,
   IApiConfig,
   ViewableItemImage,
@@ -228,7 +229,10 @@ describe('PlayerService', () => {
       mockPlayerApi.launchFile.mockResolvedValue(response);
       mockAlertService.warning = vi.fn();
 
-      const fileItem: FileItem = createFileItem({ path: '/test/file.prg', storageType: StorageType.Sd });
+      const fileItem: FileItem = createFileItem({
+        path: '/test/file.prg',
+        storageType: StorageType.Sd,
+      });
       const result = await new Promise<FileItem>((resolve, reject) => {
         service.launchFile('device-123', fileItem).subscribe({
           next: resolve,
@@ -259,7 +263,10 @@ describe('PlayerService', () => {
       mockPlayerApi.launchFile.mockResolvedValue(response);
       mockAlertService.warning = vi.fn();
 
-      const fileItem: FileItem = createFileItem({ path: '/test/file.prg', storageType: StorageType.Sd });
+      const fileItem: FileItem = createFileItem({
+        path: '/test/file.prg',
+        storageType: StorageType.Sd,
+      });
       await new Promise<FileItem>((resolve, reject) => {
         service.launchFile('device-123', fileItem).subscribe({
           next: resolve,
@@ -536,7 +543,12 @@ describe('PlayerService', () => {
 
       mockPlayerApi.launchFile.mockResolvedValue(response);
 
-      const fileItem: FileItem = createFileItem({ path: '/test/incompatible.sid', name: 'incompatible.sid', isCompatible: false, storageType: StorageType.Sd });
+      const fileItem: FileItem = createFileItem({
+        path: '/test/incompatible.sid',
+        name: 'incompatible.sid',
+        isCompatible: false,
+        storageType: StorageType.Sd,
+      });
       const result = await new Promise<FileItem>((resolve, reject) => {
         service.launchFile(deviceId, fileItem).subscribe({
           next: resolve,
@@ -564,7 +576,12 @@ describe('PlayerService', () => {
 
       mockPlayerApi.launchFile.mockResolvedValue(response);
 
-      const fileItem: FileItem = createFileItem({ path: '/test/compatible.sid', name: 'compatible.sid', isCompatible: true, storageType: StorageType.Sd });
+      const fileItem: FileItem = createFileItem({
+        path: '/test/compatible.sid',
+        name: 'compatible.sid',
+        isCompatible: true,
+        storageType: StorageType.Sd,
+      });
       const result = await new Promise<FileItem>((resolve, reject) => {
         service.launchFile(deviceId, fileItem).subscribe({
           next: resolve,
@@ -846,5 +863,113 @@ describe('PlayerService', () => {
         consoleSpy.mockRestore();
       });
     });
+  });
+});
+
+const busyBody = {
+  type: 'https://tools.ietf.org/html/rfc9110#section-15.5.10',
+  title: 'Alpha is busy with a transfer.',
+  status: 409,
+  code: 'deviceBusyWithTransfer',
+  deviceId: 'device-1',
+  activeJobId: 'job-7',
+};
+
+const busyResponseError = (): ResponseError =>
+  new ResponseError(
+    new Response(JSON.stringify(busyBody), {
+      status: 409,
+      headers: { 'content-type': 'application/problem+json' },
+    }),
+    'Response returned an error code'
+  );
+
+const expectBusyRefusal = async (
+  action: () => Promise<unknown>,
+  alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> }
+) => {
+  const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  await expect(action()).rejects.toMatchObject({
+    name: 'DeviceBusyError',
+    deviceId: 'device-1',
+    activeJobId: 'job-7',
+    message: 'Alpha is busy with a transfer.',
+  });
+  expect(alert.warning).toHaveBeenCalledTimes(1);
+  expect(alert.warning).toHaveBeenCalledWith('Alpha is busy with a transfer.');
+  expect(alert.error).not.toHaveBeenCalled();
+  logSpy.mockRestore();
+};
+
+describe('PlayerService - device busy', () => {
+  let service: PlayerService;
+  let mockPlayerApi: {
+    launchFile: ReturnType<typeof vi.fn>;
+    launchRandom: ReturnType<typeof vi.fn>;
+    toggleMusic: ReturnType<typeof vi.fn>;
+  };
+  let alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    mockPlayerApi = { launchFile: vi.fn(), launchRandom: vi.fn(), toggleMusic: vi.fn() };
+    alert = { error: vi.fn(), warning: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        PlayerService,
+        { provide: PlayerApiService, useValue: mockPlayerApi },
+        { provide: ALERT_SERVICE, useValue: alert },
+        { provide: API_CONFIG, useValue: createMockApiConfig() },
+      ],
+    });
+    service = TestBed.inject(PlayerService);
+  });
+
+  const file = (): FileItem => createFileItem({ path: '/path', storageType: StorageType.Sd });
+
+  it('warns once and throws DeviceBusyError when launchFile is refused', async () => {
+    mockPlayerApi.launchFile.mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(
+      () =>
+        new Promise((resolve, reject) =>
+          service.launchFile('device-1', file()).subscribe({ next: resolve, error: reject })
+        ),
+      alert
+    );
+  });
+
+  it('warns once and throws DeviceBusyError when launchRandom is refused', async () => {
+    mockPlayerApi.launchRandom.mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(
+      () =>
+        new Promise((resolve, reject) =>
+          service
+            .launchRandom('device-1', PlayerScope.Storage, PlayerFilterType.All)
+            .subscribe({ next: resolve, error: reject })
+        ),
+      alert
+    );
+  });
+
+  it('warns once and throws DeviceBusyError when toggleMusic is refused', async () => {
+    mockPlayerApi.toggleMusic.mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(
+      () =>
+        new Promise((resolve, reject) =>
+          service.toggleMusic('device-1').subscribe({ next: resolve, error: reject })
+        ),
+      alert
+    );
+  });
+
+  it('throws a DeviceBusyError instance', async () => {
+    mockPlayerApi.launchFile.mockRejectedValue(busyResponseError());
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(
+      new Promise((resolve, reject) =>
+        service.launchFile('device-1', file()).subscribe({ next: resolve, error: reject })
+      )
+    ).rejects.toBeInstanceOf(DeviceBusyError);
+    logSpy.mockRestore();
   });
 });

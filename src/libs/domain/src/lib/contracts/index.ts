@@ -33,3 +33,6 @@ export * from './audio-stream.contract';
 // Transfer contracts
 export * from './transfer.contract';
 export * from './transfer-hub.contract';
+
+// Device busy contracts
+export * from './device-busy.error';

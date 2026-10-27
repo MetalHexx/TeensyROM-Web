@@ -1,4 +1,46 @@
 import { ResponseError, ProblemDetails } from '@teensyrom-nx/data-access/api-client';
+import { DEVICE_BUSY_PROBLEM_CODE } from '@teensyrom-nx/domain';
+
+/** The engine's busy-with-a-transfer refusal, read from its 409 body. */
+export interface DeviceBusyProblem {
+  deviceId: string;
+  activeJobId: string | null;
+  title: string;
+}
+
+/**
+ * Recognizes the engine's busy-with-a-transfer refusal by its problem code, never by text.
+ *
+ * @param error - The error thrown by the API client
+ * @returns The busy problem, or null for any other error
+ */
+export async function readDeviceBusyProblem(error: unknown): Promise<DeviceBusyProblem | null> {
+  if (!(error instanceof ResponseError) || error.response?.status !== 409) {
+    return null;
+  }
+
+  try {
+    const body = (await error.response.clone().json()) as {
+      code?: unknown;
+      deviceId?: unknown;
+      activeJobId?: unknown;
+      title?: unknown;
+    } | null;
+    if (body?.code !== DEVICE_BUSY_PROBLEM_CODE) {
+      return null;
+    }
+    return {
+      deviceId: typeof body.deviceId === 'string' ? body.deviceId : '',
+      activeJobId: typeof body.activeJobId === 'string' ? body.activeJobId : null,
+      title:
+        typeof body.title === 'string' && body.title.trim()
+          ? body.title
+          : 'Device is busy with a transfer.',
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The API's own message from a JSON response body. The API answers 502 with a ProblemDetails object (its

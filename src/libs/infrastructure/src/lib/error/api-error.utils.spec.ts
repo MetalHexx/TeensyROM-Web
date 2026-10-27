@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { ResponseError } from '@teensyrom-nx/data-access/api-client';
-import { extractErrorMessage, extractProblemMessage } from './api-error.utils';
+import {
+  extractErrorMessage,
+  extractProblemMessage,
+  readDeviceBusyProblem,
+} from './api-error.utils';
 
 function responseErrorWithBody(body: unknown, contentType = 'application/json'): ResponseError {
   const response = new Response(JSON.stringify(body), {
@@ -79,7 +83,10 @@ describe('extractProblemMessage', () => {
 
 describe('extractErrorMessage', () => {
   it('resolves ProblemDetails.title when present', async () => {
-    const error = responseErrorWithBody({ title: 'Invalid request', detail: 'Field X is required' });
+    const error = responseErrorWithBody({
+      title: 'Invalid request',
+      detail: 'Field X is required',
+    });
 
     const message = await extractErrorMessage(error, 'fallback');
 
@@ -110,11 +117,65 @@ describe('extractErrorMessage', () => {
   });
 
   it('falls back to the fallback message when JSON parsing throws', async () => {
-    const response = new Response('{ not valid json', { headers: { 'content-type': 'application/json' } });
+    const response = new Response('{ not valid json', {
+      headers: { 'content-type': 'application/json' },
+    });
     const error = new ResponseError(response);
 
     const message = await extractErrorMessage(error, 'fallback message');
 
     expect(message).toBe('fallback message');
+  });
+});
+
+describe('readDeviceBusyProblem', () => {
+  const conflict = (body: unknown, status = 409) =>
+    new ResponseError(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/problem+json' },
+      })
+    );
+
+  it('returns the problem for a busy 409', async () => {
+    const error = conflict({
+      title: 'Alpha is busy with a transfer.',
+      status: 409,
+      code: 'deviceBusyWithTransfer',
+      deviceId: 'device-1',
+      activeJobId: 'job-7',
+    });
+
+    await expect(readDeviceBusyProblem(error)).resolves.toEqual({
+      deviceId: 'device-1',
+      activeJobId: 'job-7',
+      title: 'Alpha is busy with a transfer.',
+    });
+  });
+
+  it('returns a null activeJobId when the body carries none', async () => {
+    const error = conflict({ title: 'Busy', code: 'deviceBusyWithTransfer', deviceId: 'device-1' });
+
+    await expect(readDeviceBusyProblem(error)).resolves.toMatchObject({ activeJobId: null });
+  });
+
+  it('is null for a 409 without the busy code', async () => {
+    await expect(readDeviceBusyProblem(conflict({ title: 'Busy' }))).resolves.toBeNull();
+  });
+
+  it('is null for a 502, even with the busy code', async () => {
+    const error = conflict({ code: 'deviceBusyWithTransfer', deviceId: 'device-1' }, 502);
+
+    await expect(readDeviceBusyProblem(error)).resolves.toBeNull();
+  });
+
+  it('is null for a 409 whose body is not JSON', async () => {
+    const error = new ResponseError(new Response('not json', { status: 409 }));
+
+    await expect(readDeviceBusyProblem(error)).resolves.toBeNull();
+  });
+
+  it('is null for a non-ResponseError', async () => {
+    await expect(readDeviceBusyProblem(new Error('boom'))).resolves.toBeNull();
   });
 });

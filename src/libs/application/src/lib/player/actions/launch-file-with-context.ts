@@ -1,6 +1,12 @@
 import { firstValueFrom } from 'rxjs';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
-import { IPlayerService, LaunchMode, StorageType, FileItem } from '@teensyrom-nx/domain';
+import {
+  IPlayerService,
+  LaunchMode,
+  StorageType,
+  FileItem,
+  DeviceBusyError,
+} from '@teensyrom-nx/domain';
 import { PlayerState } from '../player-store';
 import { IPlayerStorage } from '../player-storage.interface';
 import {
@@ -108,8 +114,10 @@ export function launchFileWithContext(
           `PlayerAction: Failed to launch file ${file.name} for device ${deviceId}: ${errorMessage}`
         );
 
-        // Network/HTTP error - create file context from request so UI can show which file failed
-        const launchedFile = createLaunchedFile(deviceId, storageType, file, false);
+        // Network/HTTP error - create file context from request so UI can show which file failed.
+        // A busy refusal says nothing about the file, so it stays compatible and is not skipped.
+        const isBusyRefusal = error instanceof DeviceBusyError;
+        const launchedFile = createLaunchedFile(deviceId, storageType, file, isBusyRefusal);
         const safeIndex = Math.max(
           0,
           files.findIndex((f) => f.name === file.name)

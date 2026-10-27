@@ -10,11 +10,12 @@ import {
   StorageType,
   ALERT_SERVICE,
   IAlertService,
+  DeviceBusyError,
   API_CONFIG,
   IApiConfig,
 } from '@teensyrom-nx/domain';
 import { logError } from '@teensyrom-nx/utils';
-import { extractProblemMessage } from '../error/api-error.utils';
+import { extractProblemMessage, readDeviceBusyProblem } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerService implements IPlayerService {
@@ -27,7 +28,7 @@ export class PlayerService implements IPlayerService {
     @Inject(API_CONFIG) apiConfig: IApiConfig
   ) {
     this.baseApiUrl = apiConfig.getBaseUrl();
-    this.alertService = alertService; 
+    this.alertService = alertService;
   }
 
   launchFile(deviceId: string, file: FileItem): Observable<FileItem> {
@@ -116,10 +117,18 @@ export class PlayerService implements IPlayerService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`PlayerService.${methodName} failed:`, error);
-    return from(extractProblemMessage(error)).pipe(
-      switchMap((apiMessage) => {
-        this.alertService.error(apiMessage ?? friendlyMessage);
-        return throwError(() => error);
+    return from(readDeviceBusyProblem(error)).pipe(
+      switchMap((busy) => {
+        if (busy) {
+          this.alertService.warning(busy.title);
+          return throwError(() => new DeviceBusyError(busy.deviceId, busy.activeJobId, busy.title));
+        }
+        return from(extractProblemMessage(error)).pipe(
+          switchMap((apiMessage) => {
+            this.alertService.error(apiMessage ?? friendlyMessage);
+            return throwError(() => error);
+          })
+        );
       })
     );
   }
