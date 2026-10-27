@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  DeckMemoryKeeper,
   DeckService,
   DjSets,
   MidiControllers,
@@ -18,6 +19,7 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 describe('DjBootstrapService', () => {
   let hydrateMock: ReturnType<typeof vi.fn>;
   let installMock: ReturnType<typeof vi.fn>;
+  let keeperInstallMock: ReturnType<typeof vi.fn>;
   let mappingsHydrateMock: ReturnType<typeof vi.fn>;
   let routerStartMock: ReturnType<typeof vi.fn>;
   let setsHydrateMock: ReturnType<typeof vi.fn>;
@@ -28,6 +30,7 @@ describe('DjBootstrapService', () => {
         DjBootstrapService,
         { provide: DeckService, useValue: { hydrate: hydrateMock } },
         { provide: MixerApplier, useValue: { install: installMock } },
+        { provide: DeckMemoryKeeper, useValue: { install: keeperInstallMock } },
         { provide: MidiControllers, useValue: { hydrate: mappingsHydrateMock } },
         { provide: MidiInputRouter, useValue: { start: routerStartMock } },
         { provide: DjSets, useValue: { hydrate: setsHydrateMock } },
@@ -39,6 +42,7 @@ describe('DjBootstrapService', () => {
   beforeEach(() => {
     hydrateMock = vi.fn().mockResolvedValue(undefined);
     installMock = vi.fn();
+    keeperInstallMock = vi.fn();
     mappingsHydrateMock = vi.fn().mockResolvedValue(undefined);
     routerStartMock = vi.fn();
     setsHydrateMock = vi.fn().mockResolvedValue(undefined);
@@ -59,6 +63,31 @@ describe('DjBootstrapService', () => {
     service.init();
 
     expect(installMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('init installs the memory keeper exactly once, after the mixer applier', () => {
+    const service = configure();
+
+    service.init();
+
+    expect(keeperInstallMock).toHaveBeenCalledTimes(1);
+    expect(installMock.mock.invocationCallOrder[0]).toBeLessThan(
+      keeperInstallMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('a throwing keeper install logs a warning, never throws, and still hydrates', () => {
+    keeperInstallMock.mockImplementationOnce(() => {
+      throw new Error('no effects');
+    });
+    const service = configure();
+
+    expect(() => service.init()).not.toThrow();
+
+    expect(vi.mocked(logWarn)).toHaveBeenCalledWith(
+      'DjBootstrap: memory keeper install failed — no effects'
+    );
+    expect(hydrateMock).toHaveBeenCalledTimes(1);
   });
 
   it('a throwing mixer install logs a warning, never throws, and still hydrates', () => {

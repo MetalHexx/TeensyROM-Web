@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import type { JumpSettings } from '@sidablist/core';
-import type { LoopMarker, TuneIdentity } from '@sidablist/tunes';
+import type { LoopMarker, LoopPositionsStore, TuneIdentity } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
 import {
   DjStore,
   EMPTY_DECK_LOOPS,
+  MARKER_NAME_MAX_LENGTH,
   type DeckLoopBoundary,
   type DeckLoopMarker,
   type DeckLoopsState,
@@ -13,7 +14,6 @@ import {
   type DeckPanelState,
 } from './dj-store';
 import { MixerApplier } from './mixer-applier';
-import { LOOP_POSITIONS_STORE } from './ports';
 import { otherSlot, type Slot } from './slot';
 import {
   clamp,
@@ -26,12 +26,24 @@ import {
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { nextOffset, type LoopSnapDirection } from './loops/moment-reach';
 import { engineSettingsOf } from './mixer/engine-settings';
+import { MAX_MARKERS_PER_SUBTUNE, sanitizeName } from './sets/dj-sets';
 
 /** The SID's three voices: a new marker plays them all. */
 const ALL_VOICES: readonly number[] = [0, 1, 2];
 
 function sameTune(a: TuneIdentity, b: TuneIdentity): boolean {
   return a.sidHash === b.sidHash && a.subtune === b.subtune;
+}
+
+/** What a deck's markers are attached to: where they are read and written, and who else may share
+ *  the edits. */
+export interface DeckLoopsHolding {
+  /** The row the deck holds, as `setId:rowId`. Two decks share edits only when this and the subtune
+   *  match. */
+  readonly placementKey: string;
+  readonly identity: TuneIdentity;
+  /** Where this deck reads and writes the markers: one subtune of that row. */
+  readonly positions: LoopPositionsStore;
 }
 
 /** A loop's bounds in the engine's terms: the resolved start and end frames. */
@@ -48,8 +60,9 @@ type Mutes = DeckMixerSettings['mutes'];
 
 const NO_MUTES: Mutes = [false, false, false];
 
-/** What an edit changed in the list: where the markers are, or only the settings they carry. A
- *  settings change fires on every knob tick, so it skips what a position change must redo. */
+/** What an edit changed in the list: where the markers are, or only the settings or names they
+ *  carry. A settings change fires on every knob tick, so it skips what a position change must
+ *  redo. */
 type MarkerChange = 'positions' | 'settings';
 
 function mutesOf(voices: readonly { readonly muted: boolean }[]): Mutes {
@@ -87,6 +100,7 @@ function stored(marker: DeckLoopMarker): LoopMarker {
     start: marker.start,
     end: marker.end,
     voices: marker.voices,
+    ...(marker.name === null ? {} : { name: marker.name }),
     ...(marker.settings === null ? {} : { settings: encodeMixerSettings(marker.settings) }),
     ...(marker.ownSettings ? { usesOwnSettings: true } : {}),
   };
@@ -113,11 +127,12 @@ function reselect(
  * Each deck's loop markers: the list for the tune it holds, the readiness of each marker's start
  * in the engine, and every edit to the list.
  *
- * Attaching a tune loads its saved markers and declares their start frames to the engine, which
- * prepares each off the main thread; `reflect` mirrors the engine's published readiness onto the
- * list. Every edit writes through to the positions store, and to the other deck when it holds the
- * same tune — through the one `land` routine a local edit uses, so the other deck's readiness always
- * comes from its own engine.
+ * Attaching a tune loads the saved markers of the row and subtune the deck holds and declares their
+ * start frames to the engine, which prepares each off the main thread; `reflect` mirrors the
+ * engine's published readiness onto the list. Every edit writes through to that row's positions, and
+ * to the other deck when it holds the same row and subtune — through the one `land` routine a local
+ * edit uses, so the other deck's readiness always comes from its own engine. A name is part of the
+ * marker and follows the same path.
  *
  * It also performs the markers: toggling one idle, queued or running, queuing through the engine so
  * the hand-off lands at the end of the lap, following a landing with the selection, keeping a
@@ -139,11 +154,10 @@ function reselect(
 export class DeckLoops {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
-  private readonly positions = inject(LOOP_POSITIONS_STORE);
   private readonly mixerApplier = inject(MixerApplier);
 
-  /** The tune each slot's markers belong to; null while nothing is attached. */
-  private readonly attached: Record<Slot, TuneIdentity | null> = { A: null, B: null };
+  /** The holding each slot's markers belong to; null while nothing is attached. */
+  private readonly attached: Record<Slot, DeckLoopsHolding | null> = { A: null, B: null };
 
   /** Bumped by every `attach` and `detach`: an attach whose load resolves after a newer one has
    *  started drops its result instead of writing over it. */
@@ -172,12 +186,12 @@ export class DeckLoops {
    *  `syncQueued` re-queues when the settings the marker would carry now are another object. */
   private readonly queuedSource: Record<Slot, DeckMixerSettings | null> = { A: null, B: null };
 
-  /** Loads the tune's saved markers into the deck, selects the first, and declares their start
+  /** Loads the holding's saved markers into the deck, selects the first, and declares their start
    *  frames to the engine. A store that fails to load is logged and leaves the deck with no
    *  markers. */
   async attach(
     slot: Slot,
-    identity: TuneIdentity,
+    holding: DeckLoopsHolding,
     detectedMoments: readonly number[]
   ): Promise<void> {
     const token = ++this.attachTokens[slot];
@@ -185,7 +199,7 @@ export class DeckLoops {
 
     let saved: readonly LoopMarker[] = [];
     try {
-      saved = await this.positions.load(identity);
+      saved = await holding.positions.load(holding.identity);
     } catch (error) {
       logError(`DeckLoops: loading deck ${slot}'s loops failed`, error);
     }
@@ -193,7 +207,7 @@ export class DeckLoops {
       return;
     }
 
-    this.attached[slot] = identity;
+    this.attached[slot] = holding;
     this.resetActivity(slot);
     // The engine resets its hand-off counter on a load and on a subtune change.
     this.seenHandOffs[slot] = this.runtime.snapshot(slot).tune?.handOffs ?? 0;
@@ -201,6 +215,7 @@ export class DeckLoops {
       const settings = decodeMixerSettings(record.settings);
       return {
         id: record.id,
+        name: record.name ?? null,
         start: record.start,
         end: record.end,
         voices: record.voices,
@@ -222,8 +237,8 @@ export class DeckLoops {
     this.reflect(slot);
   }
 
-  /** Clears the deck's loop state and cancels an attach still loading. The positions store is
-   *  never touched: the saved markers stay for the next time the tune is loaded. */
+  /** Clears the deck's loop state and cancels an attach still loading. The positions are never
+   *  touched: the saved markers stay for the next time the tune is loaded. */
   detach(slot: Slot): void {
     this.attachTokens[slot]++;
     this.attached[slot] = null;
@@ -285,7 +300,7 @@ export class DeckLoops {
    * caller first.
    */
   toggle(slot: Slot, id: string): void {
-    if (this.identityOf(slot, 'toggle') === null) {
+    if (this.holdingOf(slot, 'toggle') === null) {
       return;
     }
     const { markers, runningId, queuedId } = this.loopsOf(slot);
@@ -314,7 +329,7 @@ export class DeckLoops {
    * started by the caller first.
    */
   playNow(slot: Slot, id: string): void {
-    if (this.identityOf(slot, 'playNow') === null) {
+    if (this.holdingOf(slot, 'playNow') === null) {
       return;
     }
     const { markers, runningId } = this.loopsOf(slot);
@@ -383,7 +398,15 @@ export class DeckLoops {
 
   /** Marks the playhead as a new cue and selects it. */
   add(slot: Slot): void {
-    if (this.identityOf(slot, 'add') === null) {
+    if (this.holdingOf(slot, 'add') === null) {
+      return;
+    }
+    if (this.loopsOf(slot).markers.length >= MAX_MARKERS_PER_SUBTUNE) {
+      this.refuse(
+        slot,
+        'add',
+        `already has the most markers a subtune keeps (${MAX_MARKERS_PER_SUBTUNE})`
+      );
       return;
     }
     const frame = this.runtime.capturePosition(slot);
@@ -393,6 +416,7 @@ export class DeckLoops {
     }
     const marker: DeckLoopMarker = {
       id: crypto.randomUUID(),
+      name: null,
       start: { frame, offsetFrames: 0 },
       end: null,
       voices: ALL_VOICES,
@@ -409,6 +433,31 @@ export class DeckLoops {
       return;
     }
     this.selectId(slot, id);
+  }
+
+  /** Names a marker. Control characters are removed and the name trimmed and capped to
+   *  `MARKER_NAME_MAX_LENGTH`; an empty name returns the marker to its place in the list. */
+  rename(slot: Slot, id: string, name: string): void {
+    if (this.holdingOf(slot, 'rename') === null) {
+      return;
+    }
+    const { markers, selectedId } = this.loopsOf(slot);
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (marker === undefined) {
+      this.refuse(slot, 'rename', `has no marker ${id}`);
+      return;
+    }
+    const cleaned = sanitizeName(name, MARKER_NAME_MAX_LENGTH);
+    const renamed = cleaned === '' ? null : cleaned;
+    if (renamed === marker.name) {
+      return;
+    }
+    this.commit(
+      slot,
+      markers.map((other) => (other.id === id ? { ...other, name: renamed } : other)),
+      selectedId,
+      'settings'
+    );
   }
 
   /** Moves the selection by `delta` places, stopping at the ends. */
@@ -589,24 +638,29 @@ export class DeckLoops {
   }
 
   /** Lands a changed list on the slot, saves it, and gives it to the other deck when that deck
-   *  holds the same tune. A settings change leaves the other deck's pending start audition and
-   *  its own sound alone: it plays the new settings at its next jump into the marker. */
+   *  holds the same row and subtune. A settings or names change leaves the other deck's pending
+   *  start audition and its own sound alone: it plays the new settings at its next jump into the
+   *  marker. */
   private commit(
     slot: Slot,
     markers: readonly DeckLoopMarker[],
     selectedId: string | null,
     change: MarkerChange = 'positions'
   ): void {
-    const identity = this.attached[slot];
-    if (identity === null) {
+    const mine = this.attached[slot];
+    if (mine === null) {
       return;
     }
     this.land(slot, markers, selectedId, change);
-    this.save(slot, identity, markers);
+    this.save(slot, mine, markers);
 
     const other = otherSlot(slot);
-    const otherIdentity = this.attached[other];
-    if (otherIdentity !== null && sameTune(identity, otherIdentity)) {
+    const theirs = this.attached[other];
+    if (
+      theirs !== null &&
+      theirs.placementKey === mine.placementKey &&
+      sameTune(theirs.identity, mine.identity)
+    ) {
       const { markers: before, selectedId: beforeId } = this.loopsOf(other);
       if (change === 'positions') {
         // An edit from this deck never moves the other deck's playhead.
@@ -986,9 +1040,9 @@ export class DeckLoops {
     );
   }
 
-  private save(slot: Slot, identity: TuneIdentity, markers: readonly DeckLoopMarker[]): void {
-    this.positions
-      .save(identity, markers.map(stored))
+  private save(slot: Slot, holding: DeckLoopsHolding, markers: readonly DeckLoopMarker[]): void {
+    holding.positions
+      .save(holding.identity, markers.map(stored))
       .catch((error: unknown) => logError(`DeckLoops: saving deck ${slot}'s loops failed`, error));
   }
 
@@ -1027,18 +1081,18 @@ export class DeckLoops {
     return target;
   }
 
-  /** The tune the slot is attached to, or null with a warning naming the refused command. */
-  private identityOf(slot: Slot, command: string): TuneIdentity | null {
-    const identity = this.attached[slot];
-    if (identity === null) {
+  /** What the slot is attached to, or null with a warning naming the refused command. */
+  private holdingOf(slot: Slot, command: string): DeckLoopsHolding | null {
+    const holding = this.attached[slot];
+    if (holding === null) {
       this.refuse(slot, command, 'has no tune attached');
     }
-    return identity;
+    return holding;
   }
 
   /** The selected marker, or null with a warning naming the refused command. */
   private selectedMarker(slot: Slot, command: string): DeckLoopMarker | null {
-    if (this.identityOf(slot, command) === null) {
+    if (this.holdingOf(slot, command) === null) {
       return null;
     }
     const { markers, selectedId } = this.loopsOf(slot);

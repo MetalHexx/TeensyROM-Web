@@ -1,11 +1,7 @@
 import { inject, Provider } from '@angular/core';
 import { createWorkerReplayRunner } from '@sidablist/core';
 import type { FrameClock, ReplayRunner } from '@sidablist/core';
-import {
-  createTuneInserter,
-  createTuneResolver,
-  InMemoryLoopPositionsStore,
-} from '@sidablist/tunes';
+import { createTuneInserter, createTuneResolver } from '@sidablist/tunes';
 import { API_CONFIG, type IApiConfig } from '@teensyrom-nx/domain';
 import {
   Configuration,
@@ -15,7 +11,6 @@ import {
 import {
   DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
-  LOOP_POSITIONS_STORE,
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
@@ -85,8 +80,7 @@ export const DJ_STORAGE_PROVIDERS: Provider[] = [
  *
  * Also composes the two tunes ports the application injects, over `IndexedDbTuneStore` and a
  * worker-backed `TuneIndexer` — `analysis` is reachable only through `WorkerTuneIndexer`, never
- * from application code — and provides the session loop-positions store, which a permanent one
- * replaces behind the same port.
+ * from application code.
  */
 export const DJ_ENGINE_PROVIDERS: Provider[] = [
   { provide: MIDI_ACCESS, useExisting: MidiAccessService },
@@ -102,7 +96,6 @@ export const DJ_ENGINE_PROVIDERS: Provider[] = [
           })
       ),
   },
-  { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
   { provide: TUNE_INSERTER, useFactory: () => createTuneInserter(inject(IndexedDbTuneStore)) },
   {
     provide: TUNE_RESOLVER,

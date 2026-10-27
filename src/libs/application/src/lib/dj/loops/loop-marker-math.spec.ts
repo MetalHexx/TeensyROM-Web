@@ -8,6 +8,7 @@ function marker(
 ): DeckLoopMarker {
   return {
     id: 'm',
+    name: null,
     start: { frame: start.frame, offsetFrames: start.offsetFrames ?? 0 },
     end: end === null ? null : { frame: end.frame, offsetFrames: end.offsetFrames ?? 0 },
     voices: [0, 1, 2],

@@ -1,36 +1,57 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { FakeClock, frames, milliseconds, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
-import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
-import type { LoopMarker, Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
+import {
+  InMemorySetStore,
+  InMemoryTuneMemoryStore,
+  createRow,
+  createSet,
+  subtuneMemoryOf,
+  type LoopMarker,
+  type PlainValue,
+  type Playable,
+  type TuneIdentity,
+  type TuneMemory,
+  type TuneReference,
+  type TuneSet,
+} from '@sidablist/tunes';
 import type { TuneIndexRecord } from '@sidablist/analysis';
 import {
+  ALERT_SERVICE,
   FILE_CONTENT_SERVICE,
   StorageType,
+  type Device,
   type FileContent,
   type IFileContentService,
 } from '@teensyrom-nx/domain';
+import { DeviceStore } from '../device/device-store';
 import { DeckService } from './deck.service';
 import { DeckLoops } from './deck-loops';
+import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
-import { DjStore, HOME_DECK_PANEL, type DeckMixerSettings } from './dj-store';
-import { encodeMixerSettings } from './loops/marker-settings-codec';
+import { DjStore, HOME_DECK_PANEL, type DeckHolding, type DeckMixerSettings } from './dj-store';
+import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
+import { decodeRowSettings, encodeRowSettings, type DeckRowSettings } from './loops/row-settings-codec';
+import { DjSets } from './sets/dj-sets';
+import { decodeRowHost } from './sets/row-host';
 import {
+  DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
   REPLAY_RUNNER_FACTORY,
   MIDI_ACCESS,
+  SET_STORE,
   TUNE_INSERTER,
+  TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
-  LOOP_POSITIONS_STORE,
 } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
@@ -173,6 +194,11 @@ describe('DeckService', () => {
   let byPath: Map<string, TuneFixture>;
   let bySidHash: Map<string, TuneFixture>;
   let clocks: FakeClock[];
+  let setStore: InMemorySetStore;
+  let memoryStore: InMemoryTuneMemoryStore;
+  let libraryState: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
+  let alerts: { warning: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+  let usableDevices: WritableSignal<Device[]>;
 
   function register(fixture: TuneFixture): TuneFixture {
     byPath.set(fixture.source.path, fixture);
@@ -213,6 +239,11 @@ describe('DeckService', () => {
     byPath = new Map();
     bySidHash = new Map();
     clocks = [];
+    setStore = new InMemorySetStore();
+    memoryStore = new InMemoryTuneMemoryStore();
+    libraryState = { load: vi.fn().mockResolvedValue(null), save: vi.fn().mockResolvedValue(undefined) };
+    alerts = { warning: vi.fn(), error: vi.fn() };
+    usableDevices = signal<Device[]>([{ deviceId: 'device-1' } as Device]);
 
     fileContentMock = vi.fn((deviceId: string, storageType: StorageType, path: string) => {
       const fixture = byPath.get(path);
@@ -270,7 +301,11 @@ describe('DeckService', () => {
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService },
         { provide: TUNE_INSERTER, useValue: { insert: insertMock } },
         { provide: TUNE_RESOLVER, useValue: { resolve: resolveMock } },
-        { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
+        { provide: SET_STORE, useValue: setStore },
+        { provide: TUNE_MEMORY_STORE, useValue: memoryStore },
+        { provide: DJ_LIBRARY_STATE_REPOSITORY, useValue: libraryState },
+        { provide: ALERT_SERVICE, useValue: alerts },
+        { provide: DeviceStore, useValue: { usableDevices } },
       ],
     });
 
@@ -289,6 +324,44 @@ describe('DeckService', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+
+  /** Seeds the tune's latest memory — what a new row copies — with one subtune's kept state. */
+  async function keepFor(
+    identity: TuneIdentity,
+    kept: { markers?: readonly LoopMarker[]; settings?: PlainValue }
+  ): Promise<void> {
+    const before = await memoryStore.load(identity.sidHash);
+    const others = (before?.subtunes ?? []).filter((entry) => entry.subtune !== identity.subtune);
+    const memory: TuneMemory = {
+      sidHash: identity.sidHash,
+      lastSubtune: before?.lastSubtune ?? 1,
+      subtunes: [
+        ...others,
+        {
+          subtune: identity.subtune,
+          markers: kept.markers ?? [],
+          ...(kept.settings === undefined ? {} : { settings: kept.settings }),
+        },
+      ].sort((a, b) => a.subtune - b.subtune),
+      updated: '2026-01-01T00:00:00.000Z',
+    };
+    await memoryStore.save(memory);
+  }
+
+  function keepMarkers(identity: TuneIdentity, markers: readonly LoopMarker[]): Promise<void> {
+    return keepFor(identity, { markers });
+  }
+
+  /** The markers the open sets keep for the tune's subtune. */
+  function rowMarkers(identity: TuneIdentity): readonly LoopMarker[] {
+    for (const set of Object.values(store.sets.open())) {
+      const row = set.rows.find((candidate) => candidate.tune.sidHash === identity.sidHash);
+      if (row !== undefined) {
+        return subtuneMemoryOf(row, identity.subtune)?.markers ?? [];
+      }
+    }
+    return [];
+  }
 
   async function loadAndWait(slot: 'A' | 'B', fixture: TuneFixture): Promise<void> {
     await service.load(slot, fixture.source);
@@ -1656,7 +1729,7 @@ describe('DeckService', () => {
 
     it("turns a loaded tune's markers ready as the engine builds them", async () => {
       const fixture = register(makeFixture());
-      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+      await keepMarkers(fixture.reference.identity, [
         { id: 'saved', start: { frame: 60, offsetFrames: 0 }, end: null, voices: [0, 1, 2] },
       ]);
 
@@ -1740,7 +1813,7 @@ describe('DeckService', () => {
     /** Loads a tune carrying a loop at 100–120, a loop at 300–320 and a cue at 500, all ready. */
     async function loadPlayable(slot: 'A' | 'B', detectedMoments: number[] = []): Promise<void> {
       const fixture = register(makeFixture());
-      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+      await keepMarkers(fixture.reference.identity, [
         loopMarker('a', 100, 120),
         loopMarker('b', 300, 320),
         cueMarker('c', 500),
@@ -1944,7 +2017,7 @@ describe('DeckService', () => {
        *  that shares the main track's. */
       async function loadWithSettings(slot: 'A' | 'B'): Promise<TuneFixture> {
         const fixture = register(makeFixture());
-        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        await keepMarkers(fixture.reference.identity, [
           {
             ...loopMarker('a', 100, 120),
             settings: encodeMixerSettings(SETTINGS_A),
@@ -2036,10 +2109,7 @@ describe('DeckService', () => {
         const first = await loadWithSettings('A');
         await service.toggleMarker('A', 'a');
         const save = vi.spyOn(TestBed.inject(DeckLoops), 'saveSettingsInPlay');
-        const positions = TestBed.inject(LOOP_POSITIONS_STORE);
-        const savedBefore = (await positions.load(first.reference.identity)).find(
-          (marker) => marker.id === 'a'
-        );
+        const savedBefore = rowMarkers(first.reference.identity).find((marker) => marker.id === 'a');
 
         await loadAndWait('A', register(makeFixture()));
 
@@ -2047,14 +2117,14 @@ describe('DeckService', () => {
         expect(loopsOf('A').settingsInPlayId).toBeNull();
         expect(store.panel().A).toBe(HOME_DECK_PANEL);
         expect(engineMutes('A')).toEqual([false, false, false]);
-        expect(
-          (await positions.load(first.reference.identity)).find((marker) => marker.id === 'a')
-        ).toEqual(savedBefore);
+        expect(rowMarkers(first.reference.identity).find((marker) => marker.id === 'a')).toEqual(
+          savedBefore
+        );
       });
 
       it('never writes a subtune change back into the marker that was in play', async () => {
         const fixture = register(makeFixture({ subtuneCount: 2 }));
-        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        await keepMarkers(fixture.reference.identity, [
           {
             ...loopMarker('a', 100, 120),
             settings: encodeMixerSettings(SETTINGS_A),
@@ -2211,7 +2281,7 @@ describe('DeckService', () => {
 
       it("never moves the other deck's playhead on a shared tune", async () => {
         const fixture = register(makeFixture());
-        await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+        await keepMarkers(fixture.reference.identity, [
           loopMarker('a', 100, 120),
         ]);
         await loadAndWait('A', fixture);
@@ -2246,7 +2316,7 @@ describe('DeckService', () => {
 
     it("follows an edit made on the other deck's list through the same tune", async () => {
       const fixture = register(makeFixture());
-      await TestBed.inject(LOOP_POSITIONS_STORE).save(fixture.reference.identity, [
+      await keepMarkers(fixture.reference.identity, [
         loopMarker('a', 100, 120),
       ]);
       await loadAndWait('A', fixture);
@@ -2261,6 +2331,814 @@ describe('DeckService', () => {
       expect(loopsOf('B').runningId).toBeNull();
       expect(engineLoop('B')).toBeNull();
       expect(store.loopsSummary('B')().canStop).toBe(false);
+    });
+  });
+
+  describe('rows and kept state', () => {
+    const WRITE_DELAY_MS = 250;
+
+    const SHAPED: DeckRowSettings = {
+      mixer: {
+        panel: { ...HOME_DECK_PANEL, cutoff: 200, keySemitones: 2 },
+        mutes: [true, false, false],
+      },
+      speed: 1.25,
+      repeat: false,
+    };
+    const OTHER: DeckRowSettings = {
+      mixer: { panel: { ...HOME_DECK_PANEL, resonance: 5 }, mutes: [false, true, false] },
+      speed: 0.8,
+      repeat: true,
+    };
+    const HOME_VOICES = [false, false, false];
+
+    let mixer: MixerService;
+    let sets: DjSets;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mixer = TestBed.inject(MixerService);
+      sets = TestBed.inject(DjSets);
+      TestBed.inject(DeckMemoryKeeper).install();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Runs the pending effects, lets `ms` of fake time pass, and runs the effects that caused. */
+    async function settle(ms = 0): Promise<void> {
+      TestBed.flushEffects();
+      await vi.advanceTimersByTimeAsync(ms);
+      TestBed.flushEffects();
+    }
+
+    function keepSettings(identity: TuneIdentity, settings: DeckRowSettings): Promise<void> {
+      return keepFor(identity, { settings: encodeRowSettings(settings) });
+    }
+
+    function holdingOf(slot: 'A' | 'B'): DeckHolding {
+      const holding = store.sets.holdings()[slot];
+      if (holding === null) {
+        throw new Error(`deck ${slot} holds no row`);
+      }
+      return holding;
+    }
+
+    function currentSet(): TuneSet {
+      const id = store.sets.currentSetId();
+      if (id === null) {
+        throw new Error('no current set');
+      }
+      return store.sets.open()[id];
+    }
+
+    const keptBy = (holding: DeckHolding): DeckRowSettings | null =>
+      decodeRowSettings(sets.subtuneSettingsOf(holding));
+
+    const engineMutes = (slot: 'A' | 'B') => runtime.snapshot(slot).voices.map((voice) => voice.muted);
+
+    /** What a deck shows is `settings`, in the store and in the engine. */
+    function expectRestored(slot: 'A' | 'B', settings: DeckRowSettings): void {
+      const deck = store.deck(slot)();
+      expect(store.panel()[slot]).toEqual(settings.mixer.panel);
+      expect(engineMutes(slot)).toEqual(settings.mixer.mutes);
+      expect(deck.voices.map((voice) => voice.muted)).toEqual(settings.mixer.mutes);
+      expect(runtime.snapshot(slot).tempo.multiplier).toBe(settings.speed);
+      expect(deck.faderSpeed).toBe(settings.speed);
+      expect(deck.repeat).toBe(settings.repeat);
+      expect(runtime.snapshot(slot).repeatTrack).toBe(settings.repeat);
+    }
+
+    function expectHome(slot: 'A' | 'B'): void {
+      expect(store.panel()[slot]).toEqual(HOME_DECK_PANEL);
+      expect(engineMutes(slot)).toEqual(HOME_VOICES);
+      expect(runtime.snapshot(slot).tempo.multiplier).toBe(1);
+      expect(store.deck(slot)().faderSpeed).toBe(1);
+    }
+
+    async function markAt(slot: 'A' | 'B', frame: number): Promise<void> {
+      await runtime.seekToFrame(slot, frame);
+      service.addMarker(slot);
+    }
+
+    describe('a drop', () => {
+      it('appends a row to the current set and holds it', async () => {
+        const fixture = register(makeFixture());
+
+        await loadAndWait('A', fixture);
+
+        const [row] = currentSet().rows;
+        expect(currentSet().rows).toHaveLength(1);
+        expect(row.tune.sidHash).toBe(fixture.reference.identity.sidHash);
+        expect(decodeRowHost(row.host)?.source).toEqual(fixture.source);
+        expect(holdingOf('A')).toEqual({
+          setId: currentSet().id,
+          rowId: row.id,
+          sidHash: row.tune.sidHash,
+          subtune: 1,
+        });
+        expect(store.deck('A')().status).toBe('playing');
+      });
+
+      it('reuses the row the SID already has, for either deck', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+
+        await loadAndWait('B', fixture);
+        await loadAndWait('A', fixture);
+
+        expect(currentSet().rows).toHaveLength(1);
+        expect(holdingOf('B').rowId).toBe(holdingOf('A').rowId);
+      });
+
+      it('copies what the tune\'s latest version kept into the new row', async () => {
+        const fixture = register(makeFixture());
+        await keepSettings(fixture.reference.identity, SHAPED);
+
+        await loadAndWait('A', fixture);
+
+        expect(keptBy(holdingOf('A'))).toEqual(SHAPED);
+      });
+    });
+
+    describe('loadRow', () => {
+      it('loads any open set\'s row at the subtune it was last on, replacing what plays', async () => {
+        const first = register(makeFixture({ subtuneCount: 3 }));
+        const second = register(makeFixture());
+        await keepSettings({ ...first.reference.identity, subtune: 2 }, OTHER);
+        await loadAndWait('A', first);
+        await service.selectSubtune('A', 2);
+        const heldFirst = holdingOf('A');
+        await loadAndWait('A', second);
+        await settle();
+
+        await service.loadRow('A', heldFirst.setId, heldFirst.rowId);
+
+        expect(holdingOf('A')).toEqual(heldFirst);
+        expect(store.deck('A')().loaded?.identity).toEqual({
+          sidHash: first.reference.identity.sidHash,
+          subtune: 2,
+        });
+        expect(store.deck('A')().status).toBe('playing');
+        expectRestored('A', OTHER);
+      });
+
+      it('loads a row of a set that is not the current one', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        const held = holdingOf('A');
+        sets.newSet();
+        await settle();
+        expect(currentSet().id).not.toBe(held.setId);
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(holdingOf('B')).toEqual(held);
+        expect(store.deck('B')().status).toBe('playing');
+      });
+
+      it('refuses with a warning for a row that is not in an open set, leaving the deck as it was', async () => {
+        vi.mocked(logWarn).mockClear();
+
+        await service.loadRow('A', 'no-set', 'no-row');
+
+        expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+        expect(store.deck('A')().status).toBe('empty');
+        expect(store.deck('A')().busy).toBe(false);
+        expect(store.sets.holdings().A).toBeNull();
+      });
+    });
+
+    describe('restoring', () => {
+      it('lands the settings each subtune keeps, and home for one that keeps none', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 3 }));
+        const { sidHash } = fixture.reference.identity;
+        await keepSettings({ sidHash, subtune: 1 }, SHAPED);
+        await keepSettings({ sidHash, subtune: 2 }, OTHER);
+
+        await loadAndWait('A', fixture);
+        expectRestored('A', SHAPED);
+
+        await service.selectSubtune('A', 2);
+        expectRestored('A', OTHER);
+
+        await service.selectSubtune('A', 3);
+        expectHome('A');
+        expect(store.deck('A')().repeat).toBe(OTHER.repeat);
+      });
+
+      it('loads a voice latched muted as muted, and writes nothing back for it', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 2 }));
+        const { sidHash } = fixture.reference.identity;
+        await keepSettings({ sidHash, subtune: 1 }, SHAPED);
+        await keepSettings({ sidHash, subtune: 2 }, OTHER);
+        const save = vi.spyOn(sets, 'saveSubtuneSettings');
+
+        await loadAndWait('A', fixture);
+        await settle(WRITE_DELAY_MS * 2);
+        expect(engineMutes('A')).toEqual([true, false, false]);
+        expect(keptBy(holdingOf('A'))).toEqual(SHAPED);
+
+        await service.selectSubtune('A', 2);
+        await settle(WRITE_DELAY_MS * 2);
+        expect(engineMutes('A')).toEqual([false, true, false]);
+        expect(keptBy(holdingOf('A'))).toEqual(OTHER);
+        expect(save).not.toHaveBeenCalled();
+      });
+
+      it('returns holds, nudges and an open excursion home, whatever the row keeps', async () => {
+        const fixture = register(makeFixture());
+        await keepSettings(fixture.reference.identity, SHAPED);
+        await loadAndWait('A', fixture);
+        service.setNudge('A', 'up', true);
+        service.setVoiceHeld('A', 2, true);
+        service.jumpSpeed('A', 'up');
+        expect(store.deck('A')().nudging).toBe(true);
+
+        await loadAndWait('A', fixture);
+
+        expectRestored('A', SHAPED);
+        expect(store.deck('A')().nudging).toBe(false);
+        expect(runtime.snapshot('A').voices.map((voice) => voice.held)).toEqual(HOME_VOICES);
+        service.jumpSpeed('A', 'down');
+        expect(store.deck('A')().faderSpeed).toBeCloseTo(SHAPED.speed - 0.5);
+      });
+
+      it('writes nothing for a subtune that keeps no settings', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 3 }));
+        await keepSettings(fixture.reference.identity, SHAPED);
+        const save = vi.spyOn(sets, 'saveSubtuneSettings');
+
+        await loadAndWait('A', fixture);
+        await service.selectSubtune('A', 3);
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(save).not.toHaveBeenCalled();
+        expect(sets.subtuneSettingsOf(holdingOf('A'))).toBeUndefined();
+        expect(currentSet().rows[0].subtunes.map((entry) => entry.subtune)).toEqual([1]);
+      });
+
+      it('writes nothing into a row for a tune that is new to it', async () => {
+        const save = vi.spyOn(sets, 'saveSubtuneSettings');
+
+        await loadAndWait('A', register(makeFixture()));
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(save).not.toHaveBeenCalled();
+        expect(currentSet().rows[0].subtunes).toEqual([]);
+      });
+    });
+
+    describe('a superseded load', () => {
+      it('never holds the row or restores its settings after the newer load', async () => {
+        const older = register(makeFixture());
+        const newer = register(makeFixture());
+        await keepSettings(older.reference.identity, SHAPED);
+        await keepSettings(newer.reference.identity, OTHER);
+        let release!: (memory: TuneMemory | null) => void;
+        const gate = new Promise<TuneMemory | null>((resolve) => {
+          release = resolve;
+        });
+        const kept = await memoryStore.load(older.reference.identity.sidHash);
+        const realLoad = memoryStore.load.bind(memoryStore);
+        vi.spyOn(memoryStore, 'load').mockImplementation((hash) =>
+          hash === older.reference.identity.sidHash ? gate : realLoad(hash)
+        );
+
+        const first = service.load('A', older.source);
+        await vi.waitFor(() => expect(memoryStore.load).toHaveBeenCalledTimes(1));
+        await service.load('A', newer.source);
+        release(kept);
+        await first;
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(holdingOf('A').sidHash).toBe(newer.reference.identity.sidHash);
+        expect(store.deck('A')().loaded?.identity.sidHash).toBe(newer.reference.identity.sidHash);
+        expectRestored('A', OTHER);
+        expect(keptBy(holdingOf('A'))).toEqual(OTHER);
+      });
+
+      it('never holds a row for a load a newer one superseded while it fetched', async () => {
+        const older = register(makeFixture());
+        const newer = register(makeFixture());
+        let release!: () => void;
+        const realInsert = insertMock.getMockImplementation();
+        insertMock.mockImplementationOnce(
+          (bytes: Uint8Array) =>
+            new Promise<TuneReference>((resolve) => {
+              release = () => void realInsert?.(bytes).then(resolve);
+            })
+        );
+
+        const first = service.load('A', older.source);
+        await vi.waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+        await service.load('A', newer.source);
+        release();
+        await first;
+
+        expect(currentSet().rows.map((row) => row.tune.sidHash)).toEqual([
+          newer.reference.identity.sidHash,
+        ]);
+        expect(holdingOf('A').sidHash).toBe(newer.reference.identity.sidHash);
+      });
+    });
+
+    describe('a failed load', () => {
+      it('leaves the row it held untouched, also after Repeat is pressed on the failed deck', async () => {
+        const fixture = register(makeFixture());
+        await keepSettings(fixture.reference.identity, SHAPED);
+        await loadAndWait('A', fixture);
+        await settle(WRITE_DELAY_MS * 2);
+        const held = holdingOf('A');
+        const before = sets.subtuneSettingsOf(held);
+        expect(before).toEqual(encodeRowSettings(SHAPED));
+
+        await service.load('A', makeFixture().source);
+        expect(store.deck('A')().status).toBe('failed');
+        service.setRepeat('A', !store.deck('A')().repeat);
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(holdingOf('A')).toEqual(held);
+        expect(sets.subtuneSettingsOf(held)).toEqual(before);
+        expect((await memoryStore.load(held.sidHash))?.subtunes[0].settings).toEqual(before);
+      });
+
+      it('leaves a row it took alone too, when the tune fails to scan', async () => {
+        const fixture = register(makeFixture({ invalidBytes: true }));
+        await keepSettings(fixture.reference.identity, SHAPED);
+        resolveMock.mockRejectedValue(new Error('cannot scan'));
+
+        await service.load('A', fixture.source);
+        service.setRepeat('A', true);
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(store.deck('A')().status).toBe('failed');
+        expect(keptBy(holdingOf('A'))).toEqual(SHAPED);
+      });
+    });
+
+    describe('edits', () => {
+      it('write the deck\'s controls into the held row and subtune, and the tune\'s latest version', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 2 }));
+        await loadAndWait('A', fixture);
+        await service.selectSubtune('A', 2);
+        await settle();
+
+        mixer.setFilterKnob('A', 'cutoff', 600);
+        service.setVoiceMuted('A', 1, true);
+        service.setSpeed('A', 1.3);
+        service.setRepeat('A', false);
+        await settle(WRITE_DELAY_MS);
+
+        const held = holdingOf('A');
+        expect(held.subtune).toBe(2);
+        expect(keptBy(held)).toEqual({
+          mixer: { panel: store.panel().A, mutes: [false, true, false] },
+          speed: 1.3,
+          repeat: false,
+        });
+        expect(store.panel().A.cutoff).toBe(600);
+        expect(sets.subtuneSettingsOf({ ...held, subtune: 1 })).toBeUndefined();
+
+        await settle(400);
+        const memory = await memoryStore.load(held.sidHash);
+        expect(memory?.lastSubtune).toBe(2);
+        expect(memory?.subtunes.find((entry) => entry.subtune === 2)?.settings).toEqual(
+          sets.subtuneSettingsOf(held)
+        );
+        const saved = await setStore.load(held.setId);
+        expect(saved?.rows[0].subtunes.find((entry) => entry.subtune === 2)?.settings).toEqual(
+          sets.subtuneSettingsOf(held)
+        );
+      });
+
+      it('write marker edits into the held row too', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+
+        await markAt('A', 100);
+        await settle(400);
+
+        const held = holdingOf('A');
+        expect(rowMarkers(fixture.reference.identity).map((marker) => marker.start.frame)).toEqual([100]);
+        const memory = await memoryStore.load(held.sidHash);
+        expect(memory?.subtunes[0].markers.map((marker) => marker.start.frame)).toEqual([100]);
+      });
+
+      it('keep the main track\'s settings while a marker\'s own are in play', async () => {
+        const own: DeckMixerSettings = {
+          panel: { ...HOME_DECK_PANEL, keySemitones: -4 },
+          mutes: [false, true, false],
+        };
+        const fixture = register(makeFixture());
+        await keepMarkers(fixture.reference.identity, [
+          {
+            id: 'a',
+            start: { frame: 100, offsetFrames: 0 },
+            end: null,
+            voices: [0, 1, 2],
+            settings: encodeMixerSettings(own),
+            usesOwnSettings: true,
+          },
+        ]);
+        await loadAndWait('A', fixture);
+        await vi.waitFor(() =>
+          expect(store.loops().A.markers.every((marker) => marker.ready)).toBe(true)
+        );
+        await settle();
+        mixer.setFilterKnob('A', 'cutoff', 50);
+        await settle(WRITE_DELAY_MS);
+        const held = holdingOf('A');
+        const main = sets.subtuneSettingsOf(held);
+        expect(keptBy(held)?.mixer.panel.cutoff).toBe(50);
+
+        await service.toggleMarker('A', 'a');
+        expect(store.panel().A).toEqual(own.panel);
+        service.setVoiceMuted('A', 0, true);
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(sets.subtuneSettingsOf(held)).toEqual(main);
+        expect(
+          decodeMixerSettings(rowMarkers(fixture.reference.identity)[0].settings)?.mutes
+        ).toEqual([true, true, false]);
+
+        service.stopMarkerLoop('A');
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(sets.subtuneSettingsOf(held)).toEqual(main);
+        expect(store.panel().A.cutoff).toBe(50);
+      });
+
+      it('leave nudges and holds out, and keep an open excursion as the speed it remembered', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        await settle();
+        service.setSpeed('A', 1.2);
+        await settle(WRITE_DELAY_MS);
+        const save = vi.spyOn(sets, 'saveSubtuneSettings');
+
+        service.setNudge('A', 'up', true);
+        service.setVoiceHeld('A', 0, true);
+        service.jumpSpeed('A', 'up');
+        service.setSpeed('A', 0.9);
+        await settle(WRITE_DELAY_MS * 2);
+        expect(store.deck('A')().faderSpeed).toBe(0.9);
+        service.jumpSpeed('A', 'home');
+        await settle(WRITE_DELAY_MS * 2);
+
+        expect(save).not.toHaveBeenCalled();
+        expect(keptBy(holdingOf('A'))?.speed).toBe(1.2);
+      });
+    });
+
+    describe('one row on both decks', () => {
+      it('shares its markers, and the other deck\'s sound changes only at its next load', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        await loadAndWait('B', fixture);
+        await settle();
+
+        await markAt('A', 100);
+        service.setVoiceMuted('A', 0, true);
+        await settle(WRITE_DELAY_MS);
+
+        expect(store.loops().B.markers.map((marker) => marker.start.frame)).toEqual([100]);
+        expect(engineMutes('B')).toEqual(HOME_VOICES);
+
+        await loadAndWait('B', fixture);
+        expect(engineMutes('B')).toEqual([true, false, false]);
+      });
+
+      it('writes a bounded number of times, the row keeping the deck that changed last', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        await loadAndWait('B', fixture);
+        await settle();
+        const save = vi.spyOn(sets, 'saveSubtuneSettings');
+
+        service.setVoiceMuted('A', 0, true);
+        await settle(WRITE_DELAY_MS);
+        service.setVoiceMuted('B', 2, true);
+        await settle(WRITE_DELAY_MS);
+        await settle(WRITE_DELAY_MS * 4);
+
+        expect(save).toHaveBeenCalledTimes(2);
+        expect(keptBy(holdingOf('A'))?.mixer.mutes).toEqual([false, false, true]);
+        expect(engineMutes('A')).toEqual([true, false, false]);
+        expect(engineMutes('B')).toEqual([false, false, true]);
+      });
+    });
+
+    describe('two rows of one SID in two sets', () => {
+      it('share nothing: each keeps its own markers and settings', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        await settle();
+        await markAt('A', 100);
+        const firstSetId = currentSet().id;
+        sets.newSet();
+        await settle();
+
+        await loadAndWait('B', fixture);
+        await settle();
+        expect(holdingOf('B').setId).not.toBe(firstSetId);
+        expect(holdingOf('B').rowId).not.toBe(holdingOf('A').rowId);
+        expect(store.loops().B.markers.map((marker) => marker.start.frame)).toEqual([100]);
+
+        await markAt('A', 200);
+        await markAt('B', 300);
+        mixer.setFilterKnob('A', 'cutoff', 111);
+        await settle(WRITE_DELAY_MS);
+        mixer.setFilterKnob('B', 'cutoff', 222);
+        await settle(WRITE_DELAY_MS);
+
+        const frames = (slot: 'A' | 'B') =>
+          store.loops()[slot].markers.map((marker) => marker.start.frame);
+        expect(frames('A')).toEqual([100, 200]);
+        expect(frames('B')).toEqual([100, 300]);
+        expect(keptBy(holdingOf('A'))?.mixer.panel.cutoff).toBe(111);
+        expect(keptBy(holdingOf('B'))?.mixer.panel.cutoff).toBe(222);
+
+        await settle(400);
+        const latest = await memoryStore.load(holdingOf('B').sidHash);
+        expect(latest?.subtunes[0].markers.map((marker) => marker.start.frame)).toEqual([100, 300]);
+      });
+    });
+
+    describe('a pending write', () => {
+      it('lands in the row the deck held when loading another row closes its set', async () => {
+        const first = register(makeFixture());
+        const second = register(makeFixture());
+        await loadAndWait('A', first);
+        await settle();
+        const held = holdingOf('A');
+        sets.newSet();
+        await sets.addFromListing(second.source, null);
+        const target = currentSet().rows[0];
+
+        mixer.setFilterKnob('A', 'cutoff', 600);
+        TestBed.flushEffects();
+        await service.loadRow('A', currentSet().id, target.id);
+        await settle(400);
+
+        expect(store.sets.open()[held.setId]).toBeUndefined();
+        const memory = await memoryStore.load(held.sidHash);
+        expect(
+          decodeRowSettings(memory?.subtunes[0].settings)?.mixer.panel.cutoff
+        ).toBe(600);
+        const saved = await setStore.load(held.setId);
+        expect(
+          decodeRowSettings(saved?.rows[0].subtunes[0].settings)?.mixer.panel.cutoff
+        ).toBe(600);
+        expect(holdingOf('A').rowId).toBe(target.id);
+      });
+    });
+
+    describe('a deck whose set was deleted', () => {
+      it('keeps its row, and keeps writing its edits to the tune\'s memory only', async () => {
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        const held = holdingOf('A');
+
+        await sets.deleteCurrent();
+        await settle();
+        expect(store.sets.open()[held.setId]).toBeUndefined();
+
+        mixer.setFilterKnob('A', 'cutoff', 600);
+        await markAt('A', 100);
+        await settle(WRITE_DELAY_MS + 400);
+
+        expect(keptBy(held)?.mixer.panel.cutoff).toBe(600);
+        expect(rowMarkers(fixture.reference.identity)).toEqual([]);
+        const memory = await memoryStore.load(held.sidHash);
+        expect(decodeRowSettings(memory?.subtunes[0].settings)?.mixer.panel.cutoff).toBe(600);
+        expect(memory?.subtunes[0].markers.map((marker) => marker.start.frame)).toEqual([100]);
+        expect(await setStore.load(held.setId)).toBeNull();
+      });
+    });
+
+    describe('naming markers', () => {
+      const names = () => store.loops().A.markers.map((marker) => marker.name);
+
+      async function loadWithMarkers(): Promise<TuneFixture> {
+        const fixture = register(makeFixture());
+        await keepMarkers(fixture.reference.identity, [
+          { id: 'a', start: { frame: 100, offsetFrames: 0 }, end: null, voices: [0, 1, 2] },
+          { id: 'b', start: { frame: 200, offsetFrames: 0 }, end: null, voices: [0, 1, 2] },
+        ]);
+        await loadAndWait('A', fixture);
+        return fixture;
+      }
+
+      it('names a marker, shows the name in place of its position and keeps it in the row', async () => {
+        const fixture = await loadWithMarkers();
+
+        service.renameMarker('A', 'b', 'Drop');
+
+        expect(names()).toEqual([null, 'Drop']);
+        expect(store.loopsSummary('A')().items.map((item) => item.name)).toEqual(['Item 1', 'Drop']);
+        expect(rowMarkers(fixture.reference.identity).map((marker) => marker.name)).toEqual([
+          undefined,
+          'Drop',
+        ]);
+        await loadAndWait('A', fixture);
+        expect(names()).toEqual([null, 'Drop']);
+      });
+
+      it('returns a marker to its place in the list when the name is empty', async () => {
+        await loadWithMarkers();
+        service.renameMarker('A', 'a', 'Intro');
+
+        service.renameMarker('A', 'a', '');
+
+        expect(names()).toEqual([null, null]);
+        expect(store.loopsSummary('A')().items[0].name).toBe('Item 1');
+      });
+
+      it('caps a name at 48 characters and drops a pasted tab', async () => {
+        await loadWithMarkers();
+
+        service.renameMarker('A', 'a', 'x'.repeat(49));
+        service.renameMarker('A', 'b', 'Big\tDrop');
+
+        expect(names()).toEqual(['x'.repeat(48), 'BigDrop']);
+      });
+
+      it('is refused while the deck has nothing shapeable loaded', () => {
+        vi.mocked(logWarn).mockClear();
+
+        service.renameMarker('A', 'a', 'Intro');
+
+        expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('an unavailable row', () => {
+      const CAUSES = {
+        unknown: 'is not cached and where it was found is unknown',
+        absent: 'is not cached and device-1 is not connected',
+        unreadable: 'could not be fetched: offline',
+        changed: 'on device-1 has changed since it was added',
+      } as const;
+
+      /** Resolves only what was inserted since, as a cache that lost the tune does. */
+      let cached: Set<string>;
+
+      beforeEach(() => {
+        cached = new Set();
+        const baseInsert = insertMock.getMockImplementation();
+        insertMock.mockImplementation(async (bytes: Uint8Array) => {
+          const reference = await baseInsert?.(bytes);
+          cached.add(reference.identity.sidHash);
+          return reference;
+        });
+        resolveMock.mockImplementation(async (identity: TuneIdentity) => {
+          const fixture = bySidHash.get(identity.sidHash);
+          return fixture === undefined || !cached.has(identity.sidHash)
+            ? null
+            : playableOf(fixture, identity.subtune);
+        });
+      });
+
+      /** A row for the fixture in the current set, with its bytes gone from the cache. */
+      async function rowWithoutBytes(fixture: TuneFixture): Promise<DeckHolding> {
+        await loadAndWait('A', fixture);
+        cached.clear();
+        return holdingOf('A');
+      }
+
+      const prepOf = (rowId: string) => store.sets.prep()[rowId];
+
+      it('fails with the reason when the row does not say where the file was found, and plays once the cache has it', async () => {
+        const fixture = register(makeFixture());
+        const row = createRow({
+          id: 'row-1',
+          tune: {
+            sidHash: fixture.reference.identity.sidHash,
+            title: 'Commando',
+            author: 'Hubbard',
+            released: '1985',
+            subtuneCount: 1,
+            byteLength: 3,
+          },
+          memory: null,
+          startSubtune: 1,
+        });
+        store.putOpenSet({
+          set: { ...createSet({ id: 'set-x', placeholder: 'Set X', now: '2026-01-01T00:00:00.000Z' }), rows: [row] },
+        });
+
+        await service.loadRow('B', 'set-x', 'row-1');
+
+        expect(store.deck('B')().status).toBe('failed');
+        expect(store.deck('B')().error).toBe(`Commando ${CAUSES.unknown}`);
+        expect(prepOf('row-1')).toEqual({ phase: 'unavailable', reason: `Commando ${CAUSES.unknown}` });
+
+        cached.add(fixture.reference.identity.sidHash);
+        await service.loadRow('B', 'set-x', 'row-1');
+
+        expect(store.deck('B')().status).toBe('playing');
+        expect(prepOf('row-1')).toBeUndefined();
+      });
+
+      it('fails with the reason when the device is not connected, and plays once it is', async () => {
+        const fixture = register(makeFixture());
+        const held = await rowWithoutBytes(fixture);
+        usableDevices.set([]);
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('failed');
+        expect(store.deck('B')().error).toBe(`${fixture.source.fileName} ${CAUSES.absent}`);
+        expect(prepOf(held.rowId)).toEqual({
+          phase: 'unavailable',
+          reason: `${fixture.source.fileName} ${CAUSES.absent}`,
+        });
+        expect(fileContentMock).toHaveBeenCalledTimes(1);
+
+        usableDevices.set([{ deviceId: 'device-1' } as Device]);
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('playing');
+        expect(prepOf(held.rowId)).toBeUndefined();
+        expect(fileContentMock).toHaveBeenCalledTimes(2);
+      });
+
+      it('fails with the reason when the fetch fails, and plays once it succeeds', async () => {
+        const fixture = register(makeFixture());
+        const held = await rowWithoutBytes(fixture);
+        fileContentMock.mockReturnValueOnce(throwError(() => new Error('offline')));
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('failed');
+        expect(store.deck('B')().error).toBe(`${fixture.source.fileName} ${CAUSES.unreadable}`);
+        expect(prepOf(held.rowId)?.phase).toBe('unavailable');
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('playing');
+        expect(prepOf(held.rowId)).toBeUndefined();
+      });
+
+      it('fails with the reason when the file is no longer the row\'s tune, and plays once it is again', async () => {
+        const fixture = register(makeFixture());
+        const held = await rowWithoutBytes(fixture);
+        const replacement = register(makeFixture());
+        byPath.set(fixture.source.path, replacement);
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('failed');
+        expect(store.deck('B')().error).toBe(`${fixture.source.fileName} ${CAUSES.changed}`);
+        expect(prepOf(held.rowId)?.phase).toBe('unavailable');
+
+        byPath.set(fixture.source.path, fixture);
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('playing');
+        expect(prepOf(held.rowId)).toBeUndefined();
+      });
+
+      it('does not mark a row unavailable for any other failure', async () => {
+        const fixture = register(makeFixture());
+        const held = await rowWithoutBytes(fixture);
+        insertMock.mockRejectedValue(new Error('not a SID file'));
+
+        await service.loadRow('B', held.setId, held.rowId);
+
+        expect(store.deck('B')().status).toBe('failed');
+        expect(store.deck('B')().error).toBe('not a SID file');
+        expect(prepOf(held.rowId)).toBeUndefined();
+      });
+    });
+
+    describe('subtune switches', () => {
+      it('refuse with a warning when the deck holds no row', async () => {
+        store.setDeckLoaded({ slot: 'A', reference: makeFixture({ subtuneCount: 2 }).reference });
+        store.setDeckStatus({ slot: 'A', status: 'paused' });
+        vi.mocked(logWarn).mockClear();
+
+        await service.selectSubtune('A', 2);
+
+        expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
+        expect(store.deck('A')().busy).toBe(false);
+        expect(store.deck('A')().status).toBe('paused');
+      });
+
+      it('record the subtune as the row\'s last, in the set and the tune\'s memory', async () => {
+        const fixture = register(makeFixture({ subtuneCount: 3 }));
+        await loadAndWait('A', fixture);
+
+        await service.selectSubtune('A', 3);
+        await settle(400);
+
+        const held = holdingOf('A');
+        expect(held.subtune).toBe(3);
+        expect(currentSet().rows[0].lastSubtune).toBe(3);
+        expect((await memoryStore.load(held.sidHash))?.lastSubtune).toBe(3);
+      });
     });
   });
 

@@ -5,6 +5,7 @@ import { DjStore, EMPTY_DECK_LOOPS, type DeckLoopMarker } from '../dj-store';
 function marker(id: string, start: number, end: number | null, nudge = 0): DeckLoopMarker {
   return {
     id,
+    name: null,
     start: { frame: start, offsetFrames: nudge },
     end: end === null ? null : { frame: end, offsetFrames: -nudge },
     voices: [0, 1, 2],

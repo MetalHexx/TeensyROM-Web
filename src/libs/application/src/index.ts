@@ -23,6 +23,7 @@ export * from './lib/dj/tune-loader';
 export * from './lib/dj/sets/dj-sets';
 export * from './lib/dj/sets/row-host';
 export * from './lib/dj/deck.service';
+export * from './lib/dj/deck-memory-keeper';
 export * from './lib/dj/sid-panel-painter';
 export * from './lib/dj/sid-panel-targets';
 export * from './lib/dj/mixer.service';

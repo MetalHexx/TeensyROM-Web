@@ -167,9 +167,14 @@ export interface DeckLoopBoundary {
   readonly offsetFrames: number;
 }
 
+/** The longest marker name, in UTF-16 units; the server rejects a longer one. */
+export const MARKER_NAME_MAX_LENGTH = 48;
+
 /** One saved position in the tune: a cue when it has no end, a loop when it has one. */
 export interface DeckLoopMarker {
   readonly id: string;
+  /** What the performer called it; null shows as 'Item N' by list position. */
+  readonly name: string | null;
   readonly start: DeckLoopBoundary;
   readonly end: DeckLoopBoundary | null;
   readonly voices: readonly number[];

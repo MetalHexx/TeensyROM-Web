@@ -18,7 +18,7 @@ export type LoopActivity = 'idle' | 'queued' | 'running';
 
 export interface LoopItemSummary {
   readonly id: string;
-  /** 'Item N' by list position. */
+  /** The marker's name, else 'Item N' by list position. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
   /** '7.8s' for a loop, 'CUE' for a cue. */
@@ -116,7 +116,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
           const end = marker.end === null ? null : resolvedFrame(marker.end);
           return {
             id: marker.id,
-            name: `Item ${index + 1}`,
+            name: marker.name ?? `Item ${index + 1}`,
             kind,
             lengthText:
               kind === 'loop' && end !== null ? formatSeconds(end - start, intervalUs) : 'CUE',

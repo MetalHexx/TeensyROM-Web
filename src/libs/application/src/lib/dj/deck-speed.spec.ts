@@ -322,6 +322,35 @@ describe('DeckSpeed', () => {
     });
   });
 
+  describe('keptSpeed', () => {
+    it('is the fader value, and never a held nudge', () => {
+      speed.setFader('A', 1.2);
+      speed.setNudge('A', 'up', true, NUDGE);
+
+      expect(speed.keptSpeed('A')).toBe(1.2);
+    });
+
+    it('is the value an open excursion remembers, however far the excursion or the fader has moved', () => {
+      speed.setFader('A', 1.2);
+      speed.jump('A', 'up');
+      expect(speed.faderValue('A')).toBeCloseTo(1.7);
+      expect(speed.keptSpeed('A')).toBe(1.2);
+
+      speed.setFader('A', 0.8);
+      expect(speed.keptSpeed('A')).toBe(1.2);
+    });
+
+    it('is the fader value again once the excursion closes', () => {
+      speed.setFader('A', 1.2);
+      speed.jump('A', 'up');
+      speed.jump('A', 'home');
+
+      expect(speed.keptSpeed('A')).toBe(1.2);
+      speed.setFader('A', 0.9);
+      expect(speed.keptSpeed('A')).toBe(0.9);
+    });
+  });
+
   it('keeps each deck its own tempo and excursion', () => {
     speed.setFader('A', 1.2);
     speed.jump('A', 'up');

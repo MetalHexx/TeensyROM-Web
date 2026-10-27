@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import {
   DJ_LIBRARY_STATE_REPOSITORY,
-  LOOP_POSITIONS_STORE,
   SET_STORE,
   TUNE_INSERTER,
   TUNE_MEMORY_STORE,
@@ -113,19 +112,6 @@ describe('DJ_ENGINE_PROVIDERS composition', () => {
     expect(playable?.bytes).toEqual(bytes);
     expect(playable?.reference.identity).toEqual(reference.identity);
     expect(indexer.index).toHaveBeenCalledTimes(1);
-  });
-
-  it('provides a loop-positions store that hands back what was saved', async () => {
-    const store = TestBed.inject(LOOP_POSITIONS_STORE);
-    const identity = { sidHash: 'tune', subtune: 1 };
-    const markers = [
-      { id: 'a', start: { frame: 100, offsetFrames: -4 }, end: null, voices: [0, 1, 2] },
-    ];
-
-    await store.save(identity, markers);
-
-    expect(await store.load(identity)).toEqual(markers);
-    expect(await store.load({ sidHash: 'tune', subtune: 2 })).toEqual([]);
   });
 });
 

@@ -5,6 +5,7 @@ import { DjStore, EMPTY_DECK_LOOPS, HOME_DECK_PANEL, type DeckLoopMarker } from 
 function marker(id: string): DeckLoopMarker {
   return {
     id,
+    name: null,
     start: { frame: 100, offsetFrames: 0 },
     end: null,
     voices: [0, 1, 2],
@@ -43,6 +44,21 @@ describe('settingsInPlay', () => {
     });
 
     expect(store.settingsInPlay('A')()).toEqual({ markerId: 'b', name: 'Item 2' });
+  });
+
+  it('names the marker in play by its own name when it has one', () => {
+    const main = { panel: HOME_DECK_PANEL, mutes: [false, false, false] } as const;
+    store.setDeckLoops({
+      slot: 'A',
+      loops: {
+        ...EMPTY_DECK_LOOPS,
+        markers: [marker('a'), { ...marker('b'), name: 'Bridge' }],
+        settingsInPlayId: 'b',
+        mainSettings: main,
+      },
+    });
+
+    expect(store.settingsInPlay('A')()).toEqual({ markerId: 'b', name: 'Bridge' });
   });
 
   it('follows the swap, and is per deck', () => {

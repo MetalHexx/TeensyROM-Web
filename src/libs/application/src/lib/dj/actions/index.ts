@@ -14,6 +14,7 @@ import { setVoiceStrip } from './set-voice-strip';
 import { setDeckPanel } from './set-deck-panel';
 import { setKeyDisplayFormat } from './set-key-display-format';
 import { resetDeckPanel } from './reset-deck-panel';
+import { restoreDeckPanel } from './restore-deck-panel';
 import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
@@ -53,6 +54,7 @@ export function withDjActions() {
       ...setDeckPanel(writableStore),
       ...setKeyDisplayFormat(writableStore),
       ...resetDeckPanel(writableStore),
+      ...restoreDeckPanel(writableStore),
       ...setDeckEngineControls(writableStore),
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),

@@ -360,6 +360,7 @@ describe('DjSidPanelComponent', () => {
   describe('the settings sign', () => {
     const marker = (id: string) => ({
       id,
+      name: null,
       start: { frame: 100, offsetFrames: 0 },
       end: null,
       voices: [0, 1, 2],

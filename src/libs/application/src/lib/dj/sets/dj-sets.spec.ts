@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { of, Subject, throwError, type Observable } from 'rxjs';
 import {
@@ -17,8 +18,10 @@ import {
   ALERT_SERVICE,
   FILE_CONTENT_SERVICE,
   StorageType,
+  type Device,
   type FileContent,
 } from '@teensyrom-nx/domain';
+import { DeviceStore } from '../../device/device-store';
 import { DjStore, type DeckHolding } from '../dj-store';
 import type { LoadSource } from '../load-source';
 import {
@@ -211,6 +214,7 @@ describe('DjSets', () => {
         { provide: FILE_CONTENT_SERVICE, useValue: fileContent },
         { provide: TUNE_INSERTER, useValue: inserter },
         { provide: TUNE_RESOLVER, useValue: resolver },
+        { provide: DeviceStore, useValue: { usableDevices: signal<Device[]>([]) } },
       ],
     });
     store = TestBed.inject(DjStore);
