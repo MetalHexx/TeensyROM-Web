@@ -16,7 +16,7 @@ public class GetDirectoryEndpointTests
     private readonly IDeviceConnectionManager _deviceManager = Substitute.For<IDeviceConnectionManager>();
     private readonly IStorageService _sdStorage = Substitute.For<IStorageService>();
 
-    private GetDirectoryEndpoint GivenDevice()
+    private GetDirectoryEndpoint GivenDevice(IDeviceTransferLease? lease = null)
     {
         var cart = new Cart
         {
@@ -26,7 +26,7 @@ public class GetDirectoryEndpointTests
         };
         var device = new TeensyRomDevice(cart, Substitute.For<ICommunicationPort>(), _sdStorage, Substitute.For<IStorageService>());
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        return EndpointFactory.CreateEndpoint<GetDirectoryEndpoint>(_deviceManager);
+        return EndpointFactory.CreateEndpoint<GetDirectoryEndpoint>(_deviceManager, lease ?? LeaseDoubles.Free());
     }
 
     private static GetDirectoryRequest Request() => new() { DeviceId = DeviceId, StorageType = TeensyStorageType.SD, Path = "/music/" };
@@ -66,5 +66,17 @@ public class GetDirectoryEndpointTests
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
         endpoint.Response!.StorageItem.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ReadFailedWhileDeviceBusy_SendsTheSharedConflictNotBadGateway()
+    {
+        var endpoint = GivenDevice(LeaseDoubles.Busy());
+        _sdStorage.ReadDirectory(Arg.Any<DirectoryPath>()).Returns(DirectoryReadResult.Failed("busy"));
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
     }
 }

@@ -17,7 +17,7 @@ public class LaunchFileEndpointTests
     private readonly IDeviceConnectionManager _deviceManager = Substitute.For<IDeviceConnectionManager>();
     private readonly IStorageService _sdStorage = Substitute.For<IStorageService>();
 
-    private LaunchFileEndpoint GivenDevice()
+    private LaunchFileEndpoint GivenDevice(IDeviceTransferLease? lease = null)
     {
         var cart = new Cart
         {
@@ -29,7 +29,7 @@ public class LaunchFileEndpointTests
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
 
         var scopeFactory = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
-        var launcher = new FileLaunchService(_deviceManager, scopeFactory);
+        var launcher = new FileLaunchService(_deviceManager, lease ?? LeaseDoubles.Free(), scopeFactory);
         return EndpointFactory.CreateEndpoint<LaunchFileEndpoint>(launcher);
     }
 
@@ -56,5 +56,17 @@ public class LaunchFileEndpointTests
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Handle_LookupFailedWhileDeviceBusy_SendsTheSharedConflictNotBadGateway()
+    {
+        var endpoint = GivenDevice(LeaseDoubles.Busy());
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("busy"));
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
     }
 }

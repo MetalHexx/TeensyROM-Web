@@ -228,6 +228,9 @@ Endpoints/
 | `POST /api/devices/{deviceId}/reconnect` | 200 — reconnected, or already available (no contact) | 404 unknown device; 502 the saved addresses and the search for missing units both missed |
 | `PUT /api/devices/{deviceId}/name` | 200 — the renamed unit's updated `CartDto`; works offline, no device contact | 400 invalid name (trimmed, 1–24 chars, no control characters); 404 unknown device or a per-run `Unknown` stand-in |
 | `DELETE /api/devices/{deviceId}` | 200 — forgotten, from memory, the saved file and `settings.json` | 404 unknown device; 409 still available (an available device is left untouched; only an offline unit can be forgotten) |
+| Any endpoint that talks to a device (toggle music, reset, ping, launch, random launch, directory, file content, favorite, remove favorite, ban, index, index all) | — | 409 busy with a transfer — one shared `ProblemDetails`, see *Busy with a transfer* below |
+
+**Busy with a transfer.** While a transfer job holds a device's lease, every endpoint that would talk to that device answers the same `409` (`DeviceBusyProblem` in `Endpoints/Common`): `type` `urn:teensyrom:problem:device-busy-with-transfer`, a title naming the device, and the extensions `code` (`deviceBusyWithTransfer`), `deviceId` and `activeJobId`. Command endpoints read it from the failed result's `ActiveTransferJobId`; storage-backed endpoints (directory, file content, favorite, remove favorite, ban, index) check the lease after a refusal, and `FileLaunchService` reports it as `FileLaunchStatus.DeviceBusy`. The check always runs before the generic failure and before any "incompatible" reading of a launch result, so a refused launch is never a `200`. Create-job answers the same body with the lease conflict's message as `detail`. Index refuses up front, because indexing clears the cache before it reads; index all skips a held device, indexes the rest, and answers the `409` with `busyDeviceIds` (or its usual `500` with `busyDeviceIds` added when other storage failed too). The device listing marks a transferring device with `activeTransferJobId`.
 
 The API owns device names. `DeviceConnectionManager` keeps each name on the unit's connection record (`ConnectionRecords.json`, never `settings.json`) and stamps it onto `Cart.Name` whenever a device is rebuilt. A unit with no name gets the lowest free `TR-n`; this is backfilled in chip-id order at start and assigned on first sight, and Forget drops the name. Rename is the one device operation outside the occasion queue (see *The Five Discovery Occasions*): it contacts no device and serialises on the manager's names lock and its single whole-file save lock.
 
@@ -369,7 +372,7 @@ public interface ITeensyCommand<T> : IRequest<T>
 
 ### The Pipeline & the Gate
 
-Every command runs `Logging → Exception → CommunicationPort`:
+Every command runs `Logging → Exception → TransferLockout → CommunicationPort`:
 
 #### 1. LoggingBehavior
 - **Purpose**: Logs command start/completion with timing and request/response details
@@ -384,7 +387,12 @@ Every command runs `Logging → Exception → CommunicationPort`:
   - Port closed errors → "Disconnected from TeensyROM"
   - Generic exceptions → Wrapped error responses
 
-#### 3. CommunicationPortBehavior — the gate
+#### 3. TransferLockoutBehavior — the lockout
+- **Purpose**: Keep every command off a device a transfer job holds
+- **Key File**: #file:apps/api/src/TeensyRom.Core.Serial/Commands/Behaviors/TransferLockoutBehavior.cs
+- **Operation**: Asks `IDeviceTransferLease` who holds the command's device. Free device, or an `ITransferCommand` stamped with the holder's own job id: the command passes. Anything else is refused at once with a failed result whose `ActiveTransferJobId` names the job. It never waits, never throws and keeps no lock of its own, so a refused command never queues on the port lock behind the transfer. Endpoints turn the marker into the shared `409` (see *Busy with a transfer*)
+
+#### 4. CommunicationPortBehavior — the gate
 - **Purpose**: One command at a time per device, an open port for the exchange, and a reaction to what the exchange actually reports rather than a firmware probe up front
 - **Key File**: #file:apps/api/src/TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs
 - **What it does**:
@@ -814,6 +822,7 @@ TeensyRom.Api
 2. **ProblemDetails**: ASP.NET Core middleware maps unhandled exceptions to RFC 7807 responses
 3. **Endpoint Validation**: RadEndpoints validates request models, returns 400 on failures
 4. **Device Recovery**: The gate (`CommunicationPortBehavior`) hands any transport drop to `DeviceRecovery`, which reacquires the device in place and updates its `DeviceConnectionRecord` (see *Connectivity Ring*)
+5. **Transfer lockout**: a device busy with a transfer is refused by `TransferLockoutBehavior` and every device endpoint answers it with the one shared `409` (`code` `deviceBusyWithTransfer`); never a `502`/`500`, never a bare string body
 
 **Error Logging**:
 - `ExceptionBehavior` writes every caught exception to `ILoggingService`, tagged with the request's device id (the generic catch includes the exception type and stack trace)

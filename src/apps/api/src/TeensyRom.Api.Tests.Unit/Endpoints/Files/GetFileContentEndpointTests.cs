@@ -38,7 +38,7 @@ public class GetFileContentEndpointTests
     public async Task Handle_UnknownDevice_SendsNotFound()
     {
         _deviceManager.GetAvailableDevice("UNKNOWN1").Returns((TeensyRomDevice?)null);
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(deviceId: "UNKNOWN1"), CancellationToken.None);
 
@@ -51,7 +51,7 @@ public class GetFileContentEndpointTests
     {
         var device = NewDevice(sdAvailable: false);
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -67,7 +67,7 @@ public class GetFileContentEndpointTests
         _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Failure(FileBytesError.NotFound));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class GetFileContentEndpointTests
         _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Failure(FileBytesError.Failed));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -98,7 +98,7 @@ public class GetFileContentEndpointTests
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
         _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Found(new FileItem { Size = GetFileContentEndpoint.MaxFileBytes + 1 }));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -115,7 +115,7 @@ public class GetFileContentEndpointTests
         var bytes = new byte[] { 1, 2, 3 };
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -135,7 +135,7 @@ public class GetFileContentEndpointTests
         var bytes = new byte[GetFileContentEndpoint.MaxFileBytes + 1];
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -151,7 +151,7 @@ public class GetFileContentEndpointTests
         var bytes = new byte[] { 9, 8, 7 };
         _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
             .Returns(FileBytesResult.Success(bytes));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
@@ -167,12 +167,42 @@ public class GetFileContentEndpointTests
         var device = NewDevice();
         _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
         _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("The link dropped."));
-        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager);
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Free());
 
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
         endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("The link dropped.");
         await _sdStorage.DidNotReceive().ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_LookupFailedWhileDeviceBusy_SendsTheSharedConflict()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("busy"));
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Busy());
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
+    }
+
+    [Fact]
+    public async Task Handle_ReadFailedWhileDeviceBusy_SendsTheSharedConflictNotInternalError()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.NotFound());
+        _sdStorage.ReadFileBytes(Arg.Any<FilePath>(), Arg.Any<CancellationToken>())
+            .Returns(FileBytesResult.Failure(FileBytesError.Failed));
+        var endpoint = EndpointFactory.CreateEndpoint<GetFileContentEndpoint>(_deviceManager, LeaseDoubles.Busy());
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
     }
 }

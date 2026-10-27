@@ -5,6 +5,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
 {
     public class FindDevicesEndpoint(
         IDeviceConnectionManager deviceManager,
+        IDeviceTransferLease lease,
         IDeviceSettingsProvider deviceSettingsProvider) : RadEndpoint<FindDevicesRequest, FindDevicesResponse>
     {
         public override void Configure()
@@ -23,7 +24,8 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                     "- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, " +
                     "and every currently connected device is momentarily disconnected while the sweep runs.\n" +
                     "- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.\n" +
-                    "- Offline units are listed after the online ones, with deviceState ConnectionLost."
+                    "- Offline units are listed after the online ones, with deviceState ConnectionLost.\n" +
+                    "- A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it."
                 );
         }
 
@@ -40,6 +42,11 @@ namespace TeensyRom.Api.Endpoints.FindCarts
 
             List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(d => CartDto.FromDevice(d, deviceSettingsProvider)))];
             deviceDtos.AddRange(offlineDevices.Select(d => CartDto.FromOffline(d, deviceSettingsProvider)));
+
+            foreach (var dto in deviceDtos)
+            {
+                dto.ActiveTransferJobId = lease.GetActiveJobId(dto.DeviceId);
+            }
 
             Response = new()
             {

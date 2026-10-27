@@ -1,5 +1,6 @@
 using MediatR;
 using RadEndpoints;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Serial.Commands.ToggleMusic;
 
@@ -13,10 +14,14 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
                 .Produces<ToggleMusicResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("ToggleMusic")
                 .WithSummary("Toggle Music Playback")
-                .WithDescription("Toggles the play/pause state of the currently playing music on the TeensyRom device.")
+                .WithDescription(
+                    "Toggles the play/pause state of the currently playing music on the TeensyRom device.\n\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
+                )
                 .WithTags("Player");
         }
 
@@ -39,6 +44,11 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
 
             if (!result.IsSuccess)
             {
+                if (result.ActiveTransferJobId is { } jobId)
+                {
+                    SendProblem(DeviceBusyProblem.Create(r.DeviceId, device.Cart.Name, jobId));
+                    return;
+                }
                 SendExternalError(result.Error);
                 return;
             }

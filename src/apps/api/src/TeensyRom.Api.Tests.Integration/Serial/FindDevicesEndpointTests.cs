@@ -34,7 +34,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
@@ -71,7 +71,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
@@ -108,7 +108,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
@@ -145,7 +145,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
@@ -196,7 +196,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice1, mockDevice2]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
@@ -228,7 +228,7 @@ namespace TeensyRom.Api.Tests.Integration.Serial
             var mockDeviceManager = Substitute.For<IDeviceConnectionManager>();
             mockDeviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([mockDevice]);
 
-            var endpoint = new FindDevicesEndpoint(mockDeviceManager, mockSettingsProvider);
+            var endpoint = new FindDevicesEndpoint(mockDeviceManager, Substitute.For<IDeviceTransferLease>(), mockSettingsProvider);
 
             // Act
             await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);

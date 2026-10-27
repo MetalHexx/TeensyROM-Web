@@ -1,3 +1,4 @@
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
@@ -6,7 +7,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.BanFile
 {
-    public class BanFileEndpoint(IDeviceConnectionManager deviceManager, ISettingsService settingsService)
+    public class BanFileEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease, ISettingsService settingsService)
         : RadEndpoint<BanFileRequest, BanFileResponse>
     {
         public override void Configure()
@@ -15,10 +16,14 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
                 .Produces<BanFileResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("BanFile")
                 .WithSummary("Ban File")
-                .WithDescription("Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.")
+                .WithDescription(
+                    "Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.\n\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
+                )
                 .WithTags("Files");
         }
 
@@ -73,6 +78,11 @@ namespace TeensyRom.Api.Endpoints.Files.BanFile
 
             if (lookup.Failure is not null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError(lookup.Failure);
                 return;
             }

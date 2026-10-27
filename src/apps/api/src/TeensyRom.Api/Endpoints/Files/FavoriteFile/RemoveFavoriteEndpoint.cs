@@ -1,3 +1,4 @@
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Api.Endpoints.Files.FavoriteFile;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
@@ -6,7 +7,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 {
-    public class RemoveFavoriteEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<RemoveFavoriteRequest, RemoveFavoriteResponse>
+    public class RemoveFavoriteEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease) : RadEndpoint<RemoveFavoriteRequest, RemoveFavoriteResponse>
     {
         public override void Configure()
         {
@@ -14,10 +15,14 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
                 .Produces<RemoveFavoriteResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("RemoveFavorite")
                 .WithSummary("Remove Favorite")
-                .WithDescription("Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.")
+                .WithDescription(
+                    "Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.\n\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
+                )
                 .WithTags("Files");
         }
 
@@ -56,6 +61,11 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 
             if (lookup.Failure is not null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError(lookup.Failure);
                 return;
             }
@@ -78,6 +88,11 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 
             if (!success)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError("Failed to remove favorite. Please try again.");
                 return;
             }

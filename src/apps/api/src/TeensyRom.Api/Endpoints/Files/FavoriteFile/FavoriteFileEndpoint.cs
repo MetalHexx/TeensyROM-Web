@@ -1,3 +1,4 @@
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Api.Models;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
@@ -7,7 +8,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 {
-    public class FavoriteFileEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<SaveFavoriteRequest, SaveFavoriteResponse>
+    public class FavoriteFileEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease) : RadEndpoint<SaveFavoriteRequest, SaveFavoriteResponse>
     {
         public override void Configure()
         {
@@ -15,10 +16,14 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
                 .Produces<SaveFavoriteResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("SaveFavorite")
                 .WithSummary("Save Favorite")
-                .WithDescription("Saves a file as a favorite, creating a copy in the appropriate favorites directory.")
+                .WithDescription(
+                    "Saves a file as a favorite, creating a copy in the appropriate favorites directory.\n\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
+                )
                 .WithTags("Files");
         }
 
@@ -57,6 +62,11 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 
             if (lookup.Failure is not null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError(lookup.Failure);
                 return;
             }
@@ -79,6 +89,11 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 
             if (savedFav is null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError("Failed to save favorite. Please try again.");
                 return;
             }

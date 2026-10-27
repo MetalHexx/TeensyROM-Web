@@ -51,7 +51,6 @@
 
   <ItemGroup>
     <Folder Include="ClientApp\" />
-    <Folder Include="Endpoints\Common\" />
   </ItemGroup>
 
   <ItemGroup>

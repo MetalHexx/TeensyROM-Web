@@ -1,11 +1,12 @@
 using RadEndpoints;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Api.Models;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.GetDirectory
 {
-    public class GetDirectoryEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<GetDirectoryRequest, GetDirectoryResponse>
+    public class GetDirectoryEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease) : RadEndpoint<GetDirectoryRequest, GetDirectoryResponse>
     {
         public override void Configure()
         {
@@ -13,6 +14,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
                 .Produces<GetDirectoryResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .Produces<string>(StatusCodes.Status404NotFound, "application/json")
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("GetDirectory")
                 .WithSummary("Get Directory")
@@ -21,7 +23,8 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
                     "Gets a directory for given storage device.\n\n" +
                     "- Returns metadata for all files in the directory.\n" +
                     "- This is not recursive and will only include the files for the requested directory.\n" +
-                    "- Make another request to get subdirectory content."
+                    "- Make another request to get subdirectory content.\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
 
@@ -42,6 +45,11 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
             var read = await storage.ReadDirectory(new DirectoryPath(r.Path!));
             if (read.Failure is not null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId!, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError(read.Failure);
                 return;
             }

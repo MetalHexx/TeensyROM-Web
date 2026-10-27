@@ -31,7 +31,7 @@ public class FindDevicesEndpointTests
         var offlineDevices = new List<OfflineDevice> { OfflineDevice() };
         _deviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns(onlineDevices);
         _deviceManager.GetOfflineDevices().Returns(offlineDevices);
-        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, _settingsProvider);
+        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, LeaseDoubles.Free(), _settingsProvider);
 
         await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
 
@@ -45,7 +45,7 @@ public class FindDevicesEndpointTests
         var offlineDevices = new List<OfflineDevice> { OfflineDevice() };
         _deviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([]);
         _deviceManager.GetOfflineDevices().Returns(offlineDevices);
-        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, _settingsProvider);
+        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, LeaseDoubles.Free(), _settingsProvider);
 
         await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
 
@@ -58,10 +58,28 @@ public class FindDevicesEndpointTests
     {
         _deviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns([]);
         _deviceManager.GetOfflineDevices().Returns([]);
-        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, _settingsProvider);
+        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, LeaseDoubles.Free(), _settingsProvider);
 
         await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Handle_TransferringDevice_ListsItsJobAndLeavesOthersNull()
+    {
+        var lease = Substitute.For<IDeviceTransferLease>();
+        lease.GetActiveJobId(Arg.Any<string>()).Returns((string?)null);
+        lease.GetActiveJobId(OnlineDeviceId).Returns("job-1");
+        var onlineDevices = new List<TeensyRomDevice> { OnlineDevice() };
+        var offlineDevices = new List<OfflineDevice> { OfflineDevice() };
+        _deviceManager.FindDevices(false, Arg.Any<CancellationToken>(), false).Returns(onlineDevices);
+        _deviceManager.GetOfflineDevices().Returns(offlineDevices);
+        var endpoint = EndpointFactory.CreateEndpoint<FindDevicesEndpoint>(_deviceManager, lease, _settingsProvider);
+
+        await endpoint.Handle(new FindDevicesRequest(), CancellationToken.None);
+
+        endpoint.Response!.Devices.Single(d => d.DeviceId == OnlineDeviceId).ActiveTransferJobId.Should().Be("job-1");
+        endpoint.Response!.Devices.Single(d => d.DeviceId == OfflineDeviceId).ActiveTransferJobId.Should().BeNull();
     }
 }

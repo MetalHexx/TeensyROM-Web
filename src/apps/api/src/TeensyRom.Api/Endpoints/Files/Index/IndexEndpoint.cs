@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Storage;
@@ -6,7 +7,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.Index
 {
-    public class IndexEndpoint(IDeviceConnectionManager deviceManager, IDeviceSettingsProvider settingsProvider) : RadEndpoint<IndexRequest, IndexResponse>
+    public class IndexEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease, IDeviceSettingsProvider settingsProvider) : RadEndpoint<IndexRequest, IndexResponse>
     {
         private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
         public override void Configure()
@@ -14,6 +15,9 @@ namespace TeensyRom.Api.Endpoints.Files.Index
             Post("/api/devices/{deviceId}/storage/{storageType}/index")
                 .Produces<IndexResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
+                .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithName("Index")
                 .WithSummary("Index")
                 .WithTags("Files")
@@ -21,7 +25,8 @@ namespace TeensyRom.Api.Endpoints.Files.Index
                     "Indexes the directory structure of a given TeensyROM device and storage type.\n\n" +
                     "- Providing a path will index starting at that directory and all subdirectories below it.\n" +
                     "- Providing no path will index the whole storage device.\n" +
-                    "- Don't touch your commodore while indexing is in progress."
+                    "- Don't touch your commodore while indexing is in progress.\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
 
@@ -35,6 +40,13 @@ namespace TeensyRom.Api.Endpoints.Files.Index
 				return;
 			}
 
+			// Indexing clears the cache before it reads, so a transferring device must be refused up front.
+			if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busy)
+			{
+				SendProblem(busy);
+				return;
+			}
+
 			// Determine if this is a full index operation
 			var isFullIndex = string.IsNullOrWhiteSpace(r.StartingPath) || r.StartingPath == StorageHelper.Remote_Path_Root;
 
@@ -44,6 +56,11 @@ namespace TeensyRom.Api.Endpoints.Files.Index
 
 			if (!result)
 			{
+				if (DeviceBusyProblem.For(lease, r.DeviceId, device.Cart.Name) is { } busyAfter)
+				{
+					SendProblem(busyAfter);
+					return;
+				}
 				SendInternalError("There was an error indexing.");
 				return;
 			}

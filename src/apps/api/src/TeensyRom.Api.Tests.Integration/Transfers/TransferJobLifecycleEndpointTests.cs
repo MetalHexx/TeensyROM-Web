@@ -128,6 +128,9 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 NewCreateRequest(device.DeviceId, "/music/second"));
 
             secondCreate.Should().BeProblem().WithStatusCode(HttpStatusCode.Conflict);
+            secondCreate.Content.Title.Should().EndWith("is busy with a transfer.");
+            secondCreate.Content.Extensions["code"]!.ToString().Should().Be("deviceBusyWithTransfer");
+            secondCreate.Content.Extensions["deviceId"]!.ToString().Should().Be(device.DeviceId);
             secondCreate.Content.Extensions["activeJobId"]!.ToString().Should().Be(firstJobId);
 
             // Sealing the first job with an empty queue reaches Completed immediately, releasing its lease.

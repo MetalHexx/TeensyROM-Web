@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using RadEndpoints;
+using TeensyRom.Api.Endpoints.Common;
 using System.Net.Mime;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
@@ -7,7 +8,7 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.GetFileContent
 {
-    public class GetFileContentEndpoint(IDeviceConnectionManager deviceManager)
+    public class GetFileContentEndpoint(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease)
         : RadEndpoint<GetFileContentRequest, GetFileContentResponse>
     {
         /// The cap is deliberately far above any SID (C64 memory bounds them) so the endpoint stays
@@ -21,6 +22,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
                 .Produces<Stream>(StatusCodes.Status200OK, MediaTypeNames.Application.Octet)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
@@ -31,7 +33,8 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
                     "Returns a file's raw bytes (application/octet-stream) from a device's storage.\n\n" +
                     "- Byte-identical to the file on the cartridge.\n" +
                     "- Refused with 413 above 10 MB.\n" +
-                    "- The path must be a Unix-style file path with no '..' segment."
+                    "- The path must be a Unix-style file path with no '..' segment.\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
 
@@ -54,6 +57,11 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
             var lookup = await storage.LookupFile(filePath);
             if (lookup.Failure is not null)
             {
+                if (DeviceBusyProblem.For(lease, r.DeviceId!, device.Cart.Name) is { } busy)
+                {
+                    SendProblem(busy);
+                    return;
+                }
                 SendExternalError(lookup.Failure);
                 return;
             }
@@ -66,6 +74,12 @@ namespace TeensyRom.Api.Endpoints.Files.GetFileContent
             }
 
             var result = await storage.ReadFileBytes(filePath, ct);
+
+            if (result.Error is not null && DeviceBusyProblem.For(lease, r.DeviceId!, device.Cart.Name) is { } busyRead)
+            {
+                SendProblem(busyRead);
+                return;
+            }
 
             switch (result.Error)
             {

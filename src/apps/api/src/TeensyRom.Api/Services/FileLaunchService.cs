@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Services
     /// A singleton, so the mediator is resolved from a fresh scope per call - and only once the device,
     /// storage, lookup and launchable checks have passed.
     /// </summary>
-    public sealed class FileLaunchService(IDeviceConnectionManager deviceManager, IServiceScopeFactory scopeFactory) : IFileLaunchService
+    public sealed class FileLaunchService(IDeviceConnectionManager deviceManager, IDeviceTransferLease lease, IServiceScopeFactory scopeFactory) : IFileLaunchService
     {
         public async Task<FileLaunchOutcome> LaunchAsync(string deviceId, TeensyStorageType storageType, FilePath path, CancellationToken ct)
         {
@@ -35,6 +35,12 @@ namespace TeensyRom.Api.Services
 
             if (lookup.Failure is not null)
             {
+                // A cache-miss directory read refused by the lockout surfaces here as a plain lookup failure.
+                if (lease.GetActiveJobId(deviceId) is { } holder)
+                {
+                    return Busy(device.Cart.Name, holder, lookup.Failure);
+                }
+
                 return Failure(FileLaunchStatus.LookupFailed, lookup.Failure);
             }
 
@@ -59,6 +65,11 @@ namespace TeensyRom.Api.Services
                 CommunicationPort = device.CommunicationPort
             }, ct);
 
+            if (result.ActiveTransferJobId is { } activeJobId)
+            {
+                return Busy(device.Cart.Name, activeJobId, result.Error);
+            }
+
             if (result.IsSuccess || !result.IsCompatible)
             {
                 return result.IsCompatible
@@ -68,6 +79,9 @@ namespace TeensyRom.Api.Services
 
             return Failure(FileLaunchStatus.LaunchFailed, result.Error);
         }
+
+        private static FileLaunchOutcome Busy(string deviceName, string activeJobId, string message) =>
+            new(FileLaunchStatus.DeviceBusy, null, message, activeJobId, deviceName);
 
         private static FileLaunchOutcome Failure(FileLaunchStatus status, string message) => new(status, null, message);
     }

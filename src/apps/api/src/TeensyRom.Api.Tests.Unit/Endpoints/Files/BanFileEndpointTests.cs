@@ -61,8 +61,8 @@ public class BanFileEndpointTests
         FilePath = path
     };
 
-    private BanFileEndpoint NewEndpoint() =>
-        EndpointFactory.CreateEndpoint<BanFileEndpoint>(_deviceManager, _settingsService);
+    private BanFileEndpoint NewEndpoint(IDeviceTransferLease? lease = null) =>
+        EndpointFactory.CreateEndpoint<BanFileEndpoint>(_deviceManager, lease ?? LeaseDoubles.Free(), _settingsService);
 
     [Fact]
     public async Task Handle_NewFile_AddsNameOnceAndSavesNewList()
@@ -224,5 +224,20 @@ public class BanFileEndpointTests
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
         endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("The link dropped.");
         _settingsService.DidNotReceive().UpdateSettings(Arg.Any<Func<TeensySettings, TeensySettings>>());
+    }
+
+    [Fact]
+    public async Task Handle_LookupFailedWhileDeviceBusy_SendsTheSharedConflictAndBansNothing()
+    {
+        var device = NewDevice();
+        _deviceManager.GetAvailableDevice(DeviceId).Returns(device);
+        _sdStorage.LookupFile(Arg.Any<FilePath>()).Returns(FileLookupResult.Failed("busy"));
+        var endpoint = NewEndpoint(LeaseDoubles.Busy());
+
+        await endpoint.Handle(Request(), CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
+        _saves.Should().Be(0);
     }
 }

@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.Commands.LaunchFile;
@@ -15,6 +16,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
                 .Produces<LaunchRandomResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("LaunchRandom")
                 .WithSummary("Launch Random File")
@@ -28,7 +30,8 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
                     "- Filter: `All` - Any file type will be randomly selected.\n" +
                     "- Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games.\n" +
                     "- Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc).\n" +
-                    "- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)"
+                    "- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
 
@@ -88,6 +91,12 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
 				DeviceId = r.DeviceId,
 				CommunicationPort = device.CommunicationPort
 			}, ct);
+
+			if (result.ActiveTransferJobId is { } jobId)
+			{
+				SendProblem(DeviceBusyProblem.Create(r.DeviceId, device.Cart.Name, jobId));
+				return;
+			}
 
 			if (result.IsSuccess || result.IsCompatible == false)
 			{

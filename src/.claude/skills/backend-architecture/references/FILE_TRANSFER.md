@@ -154,6 +154,9 @@ A file transfer job must hold exclusive access to the device **across many seria
 The `DeviceLeaseCoordinator` solves this by being a **separate, timer-less construct** above the port lock:
 - When a job starts, `ITransferJobService.Start` acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
 - `Start` is the sole exclusivity gate, and both `CreateJobEndpoint` and the watch-folder delivery call it. `TryAcquire` atomically claims the lease only if the device is unheld. On a conflict `Start` removes the new job and returns `DeviceBusy` with the holding job's id as `ActiveJobId`; `CreateJobEndpoint` answers that as a `409 Conflict` carrying it as the `activeJobId` extension. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
+- While the lease is held it gates **every** device command, not just a second transfer: `TransferLockoutBehavior` refuses any command for that device unless it carries the holder's own job id, so the job's resets and writes pass and nothing else does. Endpoints answer a refused command with the shared `409` body — `type` `urn:teensyrom:problem:device-busy-with-transfer`, extensions `code` (`deviceBusyWithTransfer`), `deviceId` and `activeJobId` — the same body `CreateJobEndpoint` sends for a lease conflict (plus the conflict's `detail`).
+- Full discovery skips a leased device: its port stays open, its endpoints are kept out of the sweep, and it stays listed, so a rescan cannot cut a transfer's writes mid-file. The device listing shows the holder as `activeTransferJobId`.
+- Index operations never clear a transferring device's cache: index refuses with the `409`, index all skips the device and lists it in `busyDeviceIds`.
 - When the job reaches a terminal state, the lease is released.
 - No stale-lock cleanup: the lease is held in-memory and released explicitly by the pump.
 

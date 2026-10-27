@@ -401,6 +401,8 @@ namespace TeensyRom.Core.Storage
             if (!result.IsSuccess)
             {
                 log.InternalError($"There was an error removing {file.Name} from favorites.", settings.CartStorage.DeviceId);
+                file.IsFavorite = true;
+                cache.UpsertFile(file);
                 cache.WriteToDisk();
                 return false;
             }
