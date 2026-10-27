@@ -17,6 +17,10 @@ import {
   DeviceMachine,
   DeviceVideoStandard,
   DeviceHardwareVariant,
+  TransferJobSnapshot,
+  TransferJobState,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/domain';
 import { DropzoneCardComponent } from './dropzone-card.component';
 
@@ -41,6 +45,41 @@ function createDevice(overrides: Partial<Device> = {}): Device {
   };
 }
 
+function createSnapshot(
+  deviceId: string,
+  overrides: Partial<TransferJobSnapshot> = {}
+): TransferJobSnapshot {
+  return {
+    jobId: 'job-1',
+    deviceId,
+    storageType: StorageType.Sd,
+    destinationDirectory: '/games/',
+    state: TransferJobState.Receiving,
+    filesReceived: 0,
+    filesSent: 0,
+    filesFailed: 0,
+    bytesSent: 0,
+    totalFiles: null,
+    currentFile: null,
+    origin: { kind: TransferOriginKind.WatchFolder, watchFolderId: 'wf-1', watchFolderPath: '/in' },
+    startedUtc: new Date('2026-01-01T00:00:00Z'),
+    lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
+    error: null,
+    failures: [],
+    recentCompletions: [],
+    bytesPerSecond: 0,
+    filesPerSecond: 0,
+    expandingArchive: null,
+    expansionBytesWritten: 0,
+    expansionBytesDeclared: 0,
+    expandedFileCount: null,
+    launchState: TransferLaunchState.None,
+    launchedPath: null,
+    launchError: null,
+    ...overrides,
+  };
+}
+
 describe('DropzoneCardComponent', () => {
   let fixture: ComponentFixture<DropzoneCardComponent>;
   let transferStore: InstanceType<typeof TransferStore>;
@@ -56,7 +95,9 @@ describe('DropzoneCardComponent', () => {
       retryCreate: vi.fn().mockResolvedValue(undefined),
       cancelTransfer: vi.fn().mockResolvedValue(undefined),
       closeTransfer: vi.fn().mockResolvedValue(undefined),
-      refreshDeviceBusyState: vi.fn().mockResolvedValue(undefined),
+      showDetails: vi.fn().mockResolvedValue(undefined),
+      hideDetails: vi.fn().mockResolvedValue(undefined),
+      releaseOwnRecords: vi.fn().mockResolvedValue(undefined),
     };
 
     await TestBed.configureTestingModule({
@@ -101,15 +142,6 @@ describe('DropzoneCardComponent', () => {
 
       expect(fixture.componentInstance.destinationLabel()).toBe('SD · /games');
       expect(dropzoneEl().classList.contains('state-idle')).toBe(true);
-    });
-
-    it('calls the busy-state refresh for the target device', async () => {
-      const device = createDevice();
-      await setup([device], null);
-      transferStore.setTargetDevice({ deviceId: device.deviceId });
-      fixture.detectChanges();
-
-      expect(transferContext.refreshDeviceBusyState).toHaveBeenCalledWith(device.deviceId);
     });
   });
 
@@ -177,6 +209,22 @@ describe('DropzoneCardComponent', () => {
         '[data-testid="dropzone-choose-files"] button'
       );
       expect(chooseFilesButton?.disabled).toBe(true);
+    });
+
+    it('follows the store alone: a transfer started elsewhere refuses the drop until its end push lands', async () => {
+      const device = createDevice();
+      await setup([device], null);
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot(device.deviceId) });
+      fixture.detectChanges();
+      expect(dropzoneEl().classList.contains('state-device-busy')).toBe(true);
+
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot(device.deviceId, { state: TransferJobState.Completed }),
+      });
+      fixture.detectChanges();
+      expect(dropzoneEl().classList.contains('state-device-busy')).toBe(false);
     });
 
     it('ignores a drop', async () => {

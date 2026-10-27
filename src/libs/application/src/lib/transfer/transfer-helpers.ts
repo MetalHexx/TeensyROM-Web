@@ -7,6 +7,7 @@ import {
   DeviceTransferState,
   TransferFeedEntry,
   TransferModalState,
+  TransferPhase,
 } from './transfer-store';
 import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP, UPLOAD_RATE_MIN_DIVISOR_MS } from './transfer.constants';
 
@@ -34,7 +35,40 @@ export function createDefaultDeviceTransferState(deviceId: string): DeviceTransf
     error: null,
     isLoading: false,
     lastUpdated: null,
+    startedHere: false,
   };
+}
+
+/** Own-entry phases that exist before a job does, or after its create was refused. */
+export const PRE_JOB_PHASES: ReadonlySet<TransferPhase> = new Set<TransferPhase>([
+  'scanning',
+  'starting',
+  'nothing-to-transfer',
+  'device-busy',
+  'failed',
+]);
+
+const REFUSAL_PHASES: ReadonlySet<TransferPhase> = new Set<TransferPhase>([
+  'device-busy',
+  'nothing-to-transfer',
+  'failed',
+]);
+
+/**
+ * Where the details move when the shown device's dialog closes: another own entry holding a
+ * refusal, so it is never stranded behind a closed dialog. Null when there is none.
+ */
+export function findWaitingRefusalDeviceId(
+  transfers: Record<string, DeviceTransferState>,
+  excludeDeviceId: string | null
+): string | null {
+  const waiting = Object.values(transfers).find(
+    (transfer) =>
+      transfer.startedHere &&
+      transfer.deviceId !== excludeDeviceId &&
+      REFUSAL_PHASES.has(transfer.phase)
+  );
+  return waiting?.deviceId ?? null;
 }
 
 /** Returns the device's transfer state, creating and storing a fresh `idle` entry if absent. */
@@ -142,6 +176,8 @@ export function isTerminalJobState(state: TransferJobState): boolean {
 }
 
 export interface TransferMetrics {
+  /** The file count every bar divides by: the scan's total for this tab's own drop, else the job's own. */
+  total: number;
   uploaded: number;
   written: number;
   failed: number;
@@ -191,6 +227,7 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
 
   if (!transfer || !job) {
     return {
+      total: scanTotal,
       uploaded: 0,
       written: 0,
       failed: uploadFailedCount,
@@ -224,15 +261,23 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
       ? Math.min(100, Math.floor((job.expansionBytesWritten / job.expansionBytesDeclared) * 100))
       : 0;
 
+  // A transfer started elsewhere has no scan, and its browser sent no bytes: the job's own counts
+  // stand in. `expandedFileCount` is 0 (not null) for a job without archives, so it is summed, not
+  // coalesced; the sum overcounts by the archives themselves, which `Completed` pins away.
+  const total = transfer.startedHere
+    ? expandedTotal ?? scanTotal
+    : (job.totalFiles ?? job.filesReceived) + (job.expandedFileCount ?? 0);
+  const apiRatio = transfer.startedHere
+    ? pct(uploadedBytes, scanTotalBytes)
+    : pct(job.filesReceived, total);
+
   return {
+    total,
     uploaded: job.filesReceived,
     written: job.filesSent,
     failed: job.filesFailed + uploadFailedCount,
-    apiPct: isSealedOrTerminalJobState(job.state) ? 100 : pct(uploadedBytes, scanTotalBytes),
-    devicePct:
-      job.state === TransferJobState.Completed
-        ? 100
-        : pct(job.filesSent, expandedTotal ?? scanTotal),
+    apiPct: isSealedOrTerminalJobState(job.state) ? 100 : apiRatio,
+    devicePct: job.state === TransferJobState.Completed ? 100 : pct(job.filesSent, total),
     expandedTotal,
     expansionPct,
     expandingArchive: job.expandingArchive,

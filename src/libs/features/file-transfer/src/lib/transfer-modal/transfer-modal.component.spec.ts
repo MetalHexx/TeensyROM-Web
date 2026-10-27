@@ -20,6 +20,8 @@ import {
   DeviceMachine,
   DeviceVideoStandard,
   DeviceHardwareVariant,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/domain';
 import { TransferModalComponent } from './transfer-modal.component';
 
@@ -53,14 +55,24 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   filesReceived: 3,
   filesSent: 1,
   filesFailed: 0,
+  bytesSent: 0,
   totalFiles: 5,
   currentFile: 'music/song.sid',
+  origin: { kind: TransferOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
   startedUtc: new Date('2026-01-01T00:00:00Z'),
+  lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
   error: null,
   failures: [],
   recentCompletions: [],
   bytesPerSecond: 0,
   filesPerSecond: 0,
+  expandingArchive: null,
+  expansionBytesWritten: 0,
+  expansionBytesDeclared: 0,
+  expandedFileCount: null,
+  launchState: TransferLaunchState.None,
+  launchedPath: null,
+  launchError: null,
   ...overrides,
 });
 
@@ -144,7 +156,9 @@ describe('TransferModalComponent', () => {
       retryCreate: vi.fn().mockResolvedValue(undefined),
       cancelTransfer: vi.fn().mockResolvedValue(undefined),
       closeTransfer: vi.fn().mockResolvedValue(undefined),
-      refreshDeviceBusyState: vi.fn().mockResolvedValue(undefined),
+      showDetails: vi.fn().mockResolvedValue(undefined),
+      hideDetails: vi.fn().mockResolvedValue(undefined),
+      releaseOwnRecords: vi.fn().mockResolvedValue(undefined),
     };
 
     mockDialog = { open: vi.fn() };

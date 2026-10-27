@@ -97,7 +97,9 @@ describe('FileTransferViewComponent', () => {
       retryCreate: vi.fn().mockResolvedValue(undefined),
       cancelTransfer: vi.fn().mockResolvedValue(undefined),
       closeTransfer: vi.fn().mockResolvedValue(undefined),
-      refreshDeviceBusyState: vi.fn().mockResolvedValue(undefined),
+      showDetails: vi.fn().mockResolvedValue(undefined),
+      hideDetails: vi.fn().mockResolvedValue(undefined),
+      releaseOwnRecords: vi.fn().mockResolvedValue(undefined),
     };
 
     await TestBed.configureTestingModule({

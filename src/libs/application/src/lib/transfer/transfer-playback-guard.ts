@@ -2,15 +2,17 @@ import { Injectable, effect, inject } from '@angular/core';
 import { PlayerStore } from '../player/player-store';
 import { PlayerTimerManager } from '../player/player-timer-manager';
 import { TransferStore } from './transfer-store';
+import { isTerminalJobState } from './transfer-helpers';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 
 /**
- * Suppresses player timers for any device with an active transfer job.
+ * Suppresses player timers for any device with a transfer job under way.
  *
  * The engine resets the device server-side before the first file arrives, unless it believes the
- * device is idle with nothing launched on it, so playback is already stopped there. This reacts to `TransferStore` state alone — never to the drop flow — so
- * it also covers a job this client did not start (the busy pre-check finding a foreign job). It
- * issues no device command at any point; `reflectTransferStopped` is a local-only status write.
+ * device is idle with nothing launched on it, so playback is already stopped there. This reacts
+ * to `TransferStore` state alone — never to the drop flow — so it also covers a job this client
+ * did not start. A job that has ended no longer counts. It issues no device command at any
+ * point; `reflectTransferStopped` is a local-only status write.
  */
 @Injectable({ providedIn: 'root' })
 export class TransferPlaybackGuard {
@@ -27,7 +29,9 @@ export class TransferPlaybackGuard {
 
       for (const deviceId of Object.keys(transfers)) {
         const transfer = transfers[deviceId];
-        const hasActiveJob = transfer.phase === 'running' || transfer.activeForeignJobId !== null;
+        const hasActiveJob =
+          (transfer.job !== null && !isTerminalJobState(transfer.job.state)) ||
+          transfer.activeForeignJobId !== null;
 
         if (hasActiveJob) {
           if (!this.suppressedDevices.has(deviceId)) {

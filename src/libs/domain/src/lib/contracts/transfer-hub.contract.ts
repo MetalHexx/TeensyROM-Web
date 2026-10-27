@@ -14,8 +14,17 @@ export interface ITransferHubService {
   /** Leaves the job group. Only call once the client is genuinely done with the job. */
   unsubscribe(jobId: string): Promise<void>;
 
+  /** Joins the all-transfers group and returns every job the engine holds, newest first. */
+  subscribeAll(): Promise<TransferJobSnapshot[]>;
+
+  /** Leaves the all-transfers group. */
+  unsubscribeAll(): Promise<void>;
+
   /** Complete job snapshots pushed by the server, including the one seeded by `subscribe`. */
   readonly snapshots$: Observable<TransferJobSnapshot>;
+
+  /** After an automatic reconnect rejoins the all-transfers group: the full current list again. */
+  readonly allResynced$: Observable<TransferJobSnapshot[]>;
 
   /** Stops the hub connection and releases resources. */
   disconnect(): Promise<void>;

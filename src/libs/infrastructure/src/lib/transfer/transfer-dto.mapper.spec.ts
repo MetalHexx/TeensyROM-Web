@@ -7,7 +7,12 @@ import {
   TransferOriginKind,
   TeensyStorageType,
 } from '@teensyrom-nx/data-access/api-client';
-import { StorageType, TransferJobState } from '@teensyrom-nx/domain';
+import {
+  StorageType,
+  TransferJobState,
+  TransferLaunchState as DomainLaunchState,
+  TransferOriginKind as DomainOriginKind,
+} from '@teensyrom-nx/domain';
 import { TransferDtoMapper } from './transfer-dto.mapper';
 
 describe('TransferDtoMapper', () => {
@@ -70,9 +75,12 @@ describe('TransferDtoMapper', () => {
       filesReceived: 2,
       filesSent: 3,
       filesFailed: 1,
+      bytesSent: 4096,
       totalFiles: 5,
       currentFile: 'game.prg',
+      origin: { kind: DomainOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
       startedUtc: baseFields.startedUtc,
+      lastActivityUtc: baseFields.lastActivityUtc,
       error: 'partial failure',
       failures: [
         {
@@ -100,6 +108,9 @@ describe('TransferDtoMapper', () => {
       expansionBytesWritten: 512000,
       expansionBytesDeclared: 1024000,
       expandedFileCount: 42,
+      launchState: DomainLaunchState.None,
+      launchedPath: null,
+      launchError: null,
     });
   });
 
@@ -137,6 +148,72 @@ describe('TransferDtoMapper', () => {
 
     expect(snapshot.startedUtc).toEqual(new Date('2026-01-01T00:00:00.000Z'));
     expect(snapshot.startedUtc.getTime()).toBe(new Date('2026-01-01T00:00:00.000Z').getTime());
+  });
+
+  it('coerces a raw ISO string lastActivityUtc into a Date', () => {
+    const dto = {
+      ...baseFields,
+      lastActivityUtc: '2026-01-01T00:01:00.000Z',
+    } as unknown as TransferJobDto;
+
+    expect(TransferDtoMapper.toSnapshot(dto).lastActivityUtc).toEqual(
+      new Date('2026-01-01T00:01:00.000Z')
+    );
+  });
+
+  it('maps a watch-folder origin with its folder id and path', () => {
+    const dto: TransferJobDto = {
+      ...baseFields,
+      origin: {
+        kind: TransferOriginKind.WatchFolder,
+        watchFolderId: 'wf-1',
+        watchFolderPath: 'C:/roms/incoming',
+      },
+    };
+
+    expect(TransferDtoMapper.toSnapshot(dto).origin).toEqual({
+      kind: DomainOriginKind.WatchFolder,
+      watchFolderId: 'wf-1',
+      watchFolderPath: 'C:/roms/incoming',
+    });
+  });
+
+  it('maps every generated launch state and the launched path and error', () => {
+    const states: Array<[TransferLaunchState, DomainLaunchState]> = [
+      [TransferLaunchState.None, DomainLaunchState.None],
+      [TransferLaunchState.Pending, DomainLaunchState.Pending],
+      [TransferLaunchState.Launched, DomainLaunchState.Launched],
+      [TransferLaunchState.Incompatible, DomainLaunchState.Incompatible],
+      [TransferLaunchState.Failed, DomainLaunchState.Failed],
+    ];
+
+    for (const [apiState, domainState] of states) {
+      const dto: TransferJobDto = {
+        ...baseFields,
+        launchState: apiState,
+        launchedPath: '/games/a.prg',
+        launchError: 'boom',
+      };
+      const snapshot = TransferDtoMapper.toSnapshot(dto);
+      expect(snapshot.launchState).toBe(domainState);
+      expect(snapshot.launchedPath).toBe('/games/a.prg');
+      expect(snapshot.launchError).toBe('boom');
+    }
+  });
+
+  it('throws on an origin kind or launch state the domain does not recognize', () => {
+    expect(() =>
+      TransferDtoMapper.toSnapshot({
+        ...baseFields,
+        origin: { kind: 'Mystery' as TransferOriginKind },
+      })
+    ).toThrow('Unknown API transfer origin kind');
+    expect(() =>
+      TransferDtoMapper.toSnapshot({
+        ...baseFields,
+        launchState: 'Mystery' as TransferLaunchState,
+      })
+    ).toThrow('Unknown API transfer launch state');
   });
 
   it('maps USB storage type', () => {

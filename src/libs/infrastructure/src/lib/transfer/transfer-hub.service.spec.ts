@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import {
   TeensyStorageType,
   TransferJobState as ApiTransferJobState,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/data-access/api-client';
 import { API_CONFIG, IApiConfig, TransferJobState, StorageType } from '@teensyrom-nx/domain';
 import { TransferHubService } from './transfer-hub.service';
@@ -75,6 +77,7 @@ const jobDto = {
   bytesSent: 100,
   totalFiles: 3,
   currentFile: 'a.prg',
+  origin: { kind: TransferOriginKind.Upload },
   startedUtc: new Date('2026-01-01T00:00:00Z'),
   lastActivityUtc: new Date('2026-01-01T00:01:00Z'),
   error: null,
@@ -82,6 +85,9 @@ const jobDto = {
   recentCompletions: [],
   bytesPerSecond: 0,
   filesPerSecond: 0,
+  expansionBytesWritten: 0,
+  expansionBytesDeclared: 0,
+  launchState: TransferLaunchState.None,
 };
 
 describe('TransferHubService', () => {
@@ -190,6 +196,185 @@ describe('TransferHubService', () => {
     const reconnected = mocks.__getReconnectedHandler();
     await reconnected?.();
     expect(mocks.__mockHubConnection.invoke).not.toHaveBeenCalled();
+  });
+
+  it('rejoins every subscribed job on reconnect and drops one whose Subscribe is rejected', async () => {
+    await service.subscribe('job-1');
+    await service.subscribe('job-2');
+    const emitted: string[] = [];
+    service.snapshots$.subscribe((snapshot) => emitted.push(snapshot.jobId));
+
+    mocks.__mockHubConnection.invoke.mockClear();
+    mocks.__mockHubConnection.invoke.mockImplementation(async (_method: string, jobId: string) => {
+      if (jobId === 'job-1') throw new Error('Unknown job id');
+      return { ...jobDto, jobId, filesReceived: 9 };
+    });
+
+    const reconnected = mocks.__getReconnectedHandler();
+    await reconnected?.();
+
+    expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('Subscribe', 'job-1');
+    expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('Subscribe', 'job-2');
+    expect(emitted).toEqual(['job-2']);
+
+    mocks.__mockHubConnection.invoke.mockClear();
+    await reconnected?.();
+    expect(mocks.__mockHubConnection.invoke).not.toHaveBeenCalledWith('Subscribe', 'job-1');
+    expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('Subscribe', 'job-2');
+  });
+
+  it('keeps the other jobs subscribed when one is unsubscribed', async () => {
+    await service.subscribe('job-1');
+    await service.subscribe('job-2');
+    await service.unsubscribe('job-1');
+
+    mocks.__mockHubConnection.invoke.mockClear();
+    mocks.__mockHubConnection.invoke.mockResolvedValue({ ...jobDto, jobId: 'job-2' });
+    await mocks.__getReconnectedHandler()?.();
+
+    expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('Subscribe', 'job-2');
+  });
+
+  describe('all-transfers subscription', () => {
+    it('invokes SubscribeAll and maps the returned list in the order the server sent it', async () => {
+      mocks.__mockHubConnection.invoke.mockResolvedValue([
+        {
+          ...jobDto,
+          jobId: 'job-b',
+          origin: { kind: TransferOriginKind.WatchFolder, watchFolderPath: 'C:/in' },
+        },
+        { ...jobDto, jobId: 'job-a', launchState: TransferLaunchState.Pending },
+      ]);
+
+      const snapshots = await service.subscribeAll();
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('SubscribeAll');
+      expect(snapshots.map((s) => s.jobId)).toEqual(['job-b', 'job-a']);
+      expect(snapshots[0].origin.watchFolderPath).toBe('C:/in');
+      expect(snapshots[1].launchState).toBe('Pending');
+    });
+
+    it('re-invokes SubscribeAll on reconnect and emits the full list on allResynced$', async () => {
+      mocks.__mockHubConnection.invoke.mockResolvedValue([]);
+      await service.subscribeAll();
+      const resynced: string[][] = [];
+      service.allResynced$.subscribe((list) => resynced.push(list.map((s) => s.jobId)));
+
+      mocks.__mockHubConnection.invoke.mockClear();
+      mocks.__mockHubConnection.invoke.mockResolvedValue([
+        { ...jobDto, jobId: 'job-1' },
+        { ...jobDto, jobId: 'job-2' },
+      ]);
+      await mocks.__getReconnectedHandler()?.();
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('SubscribeAll');
+      expect(resynced).toEqual([['job-1', 'job-2']]);
+    });
+
+    it('rejoins both a subscribed job and the all group on reconnect', async () => {
+      mocks.__mockHubConnection.invoke.mockResolvedValue([]);
+      await service.subscribeAll();
+      mocks.__mockHubConnection.invoke.mockResolvedValue({ ...jobDto });
+      await service.subscribe('job-1');
+
+      mocks.__mockHubConnection.invoke.mockClear();
+      mocks.__mockHubConnection.invoke.mockImplementation(async (method: string) =>
+        method === 'SubscribeAll' ? [] : { ...jobDto, filesReceived: 7 }
+      );
+      await mocks.__getReconnectedHandler()?.();
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('Subscribe', 'job-1');
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('SubscribeAll');
+    });
+
+    it('joins the all group on a connection first made by another call after a failed subscribeAll', async () => {
+      mocks.__mockHubConnection.start.mockRejectedValueOnce(new Error('engine down'));
+      await expect(service.subscribeAll()).rejects.toThrow('engine down');
+
+      const resynced: string[][] = [];
+      service.allResynced$.subscribe((list) => resynced.push(list.map((s) => s.jobId)));
+      mocks.__mockHubConnection.invoke.mockImplementation(async (method: string) =>
+        method === 'SubscribeAll' ? [{ ...jobDto, jobId: 'job-9' }] : { ...jobDto }
+      );
+
+      await service.subscribe('job-1');
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('SubscribeAll');
+      expect(resynced).toEqual([['job-9']]);
+    });
+
+    it('does not rejoin the all group on the connection its own subscribeAll built', async () => {
+      mocks.__mockHubConnection.invoke.mockResolvedValue([]);
+      const resynced: unknown[] = [];
+      service.allResynced$.subscribe((list) => resynced.push(list));
+
+      await service.subscribeAll();
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledTimes(1);
+      expect(resynced).toEqual([]);
+    });
+
+    it('invokes UnsubscribeAll and stops rejoining the all group', async () => {
+      mocks.__mockHubConnection.invoke.mockResolvedValue([]);
+      await service.subscribeAll();
+      await service.unsubscribeAll();
+
+      expect(mocks.__mockHubConnection.invoke).toHaveBeenCalledWith('UnsubscribeAll');
+
+      mocks.__mockHubConnection.invoke.mockClear();
+      await mocks.__getReconnectedHandler()?.();
+      expect(mocks.__mockHubConnection.invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('duplicate pushes', () => {
+    it("drops a push identical to that job's previous push", async () => {
+      await service.subscribe('job-1');
+      const emitted: unknown[] = [];
+      service.snapshots$.subscribe((snapshot) => emitted.push(snapshot));
+
+      mocks.__handlers['JobSnapshot']({ ...jobDto, filesReceived: 2 });
+      mocks.__handlers['JobSnapshot']({ ...jobDto, filesReceived: 2 });
+
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('forwards a changed push, and the same content again after a different one', async () => {
+      await service.subscribe('job-1');
+      const emitted: number[] = [];
+      service.snapshots$.subscribe((snapshot) => emitted.push(snapshot.filesReceived));
+
+      mocks.__handlers['JobSnapshot']({ ...jobDto, filesReceived: 2 });
+      mocks.__handlers['JobSnapshot']({ ...jobDto, filesReceived: 3 });
+      mocks.__handlers['JobSnapshot']({ ...jobDto, filesReceived: 2 });
+
+      expect(emitted).toEqual([2, 3, 2]);
+    });
+
+    it('tracks repeats per job', async () => {
+      await service.subscribe('job-1');
+      const emitted: string[] = [];
+      service.snapshots$.subscribe((snapshot) => emitted.push(snapshot.jobId));
+
+      mocks.__handlers['JobSnapshot']({ ...jobDto, jobId: 'job-1' });
+      mocks.__handlers['JobSnapshot']({ ...jobDto, jobId: 'job-2' });
+      mocks.__handlers['JobSnapshot']({ ...jobDto, jobId: 'job-1' });
+
+      expect(emitted).toEqual(['job-1', 'job-2']);
+    });
+
+    it('forgets the last pushes on disconnect', async () => {
+      await service.subscribe('job-1');
+      const emitted: unknown[] = [];
+      service.snapshots$.subscribe((snapshot) => emitted.push(snapshot));
+
+      mocks.__handlers['JobSnapshot']({ ...jobDto });
+      await service.disconnect();
+      mocks.__handlers['JobSnapshot']({ ...jobDto });
+
+      expect(emitted).toHaveLength(2);
+    });
   });
 
   it('stops the connection on disconnect', async () => {

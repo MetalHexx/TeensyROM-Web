@@ -9,6 +9,7 @@ export interface BeginScanParams {
   destinationLabel: string;
 }
 
+/** Starts this tab's own drop on a device and opens the details dialog for it. */
 export function beginScan(store: WritableStore<TransferState>) {
   return {
     beginScan: ({ deviceId, droppedRootName, destinationLabel }: BeginScanParams): void => {
@@ -22,6 +23,7 @@ export function beginScan(store: WritableStore<TransferState>) {
         destinationLabel,
         isLoading: true,
         lastUpdated: Date.now(),
+        startedHere: true,
       };
 
       updateState(store, actionMessage, (state) => ({
@@ -29,6 +31,7 @@ export function beginScan(store: WritableStore<TransferState>) {
           ...state.transfers,
           [deviceId]: freshTransfer,
         },
+        detailsDeviceId: deviceId,
       }));
     },
   };

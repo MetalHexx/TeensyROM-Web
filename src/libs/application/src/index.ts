@@ -54,5 +54,11 @@ export * from './lib/transfer/transfer-store';
 export * from './lib/transfer/transfer-context.interface';
 export * from './lib/transfer/transfer-context.service';
 export * from './lib/transfer/transfer-playback-guard';
+export * from './lib/transfer/transfer-tracker';
+export {
+  buildStartAnnouncement,
+  buildEndAnnouncement,
+  type TransferAnnouncement,
+} from './lib/transfer/transfer-announcements';
 export * from './lib/transfer/providers';
 export { formatElapsedLabel } from './lib/transfer/selectors/get-transfer-summary';

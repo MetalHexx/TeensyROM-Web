@@ -1,7 +1,7 @@
 import { signalStore, withState } from '@ngrx/signals';
 import { withDevtools } from '@angular-architects/ngrx-toolkit';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
-import { TransferJobSnapshot } from '@teensyrom-nx/domain';
+import { TransferJobSnapshot, TransferJobState, TransferOrigin } from '@teensyrom-nx/domain';
 import { withTransferSelectors } from './selectors';
 import { withTransferActions } from './actions';
 
@@ -65,20 +65,47 @@ export interface DeviceTransferState {
   droppedRootName: string | null;
   destinationLabel: string | null;
   startedAt: number | null;
-  activeForeignJobId: string | null; // set by the busy-device pre-check
+  activeForeignJobId: string | null; // a job this tab did not start, recorded while this tab's own entry is pre-job
   error: string | null;
   isLoading: boolean;
   lastUpdated: number | null;
+  startedHere: boolean; // true only for a transfer this tab started
 }
 
 export interface TransferState {
   targetDeviceId: string | null;
   transfers: Record<string, DeviceTransferState>;
+  /** The device whose transfer the details dialog shows; null while the dialog is closed or hidden. */
+  detailsDeviceId: string | null;
+}
+
+/** A transfer under way on a device, from this tab or elsewhere. */
+export interface LiveTransfer {
+  deviceId: string;
+  jobId: string;
+  origin: TransferOrigin;
+  state: TransferJobState; // Created | Receiving | Sealed only
+  filesSent: number;
+  filesReceived: number;
+  totalFiles: number | null;
+  fileTotal: number; // computeTransferMetrics(entry).total
+  devicePercent: number; // computeTransferMetrics(entry).devicePct
+  bytesPerSecond: number;
+  startedAt: number;
+  startedHere: boolean;
+}
+
+/** One tab of the details dialog. */
+export interface TransferTab {
+  deviceId: string;
+  percent: number;
+  ended: boolean;
 }
 
 const initialState: TransferState = {
   targetDeviceId: null,
   transfers: {},
+  detailsDeviceId: null,
 };
 
 logInfo(LogType.Start, 'TransferStore: Initializing transfer state management store');

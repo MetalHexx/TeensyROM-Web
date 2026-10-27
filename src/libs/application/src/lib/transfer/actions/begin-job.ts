@@ -6,7 +6,12 @@ export interface BeginJobParams {
   deviceId: string;
 }
 
-/** Marks job creation as in flight. Also used to retry from `device-busy` — the manifest is retained. */
+/**
+ * Marks job creation as in flight. Also used to retry from `device-busy` — the manifest is retained.
+ *
+ * The recorded foreign job id is dropped: pushes are ignored while `starting`, so a terminal one
+ * could never clear it, and a refused create records it afresh.
+ */
 export function beginJob(store: WritableStore<TransferState>) {
   return {
     beginJob: ({ deviceId }: BeginJobParams): void => {
@@ -17,6 +22,7 @@ export function beginJob(store: WritableStore<TransferState>) {
         ...state,
         phase: 'starting',
         job: null,
+        activeForeignJobId: null,
         error: null,
         isLoading: true,
         lastUpdated: Date.now(),

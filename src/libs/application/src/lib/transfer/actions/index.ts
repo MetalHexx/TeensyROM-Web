@@ -15,6 +15,9 @@ import { setTransferError } from './set-transfer-error';
 import { setCancelError } from './set-cancel-error';
 import { setActiveForeignJob } from './set-active-foreign-job';
 import { clearTransfer } from './clear-transfer';
+import { foldLiveSnapshot } from './fold-live-snapshot';
+import { showTransferDetails } from './show-transfer-details';
+import { hideTransferDetails } from './hide-transfer-details';
 
 export function withTransferActions() {
   return withMethods((store) => {
@@ -34,6 +37,9 @@ export function withTransferActions() {
       ...setCancelError(writableStore),
       ...setActiveForeignJob(writableStore),
       ...clearTransfer(writableStore),
+      ...foldLiveSnapshot(writableStore),
+      ...showTransferDetails(writableStore),
+      ...hideTransferDetails(writableStore),
     };
   });
 }
