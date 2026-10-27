@@ -229,6 +229,25 @@ describe('set selectors', () => {
         { id: 'set-1', name: 'First', loaded: false },
       ]);
     });
+
+    it('lights only the set in the card when a deck keeps another set open', () => {
+      const current = setOf([], 'set-2', 'Second', '2026-03-01T00:00:00.000Z');
+      store.setSetsLibrary({
+        summaries: [
+          { id: 'set-1', name: 'First', rowCount: 1, updated: '2026-01-01T00:00:00.000Z' },
+          { id: 'set-2', name: 'Second', rowCount: 0, updated: '2026-03-01T00:00:00.000Z' },
+        ],
+        current,
+      });
+      store.putOpenSet({ set: setOf([row('a')], 'set-1', 'First', '2026-01-01T00:00:00.000Z') });
+
+      const loaded = store
+        .setTreeSummary()()
+        .sets.filter((entry) => entry.loaded)
+        .map((entry) => entry.id);
+
+      expect(loaded).toEqual(['set-2']);
+    });
   });
 
   describe('deckHolding', () => {

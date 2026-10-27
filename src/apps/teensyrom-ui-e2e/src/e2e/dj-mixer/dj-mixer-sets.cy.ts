@@ -226,7 +226,8 @@ describe('DJ Mixer — sets', () => {
     it('rises over the bottom on a Select turn while the browser is hidden, then leaves the decks clickable', function () {
       cy.window().then((win) => {
         if ((win as unknown as { ng?: NgDebug }).ng === undefined) {
-          // A production build has no debug API to turn the Select knob with; run against `serve`.
+          // A production build has no debug API to turn the Select knob with, so the CI static
+          // build skips this case; run against `serve`.
           this.skip();
         }
       });

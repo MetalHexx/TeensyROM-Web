@@ -488,6 +488,19 @@ bench list for real hardware. `dj-mixer-sets.cy.ts` now commits the peek case (i
 - **Browser button glyph.** `dock_to_bottom`, Material Symbols' window with a bottom panel; the
   mockup draws its own outline glyph. The button order (Bindings, then Browser), the 4 px gap and the
   lamp before the count were changed to match the mockup.
+- **"Most recently used" is read as most recently edited.** The tree orders the sets by their
+  `updated` stamp, which a rename, add, move, remove or row edit moves. Opening a set and playing from
+  it without an edit does not, because a set carries only `created` and `updated` and has no
+  last-used stamp.
+- **"Unavailable" shows after a load is tried.** A row is marked unavailable when loading it finds its
+  bytes uncached and its source device absent (and when its analysis fails); the load reports why.
+  A row is not checked against the connected devices when a set is opened, so one that cannot load
+  looks like any other until a Load or previous/next is attempted.
+
+**Known limitation: the peek case in CI.** The peek's end-to-end case turns the Select knob through
+Angular's dev-mode debug API, which a production build does not have. It runs against `nx run
+teensyrom-ui:serve` and skips itself against the static build the CI configuration serves; the view
+spec covers the logic there.
 
 **Known limitation: save state while the browser is hidden.** The Saved lamp and the card's live region
 live in the set card, which is not in the DOM while the browser is hidden and no peek is up. A save

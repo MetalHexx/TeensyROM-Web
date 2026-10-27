@@ -31,13 +31,8 @@ import {
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from '../ports';
-import {
-  DjSets,
-  MAX_ROWS_PER_SET,
-  MAX_SETS,
-  SET_NAME_MAX_LENGTH,
-  sanitizeName,
-} from './dj-sets';
+import { DjSets } from './dj-sets';
+import { MAX_ROWS_PER_SET, MAX_SETS, SET_NAME_MAX_LENGTH, sanitizeName } from './set-limits';
 import { decodeRowHost } from './row-host';
 
 function deferred<T = void>() {

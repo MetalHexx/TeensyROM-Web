@@ -6,7 +6,6 @@ import { DeckRuntime } from './deck-runtime';
 import {
   DjStore,
   EMPTY_DECK_LOOPS,
-  MARKER_NAME_MAX_LENGTH,
   type DeckLoopBoundary,
   type DeckLoopMarker,
   type DeckLoopsState,
@@ -26,7 +25,11 @@ import {
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { nextOffset, type LoopSnapDirection } from './loops/moment-reach';
 import { engineSettingsOf } from './mixer/engine-settings';
-import { MAX_MARKERS_PER_SUBTUNE, sanitizeName } from './sets/dj-sets';
+import {
+  MARKER_NAME_MAX_LENGTH,
+  MAX_MARKERS_PER_SUBTUNE,
+  sanitizeName,
+} from './sets/set-limits';
 
 /** The SID's three voices: a new marker plays them all. */
 const ALL_VOICES: readonly number[] = [0, 1, 2];

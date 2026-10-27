@@ -12,7 +12,6 @@ import { DeckRuntime } from './deck-runtime';
 import {
   DjStore,
   HOME_DECK_PANEL,
-  MARKER_NAME_MAX_LENGTH,
   type DeckLoopMarker,
   type DeckMixerSettings,
   type DeckPanelState,
@@ -20,7 +19,7 @@ import {
 import { MixerApplier } from './mixer-applier';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { engineSettingsOf } from './mixer/engine-settings';
-import { MAX_MARKERS_PER_SUBTUNE } from './sets/dj-sets';
+import { MARKER_NAME_MAX_LENGTH, MAX_MARKERS_PER_SUBTUNE } from './sets/set-limits';
 import { voicePitchMultiplier } from './mixer/pitch';
 import {
   FRAME_CLOCK_FACTORY,

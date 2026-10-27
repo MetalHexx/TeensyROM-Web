@@ -61,7 +61,7 @@ export interface SetTreeSummary {
   readonly sets: readonly {
     readonly id: string;
     readonly name: string;
-    /** Open as a working copy. */
+    /** The set in the card; a set open only because a deck holds one of its rows is not loaded. */
     readonly loaded: boolean;
   }[];
 }
@@ -246,14 +246,14 @@ export function setTreeSummary(store: WritableStore<DjState>) {
   return {
     setTreeSummary: () =>
       computed<SetTreeSummary>(() => {
-        const open = store.sets.open();
+        const currentSetId = store.sets.currentSetId();
         return {
           sets: [...store.sets.summaries()]
             .sort((a, b) => updatedTime(b.updated) - updatedTime(a.updated))
             .map((summary) => ({
               id: summary.id,
               name: summary.name,
-              loaded: summary.id in open,
+              loaded: summary.id === currentSetId,
             })),
         };
       }),

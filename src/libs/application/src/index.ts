@@ -21,6 +21,7 @@ export * from './lib/dj/load-source';
 export * from './lib/dj/deck-runtime';
 export * from './lib/dj/tune-loader';
 export * from './lib/dj/sets/dj-sets';
+export * from './lib/dj/sets/set-limits';
 export * from './lib/dj/sets/row-host';
 export * from './lib/dj/deck.service';
 export * from './lib/dj/deck-memory-keeper';
