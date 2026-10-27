@@ -75,7 +75,9 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAudioCaptureService, PortAudioCaptureService>();
             services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
             services.AddSingleton<ITransferJobRegistry, TransferJobRegistry>();
-            services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
+            services.AddSingleton<DeviceLeaseCoordinator>();
+            services.AddSingleton<IDeviceLeaseCoordinator>(sp => sp.GetRequiredService<DeviceLeaseCoordinator>());
+            services.AddSingleton<IDeviceTransferLease>(sp => sp.GetRequiredService<DeviceLeaseCoordinator>());
             services.AddSingleton(sp => TransferOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
             services.AddSingleton<ITransferScratchStore, TransferScratchStore>();

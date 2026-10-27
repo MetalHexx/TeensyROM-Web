@@ -4,11 +4,12 @@ using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands
 {
-    public sealed class TransferFilesCommand : ITeensyCommand<TransferFilesResult>
+    public sealed class TransferFilesCommand : ITeensyCommand<TransferFilesResult>, ITransferCommand
     {
         public required List<StreamedFileTransfer> Files { get; init; }
         public string? DeviceId { get; set; }
         public required ICommunicationPort CommunicationPort { get; init; }
+        public string? TransferJobId { get; init; }
 
         /// <summary>
         /// Invoked after each file completes, before the handler moves to the next.

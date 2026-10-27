@@ -44,6 +44,7 @@ namespace TeensyRom.Core.Device
         private readonly ITeensyPortLocator _locator;
         private readonly ConnectionOptions _options;
         private readonly ILoggingService _log;
+        private readonly IDeviceTransferLease _lease;
 
         private readonly ConcurrentDictionary<string, TeensyRomDevice> _byChip = new();
 
@@ -77,7 +78,8 @@ namespace TeensyRom.Core.Device
             IDeviceInterrogator interrogator,
             ITeensyPortLocator locator,
             ConnectionOptions options,
-            ILoggingService log)
+            ILoggingService log,
+            IDeviceTransferLease lease)
         {
             _finder = finder;
             _cache = cache;
@@ -86,6 +88,7 @@ namespace TeensyRom.Core.Device
             _locator = locator;
             _options = options;
             _log = log;
+            _lease = lease;
         }
 
         public bool StartedFromSavedRecords => _startedFromSavedRecords;
@@ -433,19 +436,42 @@ namespace TeensyRom.Core.Device
         {
             var stopwatch = Stopwatch.StartNew();
 
-            foreach (var device in _byChip.Values)
+            // A device a transfer holds is left exactly as it is: its port stays open, its endpoints are
+            // kept out of the sweep, and it stays listed. Disposing or probing it would cut the transfer's
+            // writes mid-file.
+            var transferring = _byChip.Values.Where(d => _lease.GetActiveJobId(d.DeviceId) is not null).ToList();
+            var transferringChips = transferring.Select(d => d.DeviceId).ToHashSet();
+            var skip = _noSkips;
+
+            if (transferring.Count > 0)
             {
-                device.CommunicationPort.Dispose();
+                var skipSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var device in transferring)
+                {
+                    AddEndpointsToSkipSet(skipSet, device);
+                    _log.Internal($"DeviceConnectionManager.FindDevices: Discovery ({occasion}): not scanning the device, a transfer holds it", device.DeviceId);
+                }
+
+                skip = skipSet;
             }
 
-            var discovered = await _finder.FindDevices(_noSkips, ct);
+            foreach (var device in _byChip.Values)
+            {
+                if (!transferringChips.Contains(device.DeviceId))
+                {
+                    device.CommunicationPort.Dispose();
+                }
+            }
+
+            var discovered = await _finder.FindDevices(skip, ct);
             var discoveredChips = new HashSet<string>(discovered.Select(d => d.DeviceId));
 
             MergeDiscovered(discovered);
 
             foreach (var (chipId, device) in _byChip)
             {
-                if (!discoveredChips.Contains(chipId))
+                if (!discoveredChips.Contains(chipId) && !transferringChips.Contains(chipId))
                 {
                     device.MarkUnreachable();
                 }
@@ -706,18 +732,23 @@ namespace TeensyRom.Core.Device
 
             foreach (var device in GetAvailableDevices())
             {
-                if (!string.IsNullOrEmpty(device.Connection.SerialPortName))
-                {
-                    skip.Add(device.Connection.SerialPortName);
-                }
-
-                if (!string.IsNullOrEmpty(device.Connection.TcpEndpoint))
-                {
-                    skip.Add(device.Connection.TcpEndpoint.GetIpAddress());
-                }
+                AddEndpointsToSkipSet(skip, device);
             }
 
             return skip;
+        }
+
+        private static void AddEndpointsToSkipSet(HashSet<string> skip, TeensyRomDevice device)
+        {
+            if (!string.IsNullOrEmpty(device.Connection.SerialPortName))
+            {
+                skip.Add(device.Connection.SerialPortName);
+            }
+
+            if (!string.IsNullOrEmpty(device.Connection.TcpEndpoint))
+            {
+                skip.Add(device.Connection.TcpEndpoint.GetIpAddress());
+            }
         }
 
         /// <summary>

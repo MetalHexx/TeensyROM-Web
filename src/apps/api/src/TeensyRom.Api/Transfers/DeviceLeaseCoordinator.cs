@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Transfers
 {
@@ -8,7 +9,7 @@ namespace TeensyRom.Api.Transfers
     /// a job holding that lock across its whole lifetime would have it disposed out from under it by an
     /// unrelated command's cleanup pass. The lease is independent of it on purpose.
     /// </summary>
-    public sealed class DeviceLeaseCoordinator : IDeviceLeaseCoordinator
+    public sealed class DeviceLeaseCoordinator : IDeviceLeaseCoordinator, IDeviceTransferLease
     {
         private readonly ConcurrentDictionary<string, string> _leases = new();
 
@@ -20,5 +21,7 @@ namespace TeensyRom.Api.Transfers
 
         public string? GetHolder(string deviceId) =>
             _leases.TryGetValue(deviceId, out var jobId) ? jobId : null;
+
+        public string? GetActiveJobId(string deviceId) => GetHolder(deviceId);
     }
 }

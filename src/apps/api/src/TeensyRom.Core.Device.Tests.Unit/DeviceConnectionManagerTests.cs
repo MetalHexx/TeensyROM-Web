@@ -21,9 +21,16 @@ public class DeviceConnectionManagerTests
     private readonly ITeensyPortLocator _locator = Substitute.For<ITeensyPortLocator>();
     private readonly ConnectionOptions _options = new() { ConnectTimeoutMs = 5 };
     private readonly ILoggingService _log = Substitute.For<ILoggingService>();
+    private readonly IDeviceTransferLease _lease = Substitute.For<IDeviceTransferLease>();
+
+    public DeviceConnectionManagerTests()
+    {
+        // NSubstitute answers an unconfigured string member with "", which would read as a holder.
+        _lease.GetActiveJobId(Arg.Any<string>()).Returns((string?)null);
+    }
 
     private DeviceConnectionManager CreateManager() =>
-        new(_finder, _cache, _transports, _interrogator, _locator, _options, _log);
+        new(_finder, _cache, _transports, _interrogator, _locator, _options, _log, _lease);
 
     private static ICommunicationPort CreatePort(ConnectionType connectionType)
     {
@@ -354,6 +361,39 @@ public class DeviceConnectionManagerTests
         await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
 
         await _finder.Received(1).FindDevices(Arg.Is<IReadOnlySet<string>>(s => s.Count == 0), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FindDevices_FullScan_WithALeasedDevice_LeavesItsPortAndEndpointsAloneAndKeepsItListed()
+    {
+        var leasedPort = CreatePort(ConnectionType.Tcp);
+        var leased = CreateDevice("leased01", ConnectionType.Tcp, "10.0.0.5:80", leasedPort);
+        leased.Connection.RememberEndpoint(ConnectionType.Serial, "COM3");
+        var freePort = CreatePort(ConnectionType.Serial);
+        var free = CreateDevice("free0001", ConnectionType.Serial, "COM4", freePort);
+        var rescannedFree = CreateDevice("free0001", ConnectionType.Serial, "COM4", CreatePort(ConnectionType.Serial));
+
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
+            new List<TeensyRomDevice> { leased, free },
+            new List<TeensyRomDevice> { rescannedFree });
+
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        _finder.ClearReceivedCalls();
+        leasedPort.ClearReceivedCalls();
+        freePort.ClearReceivedCalls();
+        _lease.GetActiveJobId("leased01").Returns("job-1");
+
+        var second = await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+
+        leasedPort.DidNotReceive().Dispose();
+        freePort.Received(1).Dispose();
+        await _finder.Received(1).FindDevices(
+            Arg.Is<IReadOnlySet<string>>(s => s.Count == 2 && s.Contains("com3") && s.Contains("10.0.0.5")),
+            Arg.Any<CancellationToken>());
+        leased.Connection.Mode.Should().NotBe(DeviceMode.Unreachable);
+        second.Should().HaveCount(2).And.Contain(leased).And.Contain(rescannedFree);
+        manager.GetAvailableDevice("leased01").Should().BeSameAs(leased);
     }
 
     [Fact]
@@ -709,7 +749,7 @@ public class DeviceConnectionManagerTests
         staleDevice.Connection.RememberEndpoint(ConnectionType.Serial, "COM8");
 
         var finderStub = Substitute.For<ICartFinder>();
-        var manager = new DeviceConnectionManager(finderStub, _cache, _transports, _interrogator, _locator, _options, _log);
+        var manager = new DeviceConnectionManager(finderStub, _cache, _transports, _interrogator, _locator, _options, _log, _lease);
 
         // Seed the manager's knowledge of this unreachable device via a full discovery that then loses it.
         finderStub.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
@@ -1350,7 +1390,7 @@ public class DeviceConnectionManagerTests
     {
         var staleDevice = CreateDevice("reconnct", ConnectionType.Tcp, "10.0.0.9:80", CreatePort(ConnectionType.Tcp));
         var finderStub = Substitute.For<ICartFinder>();
-        var manager = new DeviceConnectionManager(finderStub, _cache, _transports, _interrogator, _locator, _options, _log);
+        var manager = new DeviceConnectionManager(finderStub, _cache, _transports, _interrogator, _locator, _options, _log, _lease);
         finderStub.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(
             new List<TeensyRomDevice> { staleDevice },
             new List<TeensyRomDevice>());

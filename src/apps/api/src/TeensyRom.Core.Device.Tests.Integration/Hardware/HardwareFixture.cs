@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Serial.Recovery;
@@ -122,10 +123,21 @@ public sealed class HardwareFixture : IAsyncLifetime
         return BuildManager();
     }
 
+    /// <summary>No transfer ever holds a bench device. Explicit because NSubstitute answers an unconfigured string member with "", which would read as a holder.</summary>
+    private static IDeviceTransferLease NoTransfers
+    {
+        get
+        {
+            var lease = Substitute.For<IDeviceTransferLease>();
+            lease.GetActiveJobId(Arg.Any<string>()).Returns((string?)null);
+            return lease;
+        }
+    }
+
     private IDeviceConnectionManager BuildManager()
     {
         var cache = new ConnectionRecordCache(Log, _cachePath);
-        return new DeviceConnectionManager(_finder, cache, Transports, Interrogator, Locator, Options, Log);
+        return new DeviceConnectionManager(_finder, cache, Transports, Interrogator, Locator, Options, Log, NoTransfers);
     }
 
     /// <summary>

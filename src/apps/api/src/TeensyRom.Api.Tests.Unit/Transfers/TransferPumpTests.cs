@@ -1,6 +1,9 @@
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Commands;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Entities.Transfers;
 using TeensyRom.Core.Logging;
@@ -14,7 +17,7 @@ namespace TeensyRom.Api.Tests.Unit.Transfers;
 /// queue-draining loop. <see cref="_scratch"/> is a real
 /// <see cref="TransferScratchStore"/> rather than a substitute so the release tests can assert the
 /// budget itself (<see cref="ITransferScratchStore.BytesInUse"/>) coming back, not just that a purge call
-/// was made.
+/// was made. The one test that does run the loop checks the commands it sends carry their job's id.
 /// </summary>
 public class TransferPumpTests : IDisposable
 {
@@ -273,5 +276,59 @@ public class TransferPumpTests : IDisposable
         job.State.Should().Be(TransferJobState.Completed);
         _leaseCoordinator.Received(1).Release("device-1", job.JobId);
         _staging.Received(1).PurgeJob(job.JobId);
+    }
+
+    [Fact]
+    public async Task Drain_SendsTheResetAndTheFileBatchStampedWithTheJobId()
+    {
+        var job = JobIn(TransferJobState.Receiving, pendingCount: 1);
+        var stagingPath = Path.Combine(_scratchRoot, "file.prg");
+        await File.WriteAllBytesAsync(stagingPath, [1, 2, 3]);
+        var staged = new StagedFile(job.JobId, stagingPath, "file.prg", new FilePath("/transfers/file.prg"), TeensyStorageType.SD, 3, 3);
+        var device = new TeensyRomDevice(
+            new Cart { DeviceId = job.DeviceId }, Substitute.For<ICommunicationPort>(),
+            Substitute.For<IStorageService>(), Substitute.For<IStorageService>(), new DeviceConnectionRecord(job.DeviceId));
+        var mediator = Substitute.For<IMediator>();
+        mediator.Send(Arg.Any<ResetCommand>(), Arg.Any<CancellationToken>()).Returns(new ResetResult());
+        mediator.Send(Arg.Any<TransferFilesCommand>(), Arg.Any<CancellationToken>()).Returns(new TransferFilesResult());
+        using var provider = new ServiceCollection().AddSingleton(mediator).BuildServiceProvider();
+        _scopeFactory.CreateScope().Returns(_ => provider.CreateScope());
+        _queue.ActiveDeviceIds.Returns(new[] { job.DeviceId });
+        _queue.ReadAllAsync(job.DeviceId, Arg.Any<CancellationToken>()).Returns(_ => Once(staged));
+        _registry.Get(job.JobId).Returns(job);
+        _deviceManager.GetAvailableDevice(job.DeviceId).Returns(device);
+        var pump = NewPump();
+
+        await pump.StartAsync(CancellationToken.None);
+
+        try
+        {
+            await WaitUntil(() => mediator.ReceivedCalls().Any(c => c.GetArguments().OfType<TransferFilesCommand>().Any()));
+        }
+        finally
+        {
+            await pump.StopAsync(CancellationToken.None);
+        }
+
+        await mediator.Received(1).Send(Arg.Is<ResetCommand>(c => c.TransferJobId == job.JobId && c.DeviceId == job.DeviceId), Arg.Any<CancellationToken>());
+        await mediator.Received(1).Send(Arg.Is<TransferFilesCommand>(c => c.TransferJobId == job.JobId && c.DeviceId == job.DeviceId), Arg.Any<CancellationToken>());
+    }
+
+    private static async IAsyncEnumerable<StagedFile> Once(StagedFile file)
+    {
+        await Task.Yield();
+        yield return file;
+    }
+
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        condition().Should().BeTrue("the pump should have sent the batch");
     }
 }

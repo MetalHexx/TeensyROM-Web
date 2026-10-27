@@ -1,4 +1,5 @@
 using TeensyRom.Api.Transfers;
+using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Tests.Unit.Transfers;
 
@@ -68,6 +69,22 @@ public class DeviceLeaseCoordinatorTests
     [Fact]
     public void GetHolder_UnheldDevice_ReturnsNull() =>
         NewCoordinator().GetHolder("device-1").Should().BeNull();
+
+    [Fact]
+    public void GetActiveJobId_ReportsTheSameHolderTheCoordinatorRecords()
+    {
+        var coordinator = new DeviceLeaseCoordinator();
+        IDeviceTransferLease lease = coordinator;
+
+        lease.GetActiveJobId("device-1").Should().BeNull();
+
+        coordinator.TryAcquire("device-1", "job-1");
+        lease.GetActiveJobId("device-1").Should().Be("job-1");
+        lease.GetActiveJobId("device-2").Should().BeNull();
+
+        coordinator.Release("device-1", "job-1");
+        lease.GetActiveJobId("device-1").Should().BeNull();
+    }
 
     [Fact]
     public async Task TryAcquire_ManyParallelCallsForOneDevice_YieldsExactlyOneWinner()
