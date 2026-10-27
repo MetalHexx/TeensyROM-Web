@@ -145,12 +145,33 @@ public class WatchFolderWatcherTests : IAsyncLifetime
     [Fact]
     public async Task ASettingsChange_OnlyPostsAMessage_ItNeverStartsAWatchOnTheCallersThread()
     {
-        var callerThread = Environment.CurrentManagedThreadId;
+        // The caller is a dedicated thread that stays alive until the assertion. A pool thread would go back to the
+        // pool at the first await and could be picked up by the watcher's loop, which would look like an inline start.
+        var folder = AddFolder("a");
+        var callerThread = 0;
+        using var called = new ManualResetEventSlim();
+        using var done = new ManualResetEventSlim();
+        var caller = new Thread(() =>
+        {
+            callerThread = Environment.CurrentManagedThreadId;
+            _store.Set(folder);
+            called.Set();
+            done.Wait(Timeout);
+        }) { IsBackground = true };
+        caller.Start();
 
-        _store.Set(AddFolder("a"));
-        await Eventually(() => _factory.IsWatching(FolderPath("a")), "folder a to be watched");
+        try
+        {
+            called.Wait(Timeout).Should().BeTrue("the settings change should return");
+            await Eventually(() => _factory.IsWatching(FolderPath("a")), "folder a to be watched");
 
-        _factory.Watches.Should().OnlyContain(w => w.StartedOnThread != callerThread);
+            _factory.Watches.Should().OnlyContain(w => w.StartedOnThread != callerThread);
+        }
+        finally
+        {
+            done.Set();
+            caller.Join();
+        }
     }
 
     [Fact]
