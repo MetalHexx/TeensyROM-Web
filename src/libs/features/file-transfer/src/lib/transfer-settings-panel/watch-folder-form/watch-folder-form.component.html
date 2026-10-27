@@ -1,0 +1,100 @@
+<div
+  class="watch-form"
+  role="group"
+  aria-label="Add watch folder"
+  [formGroup]="formGroup()"
+  data-testid="watch-folder-form"
+  (keydown.escape)="onEscape($event)"
+>
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+    <mat-label>Folder to watch</mat-label>
+    <input
+      #firstField
+      matInput
+      type="text"
+      formControlName="folder"
+      placeholder="Path on the engine's computer"
+      autocomplete="off"
+      [errorStateMatcher]="folderMatcher"
+      data-testid="form-folder"
+      (keydown.enter)="onSubmit()"
+    />
+    @if (errors().folder; as message) {
+    <mat-error data-testid="error-folder">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+    <mat-label>Device</mat-label>
+    <mat-select
+      formControlName="device"
+      [errorStateMatcher]="deviceMatcher"
+      data-testid="form-device"
+    >
+      @for (device of devices(); track device.deviceId) {
+      <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+      }
+    </mat-select>
+    @if (errors().device; as message) {
+    <mat-error data-testid="error-device">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+    <mat-label>Storage</mat-label>
+    <mat-select
+      formControlName="storage"
+      [errorStateMatcher]="storageMatcher"
+      data-testid="form-storage"
+    >
+      @for (storage of storageOptions(); track storage) {
+      <mat-option [value]="storage">{{ storage }}</mat-option>
+      }
+    </mat-select>
+    @if (errors().storage; as message) {
+    <mat-error data-testid="error-storage">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+    <mat-label>Device folder</mat-label>
+    <input
+      matInput
+      type="text"
+      formControlName="devicePath"
+      autocomplete="off"
+      [errorStateMatcher]="devicePathMatcher"
+      data-testid="form-device-path"
+      (keydown.enter)="onSubmit()"
+    />
+    @if (errors().devicePath; as message) {
+    <mat-error data-testid="error-device-path">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="launch" data-testid="form-launch">Launch</mat-slide-toggle>
+
+  @if (errors().form; as message) {
+  <p class="form-error" role="alert" data-testid="error-form">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <lib-action-button
+      icon="close"
+      label="Cancel"
+      color="normal"
+      [fullWidth]="false"
+      data-testid="form-cancel"
+      (buttonClick)="formCancel.emit()"
+    />
+    <lib-action-button
+      icon="add"
+      label="Add"
+      variant="flat"
+      [fullWidth]="false"
+      [disabled]="!canSubmit()"
+      data-testid="form-submit"
+      (buttonClick)="onSubmit()"
+    />
+  </div>
+</div>

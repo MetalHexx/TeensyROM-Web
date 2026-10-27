@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
-import { SettingsStore } from '@teensyrom-nx/application';
+import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
 import {
+  Device,
   ISettingsService,
   PlayerFilterType,
   SETTINGS_SERVICE,
@@ -11,6 +13,8 @@ import {
   StorageType,
   WATCH_FOLDER_SERVICE,
   WatchFolder,
+  WatchFolderField,
+  WatchFolderRejectedError,
   WatchFolderState,
 } from '@teensyrom-nx/domain';
 import { TransferSettingsPanelComponent } from './transfer-settings-panel.component';
@@ -32,6 +36,17 @@ const folder = (id: string, overrides: Partial<WatchFolder> = {}): WatchFolder =
   ],
   ...overrides,
 });
+
+const device = (deviceId: string, name: string, usb: boolean): Device =>
+  ({
+    deviceId,
+    name,
+    sdStorage: { available: true },
+    usbStorage: { available: usb },
+  }) as unknown as Device;
+
+const rackDevice = device('dev-1', 'Rack TeensyROM', false);
+const benchDevice = device('dev-2', 'Bench TeensyROM', true);
 
 const settings = (autoLaunch = false): Settings =>
   ({
@@ -101,6 +116,7 @@ describe('TransferSettingsPanelComponent', () => {
         provideNoopAnimations(),
         { provide: SETTINGS_SERVICE, useValue: settingsService as unknown as ISettingsService },
         { provide: WATCH_FOLDER_SERVICE, useValue: watchFolders },
+        { provide: DeviceStore, useValue: { usableDevices: signal([rackDevice, benchDevice]) } },
       ],
     }).compileComponents();
 
@@ -324,23 +340,332 @@ describe('TransferSettingsPanelComponent', () => {
     });
   });
 
-  describe('hooks for the form', () => {
-    it('emits addFolder, addDevice and editDevice', async () => {
-      await setup({ folders: [folder('a')] });
-      const added = vi.fn();
-      const device = vi.fn();
-      const edited = vi.fn();
-      fixture.componentInstance.addFolder.subscribe(added);
-      fixture.componentInstance.addDevice.subscribe(device);
-      fixture.componentInstance.editDevice.subscribe(edited);
+  describe('forms', () => {
+    const type = async (testId: string, value: string) => {
+      const input = query<HTMLInputElement>(testId);
+      if (!input) throw new Error(`No field ${testId}`);
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await settle();
+    };
+    const optionLabels = () =>
+      Array.from(document.querySelectorAll('mat-option')).map((o) => o.textContent?.trim());
+    const openSelect = async (testId: string) => {
+      query(testId)?.querySelector<HTMLElement>('.mat-mdc-select-trigger')?.click();
+      await settle();
+    };
+    const choose = async (testId: string, label: string) => {
+      await openSelect(testId);
+      Array.from(document.querySelectorAll<HTMLElement>('mat-option'))
+        .find((o) => o.textContent?.trim() === label)
+        ?.click();
+      await settle();
+    };
+    const submitButton = () => query('form-submit')?.querySelector('button');
+    const submit = async () => {
+      submitButton()?.click();
+      await settle();
+      await settle();
+    };
+    const errorText = (testId: string) => query(testId)?.textContent?.trim();
+    const reject = (field: WatchFolderField | null, message: string) =>
+      new WatchFolderRejectedError(400, message, field);
+
+    const fillAddFolder = async () => {
+      clickButton(query('add-watch-folder'));
+      await settle();
+      await type('form-folder', '  D:\\Incoming  ');
+      await choose('form-device', 'Bench TeensyROM');
+    };
+
+    describe('add folder', () => {
+      it('gates Add on the required fields and defaults the device folder and launch', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+        expect(submitButton()?.disabled).toBe(true);
+
+        await type('form-folder', '   ');
+        expect(submitButton()?.disabled).toBe(true);
+
+        await type('form-folder', 'D:\\Incoming');
+        expect(submitButton()?.disabled).toBe(true);
+
+        await choose('form-device', 'Bench TeensyROM');
+        expect(submitButton()?.disabled).toBe(false);
+      });
+
+      it('offers only the storage the chosen device has', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+
+        await choose('form-device', 'Rack TeensyROM');
+        await openSelect('form-storage');
+        expect(optionLabels()).toEqual(['SD']);
+      });
+
+      it('saves the trimmed folder and the chosen device, then closes and lists it', async () => {
+        await setup();
+        watchFolders['add'].mockResolvedValue(
+          folder('new', {
+            path: 'D:\\Incoming',
+            destinations: [
+              {
+                id: 'new-1',
+                deviceId: 'dev-2',
+                deviceName: 'Bench TeensyROM',
+                storageType: StorageType.Sd,
+                path: '/auto-transfer',
+                launch: false,
+              },
+            ],
+          })
+        );
+
+        await fillAddFolder();
+        await submit();
+
+        expect(watchFolders['add']).toHaveBeenCalledWith({
+          path: 'D:\\Incoming',
+          deviceId: 'dev-2',
+          storageType: StorageType.Sd,
+          devicePath: '/auto-transfer',
+          launch: false,
+        });
+        expect(query('watch-folder-form')).toBeNull();
+        expect(query('watch-folder-path')?.textContent).toContain('D:\\Incoming');
+        expect(query('add-watch-folder')?.contains(document.activeElement)).toBe(true);
+      });
+
+      it('moves focus to the folder field on open', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+
+        expect(document.activeElement).toBe(query('form-folder'));
+      });
+
+      it.each([
+        ['folder', 'error-folder'],
+        ['device', 'error-device'],
+        ['storage', 'error-storage'],
+        ['devicePath', 'error-device-path'],
+      ] as const)(
+        'shows a %s refusal under that field and keeps the form with its values',
+        async (field, errorId) => {
+          await setup();
+          watchFolders['add'].mockRejectedValue(reject(field, `Refused ${field}`));
+
+          await fillAddFolder();
+          await submit();
+
+          expect(errorText(errorId)).toBe(`Refused ${field}`);
+          expect(query('error-form')).toBeNull();
+          expect(query<HTMLInputElement>('form-folder')?.value).toBe('  D:\\Incoming  ');
+          expect(submitButton()?.disabled).toBe(false);
+        }
+      );
+
+      it('shows a refusal that concerns no field above the buttons', async () => {
+        await setup();
+        watchFolders['add'].mockRejectedValue(reject(null, 'Engine unavailable'));
+
+        await fillAddFolder();
+        await submit();
+
+        expect(errorText('error-form')).toBe('Engine unavailable');
+        expect(query('error-folder')).toBeNull();
+        expect(query('watch-folder-form')).not.toBeNull();
+      });
+
+      it('clears the refusal once a value changes', async () => {
+        await setup();
+        watchFolders['add'].mockRejectedValue(reject('folder', 'Not found'));
+
+        await fillAddFolder();
+        await submit();
+        await type('form-folder', 'D:\\Other');
+
+        expect(query('error-folder')).toBeNull();
+      });
+
+      it('cancels on the Cancel button and on Escape, returning focus to the add button', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+        clickButton(query('form-cancel'));
+        await settle();
+        expect(query('watch-folder-form')).toBeNull();
+        expect(query('add-watch-folder')?.contains(document.activeElement)).toBe(true);
+
+        clickButton(query('add-watch-folder'));
+        await settle();
+        query('form-folder')?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+        );
+        await settle();
+        expect(query('watch-folder-form')).toBeNull();
+      });
+    });
+
+    describe('add device', () => {
+      it('offers only connected devices not already on the folder', async () => {
+        await setup({ folders: [folder('a')] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        await openSelect('form-device');
+        expect(optionLabels()).toEqual(['Bench TeensyROM']);
+      });
+
+      it('saves through add with the folder path and closes', async () => {
+        await setup({ folders: [folder('a')] });
+        watchFolders['add'].mockResolvedValue(
+          folder('a', {
+            destinations: [
+              ...folder('a').destinations,
+              {
+                id: 'a-2',
+                deviceId: 'dev-2',
+                deviceName: 'Bench TeensyROM',
+                storageType: StorageType.Usb,
+                path: '/auto-transfer',
+                launch: false,
+              },
+            ],
+          })
+        );
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        await choose('form-device', 'Bench TeensyROM');
+        await choose('form-storage', 'USB');
+        await submit();
+
+        expect(watchFolders['add']).toHaveBeenCalledWith({
+          path: 'C:\\Watch\\a',
+          deviceId: 'dev-2',
+          storageType: StorageType.Usb,
+          devicePath: '/auto-transfer',
+          launch: false,
+        });
+        expect(query('watch-folder-device-form')).toBeNull();
+        expect(queryAll('watch-folder-device-row')).toHaveLength(2);
+        expect(query('add-device')?.contains(document.activeElement)).toBe(true);
+      });
+
+      it('shows a refusal under its field and keeps the form open', async () => {
+        await setup({ folders: [folder('a')] });
+        watchFolders['add'].mockRejectedValue(reject('devicePath', 'Not a valid device folder'));
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        await choose('form-device', 'Bench TeensyROM');
+        await submit();
+
+        expect(errorText('error-device-path')).toBe('Not a valid device folder');
+        expect(query('watch-folder-device-form')).not.toBeNull();
+      });
+
+      it('shows a refusal about the folder above the buttons', async () => {
+        await setup({ folders: [folder('a')] });
+        watchFolders['add'].mockRejectedValue(reject('folder', 'Folder is gone'));
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        await choose('form-device', 'Bench TeensyROM');
+        await submit();
+
+        expect(errorText('error-form')).toBe('Folder is gone');
+      });
+    });
+
+    describe('edit device', () => {
+      const openEdit = async () => {
+        await setup({ folders: [folder('a')] });
+        clickButton(query('watch-folder-device-edit'));
+        await settle();
+      };
+
+      it('replaces the row with a form that shows device and storage read-only, with the note', async () => {
+        await openEdit();
+
+        expect(queryAll('watch-folder-device-row')).toHaveLength(0);
+        expect(query<HTMLInputElement>('form-device-readonly')?.value).toBe('Rack TeensyROM');
+        expect(query<HTMLInputElement>('form-storage-readonly')?.value).toBe('SD');
+        expect(query('form-readonly-note')?.textContent).toContain('remove this and add it again');
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+        expect(document.activeElement).toBe(query('form-device-path'));
+      });
+
+      it('sends only the changed field', async () => {
+        await openEdit();
+        watchFolders['setDestination'].mockResolvedValue(folder('a'));
+
+        await type('form-device-path', '/games');
+        await submit();
+
+        expect(watchFolders['setDestination']).toHaveBeenCalledWith('a', 'dev-1', {
+          devicePath: '/games',
+        });
+        expect(query('watch-folder-device-form')).toBeNull();
+        expect(queryAll('watch-folder-device-row')).toHaveLength(1);
+        expect(query('watch-folder-device-edit')?.contains(document.activeElement)).toBe(true);
+      });
+
+      it('sends the launch switch when it is toggled', async () => {
+        await openEdit();
+        watchFolders['setDestination'].mockResolvedValue(folder('a'));
+
+        query('form-launch')?.querySelector('button')?.click();
+        await settle();
+        await submit();
+
+        expect(watchFolders['setDestination']).toHaveBeenCalledWith('a', 'dev-1', {
+          launch: false,
+        });
+      });
+
+      it('closes without a request when nothing changed', async () => {
+        await openEdit();
+
+        await submit();
+
+        expect(watchFolders['setDestination']).not.toHaveBeenCalled();
+        expect(query('watch-folder-device-form')).toBeNull();
+      });
+
+      it('shows a refusal under the device folder and keeps the form open', async () => {
+        await openEdit();
+        watchFolders['setDestination'].mockRejectedValue(reject('devicePath', 'Bad path'));
+
+        await type('form-device-path', '/x');
+        await submit();
+
+        expect(errorText('error-device-path')).toBe('Bad path');
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/x');
+      });
+    });
+
+    it('keeps one form open at a time', async () => {
+      await setup({ folders: [folder('a'), folder('b')] });
 
       clickButton(query('add-watch-folder'));
-      query<HTMLButtonElement>('add-device')?.click();
-      clickButton(query('watch-folder-device-edit'));
+      await settle();
+      expect(query('watch-folder-form')).not.toBeNull();
 
-      expect(added).toHaveBeenCalledTimes(1);
-      expect(device).toHaveBeenCalledWith('a');
-      expect(edited).toHaveBeenCalledWith({ watchFolderId: 'a', deviceId: 'dev-1' });
+      queryAll('add-device')[0].click();
+      await settle();
+      expect(query('watch-folder-form')).toBeNull();
+      expect(queryAll('watch-folder-device-form')).toHaveLength(1);
+
+      clickButton(queryAll('watch-folder-device-edit')[1]);
+      await settle();
+      expect(queryAll('watch-folder-device-form')).toHaveLength(1);
+      expect(query('form-device-readonly')).not.toBeNull();
     });
   });
 

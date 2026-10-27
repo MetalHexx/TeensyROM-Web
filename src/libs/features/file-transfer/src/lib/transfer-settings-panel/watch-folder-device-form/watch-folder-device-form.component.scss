@@ -1,0 +1,32 @@
+:host {
+  display: block;
+}
+
+.device-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
+}
+
+.field {
+  width: 100%;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-dimmed-light);
+  font-size: var(--font-size-sm);
+}
+
+.form-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
