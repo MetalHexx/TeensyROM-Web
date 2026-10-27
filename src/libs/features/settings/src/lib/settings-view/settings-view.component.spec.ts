@@ -76,8 +76,6 @@ describe('SettingsViewComponent', () => {
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: false,
-      navToDirOnLaunch: false,
-      syncFilesEnabled: false,
     },
     searchSettings: {
       weights: {
@@ -181,8 +179,6 @@ describe('SettingsViewComponent', () => {
       }),
       fileTransferSettings: fb.group({
         autoLaunchOnCopyEnabled: [mockSettings.fileTransferSettings.autoLaunchOnCopyEnabled],
-        navToDirOnLaunch: [mockSettings.fileTransferSettings.navToDirOnLaunch],
-        syncFilesEnabled: [mockSettings.fileTransferSettings.syncFilesEnabled],
       }),
       searchSettings: fb.group({
         weights: fb.group(

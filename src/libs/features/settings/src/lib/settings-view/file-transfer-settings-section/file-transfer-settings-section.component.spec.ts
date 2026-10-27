@@ -20,8 +20,6 @@ describe('FileTransferSettingsSectionComponent', () => {
     // Create test FormGroup matching FileTransferSettings structure
     testFormGroup = new FormGroup({
       autoLaunchOnCopyEnabled: new FormControl(false),
-      navToDirOnLaunch: new FormControl(true),
-      syncFilesEnabled: new FormControl(false),
     });
 
     fixture = TestBed.createComponent(FileTransferSettingsSectionComponent);
@@ -48,11 +46,11 @@ describe('FileTransferSettingsSectionComponent', () => {
     expect(inputs.length).toBe(0);
   });
 
-  it('should render all 3 toggle controls', () => {
+  it('should render the auto-launch toggle control', () => {
     fixture.detectChanges();
 
     const toggles = fixture.nativeElement.querySelectorAll('mat-slide-toggle');
-    expect(toggles.length).toBe(3);
+    expect(toggles.length).toBe(1);
   });
 
   it('should bind autoLaunchOnCopyEnabled toggle to form control', () => {
@@ -64,33 +62,12 @@ describe('FileTransferSettingsSectionComponent', () => {
     expect(testFormGroup.get('autoLaunchOnCopyEnabled')?.value).toBe(true);
   });
 
-  it('should bind navToDirOnLaunch toggle to form control', () => {
-    fixture.detectChanges();
-
-    expect(testFormGroup.get('navToDirOnLaunch')?.value).toBe(true);
-
-    testFormGroup.get('navToDirOnLaunch')?.setValue(false);
-    fixture.detectChanges();
-
-    expect(testFormGroup.get('navToDirOnLaunch')?.value).toBe(false);
-  });
-
-  it('should bind syncFilesEnabled toggle to form control', () => {
-    fixture.detectChanges();
-
-    testFormGroup.get('syncFilesEnabled')?.setValue(true);
-    fixture.detectChanges();
-
-    expect(testFormGroup.get('syncFilesEnabled')?.value).toBe(true);
-  });
-
-  it('should have two settings groups with titles', () => {
+  it('should have a Launching settings group', () => {
     fixture.detectChanges();
 
     const groupTitles = fixture.nativeElement.querySelectorAll('.group-title');
-    expect(groupTitles.length).toBe(2);
+    expect(groupTitles.length).toBe(1);
     expect(groupTitles[0].textContent?.trim()).toBe('Launching');
-    expect(groupTitles[1].textContent?.trim()).toBe('Synchronization');
   });
 
   it('should accept animationTrigger input', () => {

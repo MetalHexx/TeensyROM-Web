@@ -920,14 +920,10 @@ describe('DomainMapper (Settings)', () => {
     it('should map file transfer settings correctly', () => {
       const dto = createMockGetSettingsResponse({
         autoLaunchOnCopyEnabled: false,
-        navToDirOnLaunch: true,
-        syncFilesEnabled: false,
       });
       const result = DomainMapper.toSettings(dto);
 
       expect(result.fileTransferSettings.autoLaunchOnCopyEnabled).toBe(false);
-      expect(result.fileTransferSettings.navToDirOnLaunch).toBe(true);
-      expect(result.fileTransferSettings.syncFilesEnabled).toBe(false);
     });
 
     it('should map app settings correctly (inverse firstTimeSetup)', () => {
@@ -1164,8 +1160,6 @@ interface MockSettingsOverrides {
   startupLaunchEnabled?: boolean;
   startupLaunchRandom?: boolean;
   autoLaunchOnCopyEnabled?: boolean;
-  navToDirOnLaunch?: boolean;
-  syncFilesEnabled?: boolean;
   firstTimeSetup?: boolean;
   deviceId?: string;
   enableVideo?: boolean;
@@ -1203,8 +1197,6 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
 
   const fileTransferSettings: FileTransferSettingsDto = {
     autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
-    navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
-    syncFilesEnabled: overrides.syncFilesEnabled ?? false,
   };
 
   const searchWeights: SearchWeightsDto = {
@@ -1268,8 +1260,6 @@ interface MockDomainSettingsOverrides {
   startupLaunchEnabled?: boolean;
   startupLaunchRandom?: boolean;
   autoLaunchOnCopyEnabled?: boolean;
-  navToDirOnLaunch?: boolean;
-  syncFilesEnabled?: boolean;
   setupCompleted?: boolean;
   deviceId?: string;
   enableVideo?: boolean;
@@ -1291,8 +1281,6 @@ function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): 
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
-      navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
-      syncFilesEnabled: overrides.syncFilesEnabled ?? false,
     },
     searchSettings: {
       weights: {

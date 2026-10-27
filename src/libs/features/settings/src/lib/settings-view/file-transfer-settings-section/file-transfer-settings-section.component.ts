@@ -6,7 +6,7 @@ import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-to
 
 /**
  * Presentational component for file transfer settings section.
- * Displays the launch and synchronization toggles.
+ * Displays the auto-launch toggle.
  *
  * @example
  * ```html
@@ -30,8 +30,6 @@ export class FileTransferSettingsSectionComponent {
   /**
    * FormGroup containing file transfer settings controls:
    * - autoLaunchOnCopyEnabled: FormControl<boolean>
-   * - navToDirOnLaunch: FormControl<boolean>
-   * - syncFilesEnabled: FormControl<boolean>
    */
   formGroup = input.required<FormGroup>();
 

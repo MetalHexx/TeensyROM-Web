@@ -10,21 +10,6 @@
           label="Auto-launch after copy"
           description="Launch one file on the TeensyROM when a transfer finishes"
           [control]="formGroup().controls['autoLaunchOnCopyEnabled']" />
-
-        <lib-settings-toggle-item
-          label="Navigate to directory on launch"
-          description="Automatically navigate to the file's directory when launched"
-          [control]="formGroup().controls['navToDirOnLaunch']" />
-      </div>
-
-      <!-- Synchronization Settings Group -->
-      <div class="settings-group">
-        <h3 class="group-title">Synchronization</h3>
-
-        <lib-settings-toggle-item
-          label="Enable file synchronization"
-          description="Keep files synchronized between this computer and the device"
-          [control]="formGroup().controls['syncFilesEnabled']" />
       </div>
     </div>
   </form>

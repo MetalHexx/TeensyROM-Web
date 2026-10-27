@@ -74,7 +74,7 @@ export interface ResetDeviceRequest {
 export class DevicesApiService extends runtime.BaseAPI {
 
     /**
-     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost. - A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it.
      * Find Devices
      */
     async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
@@ -104,7 +104,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost.
+     * Returns all available and connected TeensyROM devices, followed by every known offline unit.  - By default (fullScan=false), returns the devices already listed by the manager - no device is contacted. - Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs. - Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited. - Offline units are listed after the online ones, with deviceState ConnectionLost. - A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it.
      * Find Devices
      */
     async findDevices(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {
@@ -148,7 +148,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button.
+     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Ping Device
      */
     async pingDeviceRaw(requestParameters: PingDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PingDeviceResponse>> {
@@ -174,7 +174,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button.
+     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Ping Device
      */
     async pingDevice(requestParameters: PingDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PingDeviceResponse> {
@@ -263,7 +263,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button.
+     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Reset Device
      */
     async resetDeviceRaw(requestParameters: ResetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ResetDeviceResponse>> {
@@ -289,7 +289,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button.
+     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Reset Device
      */
     async resetDevice(requestParameters: ResetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ResetDeviceResponse> {

@@ -531,8 +531,6 @@ export class DomainMapper {
   private static toFileTransferSettings(dto: FileTransferSettingsDto): FileTransferSettings {
     return {
       autoLaunchOnCopyEnabled: dto.autoLaunchOnCopyEnabled,
-      navToDirOnLaunch: dto.navToDirOnLaunch,
-      syncFilesEnabled: dto.syncFilesEnabled,
     };
   }
 
@@ -541,8 +539,6 @@ export class DomainMapper {
   ): FileTransferSettingsDto {
     return {
       autoLaunchOnCopyEnabled: settings.autoLaunchOnCopyEnabled,
-      navToDirOnLaunch: settings.navToDirOnLaunch,
-      syncFilesEnabled: settings.syncFilesEnabled,
     };
   }
 

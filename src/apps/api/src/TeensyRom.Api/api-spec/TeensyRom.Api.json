@@ -727,7 +727,7 @@
           "Settings"
         ],
         "summary": "Save User Settings",
-        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n  - Auto-launch, navigate-on-launch, and sync flags\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
+        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-launch configuration\n  - Auto-launch flag\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
         "operationId": "SaveSettings",
         "requestBody": {
           "content": {
@@ -777,7 +777,7 @@
           "Settings"
         ],
         "summary": "Get User Settings",
-        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
+        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-launch configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
         "operationId": "GetSettings",
         "responses": {
           "200": {
@@ -3674,19 +3674,11 @@
       },
       "FileTransferSettingsDto": {
         "required": [
-          "autoLaunchOnCopyEnabled",
-          "navToDirOnLaunch",
-          "syncFilesEnabled"
+          "autoLaunchOnCopyEnabled"
         ],
         "type": "object",
         "properties": {
           "autoLaunchOnCopyEnabled": {
-            "type": "boolean"
-          },
-          "navToDirOnLaunch": {
-            "type": "boolean"
-          },
-          "syncFilesEnabled": {
             "type": "boolean"
           }
         }

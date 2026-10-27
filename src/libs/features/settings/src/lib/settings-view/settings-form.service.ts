@@ -219,8 +219,6 @@ export class SettingsFormService {
       }),
       fileTransferSettings: this.fb.group({
         autoLaunchOnCopyEnabled: [settings.fileTransferSettings.autoLaunchOnCopyEnabled],
-        navToDirOnLaunch: [settings.fileTransferSettings.navToDirOnLaunch],
-        syncFilesEnabled: [settings.fileTransferSettings.syncFilesEnabled],
       }),
       searchSettings: this.fb.group({
         weights: this.fb.group(
@@ -353,8 +351,6 @@ export class SettingsFormService {
       },
       fileTransferSettings: {
         autoLaunchOnCopyEnabled: settings.fileTransferSettings.autoLaunchOnCopyEnabled,
-        navToDirOnLaunch: settings.fileTransferSettings.navToDirOnLaunch,
-        syncFilesEnabled: settings.fileTransferSettings.syncFilesEnabled,
       },
       searchSettings: {
         weights: {
@@ -406,8 +402,6 @@ export class SettingsFormService {
       },
       fileTransferSettings: {
         autoLaunchOnCopyEnabled: formValue.fileTransferSettings.autoLaunchOnCopyEnabled,
-        navToDirOnLaunch: formValue.fileTransferSettings.navToDirOnLaunch,
-        syncFilesEnabled: formValue.fileTransferSettings.syncFilesEnabled,
       },
       searchSettings: {
         weights: {

@@ -22,8 +22,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                     "  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n" +
                     "- **Player Settings**: Playback behavior and startup preferences\n" +
                     "  - Repeat mode, play timer, mute settings, startup filter and launch options\n" +
-                    "- **File Transfer Settings**: Auto-launch and synchronization configuration\n" +
-                    "  - Auto-launch, navigate-on-launch, and sync flags\n" +
+                    "- **File Transfer Settings**: Auto-launch configuration\n" +
+                    "  - Auto-launch flag\n" +
                     "- **Search Settings**: Search weights, stop words, and content exclusions\n" +
                     "  - Search weights must be >= 0 with at least one > 0\n" +
                     "  - Stop words, banned directories, and banned files lists\n" +

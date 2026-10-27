@@ -61,7 +61,7 @@ export interface ToggleMusicRequest {
 export class PlayerApiService extends runtime.BaseAPI {
 
     /**
-     * Launches a file given a valid path to a file stored on the TeensyRom.
+     * Launches a file given a valid path to a file stored on the TeensyRom.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Launch File
      */
     async launchFileRaw(requestParameters: LaunchFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchFileResponse>> {
@@ -105,7 +105,7 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Launches a file given a valid path to a file stored on the TeensyRom.
+     * Launches a file given a valid path to a file stored on the TeensyRom.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Launch File
      */
     async launchFile(requestParameters: LaunchFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LaunchFileResponse> {
@@ -114,7 +114,7 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
+     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release) - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Launch Random File
      */
     async launchRandomRaw(requestParameters: LaunchRandomRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchRandomResponse>> {
@@ -159,7 +159,7 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
+     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release) - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Launch Random File
      */
     async launchRandom(requestParameters: LaunchRandomRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LaunchRandomResponse> {
@@ -168,7 +168,7 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Toggles the play/pause state of the currently playing music on the TeensyRom device.
+     * Toggles the play/pause state of the currently playing music on the TeensyRom device.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Toggle Music Playback
      */
     async toggleMusicRaw(requestParameters: ToggleMusicRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ToggleMusicResponse>> {
@@ -194,7 +194,7 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Toggles the play/pause state of the currently playing music on the TeensyRom device.
+     * Toggles the play/pause state of the currently playing music on the TeensyRom device.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Toggle Music Playback
      */
     async toggleMusic(requestParameters: ToggleMusicRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ToggleMusicResponse> {

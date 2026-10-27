@@ -247,8 +247,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
-        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
+        /// <br/>  - Auto-launch flag
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -278,7 +278,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -2276,8 +2276,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
-        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
+        /// <br/>  - Auto-launch flag
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -2400,7 +2400,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -7267,12 +7267,6 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("autoLaunchOnCopyEnabled")]
         public bool AutoLaunchOnCopyEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("navToDirOnLaunch")]
-        public bool NavToDirOnLaunch { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("syncFilesEnabled")]
-        public bool SyncFilesEnabled { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

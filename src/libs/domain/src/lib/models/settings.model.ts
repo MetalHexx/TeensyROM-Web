@@ -41,10 +41,6 @@ export interface SearchSettings {
 export interface FileTransferSettings {
   /** Whether to auto-launch files after copying */
   autoLaunchOnCopyEnabled: boolean;
-  /** Whether to navigate to directory on launch */
-  navToDirOnLaunch: boolean;
-  /** Whether file synchronization is enabled */
-  syncFilesEnabled: boolean;
 }
 
 /**

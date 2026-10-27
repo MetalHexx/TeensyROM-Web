@@ -30,8 +30,6 @@ describe('SettingsFormService', () => {
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: false,
-      navToDirOnLaunch: false,
-      syncFilesEnabled: false,
     },
     searchSettings: {
       weights: {
