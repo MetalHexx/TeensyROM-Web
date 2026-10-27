@@ -2510,6 +2510,87 @@ describe('DeckService', () => {
       });
     });
 
+    describe('the set commands', () => {
+      /** Three tunes dropped onto deck A in turn, so the current set holds three rows and A the last. */
+      async function threeRows(): Promise<string[]> {
+        for (const fixture of [
+          register(makeFixture()),
+          register(makeFixture()),
+          register(makeFixture()),
+        ]) {
+          await loadAndWait('A', fixture);
+        }
+        await settle();
+        return currentSet().rows.map((row) => row.id);
+      }
+
+      it('loadSelected loads the selected row onto the deck, replacing what plays', async () => {
+        const [first] = await threeRows();
+        sets.selectRow(first);
+
+        await service.loadSelected('B');
+
+        expect(holdingOf('B').rowId).toBe(first);
+        expect(store.deck('B')().status).toBe('playing');
+        expect(holdingOf('A').rowId).not.toBe(first);
+      });
+
+      it('loadSelected does nothing when no row is selected', async () => {
+        await threeRows();
+        expect(store.sets.selectedRowId()).toBeNull();
+
+        await service.loadSelected('B');
+
+        expect(store.sets.holdings().B).toBeNull();
+        expect(store.deck('B')().status).toBe('empty');
+      });
+
+      it('previousRow and nextRow walk the current set and stop at its ends', async () => {
+        const [first, second, third] = await threeRows();
+
+        await service.previousRow('A');
+        expect(holdingOf('A').rowId).toBe(second);
+        await service.previousRow('A');
+        expect(holdingOf('A').rowId).toBe(first);
+        await service.previousRow('A');
+        expect(holdingOf('A').rowId).toBe(first);
+
+        await service.nextRow('A');
+        await service.nextRow('A');
+        expect(holdingOf('A').rowId).toBe(third);
+        await service.nextRow('A');
+        expect(holdingOf('A').rowId).toBe(third);
+        expect(store.deck('A')().status).toBe('playing');
+      });
+
+      it('loads the neighbouring row even when the other deck holds it', async () => {
+        const [first, second] = await threeRows();
+        await service.loadRow('B', holdingOf('A').setId, first);
+        await service.previousRow('A');
+        expect(holdingOf('A').rowId).toBe(second);
+
+        await service.previousRow('A');
+
+        expect(holdingOf('A').rowId).toBe(first);
+        expect(holdingOf('B').rowId).toBe(first);
+      });
+
+      it('refuses a deck that holds a row of another set, and a deck that holds none', async () => {
+        await threeRows();
+        const held = holdingOf('A');
+        sets.newSet();
+        await settle();
+        expect(currentSet().id).not.toBe(held.setId);
+
+        await service.previousRow('A');
+        await service.nextRow('A');
+        await service.nextRow('B');
+
+        expect(holdingOf('A')).toEqual(held);
+        expect(store.sets.holdings().B).toBeNull();
+      });
+    });
+
     describe('restoring', () => {
       it('lands the settings each subtune keeps, and home for one that keeps none', async () => {
         const fixture = register(makeFixture({ subtuneCount: 3 }));

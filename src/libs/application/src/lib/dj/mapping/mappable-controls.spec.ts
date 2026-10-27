@@ -4,6 +4,7 @@ import type { MappableControl } from './mappable-controls';
 import { logWarn } from '@teensyrom-nx/utils';
 import {
   DECK_CONTROL_IDS,
+  SET_CONTROL_IDS,
   VOICE_NUMBERS,
   VOICE_STRIP_CONTROLS,
   controlKey,
@@ -51,15 +52,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 79 controls per deck, 158 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(158);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(158);
+    it('holds 81 controls per deck and 3 for the set, 165 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(165);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(165);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(79);
+        expect(ids).toHaveLength(81);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -296,6 +297,8 @@ describe('MappableControls', () => {
       ['stop', 'stop', []],
       ['subtune-previous', 'previousSubtune', []],
       ['subtune-next', 'nextSubtune', []],
+      ['set-previous', 'previousRow', []],
+      ['set-next', 'nextRow', []],
       ['speed-jump-up', 'jumpSpeed', ['up']],
       ['speed-jump-home', 'jumpSpeed', ['home']],
       ['speed-jump-down', 'jumpSpeed', ['down']],
@@ -397,6 +400,67 @@ describe('MappableControls', () => {
           stepAmount: 1,
         });
       });
+    });
+  });
+
+  describe('set controls', () => {
+    const select = () => pick('set', 'set-select', 'value');
+
+    it('belong to the set, once each, and are not on a deck', () => {
+      const owned = h.controls.all
+        .filter((c) => c.identity.owner === 'set')
+        .map((c) => c.identity.control);
+
+      expect(owned).toEqual([...SET_CONTROL_IDS]);
+      expect(h.controls.find({ owner: 'A', control: 'set-select' })).toBeNull();
+    });
+
+    it('select counts its range from the real rows and reads the selected index, 0 when none', () => {
+      expect(select().max).toBe(0);
+
+      h.seedSetRows(4, 2);
+      expect(select().max).toBe(3);
+      expect(select().read()).toBe(2);
+
+      h.seedSetRows(4, null);
+      expect(select().read()).toBe(0);
+    });
+
+    it('select counts only real rows, so a row still fetching never lengthens the range', () => {
+      h.seedSetRows(3, 1);
+      h.djStore.setPendingRows({
+        rows: [{ key: 'p1', setId: 'set-1', index: 1, title: 'Fetching', author: '' }],
+      });
+
+      expect(select().max).toBe(2);
+      expect(select().read()).toBe(1);
+    });
+
+    it('select moves the selection through the set and offers whole steps only', () => {
+      h.seedSetRows(4, 0);
+
+      select().set(3);
+
+      expect(h.djStore.sets.selectedRowId()).toBe('row-3');
+      expect(select().wholeSteps).toBe(true);
+      expect(select().styles).toEqual([
+        'relative-offset',
+        'relative-signed',
+        'step',
+        'step-release',
+      ]);
+    });
+
+    it.each([
+      ['set-load-a', 'A'],
+      ['set-load-b', 'B'],
+    ] as const)('%s loads the selected row onto deck %s', (id, slot) => {
+      const spy = vi.spyOn(h.deckService, 'loadSelected').mockResolvedValue();
+
+      pick('set', id, 'trigger').fire();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(slot);
     });
   });
 

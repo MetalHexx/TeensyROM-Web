@@ -91,12 +91,12 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         [Required] public MidiSourceDto Source { get; set; } = null!;
 
         /// <summary>
-        /// Who owns the control: "A" or "B" for a deck. "mixer" is accepted as an owner but owns no controls today.
+        /// Who owns the control: "A" or "B" for a deck, or "set" for the set. "mixer" is accepted as an owner but owns no controls today.
         /// </summary>
         [Required] public string Owner { get; set; } = string.Empty;
 
         /// <summary>
-        /// The control to drive: one of the deck control names in the app's deck control list, for owner "A" or "B".
+        /// The control to drive: one of the deck control names in the app's deck control list, for owner "A" or "B"; one of the set control names (set-select, set-load-a, set-load-b), for owner "set".
         /// </summary>
         [Required] public string Control { get; set; } = string.Empty;
 
@@ -137,6 +137,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         public const int MaxDeckBindings = 2;
 
         public const string MixerOwner = "mixer";
+        public const string SetOwner = "set";
         public const string StepStyleKind = "step";
         public const string HoldStyleKind = "hold";
 
@@ -146,18 +147,24 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
         public static readonly IReadOnlySet<string> Slots = new HashSet<string>(StringComparer.Ordinal) { "A", "B" };
 
-        public static readonly IReadOnlySet<string> Owners = new HashSet<string>(StringComparer.Ordinal) { "A", "B", MixerOwner };
+        public static readonly IReadOnlySet<string> Owners = new HashSet<string>(StringComparer.Ordinal) { "A", "B", MixerOwner, SetOwner };
 
         /// <summary>
         /// The deck control names, loaded from the generated contract file embedded in this assembly.
         /// The app's own test regenerates that file from its deck control list, so the two cannot drift.
         /// </summary>
-        public static readonly IReadOnlySet<string> DeckControls = LoadDeckControls();
+        public static readonly IReadOnlySet<string> DeckControls = LoadControls("TeensyRom.Api.DeckControlIds.json");
 
         /// <summary>
         /// The controls the mixer owns. It owns none today.
         /// </summary>
         public static readonly IReadOnlySet<string> MixerControls = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The set control names, loaded from the generated contract file embedded in this assembly.
+        /// The app's own test regenerates that file from its set control list, so the two cannot drift.
+        /// </summary>
+        public static readonly IReadOnlySet<string> SetControls = LoadControls("TeensyRom.Api.SetControlIds.json");
 
         public static readonly IReadOnlySet<string> StyleKinds = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -174,10 +181,8 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
         public static bool IsValidId(string? id) => id is not null && IdPattern.IsMatch(id);
 
-        private static HashSet<string> LoadDeckControls()
+        private static HashSet<string> LoadControls(string resourceName)
         {
-            const string resourceName = "TeensyRom.Api.DeckControlIds.json";
-
             using var stream = typeof(MidiSettingsAllowLists).Assembly.GetManifestResourceStream(resourceName)
                 ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' is missing from the build.");
 
@@ -277,7 +282,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
             RuleFor(x => x.Owner)
                 .Must(owner => owner is not null && MidiSettingsAllowLists.Owners.Contains(owner))
-                .WithMessage("Mapping owner must be 'A', 'B', or 'mixer'.");
+                .WithMessage("Mapping owner must be 'A', 'B', 'mixer' or 'set'.");
 
             RuleFor(x => x.Control)
                 .Custom((control, context) =>
@@ -285,9 +290,12 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
                     var owner = context.InstanceToValidate.Owner;
                     if (owner is null || !MidiSettingsAllowLists.Owners.Contains(owner)) return;
 
-                    var allowed = owner == MidiSettingsAllowLists.MixerOwner
-                        ? MidiSettingsAllowLists.MixerControls
-                        : MidiSettingsAllowLists.DeckControls;
+                    var allowed = owner switch
+                    {
+                        MidiSettingsAllowLists.MixerOwner => MidiSettingsAllowLists.MixerControls,
+                        MidiSettingsAllowLists.SetOwner => MidiSettingsAllowLists.SetControls,
+                        _ => MidiSettingsAllowLists.DeckControls
+                    };
 
                     if (control is null || !allowed.Contains(control))
                     {

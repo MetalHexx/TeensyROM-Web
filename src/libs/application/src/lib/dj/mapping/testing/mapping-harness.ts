@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
 import type { ReplayRunner } from '@sidablist/core';
-import { InMemorySetStore, InMemoryTuneMemoryStore } from '@sidablist/tunes';
+import { InMemorySetStore, InMemoryTuneMemoryStore, createRow, createSet } from '@sidablist/tunes';
 import type { TuneReference } from '@sidablist/tunes';
 import { ALERT_SERVICE, FILE_CONTENT_SERVICE, type Device } from '@teensyrom-nx/domain';
 import { DeviceStore } from '../../../device/device-store';
@@ -80,6 +80,9 @@ export interface MappingHarness {
    *  selected, or none when it is null. The harness loads no tune into the engine, so a marker
    *  cannot be captured through `addMarker`. */
   seedMarkers(slot: Slot, count: number, selectedIndex?: number | null): void;
+  /** Makes a current set of `count` rows (ids `row-0`…) with the one at `selectedIndex` selected, or
+   *  none when it is null. */
+  seedSetRows(count: number, selectedIndex?: number | null): void;
 }
 
 /**
@@ -159,6 +162,30 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     makeShapeable: (slot) => {
       djStore.setDeckLoaded({ slot, reference: TUNE });
       djStore.setDeckStatus({ slot, status: 'paused' });
+    },
+    seedSetRows: (count, selectedIndex = 0) => {
+      const rows = Array.from({ length: count }, (_, index) =>
+        createRow({
+          id: `row-${index}`,
+          tune: {
+            sidHash: `hash-${index}`,
+            title: `Tune ${index}`,
+            author: 'Author',
+            released: '',
+            subtuneCount: 1,
+            byteLength: 1,
+          },
+          memory: null,
+          startSubtune: 1,
+        })
+      );
+      const set = {
+        ...createSet({ id: 'set-1', placeholder: 'Set 1', now: '2026-01-01T00:00:00.000Z' }),
+        rows,
+      };
+      djStore.setSetsLibrary({ summaries: [], current: set });
+      djStore.putOpenSet({ set });
+      djStore.selectSetRow({ rowId: rows[selectedIndex ?? -1]?.id ?? null, turned: false });
     },
     seedMarkers: (slot, count, selectedIndex = 0) => {
       const markers = Array.from({ length: count }, (_, index) => ({

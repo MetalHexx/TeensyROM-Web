@@ -655,10 +655,12 @@ describe('DjMixerViewComponent', () => {
   describe('the control anchors', () => {
     // Set End lives in a selected cue's End slot, so no element exists with nothing or a loop selected.
     const ONLY_WITH_A_CUE: readonly string[] = ['loop-set-end'];
+    // The set row's Previous and Next keys arrive with the set row; the set-owned controls with the set card.
+    const ONLY_WITH_THE_SET_ROW: readonly string[] = ['set-previous', 'set-next'];
     const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
-      DECK_CONTROL_IDS.filter((control) => !ONLY_WITH_A_CUE.includes(control)).map(
-        (control): ControlIdentity => ({ owner, control })
-      )
+      DECK_CONTROL_IDS.filter(
+        (control) => !ONLY_WITH_A_CUE.includes(control) && !ONLY_WITH_THE_SET_ROW.includes(control)
+      ).map((control): ControlIdentity => ({ owner, control }))
     );
 
     it('finds every mappable control as exactly one element in the rendered grid', () => {

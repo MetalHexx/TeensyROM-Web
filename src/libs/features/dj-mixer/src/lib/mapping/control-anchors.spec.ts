@@ -1,9 +1,9 @@
-import { DECK_CONTROL_IDS, DECK_SLOTS } from '@teensyrom-nx/application';
+import { DECK_CONTROL_IDS, DECK_SLOTS, SET_CONTROL_IDS } from '@teensyrom-nx/application';
 import { anchorFor } from './control-anchors';
 
 describe('anchorFor', () => {
   it('gives every mappable deck control an anchor scoped to its deck', () => {
-    expect(DECK_CONTROL_IDS).toHaveLength(79);
+    expect(DECK_CONTROL_IDS).toHaveLength(81);
     for (const owner of DECK_SLOTS) {
       for (const control of DECK_CONTROL_IDS) {
         const anchor = anchorFor({ owner, control });
@@ -46,6 +46,12 @@ describe('anchorFor', () => {
     expect(anchorFor({ owner: 'A', control: 'voice-2-hold' })).toBe(
       '[data-deck="A"] [data-voice="2"] [data-control="voice-hold"]'
     );
+  });
+
+  it('leaves a set-owned control unscoped', () => {
+    for (const control of SET_CONTROL_IDS) {
+      expect(anchorFor({ owner: 'set', control })).toBe('[data-control="' + control + '"]');
+    }
   });
 
   it('leaves a mixer-owned control unscoped', () => {

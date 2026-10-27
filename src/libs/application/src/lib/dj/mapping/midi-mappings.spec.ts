@@ -101,6 +101,24 @@ describe('MidiMappings', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
     });
 
+    it('keeps a saved mapping on a set control, and drops one on a control the set does not own', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [
+          record('select', 7, 'set', 'set-select'),
+          record('load', 8, 'set', 'set-load-b'),
+          record('misowned', 9, 'set', 'speed'),
+          record('deck-select', 10, 'A', 'set-select'),
+        ],
+      });
+
+      await h.mappings.hydrate();
+
+      expect(
+        h.mappingStore.mappings().map((m) => `${m.control.owner}:${m.control.control}`)
+      ).toEqual(['set:set-select', 'set:set-load-b']);
+    });
+
     it('skips a saved mapping on a removed mixer control, keeps a key mapping, and saves only what remains', async () => {
       setUp({
         ...SAVED,

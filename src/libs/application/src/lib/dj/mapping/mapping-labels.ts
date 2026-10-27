@@ -71,7 +71,7 @@ export function describeStyle(style: MappingStyle, sourceKind: MidiSourceKind): 
   return [what, when].filter((part) => part !== '').join(' · ');
 }
 
-/** `deck A`, `deck B` or `mixer`. */
+/** `deck A`, `deck B`, `mixer` or `set`. */
 export function ownerLabel(owner: ControlOwner): string {
-  return owner === 'mixer' ? 'mixer' : `deck ${owner}`;
+  return owner === 'mixer' || owner === 'set' ? owner : `deck ${owner}`;
 }

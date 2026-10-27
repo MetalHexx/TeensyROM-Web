@@ -28,6 +28,7 @@ const NUDGE_A: ControlIdentity = { owner: 'A', control: 'speed-nudge-up' };
 const MUTE_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const VOICE_HOLD_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
+const SET_LOAD_A: ControlIdentity = { owner: 'set', control: 'set-load-a' };
 
 const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
 
@@ -218,6 +219,17 @@ describe('DjBindingsPanelComponent', () => {
 
       expect(headings(fixture)).toEqual(['Deck A', 'Deck B', 'Mixer', 'Controllers']);
       expect(groupRows(fixture, 'Mixer')).toEqual(['Key']);
+    });
+
+    it('shows the Set group, headed Set, once the set owns a control', () => {
+      const { fixture, seed } = render([
+        ...CONTROLS,
+        { identity: SET_LOAD_A, name: 'Load A', nature: 'trigger', fire: () => undefined },
+      ]);
+      seed([XL], [mapping('m1', SET_LOAD_A, { kind: 'press', amount: null })]);
+
+      expect(headings(fixture)).toEqual(['Deck A', 'Deck B', 'Set', 'Controllers']);
+      expect(groupRows(fixture, 'Set')).toEqual(['Load A']);
     });
 
     it('places each mapping under its owner, in control-list order and then by source', () => {

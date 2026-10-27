@@ -143,6 +143,28 @@ export class DeckService {
     await this.loadOnto(slot, { row: holding });
   }
 
+  /** Loads the current set's selected row onto the deck, replacing whatever plays. Nothing when none
+   *  is selected. */
+  async loadSelected(slot: Slot): Promise<void> {
+    const set = this.currentSet();
+    const rowId = this.store.sets.selectedRowId();
+    if (set !== null && rowId !== null && set.rows.some((row) => row.id === rowId)) {
+      await this.loadRow(slot, set.id, rowId);
+    }
+  }
+
+  /** Loads the row before the one the deck holds in the current set — skipping nothing, even a row
+   *  the other deck holds. Nothing on the first row, or when the deck holds no row of the current
+   *  set. */
+  previousRow(slot: Slot): Promise<void> {
+    return this.loadNeighbour(slot, -1);
+  }
+
+  /** Loads the row after the one the deck holds in the current set; nothing on the last row. */
+  nextRow(slot: Slot): Promise<void> {
+    return this.loadNeighbour(slot, 1);
+  }
+
   async togglePlayPause(slot: Slot): Promise<void> {
     const deck = this.store.deck(slot)();
     if (deck.busy) {
@@ -737,6 +759,27 @@ export class DeckService {
           logError(`DeckService: load failed for slot ${slot}: ${failure}`);
         }
       }
+    }
+  }
+
+  private currentSet() {
+    const id = this.store.sets.currentSetId();
+    return id === null ? null : this.store.sets.open()[id] ?? null;
+  }
+
+  /** Loads the row `step` places from the deck's, when the deck holds a row of the current set and
+   *  the neighbour exists. Not gated on `busy`: the load supersedes an in-flight one, as a drop
+   *  does. */
+  private async loadNeighbour(slot: Slot, step: -1 | 1): Promise<void> {
+    const position = this.store.deckSetSummary(slot)();
+    const set = this.currentSet();
+    const holding = this.store.sets.holdings()[slot];
+    if (!(step < 0 ? position.canPrevious : position.canNext) || set === null || holding === null) {
+      return;
+    }
+    const neighbour = set.rows[set.rows.findIndex((row) => row.id === holding.rowId) + step];
+    if (neighbour !== undefined) {
+      await this.loadRow(slot, set.id, neighbour.id);
     }
   }
 
