@@ -42,6 +42,9 @@ const loop: LoopSelectedRowModel = {
   sharesGlobal: true,
   globalDisabled: false,
   globalAccessibleName: 'GBL Item 3',
+  renameDisabled: false,
+  renameLabel: 'Rename Item 3',
+  nameMaxLength: 48,
 };
 
 const cue: Partial<LoopSelectedRowModel> = {
@@ -182,6 +185,52 @@ describe('LoopSelectedRowComponent', () => {
     expect(display().getAttribute('aria-label')).toContain('queued');
     setModel({ activity: 'idle', ready: false });
     expect(display().getAttribute('aria-label')).toContain('not ready');
+  });
+
+  describe('renaming', () => {
+    const nameButton = (): HTMLButtonElement | null =>
+      el().querySelector('.display lib-inline-edit-title button');
+    const field = (): HTMLInputElement => el().querySelector('.display input[type="text"]') as HTMLInputElement;
+
+    function commit(value: string): void {
+      nameButton()?.click();
+      fixture.detectChanges();
+      field().value = value;
+      field().dispatchEvent(new Event('input'));
+      field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    }
+
+    it('emits the typed name, named for the field by the model', () => {
+      const renames: string[] = [];
+      fixture.componentInstance.rename.subscribe((name) => renames.push(name));
+      expect(nameButton()?.getAttribute('aria-label')).toBe('Rename Item 3');
+
+      commit('Chorus drop');
+
+      expect(renames).toEqual(['Chorus drop']);
+    });
+
+    it('allows an empty name, which returns the marker to its place name', () => {
+      const renames: string[] = [];
+      fixture.componentInstance.rename.subscribe((name) => renames.push(name));
+
+      commit('   ');
+
+      expect(renames).toEqual(['']);
+    });
+
+    it('shows the name as plain text when renaming is disabled', () => {
+      setModel({ renameDisabled: true });
+
+      expect(nameButton()).toBeNull();
+      expect(display().textContent).toContain('Item 3');
+    });
+
+    it('offers no editor with nothing selected', () => {
+      setModel({ empty: true, name: '', kindLabel: '', spanText: '' });
+
+      expect(el().querySelector('lib-inline-edit-title')).toBeNull();
+    });
   });
 
   it('disables Clear End on a cue and the empty End boundary with it', () => {

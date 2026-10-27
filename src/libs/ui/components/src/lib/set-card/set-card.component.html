@@ -1,0 +1,57 @@
+<section class="card" [attr.aria-label]="model().accessibleName">
+  <lib-set-header
+    class="header"
+    [model]="model().header"
+    (rename)="rename.emit($event)"
+    (newSet)="newSet.emit()"
+    (deleteSet)="deleteSet.emit()"
+  />
+  <lib-set-control-plate
+    class="plate"
+    [model]="model().plate"
+    (selectPrevious)="selectPrevious.emit()"
+    (selectNext)="selectNext.emit()"
+    (loadA)="loadA.emit()"
+    (loadB)="loadB.emit()"
+  />
+
+  <div
+    #rowsList
+    class="rows"
+    [attr.data-drop-ready]="listingDragActive() ? '' : null"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (dragend)="onDragEnd()"
+    (drop)="onDrop($event)"
+  >
+    @if (model().rows.length === 0) {
+    <p class="empty">{{ model().emptyText }}</p>
+    @if (insertionGap() !== null) {
+    <div class="insertion-line" aria-hidden="true"></div>
+    }
+    } @else {
+    <div class="list" role="list">
+      @for (drawn of drawnRows(); track drawn.row.id) {
+      @if (drawn.realIndex !== null && drawn.realIndex === insertionGap()) {
+      <div class="insertion-line" aria-hidden="true"></div>
+      }
+      <lib-set-row
+        [model]="drawn.row"
+        (selectRow)="rowSelect.emit(drawn.row.id)"
+        (remove)="rowRemove.emit(drawn.row.id)"
+        (moveBy)="onMoveBy(drawn.row.id, $event)"
+      />
+      }
+      @if (insertionGap() === realRowCount()) {
+      <div class="insertion-line" aria-hidden="true"></div>
+      }
+    </div>
+    }
+  </div>
+
+  <div class="announcer" aria-live="polite" aria-atomic="true">
+    @for (announcement of announcements(); track announcement.seq) {
+    <span>{{ announcement.text }}</span>
+    }
+  </div>
+</section>

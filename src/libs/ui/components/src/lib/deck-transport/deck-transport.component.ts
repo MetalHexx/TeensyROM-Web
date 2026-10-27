@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { DeckSetRowComponent, type DeckSetRowModel } from '../deck-set-row/deck-set-row.component';
 import { PositionStripComponent, type PositionMark } from '../position-strip/position-strip.component';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
@@ -59,18 +60,21 @@ export interface DeckTransportModel {
   /** Each rendered as a `role="alert"` line in the display's place; a failed deck's reason
    *  arrives here. Empty renders nothing. */
   readonly errors: readonly string[];
+  /** The row under the keys that walks the deck through the set. */
+  readonly set: DeckSetRowModel;
 }
 
 /**
  * One deck's transport on its own faceplate: a display showing what is loaded and where it is, the
  * continuous position bar (still a working scrubber), and the Play/Pause, Stop, Repeat and subtune
- * keys. Purely presentational — it holds no state and leaves every gate, label and accessible name
+ * keys, with the set row beneath them. Purely presentational — it holds no state and leaves every gate, label and accessible name
  * to the caller that builds the model.
  *
  * It lays itself out by its own width, not the viewport's. Play/Pause, Stop and Repeat are three
  * identical keys at the start of the row, the stepper at the end: labelled keys from about 436px,
  * icon-only keys from about 336px, and below that the same icon-only keys with the stepper on its
- * own row beneath them and the frame number hidden. It shrinks or clips rather than overflowing at
+ * own row beneath them and the frame number hidden. The set row follows the same breakpoints, its
+ * keys losing their labels with the others. It shrinks or clips rather than overflowing at
  * any width.
  *
  * @example
@@ -90,7 +94,7 @@ export interface DeckTransportModel {
   templateUrl: './deck-transport.component.html',
   styleUrl: './deck-transport.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SynthPanelComponent, SynthKeyComponent, PositionStripComponent],
+  imports: [SynthPanelComponent, SynthKeyComponent, PositionStripComponent, DeckSetRowComponent],
 })
 export class DeckTransportComponent {
   /** Everything the transport draws that does not move per animation frame. */
@@ -116,6 +120,10 @@ export class DeckTransportComponent {
   readonly previousSubtune = output<void>();
   /** The stepper's next key was pressed. */
   readonly nextSubtune = output<void>();
+  /** The set row's previous key was pressed. */
+  readonly previousInSet = output<void>();
+  /** The set row's next key was pressed. */
+  readonly nextInSet = output<void>();
   /** Forwards the strip's every drag tick — a live preview, not a seek. */
   readonly scrubInput = output<number>();
   /** Forwards the strip's release value — the one that should seek. */

@@ -31,6 +31,7 @@ import {
   DeckService,
   DeviceStore,
   DjStore,
+  MARKER_NAME_MAX_LENGTH,
   SPEED_FADER_RANGE,
   type DeckTransportSummary,
   type LoopActivity,
@@ -122,6 +123,9 @@ function selectedRowModel(
     sharesGlobal: selection?.sharesGlobal ?? true,
     globalDisabled: selection === null,
     globalAccessibleName: `GBL ${name} deck ${letter}`,
+    renameDisabled: selection === null,
+    renameLabel: `Rename ${name}`,
+    nameMaxLength: MARKER_NAME_MAX_LENGTH,
     start: boundaryModel('Start', letter, selection?.start ?? null),
     end: boundaryModel('End', letter, selection?.end ?? null),
     triggerAccessibleName: `Trigger ${name} deck ${letter}`,
@@ -257,6 +261,14 @@ export class DjDeckColumnComponent {
       },
       // A failed load's reason travels in `label`, not `errors`.
       errors: summary.status === 'failed' && summary.label ? [summary.label] : summary.errors,
+      set: {
+        positionText: '— / —',
+        setName: '',
+        previousDisabled: true,
+        nextDisabled: true,
+        previousAccessibleName: `Previous in the set deck ${letter}`,
+        nextAccessibleName: `Next in the set deck ${letter}`,
+      },
     };
   });
 

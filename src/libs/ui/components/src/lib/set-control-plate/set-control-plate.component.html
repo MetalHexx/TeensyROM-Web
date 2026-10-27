@@ -1,0 +1,41 @@
+<lib-synth-panel class="plate">
+  <div class="controls">
+    <div class="select" data-control="set-select">
+      <lib-synth-key
+        data-part="up"
+        icon="keyboard_arrow_up"
+        [accessibleName]="model().previousAccessibleName"
+        [disabled]="model().previousDisabled"
+        (press)="selectPrevious.emit()"
+      />
+      <div class="readout" role="img" [attr.aria-label]="model().selectAccessibleName">
+        <span class="caption" aria-hidden="true">SEL</span>
+        <span class="position" aria-hidden="true">{{ model().positionText }}</span>
+        <span class="tune" aria-hidden="true">{{ tuneText() }}</span>
+      </div>
+      <lib-synth-key
+        data-part="down"
+        icon="keyboard_arrow_down"
+        [accessibleName]="model().nextAccessibleName"
+        [disabled]="model().nextDisabled"
+        (press)="selectNext.emit()"
+      />
+    </div>
+    <lib-synth-key
+      class="load"
+      data-control="set-load-a"
+      label="Load A"
+      [accessibleName]="model().loadAAccessibleName"
+      [disabled]="model().loadDisabled"
+      (press)="loadA.emit()"
+    />
+    <lib-synth-key
+      class="load"
+      data-control="set-load-b"
+      label="Load B"
+      [accessibleName]="model().loadBAccessibleName"
+      [disabled]="model().loadDisabled"
+      (press)="loadB.emit()"
+    />
+  </div>
+</lib-synth-panel>

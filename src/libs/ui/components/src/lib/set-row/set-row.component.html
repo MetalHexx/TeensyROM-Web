@@ -1,0 +1,60 @@
+@if (model().pending) {
+<span class="handle-slot" aria-hidden="true"></span>
+} @else {
+<button
+  type="button"
+  class="handle"
+  draggable="true"
+  [attr.aria-label]="model().handleAccessibleName"
+  (dragstart)="onDragStart($event)"
+  (dragend)="onDragEnd()"
+  (keydown)="onHandleKeydown($event)"
+>
+  <mat-icon aria-hidden="true">drag_indicator</mat-icon>
+</button>
+}
+
+<button
+  type="button"
+  class="select"
+  [attr.aria-label]="model().accessibleName"
+  [disabled]="model().pending"
+  (click)="selectRow.emit()"
+>
+  <span class="number" aria-hidden="true">{{ model().numberText }}</span>
+  <span class="tune" aria-hidden="true">
+    <span class="title">{{ model().title }}</span>
+    @if (model().author) {
+    <span class="author">{{ model().author }}</span>
+    }
+  </span>
+  <span class="detail" aria-hidden="true" [attr.data-kind]="model().detail.kind">
+    @switch (model().detail.kind) { @case ('fetching') {
+    <span class="detail-word">{{ detailWords.fetching }}</span>
+    <span class="bar"></span>
+    } @case ('analyzing') {
+    <span class="detail-word">{{ detailWords.analyzing }}</span>
+    <span class="bar"></span>
+    } @default {
+    {{ detailText() }}
+    } }
+  </span>
+  <span class="decks" aria-hidden="true">
+    @for (deck of model().decks; track deck.letter) {
+    <span class="deck" [attr.data-light]="deck.light">{{ deck.letter }}</span>
+    }
+  </span>
+  <span class="length" aria-hidden="true">{{ model().lengthText }}</span>
+</button>
+
+@if (!model().pending) {
+<lib-synth-key
+  class="remove"
+  data-part="remove"
+  icon="close"
+  [accessibleName]="model().removeAccessibleName"
+  (press)="remove.emit()"
+/>
+} @else {
+<span class="remove-slot" aria-hidden="true"></span>
+}

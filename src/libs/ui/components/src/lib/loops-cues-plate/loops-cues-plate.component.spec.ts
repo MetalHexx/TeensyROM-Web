@@ -46,6 +46,9 @@ function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelecte
     sharesGlobal: true,
     globalDisabled: false,
     globalAccessibleName: 'GBL selected deck A',
+    renameDisabled: false,
+    renameLabel: 'Rename selected deck A',
+    nameMaxLength: 48,
     ...overrides,
   };
 }
@@ -118,6 +121,7 @@ describe('LoopsCuesPlateComponent', () => {
     component.selectTile.subscribe(valued('selectTile'));
     component.nudgeCommit.subscribe(valued('nudgeCommit'));
     component.snap.subscribe(valued('snap'));
+    component.rename.subscribe(valued('rename'));
   });
 
   function setModel(next: LoopsCuesPlateModel): void {
@@ -167,6 +171,18 @@ describe('LoopsCuesPlateComponent', () => {
       byName('Set end deck A').click();
 
       expect(emitted).toEqual(['setEnd']);
+    });
+
+    it('re-emits a rename from the selected row', () => {
+      const name = (fixture.nativeElement as HTMLElement).querySelector('lib-loop-selected-row lib-inline-edit-title button') as HTMLButtonElement;
+      name.click();
+      fixture.detectChanges();
+      const field = (fixture.nativeElement as HTMLElement).querySelector('lib-loop-selected-row input[type="text"]') as HTMLInputElement;
+      field.value = 'Chorus';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(emitted).toEqual([['rename', 'Chorus']]);
     });
 
     it('re-emits a boundary snap tagged with the boundary and direction', () => {

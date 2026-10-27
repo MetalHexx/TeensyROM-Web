@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { InlineEditTitleComponent } from '../inline-edit-title/inline-edit-title.component';
 import {
   LoopBoundaryComponent,
   type LoopBoundaryAction,
@@ -38,6 +39,12 @@ export interface LoopSelectedRowModel {
   readonly sharesGlobal: boolean;
   readonly globalDisabled: boolean;
   readonly globalAccessibleName: string;
+  /** The name cannot be edited, e.g. while the marker is not yet saved. */
+  readonly renameDisabled: boolean;
+  /** Names the rename button and field, e.g. 'Rename Item 5'. */
+  readonly renameLabel: string;
+  /** The name field's maximum length, e.g. 48. */
+  readonly nameMaxLength: number;
 }
 
 /** A boundary nudge, tagged with the boundary it belongs to. */
@@ -76,7 +83,8 @@ const GLOBAL_LAMP_OFF = 'radio_button_unchecked';
  * state) with nothing selected. Purely presentational: it computes no time or snap target and holds
  * no drag value. The caller supplies every label and the drag offsets.
  *
- * With `model.empty` the display is blank and every key and boundary is disabled. The display's
+ * The name is renamed in place — click it, type, Enter; an empty name is allowed. With
+ * `model.empty` the display is blank and every key and boundary is disabled. The display's
  * accessible text carries the running, queued, not-ready and own-settings state in words.
  *
  * @example
@@ -94,12 +102,13 @@ const GLOBAL_LAMP_OFF = 'radio_button_unchecked';
  *   (nudgeInput)="onNudgeInput($event)"
  *   (nudgeCommit)="onNudgeCommit($event)"
  *   (snap)="onSnap($event)"
+ *   (rename)="onRename($event)"
  * />
  * ```
  */
 @Component({
   selector: 'lib-loop-selected-row',
-  imports: [LoopBoundaryComponent, SynthKeyComponent],
+  imports: [InlineEditTitleComponent, LoopBoundaryComponent, SynthKeyComponent],
   templateUrl: './loop-selected-row.component.html',
   styleUrl: './loop-selected-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -132,6 +141,8 @@ export class LoopSelectedRowComponent {
   readonly nudgeCommit = output<LoopBoundaryNudge>();
   /** Emits when a boundary's snap key is pressed, tagged with the boundary and direction. */
   readonly snap = output<LoopBoundarySnap>();
+  /** Emits the new name when the name is committed; an empty name returns the marker to its place name. */
+  readonly rename = output<string>();
 
   protected readonly stateLight = computed(() => {
     switch (this.model().activity) {

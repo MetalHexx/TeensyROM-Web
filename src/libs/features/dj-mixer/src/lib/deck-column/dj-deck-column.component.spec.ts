@@ -8,6 +8,7 @@ import {
   DeckService,
   DeviceStore,
   DjStore,
+  MARKER_NAME_MAX_LENGTH,
   type DeckBindingState,
   type DeckBindingSummary,
   type DeckLoopsSummary,
@@ -453,6 +454,25 @@ describe('DjDeckColumnComponent', () => {
       expect(tiles[1].selectAccessibleName).toBe('Item 2, loop, 7.8s, own settings, deck B');
     });
 
+    it('makes the selected marker renameable, and not when nothing is selected', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
+      });
+      let row = plate(fixture).model().selected;
+
+      expect([row.renameDisabled, row.renameLabel, row.nameMaxLength]).toEqual([
+        false,
+        'Rename Item 1',
+        MARKER_NAME_MAX_LENGTH,
+      ]);
+
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, canAdd: true, items: [loopItem()] }));
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+
+      expect(row.renameDisabled).toBe(true);
+    });
+
     it('fills the selected row and applies the disabled rules', () => {
       const { fixture, loopsSummary } = render(DECK_B, {
         loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
@@ -627,6 +647,19 @@ describe('DjDeckColumnComponent', () => {
       ]);
       expect(model.subtune.text).toBe('1/3');
       expect(transport(fixture).model()).toEqual(model);
+    });
+
+    it('carries the empty set row until the set is wired in, named for its deck', () => {
+      const { fixture } = render({ slot: 'B', letter: 'B', index: 1 });
+
+      expect(fixture.componentInstance.transportModel().set).toEqual({
+        positionText: '— / —',
+        setName: '',
+        previousDisabled: true,
+        nextDisabled: true,
+        previousAccessibleName: 'Previous in the set deck B',
+        nextAccessibleName: 'Next in the set deck B',
+      });
     });
 
     it('reads an empty deck as the empty state, labelled Stop, with the drop hint', () => {

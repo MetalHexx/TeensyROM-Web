@@ -85,6 +85,9 @@ function emptySelected(): LoopSelectedRowModel {
     sharesGlobal: true,
     globalDisabled: true,
     globalAccessibleName: 'GBL selected deck A',
+    renameDisabled: false,
+    renameLabel: 'Rename selected deck A',
+    nameMaxLength: 48,
   };
 }
 
@@ -107,6 +110,9 @@ function selectedFor(tile: LoopTileModel): LoopSelectedRowModel {
     sharesGlobal: !tile.ownSettings,
     globalDisabled: false,
     globalAccessibleName: `GBL ${tile.name} deck A`,
+    renameDisabled: false,
+    renameLabel: `Rename ${tile.name}`,
+    nameMaxLength: 48,
     start: boundary('Start'),
     end: boundary('End', { empty: isCue, disabled: isCue }),
   };

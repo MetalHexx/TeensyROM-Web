@@ -28,6 +28,8 @@ const meta: Meta<DeckTransportComponent> = {
     playPauseClick: { description: 'The Play/Pause key was pressed.' },
     stopClick: { description: 'The Stop key was pressed.' },
     repeatTrackChange: { description: 'The Repeat key was pressed; carries the new latch.' },
+    previousInSet: { description: 'The set row’s previous key was pressed.' },
+    nextInSet: { description: 'The set row’s next key was pressed.' },
     previousSubtune: { description: 'The stepper’s previous key was pressed.' },
     nextSubtune: { description: 'The stepper’s next key was pressed.' },
     scrubInput: { description: 'Every drag tick on the strip — a preview, never a seek.' },
@@ -67,6 +69,14 @@ function baseModel(): DeckTransportModel {
       repeat: 'Repeat track deck A',
     },
     errors: [],
+    set: {
+      positionText: '02/08',
+      setName: 'Friday warm-up',
+      previousDisabled: false,
+      nextDisabled: false,
+      previousAccessibleName: 'Previous in the set deck A',
+      nextAccessibleName: 'Next in the set deck A',
+    },
   };
 }
 
@@ -213,6 +223,55 @@ export const LongTitle: Story = {
     positionPercent: 85,
     elapsedText: '02:43.2',
     frameLabel: 'frame 8160',
+  },
+  render: atEveryWidth,
+};
+
+/** A deck on the second of eight rows: both set keys reachable, the position and set name read out. */
+export const OnASetRow: Story = {
+  args: {
+    model: playingModel(),
+    positionPercent: 42,
+    elapsedText: '01:20.7',
+    frameLabel: 'frame 4035',
+  },
+  render: atEveryWidth,
+};
+
+/** A deck on the first row: Previous in the set is disabled. */
+export const AtTheFirstRow: Story = {
+  args: {
+    model: {
+      ...playingModel(),
+      set: {
+        ...baseModel().set,
+        positionText: '01/08',
+        previousDisabled: true,
+      },
+    },
+    positionPercent: 42,
+    elapsedText: '01:20.7',
+    frameLabel: 'frame 4035',
+  },
+  render: atEveryWidth,
+};
+
+/** A deck with no set: the dashes stand in for the position and both keys are disabled. */
+export const WithNoSet: Story = {
+  args: {
+    model: {
+      ...playingModel(),
+      set: {
+        ...baseModel().set,
+        positionText: '— / —',
+        setName: '',
+        previousDisabled: true,
+        nextDisabled: true,
+      },
+    },
+    positionPercent: 42,
+    elapsedText: '01:20.7',
+    frameLabel: 'frame 4035',
   },
   render: atEveryWidth,
 };

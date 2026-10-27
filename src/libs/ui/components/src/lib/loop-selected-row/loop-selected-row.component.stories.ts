@@ -34,6 +34,7 @@ const meta: Meta<LoopSelectedRowComponent> = {
     deleteMarker: { description: 'Emits when Delete is pressed.' },
     nudgeInput: { description: 'Fires on every nudge drag tick, tagged with the boundary.' },
     nudgeCommit: { description: 'Fires when a nudge is released, tagged with the boundary.' },
+    rename: { description: 'Emits the new name when the name is renamed in place; empty is allowed.' },
     snap: { description: 'Emits when a snap key is pressed, tagged with the boundary and direction.' },
   },
   render: (args) => ({
@@ -93,6 +94,9 @@ const loop: LoopSelectedRowModel = {
   sharesGlobal: true,
   globalDisabled: false,
   globalAccessibleName: 'GBL Item 3',
+  renameDisabled: false,
+  renameLabel: 'Rename Item 3',
+  nameMaxLength: 48,
 };
 
 const none: LoopSelectedRowModel = {
@@ -118,6 +122,7 @@ const cue: LoopSelectedRowModel = {
   spanText: '02:43.2',
   clearEndDisabled: true,
   end: boundary('End', { empty: true, tickPercents: [] }),
+  renameLabel: 'Rename Item 4',
   triggerAccessibleName: 'Trigger Item 4',
   playNowAccessibleName: 'Play now Item 4',
   globalAccessibleName: 'GBL Item 4',
@@ -150,6 +155,20 @@ export const Running: Story = {
     startDragOffset: -17,
     endDragOffset: null,
   },
+};
+
+/** A marker the DJ has named: the name renders in place and is renamed by clicking it. */
+export const Named: Story = {
+  args: {
+    model: { ...loop, name: 'Chorus drop', renameLabel: 'Rename Chorus drop' },
+    startDragOffset: null,
+    endDragOffset: null,
+  },
+};
+
+/** Renaming is out of reach: the name is plain text. */
+export const RenameDisabled: Story = {
+  args: { model: { ...loop, renameDisabled: true }, startDragOffset: null, endDragOffset: null },
 };
 
 /** The narrow layout, with the bindings panel open: the boundaries stack. */

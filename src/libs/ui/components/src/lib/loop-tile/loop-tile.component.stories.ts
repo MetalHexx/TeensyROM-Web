@@ -80,6 +80,30 @@ export const OwnSettings: Story = {
   }),
 };
 
+/** A marker the DJ has named, beside an unnamed one: the name takes the tile's name line as is. */
+export const NamedAndUnnamed: Story = {
+  args: {
+    model: {
+      ...base,
+      id: 'loop-5',
+      name: 'Chorus drop',
+      triggerAccessibleName: 'Trigger Chorus drop',
+      selectAccessibleName: 'Select Chorus drop, loop, 7.8 seconds, idle',
+      playNowAccessibleName: 'Play now Chorus drop',
+    },
+    progressPercent: 0,
+  },
+  render: (args) => ({
+    props: { ...args, unnamed: base },
+    template: `
+      <div style="width: 232px; display: flex; flex-direction: column; gap: 8px">
+        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
+        <lib-loop-tile [model]="unnamed" [progressPercent]="0" />
+      </div>
+    `,
+  }),
+};
+
 /** The selected tile: cyan ring and `aria-current`. */
 export const Selected: Story = { args: { model: { ...base, selected: true }, progressPercent: 0 } };
 

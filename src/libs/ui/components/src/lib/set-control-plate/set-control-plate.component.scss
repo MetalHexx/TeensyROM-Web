@@ -1,0 +1,73 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
+// The plate sits in a narrow card: it trims the faceplate's default padding and clips rather than
+// widening the card.
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.plate {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.select {
+  display: flex;
+  flex: 1 1 14rem;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+lib-synth-key {
+  flex: none;
+}
+
+.readout {
+  @include styles.synth-display;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--spacing-sm);
+  overflow: hidden;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.caption {
+  flex: none;
+  color: var(--synth-display-dim);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.position {
+  flex: none;
+  color: var(--color-highlight);
+}
+
+.tune {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.load {
+  flex: 0 0 auto;
+}

@@ -101,5 +101,12 @@
         />
       </div>
     </div>
+
+    <lib-deck-set-row
+      class="set-row"
+      [model]="model().set"
+      (previous)="previousInSet.emit()"
+      (next)="nextInSet.emit()"
+    />
   </section>
 </lib-synth-panel>

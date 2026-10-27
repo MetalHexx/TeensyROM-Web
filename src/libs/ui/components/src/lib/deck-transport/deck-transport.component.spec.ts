@@ -30,6 +30,14 @@ function testModel(): DeckTransportModel {
       repeat: 'Repeat track deck A',
     },
     errors: [],
+    set: {
+      positionText: '02/08',
+      setName: 'Friday warm-up',
+      previousDisabled: false,
+      nextDisabled: false,
+      previousAccessibleName: 'Previous in the set deck A',
+      nextAccessibleName: 'Next in the set deck A',
+    },
   };
 }
 
@@ -53,6 +61,8 @@ describe('DeckTransportComponent', () => {
     component.repeatTrackChange.subscribe((latched) => emitted.push(`repeat:${latched}`));
     component.previousSubtune.subscribe(() => emitted.push('previous'));
     component.nextSubtune.subscribe(() => emitted.push('next'));
+    component.previousInSet.subscribe(() => emitted.push('previousInSet'));
+    component.nextInSet.subscribe(() => emitted.push('nextInSet'));
     component.scrubInput.subscribe((value) => emitted.push(`input:${value}`));
     component.scrubCommit.subscribe((value) => emitted.push(`commit:${value}`));
     fixture.detectChanges();
@@ -133,6 +143,26 @@ describe('DeckTransportComponent', () => {
       setModel({ subtune: { ...testModel().subtune, disabled: true } });
       keyButton('[data-control="subtune"] [data-part="previous"]').click();
       keyButton('[data-control="subtune"] [data-part="next"]').click();
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('emits previousInSet and nextInSet from the set row keys', () => {
+      keyButton('[data-control="set-previous"]').click();
+      keyButton('[data-control="set-next"]').click();
+
+      expect(emitted).toEqual(['previousInSet', 'nextInSet']);
+    });
+
+    it('shows the deck set position and name, and disables the keys the model disables', () => {
+      expect(text()).toContain('02/08');
+      expect(text()).toContain('Friday warm-up');
+
+      setModel({
+        set: { ...testModel().set, previousDisabled: true, nextDisabled: true },
+      });
+      keyButton('[data-control="set-previous"]').click();
+      keyButton('[data-control="set-next"]').click();
 
       expect(emitted).toEqual([]);
     });

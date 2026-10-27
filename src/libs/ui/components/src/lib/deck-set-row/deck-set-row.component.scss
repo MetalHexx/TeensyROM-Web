@@ -1,0 +1,50 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.step-key {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.readout {
+  @include styles.synth-display;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--spacing-sm);
+  overflow: hidden;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.caption {
+  flex: none;
+  color: var(--synth-display-dim);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.position {
+  flex: none;
+  color: var(--color-highlight);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
