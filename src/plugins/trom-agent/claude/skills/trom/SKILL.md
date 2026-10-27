@@ -45,6 +45,7 @@ If `init` shows no engine or no device online, go straight to `references/doctor
   - `watch-folder remove` takes an optional `--device`. `watch-folder set` needs one when the folder sends to several TeensyROMs, and takes no `--storage`.
   - `watch-folder list`, `watch-folder pause`, `watch-folder resume` and `transfer list` take no `--device`.
 - What is playing is only what you last launched, never a report from the device. The user can also launch from the web UI or the menu at any time, so it may have changed since.
+- The menu prints a line when any transfer starts or ends, so the user may mention one you did not start.
 - Offer only what `init`'s `capabilities` lists. The installed `trom` may be older or newer than this skill.
 - To open the web UI, or when `webUi.available` is false, read `references/web-ui.md`.
 

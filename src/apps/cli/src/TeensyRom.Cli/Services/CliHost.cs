@@ -40,7 +40,7 @@ namespace TeensyRom.Cli.Services;
 /// The CLI's service registrations, the registrar both command apps share, and the gate that readies the engine and
 /// a device before a menu flow that needs them.
 /// </summary>
-internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate, CliConsoles Consoles, ICliOutput Output, TypeRegistrar Registrar, PathOffer? PathOffer = null);
+internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate, CliConsoles Consoles, ICliOutput Output, TypeRegistrar Registrar, PathOffer? PathOffer = null, ITransferLineStream? TransferLines = null);
 
 /// <summary>
 /// One verb of the public command tree. <see cref="Command"/> and <see cref="Settings"/> are what the verb needs
@@ -226,6 +226,7 @@ internal static class CliHost
         var chooser = new DeviceChooser(deviceService, output);
         var gate = new StartupGate(engine, deviceService, chooser);
         var pathRegistrar = PathRegistrar.CreateDefault(settingsService);
+        var transferLines = new TransferLineStream(alertService, deviceService, logService, httpClient.BaseAddress!);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
@@ -245,6 +246,7 @@ internal static class CliHost
         services.AddSingleton<IAlertService>(alertService);
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<IDeviceLogStream>(new DeviceLogStream(deviceService, logService, httpClient.BaseAddress!));
+        services.AddSingleton<ITransferLineStream>(transferLines);
         services.AddSingleton<IStorageService, StorageService>();
         services.AddSingleton<ILaunchService, LaunchService>();
         services.AddSingleton<IPlayerService, PlayerService>();
@@ -260,7 +262,7 @@ internal static class CliHost
         RegisterCommands(services);
 
         return new CliComposition(services, gate, consoles, output, new TypeRegistrar(services),
-            new PathOffer(output, settingsService, locator, pathRegistrar));
+            new PathOffer(output, settingsService, locator, pathRegistrar), transferLines);
     }
 
     /// <summary>
@@ -299,7 +301,7 @@ internal static class CliHost
 
     /// <summary>Builds the interactive menu on the composition's registrar and consoles.</summary>
     public static TuiHost CreateTui(CliComposition host) =>
-        new(CreateTuiApp(host.Registrar), host.Gate, host.Output, host.Consoles);
+        new(CreateTuiApp(host.Registrar), host.Gate, host.Output, host.Consoles, host.TransferLines);
 
     /// <summary>
     /// The public app: the <c>trom &lt;noun&gt; &lt;verb&gt;</c> tree and the top-level commands, nothing else. Help and the version are written to

@@ -69,6 +69,53 @@ public sealed class TuiHostTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMenu_StartsFollowingTransfers_WithoutWaitingForTheStartToFinish()
+    {
+        _host.TransferLines.StartResult = new TaskCompletionSource().Task;
+        Pick(Leave);
+
+        var exitCode = await RunMenu().WaitAsync(TimeSpan.FromSeconds(10));
+
+        exitCode.Should().Be(0);
+        _host.TransferLines.Starts.Should().Be(1);
+        Screen.Should().Contain("Leave");
+    }
+
+    [Fact]
+    public async Task TheMenu_DisposesTheTransferLines_WhenTheUserLeaves()
+    {
+        Pick(Leave);
+
+        await RunMenu();
+
+        _host.TransferLines.Disposals.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TheMenu_DisposesTheTransferLines_WhenTheGateFails()
+    {
+        _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DeviceSummary>());
+        Pick(Devices);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(1);
+        _host.TransferLines.Disposals.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AfterTheEngineIsReady_TheMenuAsksTheTransferLinesToStartAgain()
+    {
+        _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected") });
+        Pick(Devices);
+        Pick(Leave);
+
+        await RunMenu();
+
+        _host.TransferLines.Starts.Should().Be(2);
+    }
+
+    [Fact]
     public async Task AFlowThatNeedsNoEngine_RunsWithoutOne_AndTheMenuReturns()
     {
         Pick(Credits);

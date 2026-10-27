@@ -22,6 +22,14 @@ namespace TeensyRom.Cli.Services
             ClearLine();
         }
 
+        public void PublishSuccess(string message)
+        {
+            if (output.RunMode == CliRunMode.Tui) RadHelper.WriteSuccess(message.EscapeBrackets());
+            else output.Notice(message);
+
+            ClearLine();
+        }
+
         public void PublishError(string message)
         {
             if (output.RunMode == CliRunMode.Tui) RadHelper.WriteError(message.EscapeBrackets());

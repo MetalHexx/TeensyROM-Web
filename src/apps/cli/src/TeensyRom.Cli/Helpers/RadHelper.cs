@@ -159,6 +159,15 @@ namespace TeensyRom.Cli.Helpers
         }
 
         /// <summary>
+        /// Displays a success message
+        /// </summary>
+        /// <param name="message"></param>
+        public static void WriteSuccess(string message)
+        {
+            AnsiConsole.MarkupLine($"[green]{message.EscapeBrackets()}[/]");
+        }
+
+        /// <summary>
         /// Writes a message with bullet
         /// </summary>
         /// <param name="message"></param>

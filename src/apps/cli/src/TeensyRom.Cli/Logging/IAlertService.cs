@@ -5,6 +5,7 @@
         IObservable<string> CommandErrors { get; }
 
         void Publish(string message);
+        void PublishSuccess(string message);
         void PublishError(string message);
     }
 }
