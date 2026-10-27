@@ -1,0 +1,38 @@
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fold-button {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  pointer-events: auto;
+}
+
+.strip-label {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  width: var(--fold-strip-width, 44px);
+  display: flex;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dimmed-light);
+  animation: strip-label-in 400ms ease both;
+}
+
+@keyframes strip-label-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

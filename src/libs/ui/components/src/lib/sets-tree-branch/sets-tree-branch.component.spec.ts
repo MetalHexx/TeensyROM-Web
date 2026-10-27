@@ -85,6 +85,17 @@ describe('SetsTreeBranchComponent', () => {
     ]);
   });
 
+  it('truncates the set rows but not the branch label', () => {
+    const nodes = Array.from(el().querySelectorAll<HTMLElement>('lib-directory-tree-node'));
+    const branchNode = branch().querySelector('lib-directory-tree-node') as HTMLElement;
+
+    expect(branchNode.classList.contains('truncating')).toBe(false);
+    expect(nodes.filter((n) => n.classList.contains('truncating'))).toHaveLength(2);
+    expect(setRows().every((r) => r.querySelector('lib-directory-tree-node')?.classList.contains('truncating'))).toBe(
+      true
+    );
+  });
+
   it('marks the loaded set selected and lights it, and names every row', () => {
     expect(setRows().map((r) => r.getAttribute('aria-selected'))).toEqual(['true', 'false']);
     expect(setRows().map((r) => r.querySelector('.light') !== null)).toEqual([true, false]);

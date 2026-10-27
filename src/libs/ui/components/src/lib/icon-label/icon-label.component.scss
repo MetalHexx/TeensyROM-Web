@@ -18,6 +18,14 @@
   &.gap-extra-large {
     gap: var(--spacing-lg);
   }
+
+  &.shrink {
+    min-width: 0;
+
+    lib-styled-icon {
+      flex: none;
+    }
+  }
 }
 
 .text-container {
@@ -25,6 +33,10 @@
   flex-direction: column;
   gap: 0;
   line-height: 1.5;
+
+  &.shrink {
+    min-width: 0;
+  }
 }
 
 .icon-label-text {
@@ -33,6 +45,14 @@
 
   &.truncate {
     max-width: 20ch;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  // `shrink` + `truncate`: no character cap, ellipsis only when the container constrains the row.
+  &.truncate-fill {
+    max-width: none;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

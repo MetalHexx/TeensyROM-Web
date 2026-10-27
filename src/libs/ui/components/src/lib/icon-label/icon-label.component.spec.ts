@@ -136,6 +136,40 @@ describe('IconLabelComponent', () => {
     expect(component.truncate()).toBe(false);
   });
 
+  describe('shrink', () => {
+    const labelElement = (): HTMLElement => fixture.nativeElement.querySelector('.icon-label-text');
+
+    it('keeps the 20ch cap class and no shrink markup by default', () => {
+      componentRef.setInput('label', 'Long Label');
+      fixture.detectChanges();
+
+      expect(component.shrink()).toBe(false);
+      expect(labelElement().classList.contains('truncate')).toBe(true);
+      expect(labelElement().classList.contains('truncate-fill')).toBe(false);
+      expect(fixture.nativeElement.querySelector('.shrink')).toBeNull();
+    });
+
+    it('drops the cap class and fills the room when on with truncate', () => {
+      componentRef.setInput('label', 'Long Label');
+      componentRef.setInput('shrink', true);
+      fixture.detectChanges();
+
+      expect(labelElement().classList.contains('truncate')).toBe(false);
+      expect(labelElement().classList.contains('truncate-fill')).toBe(true);
+      expect(fixture.nativeElement.querySelector('.text-container').classList.contains('shrink')).toBe(true);
+    });
+
+    it('does nothing when truncate is off', () => {
+      componentRef.setInput('label', 'Long Label');
+      componentRef.setInput('truncate', false);
+      componentRef.setInput('shrink', true);
+      fixture.detectChanges();
+
+      expect(labelElement().classList.contains('truncate')).toBe(false);
+      expect(labelElement().classList.contains('truncate-fill')).toBe(false);
+    });
+  });
+
   it('should set title attribute on label', () => {
     componentRef.setInput('icon', 'folder');
     componentRef.setInput('label', 'Hover Text');

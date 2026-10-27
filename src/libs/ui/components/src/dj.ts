@@ -25,3 +25,4 @@ export * from './lib/set-control-plate/set-control-plate.component';
 export * from './lib/set-row/set-row.component';
 export * from './lib/sets-tree-branch/sets-tree-branch.component';
 export * from './lib/deck-set-row/deck-set-row.component';
+export * from './lib/fold-handle/fold-handle.component';

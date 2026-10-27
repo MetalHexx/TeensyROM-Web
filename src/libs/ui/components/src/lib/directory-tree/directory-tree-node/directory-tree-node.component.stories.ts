@@ -19,6 +19,10 @@ const meta: Meta<DirectoryTreeNodeComponent> = {
     },
   },
   argTypes: {
+    truncate: {
+      description:
+        'Ellipsise the label when the row is constrained instead of widening it. Defaults to false.',
+    },
     nodeType: {
       control: 'select',
       options: ['device', 'storage', 'directory', 'placeholder'],
@@ -41,6 +45,30 @@ export const Default: Story = {
     isSelected: false,
     nodeType: mockGamesNode.type,
   },
+};
+
+/** With `truncate`, a long label ellipsises at the width the wrapper gives it (here 212px). */
+export const TruncatedLongLabel: Story = {
+  args: {
+    ...Default.args,
+    text: 'A directory with a name much too long to fit in the tree at this width',
+    truncate: true,
+  },
+  render: (args) => ({
+    props: args,
+    template: `
+      <div style="width: 212px">
+        <lib-directory-tree-node
+          [icon]="icon"
+          [text]="text"
+          [cssClass]="cssClass"
+          [isSelected]="isSelected"
+          [nodeType]="nodeType"
+          [truncate]="truncate"
+        />
+      </div>
+    `,
+  }),
 };
 
 export const Selected: Story = {

@@ -60,4 +60,41 @@ export const WithALoadedSet: Story = {
   },
 };
 
+const longName = 'Friday night warm-up set for the long weekend at the club, run 2';
+
+const longNameModel: SetsTreeBranchModel = {
+  label: 'Sets',
+  sets: [
+    ...model.sets.slice(0, 1),
+    { id: 's-long', name: longName, loaded: true, accessibleName: `Set ${longName}, loaded` },
+  ],
+};
+
+const wrappedAt = (width: string): Story['render'] => (args) => ({
+  props: args,
+  template: `
+    <div role="tree" style="width: ${width}">
+      <lib-sets-tree-branch [model]="model" [expanded]="expanded" />
+    </div>
+  `,
+});
+
+/** A 64-character name is cut with an ellipsis at the 212px the tree gives it; hover shows the full name. */
+export const LongNameAt212px: Story = {
+  args: { model: longNameModel, expanded: true },
+  render: wrappedAt('212px'),
+};
+
+/** At 360px the name fills the width before it is cut — it does not stop near 20 characters. */
+export const LongNameAt360px: Story = {
+  args: { model: longNameModel, expanded: true },
+  render: wrappedAt('360px'),
+};
+
+/** Nothing constrains the branch, so the name shows whole. */
+export const LongNameUnconstrained: Story = {
+  args: { model: longNameModel, expanded: true },
+  render: wrappedAt('max-content'),
+};
+
 export const NoSets: Story = { args: { model: { ...model, sets: [] }, expanded: true } };

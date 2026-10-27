@@ -35,8 +35,33 @@ export const Default: Story = {
     color: 'normal',
     size: 'medium',
     truncate: true,
+    shrink: false,
     secondaryLabel: '',
     secondaryLabelClass: '',
     labelClass: '',
   },
+};
+
+/** With `shrink`, the label fills the room it is given (here 240px) and ellipsises only when the container constrains it. */
+export const ShrinkToFill: Story = {
+  args: {
+    ...Default.args,
+    label: 'A very long label that would stop near twenty characters without shrink',
+    shrink: true,
+  },
+  render: (args) => ({
+    props: args,
+    template: `
+      <div style="width: 240px">
+        <lib-icon-label
+          [icon]="icon"
+          [label]="label"
+          [color]="color"
+          [size]="size"
+          [truncate]="truncate"
+          [shrink]="shrink"
+        />
+      </div>
+    `,
+  }),
 };

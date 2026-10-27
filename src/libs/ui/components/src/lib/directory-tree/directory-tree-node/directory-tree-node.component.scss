@@ -4,6 +4,13 @@
   display: inline-block;
 }
 
+// `truncate`: every box from the row down to the text can shrink, so the label ellipsises when
+// the row is constrained. Nothing here caps the width itself.
+:host(.truncating) {
+  display: block;
+  min-width: 0;
+}
+
 .directory-tree-node {
   @include styles.selectable-item;
   display: inline-flex;
@@ -12,5 +19,15 @@
 
   lib-icon-label {
     flex-shrink: 0;
+  }
+
+  &.truncating {
+    display: flex;
+    min-width: 0;
+
+    lib-icon-label {
+      flex-shrink: 1;
+      min-width: 0;
+    }
   }
 }
