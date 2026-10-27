@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
-import { of } from 'rxjs';
+import { of, switchMap, throwError, timer } from 'rxjs';
 import { vi } from 'vitest';
 import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
 import {
@@ -163,6 +163,23 @@ describe('TransferSettingsPanelComponent', () => {
       });
     });
 
+    it('shows the failure and puts the switch back when the save fails', async () => {
+      await setup();
+      settingsService.saveSettings.mockImplementation(() =>
+        timer(0).pipe(switchMap(() => throwError(() => new Error('Engine offline'))))
+      );
+
+      query('auto-launch-switch')?.querySelector('button')?.click();
+      await settle();
+      await settle();
+
+      expect(query('settings-error')?.textContent).toContain('Engine offline');
+      expect(settingsStore.getSettings()()?.fileTransferSettings.autoLaunchOnCopyEnabled).toBe(false);
+      expect(query('auto-launch-switch')?.querySelector('button')?.getAttribute('aria-checked')).toBe(
+        'false'
+      );
+    });
+
     it('is disabled while settings have not loaded', async () => {
       await setup({ withSettings: false });
 
@@ -272,6 +289,19 @@ describe('TransferSettingsPanelComponent', () => {
 
       expect(watchFolders['setEnabled']).toHaveBeenCalledWith('a', false);
       expect(query('watch-folder')?.classList.contains('folder-block--off')).toBe(true);
+    });
+
+    it('keeps the switch where it was when the engine refuses the change', async () => {
+      await setup({ folders: [folder('a')] });
+      watchFolders['setEnabled'].mockRejectedValue(new Error('Watch folder not found'));
+
+      query('watch-folder-switch')?.querySelector('button')?.click();
+      await settle();
+
+      expect(query('watch-folders-error')?.textContent).toContain('Watch folder not found');
+      expect(
+        query('watch-folder-switch')?.querySelector('button')?.getAttribute('aria-checked')
+      ).toBe('true');
     });
 
     it('asks before removing a folder, then removes it', async () => {

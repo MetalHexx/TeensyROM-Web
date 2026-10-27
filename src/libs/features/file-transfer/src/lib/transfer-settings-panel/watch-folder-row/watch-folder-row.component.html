@@ -3,12 +3,13 @@
     ><span class="folder-path-text">&lrm;{{ folder().path }}&lrm;</span></span
   >
   <mat-slide-toggle
+    #enabledSwitch
     class="folder-switch"
     [checked]="folder().enabled"
     [disabled]="pending()"
     [aria-label]="'Watch ' + folder().path"
     data-testid="watch-folder-switch"
-    (change)="enabledChange.emit($event.checked)"
+    (change)="onToggle(enabledSwitch, $event.checked)"
   />
   <lib-dropdown-dialog #confirm [centered]="true">
     <lib-icon-button

@@ -27,7 +27,7 @@ Load: bootstrap dispatches `SettingsStore.loadSettings()` → infra service call
 
 Save: `SettingsFormService` debounces form changes (1s) → `updateSettings()` pushes to history → `saveSettings()` persists → DomainMapper converts model → DTO → backend writes to disk and emits via an Rx observable.
 
-Settings categories: Connection, Player, Video, File Transfer, Search, App — each with a backend record, a matching frontend interface, and a dedicated settings-view section component. See [references/SETTINGS_OVERVIEW.md](references/SETTINGS_OVERVIEW.md) for the full file tree, Mermaid architecture diagram, and code samples for the backend persistence and frontend store/auto-save patterns.
+Settings categories: Connection, Player, Video, File Transfer, Search, App — each with a backend record, a matching frontend interface, and a dedicated settings-view section component, except File Transfer, whose auto-launch switch lives in the Transfer Settings panel of the File Transfer view (`libs/features/file-transfer`). See [references/SETTINGS_OVERVIEW.md](references/SETTINGS_OVERVIEW.md) for the full file tree, Mermaid architecture diagram, and code samples for the backend persistence and frontend store/auto-save patterns.
 
 ## Settings Usage Audit — Spot-Check Before Trusting
 

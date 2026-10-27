@@ -105,9 +105,10 @@ libs/features/settings/src/lib/settings-view/
 ├── connection-settings-section/    # Connection type toggle
 ├── player-settings-section/        # Player behavior toggles
 ├── video-settings-section/         # Video capture toggle
-├── file-transfer-settings-section/ # Auto-launch settings
 └── search-settings-section/        # Search weights + exclusions
 ```
+
+File Transfer has no settings-view section: its auto-launch switch lives in the Transfer Settings panel of the File Transfer view (`libs/features/file-transfer`), which writes it through `SettingsStore.updateSettings` and `saveSettings`.
 
 ---
 

@@ -91,6 +91,8 @@ export class TransferSettingsPanelComponent {
   protected readonly error = this.watchFolderStore.error;
   protected readonly isLoading = this.watchFolderStore.isLoading;
 
+  protected readonly settingsError = this.settingsStore.error;
+
   private readonly settings = this.settingsStore.getSettings();
   protected readonly settingsReady = computed(() => this.settings() !== null);
   protected readonly autoLaunch = computed(
@@ -166,11 +168,21 @@ export class TransferSettingsPanelComponent {
     this.globalSwitch()?.focus();
   }
 
+  /**
+   * Applies and saves the switch. When the save fails the stored value goes back to what the
+   * engine still holds, which moves the switch back through its binding.
+   */
   protected async onAutoLaunchChange(checked: boolean): Promise<void> {
+    const previous = this.autoLaunch();
     this.settingsStore.updateSettings({
       settings: { fileTransferSettings: { autoLaunchOnCopyEnabled: checked } },
     });
     await this.settingsStore.saveSettings();
+    if (!this.settingsStore.error()) return;
+
+    this.settingsStore.updateSettings({
+      settings: { fileTransferSettings: { autoLaunchOnCopyEnabled: previous } },
+    });
   }
 
   protected isPending(watchFolderId: string): boolean {

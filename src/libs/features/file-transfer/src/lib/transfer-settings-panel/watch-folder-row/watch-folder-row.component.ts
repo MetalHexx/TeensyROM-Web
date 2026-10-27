@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSlideToggle, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {
   ConfirmationDialogComponent,
   DropdownDialogComponent,
@@ -35,4 +35,14 @@ export class WatchFolderRowComponent {
   readonly deleteConfirmed = output<void>();
 
   protected readonly WatchFolderState = WatchFolderState;
+
+  /**
+   * The slide toggle flips itself before it emits, but the engine decides the folder's state: put
+   * the switch back to the folder's real state and let the folder input move it once the engine
+   * accepts, so a refused change leaves it where it was.
+   */
+  protected onToggle(toggle: MatSlideToggle, checked: boolean): void {
+    toggle.checked = this.folder().enabled;
+    this.enabledChange.emit(checked);
+  }
 }

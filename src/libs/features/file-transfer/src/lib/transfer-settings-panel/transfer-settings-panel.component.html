@@ -15,6 +15,9 @@
       >
         Launch after transfer
       </mat-slide-toggle>
+      @if (settingsError(); as message) {
+      <p class="group-error" role="alert" data-testid="settings-error">{{ message }}</p>
+      }
     </section>
 
     <section class="group" data-testid="watch-folders-group">
