@@ -19,6 +19,8 @@ import { map } from 'rxjs/operators';
 import {
   DECK_SLOTS,
   DeviceStore,
+  DjSets,
+  DjStore,
   MappableControls,
   MidiControllers,
   MidiLearn,
@@ -33,6 +35,7 @@ import {
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
+import type { SetsTreeBranchModel } from '@teensyrom-nx/ui/components/dj';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjSidPanelComponent } from '../sid-panel/dj-sid-panel.component';
 import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
@@ -42,6 +45,7 @@ import {
   type DjStorageSelectEvent,
 } from '../browse-trees/dj-browse-trees.component';
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
+import { DjSetCardComponent } from '../set-card/dj-set-card.component';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
 
@@ -55,6 +59,7 @@ import type { DeckRef } from '../deck-ref';
     DjSidPanelComponent,
     DjBrowseTreesComponent,
     DjDirectoryListingComponent,
+    DjSetCardComponent,
     DjBindingsPanelComponent,
     MappingOverlayLayerComponent,
     SlidingContainerComponent,
@@ -65,6 +70,8 @@ import type { DeckRef } from '../deck-ref';
 export class DjMixerViewComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly storageStore = inject(StorageStore);
+  private readonly djStore = inject(DjStore);
+  private readonly djSets = inject(DjSets);
   private readonly destroyRef = inject(DestroyRef);
   private readonly midiStore = inject(MidiMappingStore);
   private readonly controls = inject(MappableControls);
@@ -87,6 +94,19 @@ export class DjMixerViewComponent {
     slot,
     letter: slot,
     index,
+  }));
+
+  private readonly setTree = this.djStore.setTreeSummary();
+
+  /** The saved sets for the tree's Sets branch, newest first, the loaded one lit. */
+  readonly setsBranch = computed<SetsTreeBranchModel>(() => ({
+    label: 'Sets',
+    sets: this.setTree().sets.map(({ id, name, loaded }) => ({
+      id,
+      name,
+      loaded,
+      accessibleName: loaded ? `Set ${name}, loaded` : `Set ${name}`,
+    })),
   }));
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
@@ -238,6 +258,10 @@ export class DjMixerViewComponent {
     this.activeStorage.set(event);
     const path = this.storageStore.storageEntries()[activeStorageKey(event)]?.currentPath ?? '/';
     void this.storageStore.navigateToDirectory({ ...event, path });
+  }
+
+  onSetSelect(id: string): void {
+    void this.djSets.openSet(id);
   }
 
   private async seedStorage(device: Device): Promise<void> {

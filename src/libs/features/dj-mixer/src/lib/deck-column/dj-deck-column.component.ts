@@ -171,6 +171,7 @@ export class DjDeckColumnComponent {
   private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
   private readonly settingsInPlay = computed(() => this.djStore.settingsInPlay(this.deck().slot)());
   private readonly canShape = computed(() => this.djStore.canShape(this.deck().slot)());
+  private readonly deckSet = computed(() => this.djStore.deckSetSummary(this.deck().slot)());
 
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
   readonly loops = computed(() => this.djStore.loopsSummary(this.deck().slot)());
@@ -231,6 +232,7 @@ export class DjDeckColumnComponent {
   readonly transportModel = computed<DeckTransportModel>(() => {
     const { letter } = this.deck();
     const summary = this.summary();
+    const set = this.deckSet();
     const state: DeckTransportState =
       summary.status === 'empty' ? 'empty' : transportState(summary.led);
     return {
@@ -262,10 +264,10 @@ export class DjDeckColumnComponent {
       // A failed load's reason travels in `label`, not `errors`.
       errors: summary.status === 'failed' && summary.label ? [summary.label] : summary.errors,
       set: {
-        positionText: '— / —',
-        setName: '',
-        previousDisabled: true,
-        nextDisabled: true,
+        positionText: set.positionText,
+        setName: set.setName,
+        previousDisabled: !set.available || !set.canPrevious,
+        nextDisabled: !set.available || !set.canNext,
         previousAccessibleName: `Previous in the set deck ${letter}`,
         nextAccessibleName: `Next in the set deck ${letter}`,
       },
@@ -428,6 +430,14 @@ export class DjDeckColumnComponent {
     void this.deckService.nextSubtune(this.deck().slot);
   }
 
+  onPreviousInSet(): void {
+    void this.deckService.previousRow(this.deck().slot);
+  }
+
+  onNextInSet(): void {
+    void this.deckService.nextRow(this.deck().slot);
+  }
+
   /** Pins the thumb at the dragged value for as long as the drag lasts. */
   onScrubInput(value: number): void {
     this.scrubDragValue.set(value);
@@ -482,6 +492,13 @@ export class DjDeckColumnComponent {
 
   onClearEnd(): void {
     this.deckService.clearMarkerEnd(this.deck().slot);
+  }
+
+  onRenameSelected(name: string): void {
+    const id = this.loops().selected?.id;
+    if (id !== undefined) {
+      this.deckService.renameMarker(this.deck().slot, id, name);
+    }
   }
 
   onDeleteSelected(): void {

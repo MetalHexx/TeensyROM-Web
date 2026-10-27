@@ -1,3 +1,9 @@
+<lib-sets-tree-branch
+  [model]="sets()"
+  [expanded]="setsExpanded()"
+  (expandedChange)="setsExpanded.set($event)"
+  (setSelect)="setSelect.emit($event)"
+></lib-sets-tree-branch>
 @for (tree of trees(); track tree.deviceId) {
 <lib-browse-tree
   [model]="tree"

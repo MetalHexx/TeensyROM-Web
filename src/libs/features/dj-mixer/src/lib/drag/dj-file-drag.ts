@@ -7,13 +7,18 @@ export const DJ_FILE_DRAG_TYPE = 'application/x-teensyrom-dj-file';
 
 /**
  * Payload shape for a DJ file drag and drop operation. Carries the device, storage type,
- * file path, and file name across the drag boundary.
+ * file path, and file name across the drag boundary, plus the listing's own facts about the file
+ * when the source has them.
  */
 export interface DjFileDragPayload {
   readonly deviceId: string;
   readonly storageType: StorageType;
   readonly path: string;
   readonly fileName: string;
+  readonly title?: string;
+  readonly author?: string;
+  readonly playLength?: string;
+  readonly subtuneLengths?: readonly string[];
 }
 
 /**

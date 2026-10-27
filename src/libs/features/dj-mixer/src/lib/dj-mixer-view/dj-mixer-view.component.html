@@ -9,6 +9,19 @@
       (bindingsToggle)="togglePanel()"
     ></lib-dj-sid-panel>
     <div class="bottom-band">
+      <lib-scaling-compact-card
+        class="browse-card"
+        cardClass="compact-card--fill"
+        animationEntry="from-bottom"
+      >
+        <lib-dj-browse-trees
+          [devices]="enabledDevices()"
+          [sets]="setsBranch()"
+          [activeStorage]="activeStorage()"
+          (storageSelect)="onStorageSelect($event)"
+          (setSelect)="onSetSelect($event)"
+        ></lib-dj-browse-trees>
+      </lib-scaling-compact-card>
       @if (enabledDevices().length === 0) {
 
       <lib-empty-state-message
@@ -22,17 +35,6 @@
       } @else {
 
       <lib-scaling-compact-card
-        class="browse-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
-      >
-        <lib-dj-browse-trees
-          [devices]="enabledDevices()"
-          [activeStorage]="activeStorage()"
-          (storageSelect)="onStorageSelect($event)"
-        ></lib-dj-browse-trees>
-      </lib-scaling-compact-card>
-      <lib-scaling-compact-card
         class="directory-listing-card"
         cardClass="compact-card--fill"
         animationEntry="from-bottom"
@@ -45,6 +47,13 @@
       </lib-scaling-compact-card>
 
       }
+      <lib-scaling-compact-card
+        class="set-card"
+        cardClass="compact-card--fill"
+        animationEntry="from-bottom"
+      >
+        <lib-dj-set-card [listingDragActive]="dragging()"></lib-dj-set-card>
+      </lib-scaling-compact-card>
     </div>
     @if (mappingMode()) {
     <lib-mapping-overlay-layer

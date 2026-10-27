@@ -231,8 +231,31 @@ describe('DjDirectoryListingComponent', () => {
         storageType: StorageType.Sd,
         path: '/song.sid',
         fileName: 'song.sid',
+        title: 'Test Song',
+        author: 'Test Artist',
+        playLength: '3:45',
+        subtuneLengths: [],
       });
       expect(emitted.length).toBe(1);
+    });
+
+    it('falls back to the file name for the title when the file has none', async () => {
+      await setup(active, {
+        'device-1-SD': stateWith({
+          directory: {
+            directories: [],
+            files: [createTestFileItem({ name: 'untitled.sid', path: '/untitled.sid', title: '' })],
+            path: '/',
+          },
+        }),
+      });
+
+      const row = fixture.nativeElement.querySelector('.listing-row') as HTMLElement;
+      const { dataTransfer } = createFakeDataTransfer();
+      row.dispatchEvent(dragStartEvent(dataTransfer));
+
+      const payload = JSON.parse(dataTransfer.getData(DJ_FILE_DRAG_TYPE)) as DjFileDragPayload;
+      expect(payload.title).toBe('untitled.sid');
     });
 
     it('sets the drag image from the off-screen chip, current with the dragged row', async () => {

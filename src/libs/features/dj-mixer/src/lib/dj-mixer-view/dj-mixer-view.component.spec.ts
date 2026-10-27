@@ -8,8 +8,10 @@ import { vi } from 'vitest';
 import {
   DECK_CONTROL_IDS,
   DECK_SLOTS,
+  SET_CONTROL_IDS,
   DeckService,
   DeviceStore,
+  DjSets,
   DjStore,
   HOME_DECK_PANEL,
   MappableControls,
@@ -24,6 +26,9 @@ import {
   type ControlIdentity,
   type DeckBindingSummary,
   type DeckLoopsSummary,
+  type DeckSetSummary,
+  type SetCardSummary,
+  type SetTreeSummary,
   type DeckTransportSummary,
   type MappableControl,
 } from '@teensyrom-nx/application';
@@ -37,6 +42,7 @@ import { anchorFor } from '../mapping/control-anchors';
 import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
 import { DjBrowseTreesComponent } from '../browse-trees/dj-browse-trees.component';
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
+import { DjSetCardComponent } from '../set-card/dj-set-card.component';
 
 interface DeviceFixtureOptions {
   deviceId?: string;
@@ -169,8 +175,42 @@ const SELECTED_CUE: DeckLoopsSummary = {
   },
 };
 
+const NO_DECK_SET: DeckSetSummary = {
+  available: false,
+  positionText: '— / —',
+  setName: '',
+  canPrevious: false,
+  canNext: false,
+};
+
+const EMPTY_SET: SetCardSummary = {
+  ready: true,
+  name: 'Set 1',
+  placeholder: 'Set 1',
+  rowCount: 0,
+  save: 'saved',
+  rows: [],
+  selectedIndex: null,
+  positionText: '— / —',
+  realRowCount: 0,
+  selectedRowIndex: null,
+  selectedTitle: null,
+  selectedAuthor: null,
+  announcement: null,
+};
+
+const SAVED_SETS: SetTreeSummary = {
+  sets: [
+    { id: 's2', name: 'Friday', loaded: true },
+    { id: 's1', name: 'Saturday', loaded: false },
+  ],
+};
+
 function createDjStoreStub(loops: DeckLoopsSummary = NO_LOOPS) {
   return {
+    setCardSummary: () => signal(EMPTY_SET),
+    setTreeSummary: () => signal(SAVED_SETS),
+    deckSetSummary: () => signal(NO_DECK_SET),
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
     loopsSummary: () => signal(loops),
@@ -225,6 +265,9 @@ function createDeckServiceStub() {
     bindDevice: vi.fn(),
     enableMidi: vi.fn(),
     identify: vi.fn(),
+    loadSelected: vi.fn(),
+    previousRow: vi.fn(),
+    nextRow: vi.fn(),
   };
 }
 
@@ -276,6 +319,7 @@ function render(
   }: { reducedMotion?: boolean; loops?: DeckLoopsSummary } = {}
 ) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
+  const djSets = { openSet: vi.fn().mockResolvedValue(undefined) };
   const midi = createMidiStubs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const usableDevices = signal(devices.filter((d: any) => d.isEnabled));
@@ -288,6 +332,7 @@ function render(
       { provide: StorageStore, useValue: storageStore },
       { provide: DjStore, useValue: createDjStoreStub(loops) },
       { provide: DeckService, useValue: createDeckServiceStub() },
+      { provide: DjSets, useValue: djSets },
       { provide: MixerService, useValue: createMixerServiceStub() },
       { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
@@ -312,6 +357,7 @@ function render(
     fixture,
     component: fixture.componentInstance,
     storageStore,
+    djSets,
     midi,
     midiStore: TestBed.inject(MidiMappingStore),
   };
@@ -362,19 +408,20 @@ describe('DjMixerViewComponent', () => {
         .querySelector(':scope > lib-empty-state-message');
     }
 
-    it('shows the empty state and hides browse/listing when no devices are enabled', () => {
+    it('shows the empty state in the listing slot only, keeping the tree and the set card, when no devices are enabled', () => {
       const { fixture } = render([device({ isEnabled: false })]);
       const band = fixture.debugElement.query(By.css('.bottom-band'));
 
       expect(bandEmptyState(fixture)).toBeTruthy();
-      expect(band.queryAll(By.directive(DjBrowseTreesComponent)).length).toBe(0);
       expect(band.queryAll(By.directive(DjDirectoryListingComponent)).length).toBe(0);
-      // The decks and the mixer always render, even with the bottom band in its empty state.
+      expect(band.queryAll(By.directive(DjBrowseTreesComponent)).length).toBe(1);
+      expect(band.queryAll(By.directive(DjSetCardComponent)).length).toBe(1);
+      // The decks and the mixer always render, even with the listing slot in its empty state.
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(fixture.nativeElement.querySelector('.mixer-grid')).toBeTruthy();
     });
 
-    it('hides the empty state and shows browse/listing once a device is enabled', () => {
+    it('hides the empty state and shows tree, listing and set card once a device is enabled', () => {
       const { fixture, component } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
       const band = fixture.debugElement.query(By.css('.bottom-band'));
 
@@ -388,6 +435,44 @@ describe('DjMixerViewComponent', () => {
       expect(browseTrees.devices()).toEqual(component.enabledDevices());
       expect(browseTrees.activeStorage()).toEqual(component.activeStorage());
       expect(listing.activeStorage()).toEqual(component.activeStorage());
+      expect(band.queryAll(By.directive(DjSetCardComponent)).length).toBe(1);
+    });
+
+    it('orders the tree, the listing and the set card', () => {
+      const { fixture } = render([device()]);
+
+      const order = Array.from(
+        fixture.nativeElement.querySelector('.bottom-band').children as HTMLCollection
+      ).map((el) => el.className.split(' ')[0]);
+
+      expect(order).toEqual(['browse-card', 'directory-listing-card', 'set-card']);
+    });
+  });
+
+  describe('the Sets branch', () => {
+    function trees(fixture: ComponentFixture<DjMixerViewComponent>): DjBrowseTreesComponent {
+      return fixture.debugElement.query(By.directive(DjBrowseTreesComponent))
+        .componentInstance as DjBrowseTreesComponent;
+    }
+
+    it('passes the saved sets, the loaded one lit in its name', () => {
+      const { fixture } = render([]);
+
+      expect(trees(fixture).sets()).toEqual({
+        label: 'Sets',
+        sets: [
+          { id: 's2', name: 'Friday', loaded: true, accessibleName: 'Set Friday, loaded' },
+          { id: 's1', name: 'Saturday', loaded: false, accessibleName: 'Set Saturday' },
+        ],
+      });
+    });
+
+    it('opens the chosen set', () => {
+      const { fixture, djSets } = render([]);
+
+      trees(fixture).setSelect.emit('s1');
+
+      expect(djSets.openSet).toHaveBeenCalledWith('s1');
     });
   });
 
@@ -537,6 +622,25 @@ describe('DjMixerViewComponent', () => {
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelectorAll('.drop-overlay').length).toBe(0);
     });
+
+    it('lets the set card accept a listing drag only while one is in flight', () => {
+      const { fixture } = render([device({ deviceId: 'a' })]);
+      const listing = fixture.debugElement.query(By.directive(DjDirectoryListingComponent))
+        .componentInstance as DjDirectoryListingComponent;
+      const card = () =>
+        fixture.debugElement.query(By.directive(DjSetCardComponent))
+          .componentInstance as DjSetCardComponent;
+
+      expect(card().listingDragActive()).toBe(false);
+
+      listing.dragStarted.emit();
+      fixture.detectChanges();
+      expect(card().listingDragActive()).toBe(true);
+
+      listing.dragEnded.emit();
+      fixture.detectChanges();
+      expect(card().listingDragActive()).toBe(false);
+    });
   });
 
   describe('the bindings panel', () => {
@@ -656,7 +760,9 @@ describe('DjMixerViewComponent', () => {
     // Set End lives in a selected cue's End slot, so no element exists with nothing or a loop selected.
     const ONLY_WITH_A_CUE: readonly string[] = ['loop-set-end'];
     const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
-      DECK_CONTROL_IDS.filter((control) => !ONLY_WITH_A_CUE.includes(control)).map((control): ControlIdentity => ({ owner, control }))
+      DECK_CONTROL_IDS.filter((control) => !ONLY_WITH_A_CUE.includes(control)).map(
+        (control): ControlIdentity => ({ owner, control })
+      )
     );
 
     it('finds every mappable control as exactly one element in the rendered grid', () => {
@@ -672,6 +778,20 @@ describe('DjMixerViewComponent', () => {
 
       expect(ALL_IDENTITIES).toHaveLength(160);
       expect(mismatched).toEqual([]);
+    });
+
+    it('finds each set control as exactly one element, with or without devices', () => {
+      for (const devices of [[], [device()]]) {
+        const { fixture } = render(devices);
+        const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
+
+        const matches = SET_CONTROL_IDS.map(
+          (control) => grid.querySelectorAll(anchorFor({ owner: 'set', control })).length
+        );
+
+        expect(matches).toEqual([1, 1, 1]);
+        TestBed.resetTestingModule();
+      }
     });
 
     it("finds each deck's Set End key as exactly one element once a cue is selected", () => {

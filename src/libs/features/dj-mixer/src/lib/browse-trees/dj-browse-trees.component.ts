@@ -1,5 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import { BrowseTreeComponent, type BrowseTreeModel, type BrowseTreeStorageModel } from '@teensyrom-nx/ui/components';
+import {
+  BrowseTreeComponent,
+  type BrowseTreeModel,
+  type BrowseTreeStorageModel,
+} from '@teensyrom-nx/ui/components';
+import { SetsTreeBranchComponent, type SetsTreeBranchModel } from '@teensyrom-nx/ui/components/dj';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
 import type { ActiveStorage } from '../active-storage';
 
@@ -10,22 +15,28 @@ export interface DjStorageSelectEvent {
 }
 
 /**
- * The DJ view's browse band: one `lib-browse-tree` per device, each device's available
- * storages as leaves. Pure presentation composition over the view's own `devices` /
+ * The DJ view's browse band: the Sets branch, then one `lib-browse-tree` per device, each
+ * device's available storages as leaves. Pure presentation composition over the view's own `devices` /
  * `activeStorage` inputs — the view is the only place that talks to a store.
  */
 @Component({
   selector: 'lib-dj-browse-trees',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrowseTreeComponent],
+  imports: [BrowseTreeComponent, SetsTreeBranchComponent],
   templateUrl: './dj-browse-trees.component.html',
   styleUrl: './dj-browse-trees.component.scss',
 })
 export class DjBrowseTreesComponent {
   readonly devices = input.required<readonly Device[]>();
+  readonly sets = input.required<SetsTreeBranchModel>();
   readonly activeStorage = input<ActiveStorage | null>(null);
 
   readonly storageSelect = output<DjStorageSelectEvent>();
+  /** Emits a saved set's id when its row is activated. */
+  readonly setSelect = output<string>();
+
+  /** The Sets branch defaults open, like the devices'. */
+  readonly setsExpanded = signal(true);
 
   /** Each device's tree defaults open; only collapsed entries are recorded here. */
   private readonly expandedByDeviceId = signal<Record<string, boolean>>({});

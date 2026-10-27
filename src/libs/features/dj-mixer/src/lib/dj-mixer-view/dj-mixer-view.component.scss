@@ -129,20 +129,26 @@
 }
 
 .browse-card,
-.directory-listing-card {
+.directory-listing-card,
+.set-card {
   min-height: 0;
   height: 100%;
 }
 
 .browse-card {
-  flex: 0 0 300px;
+  flex: 0 0 212px;
   min-width: 0;
 
   @include styles.below-phone {
-    // 300px is a width while the band is a row; once it stacks, that basis would become a height.
+    // 212px is a width while the band is a row; once it stacks, that basis would become a height.
     flex: 0 0 auto;
     height: auto;
   }
+}
+
+.bottom-band > lib-empty-state-message {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .directory-listing-card {
@@ -151,5 +157,20 @@
 
   @include styles.below-phone {
     flex: 1 1 auto;
+  }
+}
+
+.set-card {
+  flex: 0 0 680px;
+  min-width: 0;
+
+  @include styles.below-desktop {
+    flex: 0 1 680px;
+  }
+
+  @include styles.below-phone {
+    // 680px is a width while the band is a row; once it stacks, that basis would become a height.
+    flex: 0 0 auto;
+    height: auto;
   }
 }

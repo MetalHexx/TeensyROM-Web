@@ -1,0 +1,15 @@
+<lib-set-card
+  [model]="model()"
+  [listingDragActive]="listingDragActive()"
+  (rename)="onRename($event)"
+  (newSet)="onNewSet()"
+  (deleteSet)="onDeleteSet()"
+  (selectPrevious)="onSelectPrevious()"
+  (selectNext)="onSelectNext()"
+  (loadA)="onLoadA()"
+  (loadB)="onLoadB()"
+  (rowSelect)="onRowSelect($event)"
+  (rowRemove)="onRowRemove($event)"
+  (rowMove)="onRowMove($event)"
+  (listingDrop)="onListingDrop($event)"
+></lib-set-card>
