@@ -52,7 +52,39 @@ internal static class ApiErrors
     private static bool IsApiFailure(Exception ex) =>
         ex is HttpRequestException or ApiException or OperationCanceledException;
 
-    private static TeensyApiException Wrap(Exception ex) => new(ToMessage(ex), (ex as ApiException)?.StatusCode, ex);
+    private static TeensyApiException Wrap(Exception ex)
+    {
+        var api = ex as ApiException;
+        var code = api is null ? null : ProblemBody(api.Response, "code");
+        var busyMessage = api?.StatusCode == 409 && code == TeensyApiException.DeviceBusyProblemCode
+            ? BusyMessage(api.Response)
+            : null;
+
+        return new(busyMessage ?? ToMessage(ex), api?.StatusCode, ex, problemCode: code);
+    }
+
+    private static string? BusyMessage(string? body) =>
+        ProblemBody(body, "title") is { } title && !string.IsNullOrWhiteSpace(title)
+            ? $"{title.TrimEnd('.', ' ')} — try again when it finishes."
+            : null;
+
+    private static string? ProblemBody(string? body, string name)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                ? StringProperty(document.RootElement, name)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static string? FirstText(params string?[] candidates) =>
         candidates.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c));

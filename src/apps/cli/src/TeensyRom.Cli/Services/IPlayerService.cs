@@ -19,6 +19,15 @@ namespace TeensyRom.Cli.Services
     {
         IObservable<ILaunchableItem> FileLaunched { get; }
 
+        /// <summary>The busy refusal that ended the latest menu-side call, or null when that call wasn't refused as busy.</summary>
+        Api.TeensyApiException? LastBusyRefusal { get; }
+
+        /// <summary>
+        /// Whether a busy refusal is published as an alert. A one-shot command turns it off to throw the refusal instead,
+        /// so the line is printed once.
+        /// </summary>
+        bool AnnounceBusyRefusals { get; set; }
+
         PlayerState GetState();
         Task<bool> LaunchItem(ILaunchableItem item);
         Task LaunchFromDirectory(string path);

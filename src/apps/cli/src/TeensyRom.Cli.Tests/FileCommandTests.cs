@@ -4,6 +4,7 @@ using NSubstitute;
 using Spectre.Console.Cli;
 using System.Reactive.Subjects;
 using System.Text.Json;
+using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Commands.Main.Launcher;
@@ -633,6 +634,22 @@ public sealed class FileCommandTests : IDisposable
         PlayerOpened(host).Should().BeFalse("the player's state says Playing, but the launch itself failed");
     }
 
+    [Fact]
+    public async Task LaunchPlayer_WhenTheDeviceIsBusy_IsExitSix_AndDoesNotOpenThePlayer()
+    {
+        Launchable();
+        _player.LaunchItem(Arg.Any<ILaunchableItem>()).Returns(false);
+        _player.LastBusyRefusal.Returns(new TeensyApiException("Alpha is busy with a transfer — try again when it finishes.", 409, problemCode: "deviceBusyWithTransfer"));
+        var host = NewHost(terminal: true);
+
+        var exitCode = await host.RunAsync("file", "launch", "/music/1.sid", "--player");
+
+        exitCode.Should().Be((int)CliExitCode.DeviceBusy);
+        host.Consoles.StdErr.Should().Contain("Alpha is busy with a transfer — try again when it finishes.");
+        host.Consoles.StdErr.Should().NotContain("Couldn't play");
+        PlayerOpened(host).Should().BeFalse();
+    }
+
     // ---- random ------------------------------------------------------------------------------------------------------
 
     private SongItem Picked(string path = "/music/pick.sid")
@@ -832,6 +849,20 @@ public sealed class FileCommandTests : IDisposable
     }
 
     private LaunchOutcome Launched(string path) => new(LaunchStatus.Launched, Song(path), "Launched");
+
+    [Fact]
+    public async Task RandomPlayer_WhenTheDeviceIsBusy_IsExitSix_AndDoesNotOpenThePlayer()
+    {
+        PlayerPicks(null);
+        _player.LastBusyRefusal.Returns(new TeensyApiException("Alpha is busy with a transfer — try again when it finishes.", 409, problemCode: "deviceBusyWithTransfer"));
+        var host = NewHost(terminal: true);
+
+        var exitCode = await host.RunAsync("file", "random", "--player");
+
+        exitCode.Should().Be((int)CliExitCode.DeviceBusy);
+        host.Consoles.StdErr.Should().Contain("Alpha is busy with a transfer — try again when it finishes.");
+        PlayerOpened(host).Should().BeFalse();
+    }
 
     [Fact]
     public async Task RandomPlayer_ConfiguresThePlayerFromTheOptions_ResolvesItFirst_AndOpensIt()

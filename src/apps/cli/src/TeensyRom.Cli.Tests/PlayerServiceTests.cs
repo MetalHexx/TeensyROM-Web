@@ -1,4 +1,5 @@
 ﻿using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using AutoFixture;
 using AutoFixture.AutoNSubstitute;
 using TeensyRom.Cli.Api;
@@ -1676,6 +1677,50 @@ namespace TeensyRom.Cli.Tests
             _alert.Received(1).PublishError(message);
             playerService.GetState().PlayState.Should().Be(PlayState.Stopped);
             await _storageService.Received(2).GetDirectory(Any<string>());
+        }
+
+        private static TeensyApiException BusyRefusal() =>
+            new("Alpha is busy with a transfer — try again when it finishes.", 409, problemCode: "deviceBusyWithTransfer");
+
+        [Fact]
+        public async Task When_AutoAdvanceIsRefusedAsBusy_Then_TheLineIsPublishedOnce_TheStreamStops_AndNothingElseLaunches()
+        {
+            //Arrange
+            var timer = SetupTimer();
+            var currentFile = CreateFile<SongItem>("/music/2.sid");
+            SeedStorageDirectory([CreateFile<SongItem>("/music/1.sid"), currentFile, CreateFile<SongItem>("/music/3.sid")]);
+            var playerService = _fixture.Create<PlayerService>();
+            playerService.SetDirectoryMode("/music/");
+            await playerService.LaunchFromDirectory(currentFile.Path);
+            _launchService.ClearReceivedCalls();
+            _launchService.LaunchFile(Any<TeensyStorageType>(), Any<ILaunchableItem>()).ThrowsAsync(BusyRefusal());
+
+            //Act
+            timer.OnNext(Unit.Default);
+            timer.OnNext(Unit.Default);
+
+            //Assert
+            _alert.Received(1).PublishError("Alpha is busy with a transfer — try again when it finishes.");
+            playerService.GetState().PlayState.Should().Be(PlayState.Stopped);
+            playerService.LastBusyRefusal.Should().NotBeNull();
+            await _launchService.Received(1).LaunchFile(Any<TeensyStorageType>(), Any<ILaunchableItem>());
+        }
+
+        [Fact]
+        public async Task When_ABusyRefusalIsNotAnnounced_Then_ItIsKeptForTheCaller_AndNothingIsPublished()
+        {
+            _launchService
+                .LaunchRandom(Any<TeensyStorageType>(), Any<StorageScope>(), Any<string>(), Any<TeensyFilterType>())
+                .ThrowsAsync(BusyRefusal());
+            var playerService = _fixture.Create<PlayerService>();
+            playerService.AnnounceBusyRefusals = false;
+
+            var outcome = await playerService.PlayRandom();
+
+            outcome.Should().BeNull();
+            playerService.LastBusyRefusal!.IsDeviceBusy.Should().BeTrue();
+            _alert.DidNotReceiveWithAnyArgs().PublishError(default!);
+            playerService.GetState().PlayState.Should().Be(PlayState.Stopped);
         }
 
         [Fact]

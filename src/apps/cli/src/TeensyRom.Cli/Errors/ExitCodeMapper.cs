@@ -41,6 +41,9 @@ internal static class ExitCodeMapper
             case TeensyApiException { StatusCode: null, InnerException: HttpRequestException } api:
                 return new CliException(CliExitCode.EngineUnavailable, api.Message);
 
+            case TeensyApiException { IsDeviceBusy: true } api:
+                return new CliException(CliExitCode.DeviceBusy, api.Message);
+
             case TeensyApiException api:
                 return new CliException(CliExitCode.Failed, api.Message);
 

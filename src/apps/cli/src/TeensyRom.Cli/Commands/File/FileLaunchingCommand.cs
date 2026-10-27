@@ -61,16 +61,25 @@ internal abstract class FileLaunchingCommand<T>(
             ?? throw new InvalidOperationException("The player command isn't registered.");
 
         AnsiConsole.Console = Output.Out;
+        Player.AnnounceBusyRefusals = false;
 
         return playerCommand;
     }
 
     /// <summary>Shows the player until the user leaves it.</summary>
-    protected static int ShowPlayer(CommandContext context, PlayerCommand playerCommand)
+    protected int ShowPlayer(CommandContext context, PlayerCommand playerCommand)
     {
+        Player.AnnounceBusyRefusals = true;
         playerCommand.Execute(context, new PlayerSettings());
 
         return 0;
+    }
+
+    /// <summary>Ends the command with <see cref="CliExitCode.DeviceBusy"/> when the player's latest launch was refused as busy.</summary>
+    /// <exception cref="CliException">The device is busy with a transfer.</exception>
+    protected void ThrowWhenBusy()
+    {
+        if (Player.LastBusyRefusal is { } refusal) throw new CliException(CliExitCode.DeviceBusy, refusal.Message);
     }
 
     /// <summary>

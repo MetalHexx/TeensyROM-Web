@@ -37,7 +37,7 @@ If `init` shows no engine or no device online, go straight to `references/doctor
 
 ## Groundwork
 
-- Read results with `--json`. Stdout is data. Stderr may end with one JSON `{"error":…}` or `{"notice":…}` object. Exit codes: 0 success, 1 failed, 2 usage, 3 engine unavailable, 4 no device, 5 not found.
+- Read results with `--json`. Stdout is data. Stderr may end with one JSON `{"error":…}` or `{"notice":…}` object. Exit codes: 0 success, 1 failed, 2 usage, 3 engine unavailable, 4 no device, 5 not found, 6 device busy with a transfer.
 - `trom` help goes deep: `trom <noun> --help`, `trom <noun> <verb> --help`. Look a command up only when you are about to use it.
 - Pass `--device <chosen name>` on every `device`, `file` and `index` command, and on `watch-folder add`, and on `watch-folder set` when the folder has several destinations. Switch to the new name when the user asks for a different device. Pass `--storage <sd|usb>` when the user names a storage or the device has only one available, and on `watch-folder add`. `trom` parses strictly, so a flag a verb doesn't take is exit 2. The exceptions:
   - `file banned` and `file unban` take no `--device`, because bans apply to every TeensyROM.

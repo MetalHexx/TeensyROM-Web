@@ -31,6 +31,25 @@ public class ApiErrorsTests
     }
 
     [Fact]
+    public async Task Conflict_WithTheBusyCode_IsTheBusySentence_AndIsDeviceBusy()
+    {
+        var failure = await Failure(HttpStatusCode.Conflict, """{"type":"urn:teensyrom:problem:device-busy-with-transfer","title":"Alpha is busy with a transfer.","status":409,"code":"deviceBusyWithTransfer","deviceId":"a-1","activeJobId":"j-1"}""");
+
+        failure.Message.Should().Be("Alpha is busy with a transfer — try again when it finishes.");
+        failure.StatusCode.Should().Be(409);
+        failure.IsDeviceBusy.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Conflict_WithoutTheBusyCode_KeepsTheTitle_AndIsNotDeviceBusy()
+    {
+        var failure = await Failure(HttpStatusCode.Conflict, """{"title":"Device already has an active transfer.","status":409}""");
+
+        failure.Message.Should().Be("Device already has an active transfer.");
+        failure.IsDeviceBusy.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task BadRequest_WithProblemDetails_ShowsTheTitle()
     {
         var failure = await Failure(HttpStatusCode.BadRequest, """{"title":"The device id is required.","detail":"Ignored when a title exists.","status":400}""");

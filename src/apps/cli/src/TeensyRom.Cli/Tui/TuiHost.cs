@@ -74,6 +74,10 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
         {
             RadHelper.WriteError(ex.Message);
         }
+        catch (CliException ex)
+        {
+            RadHelper.WriteError(ex.Message);
+        }
         catch (Exception ex)
         {
             AnsiConsole.WriteException(ex, ExceptionFormats.Default);

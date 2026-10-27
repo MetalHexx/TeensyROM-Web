@@ -141,6 +141,26 @@ public class LaunchServiceTests
     }
 
     [Fact]
+    public async Task LaunchFile_WhenTheDeviceIsBusyWithATransfer_Throws_RatherThanFailing()
+    {
+        var sut = Sut(HttpStatusCode.Conflict, """{"title":"Alpha is busy with a transfer.","status":409,"code":"deviceBusyWithTransfer"}""");
+
+        var act = () => sut.LaunchFile(TeensyStorageType.SD, Requested());
+
+        (await act.Should().ThrowAsync<TeensyApiException>()).Which.IsDeviceBusy.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LaunchFile_On409WithoutTheBusyCode_Fails_WithItsMessage()
+    {
+        var sut = Sut(HttpStatusCode.Conflict, """{"title":"Something else is in the way.","status":409}""");
+
+        var outcome = await sut.LaunchFile(TeensyStorageType.SD, Requested());
+
+        outcome.Should().BeEquivalentTo(new { Status = LaunchStatus.Failed, Item = (ILaunchableItem?)null, Message = "Something else is in the way." });
+    }
+
+    [Fact]
     public async Task LaunchFile_WhenTrWebDoesNotAnswer_Throws()
     {
         var client = ClientWith(_ => throw new HttpRequestException("refused"));

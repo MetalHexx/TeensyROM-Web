@@ -55,7 +55,20 @@ public sealed class TransferServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_OnABusyDevice_IsAFailureThatNamesTheDevice()
+    public async Task Create_OnADeviceBusyWithATransfer_IsDeviceBusy_WithTheEnginesSentence()
+    {
+        _api.CreateTransferJobAsync(default!, default, default!, default)
+            .ThrowsAsyncForAnyArgs(ApiTestSupport.ApiFailure(409, """{"title":"Alpha is busy with a transfer.","status":409,"code":"deviceBusyWithTransfer"}"""));
+
+        var act = () => _sut.CreateAsync(TeensyStorageType.SD, "/x", 0, false, CancellationToken.None);
+
+        var error = (await act.Should().ThrowAsync<CliException>()).Which;
+        error.Code.Should().Be(CliExitCode.DeviceBusy);
+        error.Message.Should().Be("Alpha is busy with a transfer — try again when it finishes.");
+    }
+
+    [Fact]
+    public async Task Create_On409WithoutTheBusyCode_IsAFailureThatNamesTheDevice()
     {
         _api.CreateTransferJobAsync(default!, default, default!, default)
             .ThrowsAsyncForAnyArgs(ApiTestSupport.ApiFailure(409, """{"title":"Device already has an active transfer."}"""));
