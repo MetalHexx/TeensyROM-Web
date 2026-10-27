@@ -197,12 +197,18 @@ describe('DjSidPanelComponent', () => {
       expect(toggled).toHaveBeenCalledTimes(1);
     });
 
-    it('sits beside the bindings button in the header centre cell', () => {
+    it('sits beside the bindings button in the header centre cell, bindings first', () => {
       const { fixture } = render();
 
-      expect(
+      const buttons = Array.from(
         fixture.nativeElement.querySelectorAll('.panel-header > .header-actions > lib-icon-button')
-      ).toHaveLength(2);
+      ) as HTMLElement[];
+
+      expect(buttons.map((button) => button.classList.contains('bindings-button'))).toEqual([
+        true,
+        false,
+      ]);
+      expect(buttons[1].classList.contains('browser-button')).toBe(true);
     });
   });
 

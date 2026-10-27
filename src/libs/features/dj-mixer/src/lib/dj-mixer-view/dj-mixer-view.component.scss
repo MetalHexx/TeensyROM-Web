@@ -233,3 +233,14 @@
   box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.55);
   pointer-events: auto;
 }
+
+.hidden-save-notice {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

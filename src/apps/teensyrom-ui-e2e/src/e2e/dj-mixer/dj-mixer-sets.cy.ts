@@ -207,6 +207,51 @@ describe('DJ Mixer — sets', () => {
     });
   });
 
+  describe('the set peek', () => {
+    /** The part of Angular's dev-mode debug API the case uses; absent from a production build. */
+    interface NgDebug {
+      getComponent(element: Element): { djSets: { moveSelection(delta: number): void } };
+    }
+
+    beforeEach(() => {
+      visitDjMixer({ sets: [FRIDAY], currentSetId: FRIDAY_ID });
+      cy.document().then((doc) => {
+        const style = doc.createElement('style');
+        style.textContent =
+          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; }';
+        doc.head.appendChild(style);
+      });
+    });
+
+    it('rises over the bottom on a Select turn while the browser is hidden, then leaves the decks clickable', function () {
+      cy.window().then((win) => {
+        if ((win as unknown as { ng?: NgDebug }).ng === undefined) {
+          // A production build has no debug API to turn the Select knob with; run against `serve`.
+          this.skip();
+        }
+      });
+      cy.get('.bottom-band').should('exist');
+      layoutRects().then((shown) => {
+        cy.get('button[aria-label="Hide the browser"]').click();
+        cy.get('.bottom-band').should('not.exist');
+        cy.get('.set-peek').should('not.exist');
+
+        cy.window().then((win) => {
+          const { ng } = win as unknown as { ng: NgDebug };
+          const view = win.document.querySelector('lib-dj-mixer-view') as Element;
+          ng.getComponent(view).djSets.moveSelection(1);
+        });
+
+        cy.get('.set-peek lib-set-card').should('be.visible');
+        layoutRects().should('deep.equal', shown);
+
+        cy.get('.set-peek lib-set-card', { timeout: 5000 }).should('not.exist');
+        layoutRects().should('deep.equal', shown);
+        cy.get('[data-deck="A"] [data-control="panic"] button').click();
+      });
+    });
+  });
+
   describe('dragging a SID from the listing into the card', () => {
     beforeEach(() => {
       cy.viewport(VIEWPORT.width, VIEWPORT.height);

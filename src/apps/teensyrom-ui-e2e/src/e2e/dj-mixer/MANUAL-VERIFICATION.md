@@ -407,80 +407,112 @@ kB on `main`; that warning is already on `main` and `project.json`'s budgets are
 
 ## Sets
 
-Browser check of the hideable browser, the set card's peek and the set card itself in the DJ view, the
-bundle check, and the operator's bench list.
+Frame-by-frame check of the hideable browser, the set card's peek and the set card itself in the DJ
+view against the mockup, the bundle check, and the operator's bench list.
 
-**How it was driven, and how it differs from the earlier sections.** The mockup page for this change
-was not in the workspace this run had, so no mockup-side measurement was taken; the view was
-measured against the sizes the plan states (tree 212, set card 680, peek 316) and against itself
-(frame A against frames B and C). The view was not driven through the `chrome-devtools-mcp`
-same-origin iframe: it was driven with a throwaway Cypress spec in Electron at **1920 x 1080**
-(deleted after the run, not committed), served by `pnpm nx run teensyrom-ui:serve` on port 4210,
-with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }` injected, the
-library interceptors serving a saved set "Friday" with three rows, one device, and `Still_Time.sid`
-in the listing. Every number is `getBoundingClientRect()` on the live DOM. `moveSelection` was
-reached through `ng.getComponent(document.querySelector('lib-dj-mixer-view')).djSets`, as
-planned. API port 10213 was not used: another checkout's API was listening there, so the DJ library
-was never written to a real host.
+**How it was driven.** Two pages, side by side, at **1920 x 1080**. The mockup
+(`ASID-DJ-ROOT-WIREFRAME-SETS.html`) was served statically and measured in Chrome with
+`getBoundingClientRect()`; its frames are drawn at 0.8 scale, so its numbers are divided by 0.8 and
+taken relative to each frame's own top-left. The view was driven with a throwaway Cypress spec in
+Electron (deleted after the run, not committed) against `pnpm nx run teensyrom-ui:serve` on port
+4210, with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }`
+injected and the library interceptors serving a saved set "Friday" (three rows) and a second set
+"Saturday", one device, and `Still_Time.sid` in the listing. Every view number is
+`getBoundingClientRect()` on the live DOM. `moveSelection` was reached through
+`ng.getComponent(document.querySelector('lib-dj-mixer-view')).djSets`. API port 10213 was not used:
+another checkout's API was listening there, so the DJ library was never written to a real host.
 
 **Frames.**
 
-| frame | what was checked                                                                                                     | how                                                                             |
-| ----- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| A     | full view: tree, listing, set card, the browser button lit, each deck's set row                                      | measured                                                                        |
-| B     | browser hidden: decks, speed strips and SID panel unchanged, freed height empty                                      | measured                                                                        |
-| C     | peek: slides up over the bottom, follows Select, leaves after the last, decks unmoved, deck controls clickable after | measured, screenshot                                                            |
-| D     | set card: new empty set, a drag in with a pending row then the analysed row, rename, reorder                         | drag in measured and screenshotted; rename and reorder in `dj-mixer-sets.cy.ts` |
-| E     | load a saved set from the tree, the delete confirm                                                                   | `dj-mixer-sets.cy.ts` (accessible names), not screenshotted                     |
-| F     | naming loops in place, names on the tiles and the sign                                                               | **not driven in this run**; left to the operator below                          |
+| frame | what was checked                                                                                                     | how                                                                                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| A     | full view: tree, listing, set card, the browser button lit, each deck's set row, header button order                 | measured on both pages, screenshot                                                                                               |
+| B     | browser hidden: decks, speed strips and SID panel unchanged, freed height empty                                      | measured on both pages, screenshot                                                                                               |
+| C     | peek: slides up over the bottom, follows Select, leaves after the last, decks unmoved, deck controls clickable after | measured on both pages, sampled every 150 ms, screenshot; the committed case in `dj-mixer-sets.cy.ts`                            |
+| D     | set card: a drag in with a pending row then the analysed row, rename, reorder                                        | drag in measured and screenshotted; rename and reorder in `dj-mixer-sets.cy.ts`                                                  |
+| E     | load a saved set from the tree, the delete confirm                                                                   | confirm measured and screenshotted; loading in `dj-mixer-sets.cy.ts`                                                             |
+| F     | naming loops and cues in place, the name on the tile and the settings sign                                           | driven: Still Time loaded on Deck A, a cue added and renamed in place, GBL turned off and the cue played; texts read, screenshot |
 
-D's mapping mode with the Set group was not driven live either (the controls' overlays are covered
-by the view spec's anchor and overlay cases). F needs a tune playing on a deck and was not reached.
+**Frames A, B, C: the build against the mockup** (px, 1920 x 1080 coordinates).
 
-**Frames A, B, C measured** (px, 1920 x 1080; A at rest, B 300 ms after Hide, C 600 ms after the
-first Select press):
-
-| element                                      | A                                                | B (hidden)                | C (peek up)                                           |
-| -------------------------------------------- | ------------------------------------------------ | ------------------------- | ----------------------------------------------------- |
-| transport A, x y / w x h                     | 129 75 / 440 x 163.8                             | same                      | same                                                  |
-| transport B                                  | 1447 75 / 440 x 163.8                            | same                      | same                                                  |
-| speed strip A / B                            | 628 372.6 / 28 x 96.1 and 1360 372.6 / 28 x 96.1 | same                      | same                                                  |
-| SID panel                                    | 698 66 / 620 x 555.8                             | same                      | same                                                  |
-| grid                                         | 112 66 / 1792 x 998                              | same                      | same                                                  |
-| band (tree + listing + set card)             | 112 633.8 / 1792 x 430.2                         | removed                   | removed                                               |
-| tree / listing / set card (w x h)            | 212 x 430.2 / 876 x 430.2 / 680 x 430.2          | removed                   | removed                                               |
-| header buttons: browser, bindings (x, w x h) | 972, 32 x 32; 1012, 32 x 32 (wrapper 72 x 32)    | same                      | same                                                  |
-| browser button                               | "Hide the browser", `aria-expanded` true         | "Show the browser", false | same as B                                             |
-| peek                                         | none                                             | none                      | 112 748 / 1792 x 316 (bottom 1064, the grid's bottom) |
-| deck set rows                                | 2                                                | 2                         | 2                                                     |
+| element                           | mockup                                                   | build                                                                                |
+| --------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| grid                              | 112 66 / 1792 x 998                                      | 112 66 / 1792 x 998 (same)                                                           |
+| deck column A / B                 | 112 and 1430, 474 wide, 614.5 high                       | transport 129 and 1447, 440 x 163.8                                                  |
+| SID panel                         | 698 66 / 620 x 614.5                                     | 698 66 / 620 x 555.8                                                                 |
+| band (tree + listing + set card)  | 112 692.5 / 1792 x 371.5, ends at 1064                   | 112 633.8 / 1792 x 430.2, ends at 1064                                               |
+| tree / listing / set card (width) | 212 / 876 / 680, 12 apart                                | 212 / 876 / 680, 12 apart (same)                                                     |
+| header buttons: bindings, browser | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32          | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32 (same)                               |
+| browser button                    | `Hide the browser`, engaged (lit)                        | `Hide the browser`, lit, `aria-expanded` true; `Show the browser`, false once hidden |
+| B (hidden)                        | decks, speed strips and SID panel as in A; band absent   | same as A to the pixel; band removed, the freed height empty                         |
+| C (peek up)                       | 112 / 1792 x 316                                         | 112 748 / 1792 x 316 (bottom 1064, the grid's bottom)                                |
+| set header, left to right         | glyph, name (flex), Saved lamp, count, delete 32, new 32 | name (flex), Saved lamp, count, delete 32, New key 57.2                              |
+| deck set rows                     | in each deck stack                                       | 129 212.8 and 1447 212.8, 440 x 26                                                   |
 
 The deck, speed strip, SID panel and grid rects are identical to the pixel in A, B and C, and again
-after Show (the grid was measured mid-entry, the band 0 high, and the decks had not moved). The
-tree is 212 and the set card 680 as planned. The freed 430.2 px stays empty.
+after Show. The tree is 212 and the set card 680, as in the mockup. The freed band height stays empty.
 
-**Peek timing.** The peek card was up 600 ms after the first press; a second press 1.6 s later
-kept it up another second (so it restarted rather than leaving at 1.5 s from the first); it was gone
-1.9 s after the second press. After it left, `elementFromPoint(300, 1000)`, a point it had covered,
-was `.mixer-grid`, and Deck A's Panic took a click. The wrapper is `pointer-events: none` and the
-card `auto`, as planned.
+**Frame E.** Delete asks inline: the confirm row measures 1236 679.8 / 656 x 36, directly under the
+header, with Cancel focused. Cancel sends nothing; Delete sends the `DELETE` (`dj-mixer-sets.cy.ts`).
 
-**Deviations.** The peek spans the grid's whole width (`inset-inline: 0`, 1792) as the handoff
-states; its cyan edge, opaque face and top shadow are the view's own tokens (`--synth-face`,
-`--color-highlight-rgb`) and were not compared against the mockup. The Browser button sits before
-Bindings in the header's centre cell; the mockup's order could not be confirmed.
+**Frame F.** With a cue added and renamed to "Drop", the selected row shows "Drop" with its CUE tag
+and time, the tile reads "Drop CUE" (an unnamed marker keeps "Item N"), and with GBL off and the cue
+played the settings sign over Deck A reads "Drop" (`aria-label` "Settings in play deck A: Drop"),
+Deck B's "Main". The mockup's frame F is a close-up of one plate at a wider scale (592.5 wide
+against the deck column's 440), so its tile and row sizes were not compared, only what they show.
+
+**Peek timing.** In an unloaded view the peek was up 600 ms after a press (112 748 / 1792 x 316) and
+gone about 1.9 s after the last one; a second press while up restarted the wait. After it left,
+`elementFromPoint(300, 1000)`, a point it had covered, was `.mixer-grid`, and Deck A's Panic took a
+click. With a tune playing on Deck A the same press, sampled every 150 ms, showed the card held at
+its first 26 px for about 1.1 s and then at 316 px until about 3 s: the slide started late while the
+1.5 s timer ran as usual, and the page's own 150 ms timer kept its pace. That reads as frame delivery
+in this machine's software-rendered Electron with a tune playing, not the view's logic; it is on the
+bench list for real hardware. `dj-mixer-sets.cy.ts` now commits the peek case (it needs the dev
+`serve` for Angular's debug API and skips itself against a production build).
+
+**Deviations from the mockup, and why.**
+
+- **Band height 430.2 against 371.5.** The grid's top row is sized by the decks' and the SID panel's
+  real content (555.8) and the band takes what remains; the mockup draws that row at 614.5. That row
+  is not this phase's to change; the band's width, its gaps and its bottom edge match.
+- **No glyph before the set name.** The mockup puts a queue glyph before the name; the card shows the
+  name directly, as `lib-set-header` was built and specced.
+- **The New key is labelled.** It reads "New" (57.2 wide) beside the 32 px delete key, so it reads as a
+  key like Load A and Load B; the mockup's is an icon. Its accessible name is "New set" either way.
+- **Peek surface and offset.** The peek is a card on the view's own tokens (`--synth-face`, a
+  `rgba(var(--color-highlight-rgb), 0.45)` border, a `0 -10px 24px` shadow); the mockup's is
+  `rgba(20,16,22,.96)` with a `rgba(0,247,255,.3)` ring. It sits at the grid's bottom (`bottom: 0`)
+  where the mockup's is 16 px up in its own container, and spans the grid's width (1792) as the
+  mockup's does.
+- **Browser button glyph.** `dock_to_bottom`, Material Symbols' window with a bottom panel; the
+  mockup draws its own outline glyph. The button order (Bindings, then Browser), the 4 px gap and the
+  lamp before the count were changed to match the mockup.
+
+**Known limitation: save state while the browser is hidden.** The Saved lamp and the card's live region
+live in the set card, which is not in the DOM while the browser is hidden and no peek is up. A save
+that newly fails then raises the peek (so the Not saved lamp shows for a moment) and is announced by a
+live region the view keeps ("The set was not saved"); the lamp does not stay lit afterwards, so a DJ
+who wants to see it again shows the browser. A refused or failed load still shows on the deck's own
+display.
+
+**Mapping mode.** The Set group's overlays follow the band: the view hands the overlay layer new
+targets when the band's slide finishes, so it measures again and Select, Load A and Load B regain
+their overlays after the browser is shown with mapping mode on. This is pinned in the view spec; it
+was not driven live (no MIDI is granted in this run).
 
 **Storybook.** No new component, so no new story. `pnpm nx run ui-components:build-storybook`
 passes.
 
-**Automated.** `pnpm nx test dj-mixer` (11 files, 246 specs run green; locally the `nx` process does
+**Automated.** `pnpm nx test dj-mixer` (11 files, 249 specs run green; locally the `nx` process does
 not exit after reporting, so it was run under a timeout), `pnpm nx lint dj-mixer`, `tsc` on the
 library's `tsconfig.lib.json`, `eslint` on the e2e project (no errors in the new files), `pnpm nx
 build teensyrom-ui`, `pnpm nx run ui-components:build-storybook`, and the six DJ specs against a
-`serve` on port 4210 (`dj-mixer-sets.cy.ts` 9 tests, the five earlier specs 43; 52 passing).
+`serve` on port 4210 (`dj-mixer-sets.cy.ts` 10 tests, the five earlier specs 43; 53 passing).
 `dj-mixer-sets.cy.ts` covers the saved set in the card, rename (`PUT` with the new name), Alt+ArrowDown
 on a handle (`PUT` with the new order), the tree listing the sets and loading another with its
 own `GET`, delete (Cancel sends nothing, Delete sends `DELETE` then a `PUT` of a fresh "Set N"), the
-New key, hiding and showing the browser with the deck, speed strip and SID panel rects unchanged, and
+New key, hiding and showing the browser with the deck, speed strip and SID panel rects unchanged, the peek on a Select turn (dev `serve` only), and
 a SID dragged from the listing into the card (pending row, then the titled row, then the `PUT`).
 
 ### Bundle check (sets)
@@ -512,7 +544,9 @@ task's alone. That warning is already on `main`, and `project.json`'s budgets ar
 - [ ] The peek appears on Select while the browser is hidden, follows it, and leaves after the last.
 - [ ] Hiding and showing the browser stretches or moves nothing, and every deck control still takes
       clicks after the peek has left.
-- [ ] Naming loops in place shows the names on the tiles and the sign (frame F, not driven here).
+- [ ] Naming loops in place shows the names on the tiles and the sign on the bench.
+- [ ] The peek rises promptly with a tune playing on a deck (it started late in the software-rendered run).
+- [ ] A failed save while the browser is hidden raises the peek and is announced.
 - [ ] No audible glitch or timing slip from any load, restore or save.
 
 ## Byte fidelity (P03-T02)

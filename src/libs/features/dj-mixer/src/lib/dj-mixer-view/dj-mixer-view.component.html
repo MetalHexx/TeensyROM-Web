@@ -84,7 +84,9 @@
         </div>
       </lib-sliding-container>
     </div>
-    } @if (mappingMode()) {
+    }
+    <span class="hidden-save-notice" role="status">{{ hiddenSaveNotice() }}</span>
+    @if (mappingMode()) {
     <lib-mapping-overlay-layer
       [targets]="overlayTargets()"
       [scope]="mixerGrid"

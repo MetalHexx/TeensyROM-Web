@@ -13,11 +13,11 @@
     />
     }
   </div>
-  <span class="count">{{ model().countText }}</span>
   <span class="lamp" role="status" [attr.data-save]="model().save">
     <span class="light" aria-hidden="true"></span>
     <span class="lamp-text">{{ model().saveText }}</span>
   </span>
+  <span class="count">{{ model().countText }}</span>
   <lib-synth-key
     #deleteKey
     data-part="delete"

@@ -59,13 +59,13 @@ lib-scaling-container {
   min-width: 0;
 }
 
-// The header's centre cell: the browser and bindings buttons side by side, so the three-column
+// The header's centre cell: the bindings and browser buttons side by side, so the three-column
 // grid keeps its shape.
 .header-actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-sm);
+  gap: 4px;
 }
 
 .divider {

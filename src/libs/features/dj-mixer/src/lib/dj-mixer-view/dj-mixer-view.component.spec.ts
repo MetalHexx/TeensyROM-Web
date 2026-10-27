@@ -206,9 +206,13 @@ const SAVED_SETS: SetTreeSummary = {
   ],
 };
 
-function createDjStoreStub(loops: DeckLoopsSummary = NO_LOOPS, selectTurns = signal(0)) {
+function createDjStoreStub(
+  loops: DeckLoopsSummary = NO_LOOPS,
+  selectTurns = signal(0),
+  save = signal<'saved' | 'saving' | 'failed'>('saved')
+) {
   return {
-    sets: computed(() => ({ selectTurns: selectTurns() })),
+    sets: computed(() => ({ selectTurns: selectTurns(), save: save() })),
     setCardSummary: () => signal(EMPTY_SET),
     setTreeSummary: () => signal(SAVED_SETS),
     deckSetSummary: () => signal(NO_DECK_SET),
@@ -321,6 +325,7 @@ function render(
 ) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
   const selectTurns = signal(0);
+  const save = signal<'saved' | 'saving' | 'failed'>('saved');
   const djSets = { openSet: vi.fn().mockResolvedValue(undefined) };
   const midi = createMidiStubs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -332,7 +337,7 @@ function render(
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices), usableDevices } },
       { provide: StorageStore, useValue: storageStore },
-      { provide: DjStore, useValue: createDjStoreStub(loops, selectTurns) },
+      { provide: DjStore, useValue: createDjStoreStub(loops, selectTurns, save) },
       { provide: DeckService, useValue: createDeckServiceStub() },
       { provide: DjSets, useValue: djSets },
       { provide: MixerService, useValue: createMixerServiceStub() },
@@ -361,6 +366,7 @@ function render(
     storageStore,
     djSets,
     selectTurns,
+    save,
     midi,
     midiStore: TestBed.inject(MidiMappingStore),
   };
@@ -785,6 +791,31 @@ describe('DjMixerViewComponent', () => {
       expect(ctx.component.peekShown()).toBe(false);
     });
 
+    it('is raised by a save that fails while the browser is hidden, and says so', () => {
+      const ctx = render([device()]);
+      ctx.component.toggleBrowser();
+
+      ctx.save.set('failed');
+      ctx.fixture.detectChanges();
+
+      expect(ctx.component.peekShown()).toBe(true);
+      expect(ctx.fixture.nativeElement.querySelector('.hidden-save-notice').textContent).toContain(
+        'not saved'
+      );
+    });
+
+    it('is not raised by a save that fails while the browser is shown', () => {
+      const ctx = render([device()]);
+
+      ctx.save.set('failed');
+      ctx.fixture.detectChanges();
+
+      expect(ctx.component.peekShown()).toBe(false);
+      expect(
+        ctx.fixture.nativeElement.querySelector('.hidden-save-notice').textContent.trim()
+      ).toBe('');
+    });
+
     it('is put away at once when the browser is shown', () => {
       const ctx = render([device()]);
       selectWhile(true, ctx, 1);
@@ -1013,6 +1044,19 @@ describe('DjMixerViewComponent', () => {
 
       expect(midi.learn.select).toHaveBeenCalledWith(STOP_B);
       expect(midi.learn.cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks the layer to measure again once the band has finished sliding', () => {
+      const { fixture, component, midiStore } = render([]);
+      midiStore.setMappingMode({ on: true });
+      fixture.detectChanges();
+      const instance = layer(fixture).componentInstance as MappingOverlayLayerComponent;
+      const before = instance.targets();
+
+      component.onBandAnimationComplete();
+      fixture.detectChanges();
+
+      expect(instance.targets()).not.toBe(before);
     });
 
     it('ignores a target it does not know', () => {

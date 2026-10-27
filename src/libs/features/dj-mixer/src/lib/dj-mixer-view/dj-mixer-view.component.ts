@@ -153,17 +153,29 @@ export class DjMixerViewComponent {
   /** Whether controls are overlaid for picking what a hardware input maps onto. */
   readonly mappingMode = this.midiStore.mappingMode;
 
+  /** Counts the band's finished slides. The set controls' anchors leave the DOM with the band and
+   *  come back on a slide, so the overlay layer must measure again once it settles. */
+  private readonly bandSettled = signal(0);
+
   /** One overlay per mappable control, in the state the mapping store implies. */
-  readonly overlayTargets = computed(() =>
-    buildOverlayTargets(this.controls.all, {
+  readonly overlayTargets = computed(() => {
+    this.bandSettled();
+    return buildOverlayTargets(this.controls.all, {
       learn: this.midiStore.learn(),
       mappings: this.midiStore.mappings(),
       controllers: this.midiStore.controllers(),
-    })
+    });
+  });
+
+  /** What a screen reader hears when a save fails while the browser is hidden: the set card, and
+   *  with it the Saved lamp, is not in the DOM then. */
+  readonly hiddenSaveNotice = computed(() =>
+    this.djStore.sets().save === 'failed' && !this.browserShown() ? 'The set was not saved' : ''
   );
 
   private peekTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSelectTurns = untracked(() => this.djStore.sets().selectTurns);
+  private lastSaveFailed = untracked(() => this.djStore.sets().save === 'failed');
 
   /** deviceId currently holding the navigation pin taken by this view. */
   private pinnedDeviceId: string | null = null;
@@ -241,6 +253,18 @@ export class DjMixerViewComponent {
       });
     });
 
+    // A save that fails while the browser is hidden raises the peek, so the Not saved lamp shows.
+    effect(() => {
+      const failed = this.djStore.sets().save === 'failed';
+      untracked(() => {
+        const newlyFailed = failed && !this.lastSaveFailed;
+        this.lastSaveFailed = failed;
+        if (newlyFailed && !this.browserShown()) {
+          this.showPeek();
+        }
+      });
+    });
+
     // Release the pin this view instance actually holds, not the recomputed active storage — the
     // two diverge when the active storage changes and the pin-take effect has not re-run yet.
     // Mapping mode lives in a root store, so leaving the view has to end it (and any learn) too,
@@ -292,6 +316,7 @@ export class DjMixerViewComponent {
   /** The band's slide finished: after an exit, the grid drops its row. An entry's finish is
    *  ignored — the row was restored before it began. */
   onBandAnimationComplete(): void {
+    this.bandSettled.update((count) => count + 1);
     if (!this.browserShown()) {
       this.browserCollapsed.set(true);
     }
