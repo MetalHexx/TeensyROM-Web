@@ -177,9 +177,6 @@ describe('SettingsViewComponent', () => {
         startupLaunchEnabled: [mockSettings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [mockSettings.playerSettings.startupLaunchRandom],
       }),
-      fileTransferSettings: fb.group({
-        autoLaunchOnCopyEnabled: [mockSettings.fileTransferSettings.autoLaunchOnCopyEnabled],
-      }),
       searchSettings: fb.group({
         weights: fb.group(
           {
@@ -242,7 +239,6 @@ describe('SettingsViewComponent', () => {
       redo: vi.fn(),
       getKnownDevices: vi.fn(() => mockForm.get('knownDevices') as FormArray),
       getPlayerSettings: vi.fn(() => mockForm.get('playerSettings') as FormGroup),
-      getFileTransferSettings: vi.fn(() => mockForm.get('fileTransferSettings') as FormGroup),
       getSearchSettings: vi.fn(() => mockForm.get('searchSettings') as FormGroup),
       getAppSettings: vi.fn(() => mockForm.get('appSettings') as FormGroup),
       createDefaultDeviceFormGroup: vi.fn((deviceId: string) => {
@@ -342,7 +338,6 @@ describe('SettingsViewComponent', () => {
       if (!form) return;
       
       expect(form.get('playerSettings')).toBeInstanceOf(FormGroup);
-      expect(form.get('fileTransferSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('searchSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('appSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('knownDevices')).toBeInstanceOf(FormArray);
@@ -467,8 +462,8 @@ describe('SettingsViewComponent', () => {
     });
 
     it('should update active section when setActiveSection is called', () => {
-      component.setActiveSection('fileTransfer');
-      expect(component.activeSection()).toBe('fileTransfer');
+      component.setActiveSection('search');
+      expect(component.activeSection()).toBe('search');
 
       component.setActiveSection('devices');
       expect(component.activeSection()).toBe('devices');
@@ -485,7 +480,7 @@ describe('SettingsViewComponent', () => {
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
       // Audio button removed - audio settings now embedded in device settings
-      expect(buttons.length).toBe(4);
+      expect(buttons.length).toBe(3);
     });
 
     it('should pass animationTrigger=true to active section', () => {
@@ -510,8 +505,15 @@ describe('SettingsViewComponent', () => {
 
       expect(fixture.nativeElement.querySelector('lib-player-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-device-settings-section')).toBeTruthy();
-      expect(fixture.nativeElement.querySelector('lib-file-transfer-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-search-settings-section')).toBeTruthy();
+    });
+
+    it('offers no File Transfer section or navigation button', () => {
+      fixture.detectChanges();
+
+      const nav = fixture.nativeElement.querySelector('.navigation-buttons') as HTMLElement;
+      expect(nav.textContent).not.toContain('File Transfer');
+      expect(fixture.nativeElement.querySelector('lib-file-transfer-settings-section')).toBeNull();
     });
 
     it('should not render app-settings-section in main view', () => {
@@ -527,7 +529,7 @@ describe('SettingsViewComponent', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      // Devices button should be second (after Player, before File Transfer)
+      // Devices button should be second (after Player, before Search)
       const devicesButton = buttons[1];
       expect(devicesButton).toBeTruthy();
     });

@@ -1,15 +1,17 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output } from '@angular/core';
 import {
   ScalingCompactCardComponent,
   SlidingContainerComponent,
   ProgressBarComponent,
+  IconButtonComponent,
 } from '@teensyrom-nx/ui/components';
 import { DeviceSelectorComponent } from './device-selector/device-selector.component';
 
 /**
  * Toolbar shell for the transfer view, structurally mirroring the player toolbar: a card housing
- * an (unbound, in this iteration) progress bar and the device selector. The actions slot ships
- * empty — it is the designated home for future transfer-view controls.
+ * an (unbound, in this iteration) progress bar, the device selector and, in the actions slot, the
+ * gear that opens and closes the transfer settings panel. The desktop and tablet layouts each
+ * carry the gear; only one is visible at a time.
  */
 @Component({
   selector: 'lib-transfer-toolbar',
@@ -18,9 +20,28 @@ import { DeviceSelectorComponent } from './device-selector/device-selector.compo
     SlidingContainerComponent,
     ProgressBarComponent,
     DeviceSelectorComponent,
+    IconButtonComponent,
   ],
   templateUrl: './transfer-toolbar.component.html',
   styleUrl: './transfer-toolbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TransferToolbarComponent {}
+export class TransferToolbarComponent {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /** Whether the transfer settings panel is open. */
+  readonly settingsOpen = input(false);
+
+  /** Emits when the gear is pressed. */
+  readonly settingsToggle = output<void>();
+
+  /** Moves keyboard focus to the gear in the layout that is showing. */
+  focusSettingsButton(): void {
+    const buttons = this.host.nativeElement.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="transfer-settings-button"] button'
+    );
+    Array.from(buttons)
+      .find((button) => button.getClientRects().length > 0)
+      ?.focus();
+  }
+}

@@ -1,0 +1,71 @@
+<lib-side-panel
+  heading="Transfer Settings"
+  [animationDuration]="animationDuration()"
+  (closePanel)="closePanel.emit()"
+>
+  <div class="panel-content">
+    <section class="group" data-testid="global-group">
+      <h3 class="group-title">Global</h3>
+      <mat-slide-toggle
+        #globalSwitch
+        [checked]="autoLaunch()"
+        [disabled]="!settingsReady()"
+        data-testid="auto-launch-switch"
+        (change)="onAutoLaunchChange($event.checked)"
+      >
+        Launch after transfer
+      </mat-slide-toggle>
+    </section>
+
+    <section class="group" data-testid="watch-folders-group">
+      <div class="group-header">
+        <h3 class="group-title">Watch Folders</h3>
+        <lib-icon-button
+          icon="add"
+          size="small"
+          ariaLabel="Add watch folder"
+          data-testid="add-watch-folder"
+          (buttonClick)="addFolder.emit()"
+        />
+      </div>
+
+      @if (error(); as message) {
+      <p class="group-error" role="alert" data-testid="watch-folders-error">{{ message }}</p>
+      }
+
+      @for (folder of folders(); track folder.id) {
+      <div
+        class="folder-block"
+        [class.folder-block--off]="isDimmed(folder)"
+        data-testid="watch-folder"
+      >
+        <lib-watch-folder-row
+          [folder]="folder"
+          [pending]="isPending(folder.id)"
+          (enabledChange)="onEnabledChange(folder.id, $event)"
+          (deleteConfirmed)="onDeleteFolder(folder.id)"
+        />
+        @for (destination of folder.destinations; track destination.id) {
+        <lib-watch-folder-device-row
+          [destination]="destination"
+          [isLastDevice]="folder.destinations.length === 1"
+          [pending]="isPending(folder.id)"
+          (edit)="editDevice.emit({ watchFolderId: folder.id, deviceId: destination.deviceId })"
+          (deleteConfirmed)="onDeleteDevice(folder.id, destination.deviceId)"
+        />
+        }
+        <button
+          type="button"
+          class="link-button"
+          data-testid="add-device"
+          (click)="addDevice.emit(folder.id)"
+        >
+          Add device
+        </button>
+      </div>
+      } @empty { @if (!isLoading()) {
+      <p class="group-empty" data-testid="watch-folders-empty">No watch folders yet</p>
+      } }
+    </section>
+  </div>
+</lib-side-panel>

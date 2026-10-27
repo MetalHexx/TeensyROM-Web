@@ -46,6 +46,9 @@ export * from './lib/player/providers';
 // Settings state management
 export * from './lib/settings/settings-store';
 
+// Watch folder state management
+export * from './lib/watch-folder/watch-folder-store';
+
 // Audio state management
 export * from './lib/audio/audio-store';
 

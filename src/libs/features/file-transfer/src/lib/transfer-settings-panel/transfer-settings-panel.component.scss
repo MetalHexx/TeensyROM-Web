@@ -1,0 +1,79 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.group {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.group-title {
+  margin: 0 0 2px;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  line-height: 24px;
+}
+
+.group-empty {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  color: var(--color-dimmed-light);
+  font-size: var(--font-size-sm);
+}
+
+.group-error {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.folder-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) 0;
+  border-top: 1px solid var(--color-dimmed);
+}
+
+// An off folder is dimmed with its devices.
+.folder-block--off {
+  opacity: 0.55;
+}
+
+.link-button {
+  align-self: flex-start;
+  margin-left: var(--spacing-md);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-highlight);
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

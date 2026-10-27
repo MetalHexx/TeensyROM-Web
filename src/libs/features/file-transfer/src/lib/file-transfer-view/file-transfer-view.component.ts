@@ -1,20 +1,30 @@
+import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
+  signal,
   untracked,
+  viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { map } from 'rxjs/operators';
 import { DeviceStore, StorageStore, TransferStore } from '@teensyrom-nx/application';
 import { Device, StorageType } from '@teensyrom-nx/domain';
-import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, SlidingContainerComponent } from '@teensyrom-nx/ui/components';
 import { DropzoneCardComponent } from './dropzone-card/dropzone-card.component';
 import { TransfersCardComponent } from './transfers-card/transfers-card.component';
 import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
 import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
+import { TransferSettingsPanelComponent } from '../transfer-settings-panel/transfer-settings-panel.component';
 
 /**
  * Top-level view for the File Transfer feature. Resolves and persists the
@@ -30,6 +40,8 @@ import { TransferDirectoryListingComponent } from './transfer-directory-listing/
     EmptyStateMessageComponent,
     DirectoryTreeContainerComponent,
     TransferDirectoryListingComponent,
+    SlidingContainerComponent,
+    TransferSettingsPanelComponent,
   ],
   templateUrl: './file-transfer-view.component.html',
   styleUrl: './file-transfer-view.component.scss',
@@ -40,6 +52,32 @@ export class FileTransferViewComponent {
   private readonly storageStore = inject(StorageStore);
   private readonly transferStore = inject(TransferStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+
+  private readonly toolbar = viewChild(TransferToolbarComponent);
+  private readonly panel = viewChild(TransferSettingsPanelComponent);
+  private readonly panelSlot = viewChild<unknown, ElementRef<HTMLElement>>('panelSlot', {
+    read: ElementRef,
+  });
+
+  /** Whether the transfer settings panel is open. */
+  readonly panelOpen = signal(false);
+
+  /** Whether the panel has ever been opened. The sliding container renders at full width until its
+   *  first animation, so it is only created at the first open and stays after that. */
+  readonly panelEverOpened = signal(false);
+
+  /** Whether the user prefers no motion, which makes the panel slide instant. */
+  readonly reducedMotion = toSignal(
+    inject(BreakpointObserver)
+      .observe('(prefers-reduced-motion: reduce)')
+      .pipe(map((state) => state.matches)),
+    { initialValue: false }
+  );
+
+  /** How long the panel slide and its card own entry take: instant for reduced motion. */
+  readonly panelAnimationDuration = computed(() => (this.reducedMotion() ? 0 : 400));
 
   readonly enabledDevices = computed(() => this.deviceStore.usableDevices());
 
@@ -103,6 +141,26 @@ export class FileTransferViewComponent {
         this.storageStore.clearNavigationPin({ deviceId: this.pinnedDeviceId });
       }
     });
+  }
+
+  /** Opens the panel and moves focus into it, or closes it. */
+  togglePanel(): void {
+    if (this.panelOpen()) {
+      this.closePanel();
+    } else {
+      this.panelEverOpened.set(true);
+      this.panelOpen.set(true);
+      afterNextRender(() => this.panel()?.focusEntry(), { injector: this.injector });
+    }
+  }
+
+  /** Closes the panel. Focus that was inside it returns to the gear, as the panel DOM leaves with it. */
+  closePanel(): void {
+    const focusWasInPanel = this.panelSlot()?.nativeElement.contains(this.document.activeElement);
+    this.panelOpen.set(false);
+    if (focusWasInPanel) {
+      this.toolbar()?.focusSettingsButton();
+    }
   }
 
   private async seedStorage(device: Device): Promise<void> {

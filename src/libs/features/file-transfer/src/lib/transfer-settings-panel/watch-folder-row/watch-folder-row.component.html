@@ -1,0 +1,39 @@
+<div class="folder-row" data-testid="watch-folder-row">
+  <span class="folder-path" [attr.title]="folder().path" data-testid="watch-folder-path"
+    ><span class="folder-path-text">&lrm;{{ folder().path }}&lrm;</span></span
+  >
+  <mat-slide-toggle
+    class="folder-switch"
+    [checked]="folder().enabled"
+    [disabled]="pending()"
+    [aria-label]="'Watch ' + folder().path"
+    data-testid="watch-folder-switch"
+    (change)="enabledChange.emit($event.checked)"
+  />
+  <lib-dropdown-dialog #confirm [centered]="true">
+    <lib-icon-button
+      icon="delete"
+      size="small"
+      color="error"
+      [ariaLabel]="'Stop watching ' + folder().path"
+      [disabled]="pending()"
+      data-testid="watch-folder-delete"
+      (buttonClick)="confirm.open()"
+    />
+    <div dialog-content class="confirm-pop glassy-card">
+      <lib-confirmation-dialog
+        title="Stop watching this folder?"
+        [message]="folder().path"
+        confirmLabel="Stop watching"
+        [showLabels]="true"
+        (confirmed)="confirm.close(); deleteConfirmed.emit()"
+        (cancelled)="confirm.close()"
+      />
+    </div>
+  </lib-dropdown-dialog>
+</div>
+@if (folder().state === WatchFolderState.Unavailable) {
+<p class="folder-note" role="status" data-testid="watch-folder-unavailable">
+  Unavailable — the folder is missing or can't be watched
+</p>
+}

@@ -4,12 +4,32 @@
 
     <div class="transfer-controls desktop-layout" data-testid="transfer-toolbar">
       <div class="device-selector-section"><lib-device-selector /></div>
-      <div class="toolbar-actions-section"></div>
+      <div class="toolbar-actions-section">
+        <lib-icon-button
+          icon="settings"
+          [color]="settingsOpen() ? 'highlight' : 'normal'"
+          size="medium"
+          [ariaLabel]="settingsOpen() ? 'Close transfer settings' : 'Open transfer settings'"
+          [ariaExpanded]="settingsOpen()"
+          data-testid="transfer-settings-button"
+          (buttonClick)="settingsToggle.emit()"
+        />
+      </div>
     </div>
 
     <div class="transfer-controls tablet-layout" data-testid="transfer-toolbar">
       <div class="device-selector-section"><lib-device-selector /></div>
-      <div class="toolbar-actions-section"></div>
+      <div class="toolbar-actions-section">
+        <lib-icon-button
+          icon="settings"
+          [color]="settingsOpen() ? 'highlight' : 'normal'"
+          size="medium"
+          [ariaLabel]="settingsOpen() ? 'Close transfer settings' : 'Open transfer settings'"
+          [ariaExpanded]="settingsOpen()"
+          data-testid="transfer-settings-button"
+          (buttonClick)="settingsToggle.emit()"
+        />
+      </div>
     </div>
   </lib-scaling-compact-card>
 </lib-sliding-container>

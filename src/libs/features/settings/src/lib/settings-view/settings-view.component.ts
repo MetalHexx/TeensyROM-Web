@@ -9,7 +9,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
 import { DeviceSettingsSectionComponent } from './device-settings-section/device-settings-section.component';
 import { PlayerSettingsSectionComponent } from './player-settings-section/player-settings-section.component';
-import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
 import { SearchSettingsSectionComponent } from './search-settings-section/search-settings-section.component';
 import { SettingsFormService } from './settings-form.service';
 import { DeviceStore } from '@teensyrom-nx/application';
@@ -30,7 +29,6 @@ import { DeviceStore } from '@teensyrom-nx/application';
     ActionButtonComponent,
     DeviceSettingsSectionComponent,
     PlayerSettingsSectionComponent,
-    FileTransferSettingsSectionComponent,
     SearchSettingsSectionComponent,
   ],
   providers: [SettingsFormService],
@@ -43,7 +41,7 @@ export class SettingsViewComponent {
   private readonly deviceStore = inject(DeviceStore);
 
   // Active section state
-  readonly activeSection = signal<'player' | 'devices' | 'fileTransfer' | 'search'>('player');
+  readonly activeSection = signal<'player' | 'devices' | 'search'>('player');
 
   // Device list for the device settings cards
   readonly devices = this.deviceStore.devices;
@@ -79,11 +77,6 @@ export class SettingsViewComponent {
 
   readonly devicesNavigateTooltip: TooltipConfig = {
     body: 'Navigate to device settings',
-    position: TooltipPosition.Top
-  };
-
-  readonly fileTransferNavigateTooltip: TooltipConfig = {
-    body: 'Navigate to file transfer settings',
     position: TooltipPosition.Top
   };
 
@@ -132,7 +125,7 @@ export class SettingsViewComponent {
   /**
    * Sets the active settings section
    */
-  setActiveSection(section: 'player' | 'devices' | 'fileTransfer' | 'search'): void {
+  setActiveSection(section: 'player' | 'devices' | 'search'): void {
     this.activeSection.set(section);
   }
 
@@ -146,10 +139,6 @@ export class SettingsViewComponent {
 
   getPlayerSettings(): FormGroup {
     return this.formService.getPlayerSettings();
-  }
-
-  getFileTransferSettings(): FormGroup {
-    return this.formService.getFileTransferSettings();
   }
 
   getSearchSettings(): FormGroup {

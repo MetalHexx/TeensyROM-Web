@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal, computed } from '@angular/core';
+import { signal, computed, Provider } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
+import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import {
   DeviceStore,
@@ -22,8 +24,11 @@ import {
   StorageType,
   STORAGE_SERVICE,
   IStorageService,
+  SETTINGS_SERVICE,
+  WATCH_FOLDER_SERVICE,
 } from '@teensyrom-nx/domain';
 import { FileTransferViewComponent } from './file-transfer-view.component';
+import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
 
 function createDevice(overrides: Partial<Device> = {}): Device {
   const deviceId = overrides.deviceId ?? 'device-1';
@@ -63,7 +68,7 @@ describe('FileTransferViewComponent', () => {
   let mockTransferContext: ITransferContext;
   let searchMock: ReturnType<typeof vi.fn>;
 
-  const setup = async (devices: Device[]) => {
+  const setup = async (devices: Device[], extraProviders: Provider[] = []) => {
     devicesSignal = signal(devices);
     const usableDevicesSignal = computed(() =>
       devicesSignal().filter((d) => d.isEnabled && d.deviceState !== DeviceState.ConnectionLost)
@@ -112,6 +117,9 @@ describe('FileTransferViewComponent', () => {
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: PlayerStore, useValue: mockPlayerStore },
         { provide: TRANSFER_CONTEXT, useValue: mockTransferContext },
+        { provide: SETTINGS_SERVICE, useValue: { getSettings: () => of(null), saveSettings: () => of(undefined) } },
+        { provide: WATCH_FOLDER_SERVICE, useValue: { list: vi.fn().mockResolvedValue([]) } },
+        ...extraProviders,
       ],
     }).compileComponents();
 
@@ -371,6 +379,101 @@ describe('FileTransferViewComponent', () => {
       fixture.detectChanges();
 
       expect(mockTransferContext.startTransfer).toHaveBeenCalledWith(device.deviceId, items);
+    });
+  });
+  describe('transfer settings panel', () => {
+    const gear = () =>
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="transfer-settings-button"] button'
+      ) as HTMLButtonElement;
+    const panel = () =>
+      (fixture.nativeElement as HTMLElement).querySelector('lib-transfer-settings-panel');
+    const slot = () => (fixture.nativeElement as HTMLElement).querySelector('lib-sliding-container.panel-slot');
+
+    it('keeps the panel out of the view until the gear first opens it', async () => {
+      await setup([createDevice()]);
+      createFixture();
+
+      expect(panel()).toBeNull();
+      expect(gear().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('opens and closes the panel from the gear, reflecting the state on the gear', async () => {
+      await setup([createDevice()]);
+      createFixture();
+
+      gear().click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.panelOpen()).toBe(true);
+      expect(panel()).toBeTruthy();
+      expect(slot()?.classList.contains('panel-slot--open')).toBe(true);
+      expect(gear().getAttribute('aria-expanded')).toBe('true');
+      expect(gear().getAttribute('aria-label')).toBe('Close transfer settings');
+
+      gear().click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.panelOpen()).toBe(false);
+      expect(slot()?.classList.contains('panel-slot--open')).toBe(false);
+      expect(gear().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('moves focus into the panel when it opens', async () => {
+      await setup([createDevice()]);
+      createFixture();
+
+      gear().click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(slot()?.contains(document.activeElement)).toBe(true);
+    });
+
+    it('returns focus to the gear when the panel closes with focus inside it', async () => {
+      await setup([createDevice()]);
+      createFixture();
+      gear().click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const toolbar = fixture.debugElement.query(By.directive(TransferToolbarComponent))
+        .componentInstance as TransferToolbarComponent;
+      const refocus = vi.spyOn(toolbar, 'focusSettingsButton');
+
+      fixture.componentInstance.closePanel();
+
+      expect(refocus).toHaveBeenCalled();
+    });
+
+    it('does not steal focus when the panel closes with focus elsewhere', async () => {
+      await setup([createDevice()]);
+      createFixture();
+      gear().click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      (document.activeElement as HTMLElement | null)?.blur();
+      const toolbar = fixture.debugElement.query(By.directive(TransferToolbarComponent))
+        .componentInstance as TransferToolbarComponent;
+      const refocus = vi.spyOn(toolbar, 'focusSettingsButton');
+
+      gear().click();
+
+      expect(refocus).not.toHaveBeenCalled();
+    });
+
+    it('slides over 400ms, or instantly when the user prefers reduced motion', async () => {
+      await setup([createDevice()]);
+      createFixture();
+      expect(fixture.componentInstance.panelAnimationDuration()).toBe(400);
+      fixture.destroy();
+      TestBed.resetTestingModule();
+
+      await setup([createDevice()], [
+        { provide: BreakpointObserver, useValue: { observe: () => of({ matches: true }) } },
+      ]);
+      createFixture();
+
+      expect(fixture.componentInstance.panelAnimationDuration()).toBe(0);
     });
   });
 });

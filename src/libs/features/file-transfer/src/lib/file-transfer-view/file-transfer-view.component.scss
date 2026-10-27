@@ -7,14 +7,33 @@
   min-width: 0;
 }
 
+// A row: the transfer content takes the width the settings panel, when open, does not.
 .file-transfer-view {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
+  flex-direction: row;
   height: 100%;
   width: 100%;
   min-height: 0;
   min-width: 0;
+}
+
+.transfer-main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-height: 0;
+  min-width: 0;
+}
+
+// The panel slot is as wide as its container (22.5rem) and keeps that width; the content gives way.
+.panel-slot {
+  flex: 0 0 auto;
+  min-height: 0;
+
+  &.panel-slot--open {
+    margin-left: var(--spacing-md);
+  }
 }
 
 .transfer-header {

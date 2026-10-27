@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+// Clipped from the left: the rtl inner span puts the ellipsis at the start, so the folder name
+// at the end of the path stays readable. The outer span keeps the flex item itself left-aligned.
+.folder-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-sm);
+}
+
+.folder-path-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.folder-switch,
+lib-icon-button {
+  flex: 0 0 auto;
+}
+
+.folder-note {
+  margin: 2px 0 0;
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+}
