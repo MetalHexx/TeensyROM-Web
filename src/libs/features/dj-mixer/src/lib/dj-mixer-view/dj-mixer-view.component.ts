@@ -49,6 +49,9 @@ import { DjSetCardComponent } from '../set-card/dj-set-card.component';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
 
+/** How long the peek stays after the last Select press. */
+const PEEK_DURATION_MS = 1500;
+
 @Component({
   selector: 'lib-dj-mixer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -133,6 +136,20 @@ export class DjMixerViewComponent {
   /** How long the panel's slide and its card's own entry take: instant for reduced motion. */
   readonly panelAnimationDuration = computed(() => (this.reducedMotion() ? 0 : 400));
 
+  /** Whether the browser (trees, listing and set card) is shown; session only. */
+  readonly browserShown = signal(true);
+
+  /** Whether the grid has dropped the band's row. It follows the band's exit animation, never
+   *  leads it, so the decks do not jump mid-slide. */
+  readonly browserCollapsed = signal(false);
+
+  /** Whether the set card's peek is up while the browser is hidden. */
+  readonly peekShown = signal(false);
+
+  /** Whether the peek has ever been needed: its sliding container renders at full height until
+   *  its first animation, so it is only created at first use and stays after that. */
+  readonly peekEverShown = signal(false);
+
   /** Whether controls are overlaid for picking what a hardware input maps onto. */
   readonly mappingMode = this.midiStore.mappingMode;
 
@@ -144,6 +161,9 @@ export class DjMixerViewComponent {
       controllers: this.midiStore.controllers(),
     })
   );
+
+  private peekTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastSelectTurns = untracked(() => this.djStore.sets().selectTurns);
 
   /** deviceId currently holding the navigation pin taken by this view. */
   private pinnedDeviceId: string | null = null;
@@ -208,11 +228,25 @@ export class DjMixerViewComponent {
       }
     });
 
+    // A Select press while the browser is hidden shows the set card for a moment, so the knob's
+    // position can still be read.
+    effect(() => {
+      const turns = this.djStore.sets().selectTurns;
+      untracked(() => {
+        if (turns === this.lastSelectTurns) return;
+        this.lastSelectTurns = turns;
+        if (!this.browserShown()) {
+          this.showPeek();
+        }
+      });
+    });
+
     // Release the pin this view instance actually holds, not the recomputed active storage — the
     // two diverge when the active storage changes and the pin-take effect has not re-run yet.
     // Mapping mode lives in a root store, so leaving the view has to end it (and any learn) too,
     // or the hidden mode keeps unmapped ports open and can bind a control off-screen.
     this.destroyRef.onDestroy(() => {
+      this.clearPeekTimer();
       if (this.pinnedDeviceId) {
         this.storageStore.clearNavigationPin({ deviceId: this.pinnedDeviceId });
       }
@@ -239,6 +273,44 @@ export class DjMixerViewComponent {
     void this.midiControllers.setMappingMode(false);
     if (focusWasInPanel) {
       this.sidPanel()?.focusBindingsButton();
+    }
+  }
+
+  /** Hides the browser, or shows it. Showing restores the grid's row first, so the entry
+   *  animation plays into it, and puts the peek away at once. */
+  toggleBrowser(): void {
+    if (this.browserShown()) {
+      this.browserShown.set(false);
+      return;
+    }
+    this.browserCollapsed.set(false);
+    this.browserShown.set(true);
+    this.clearPeekTimer();
+    this.peekShown.set(false);
+  }
+
+  /** The band's slide finished: after an exit, the grid drops its row. An entry's finish is
+   *  ignored — the row was restored before it began. */
+  onBandAnimationComplete(): void {
+    if (!this.browserShown()) {
+      this.browserCollapsed.set(true);
+    }
+  }
+
+  private showPeek(): void {
+    this.peekEverShown.set(true);
+    this.peekShown.set(true);
+    this.clearPeekTimer();
+    this.peekTimer = setTimeout(() => {
+      this.peekTimer = null;
+      this.peekShown.set(false);
+    }, PEEK_DURATION_MS);
+  }
+
+  private clearPeekTimer(): void {
+    if (this.peekTimer !== null) {
+      clearTimeout(this.peekTimer);
+      this.peekTimer = null;
     }
   }
 

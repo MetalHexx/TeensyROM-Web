@@ -1,9 +1,11 @@
+import { interceptDjLibrary } from '../../support/interceptors/djLibrary.interceptors';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 
 describe('DJ Mixer — Navigation', () => {
   beforeEach(() => {
+    interceptDjLibrary();
     interceptFindDevices();
     interceptConnectDevice();
     cy.visit('/devices');

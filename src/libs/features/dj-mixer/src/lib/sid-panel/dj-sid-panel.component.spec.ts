@@ -132,7 +132,7 @@ describe('DjSidPanelComponent', () => {
 
   describe('the bindings button', () => {
     function bindingsButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
-      return find(fixture, '.panel-header button');
+      return find(fixture, '.panel-header .bindings-button button');
     }
 
     it('reports whether the panel is open, and changes its name with it', () => {
@@ -166,6 +166,43 @@ describe('DjSidPanelComponent', () => {
 
       expect(document.activeElement).toBe(bindingsButton(fixture));
       fixture.nativeElement.remove();
+    });
+  });
+
+  describe('the browser button', () => {
+    function browserButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
+      return find(fixture, '.panel-header .browser-button button');
+    }
+
+    it('is lit and offers to hide while the browser is shown, and offers to show once hidden', () => {
+      const { fixture } = render();
+
+      expect(browserButton(fixture).getAttribute('aria-expanded')).toBe('true');
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Hide the browser');
+
+      fixture.componentRef.setInput('browserShown', false);
+      fixture.detectChanges();
+
+      expect(browserButton(fixture).getAttribute('aria-expanded')).toBe('false');
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Show the browser');
+    });
+
+    it('emits browserToggle when pressed', () => {
+      const { fixture } = render();
+      const toggled = vi.fn();
+      fixture.componentInstance.browserToggle.subscribe(toggled);
+
+      browserButton(fixture).click();
+
+      expect(toggled).toHaveBeenCalledTimes(1);
+    });
+
+    it('sits beside the bindings button in the header centre cell', () => {
+      const { fixture } = render();
+
+      expect(
+        fixture.nativeElement.querySelectorAll('.panel-header > .header-actions > lib-icon-button')
+      ).toHaveLength(2);
     });
   });
 

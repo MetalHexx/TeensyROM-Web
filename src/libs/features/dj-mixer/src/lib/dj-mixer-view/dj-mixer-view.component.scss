@@ -109,11 +109,31 @@
   }
 }
 
-.bottom-band {
+// With the browser hidden the grid drops the band's row, and the sliding container's host, which
+// outlives its exit, must leave the grid with it: left with `grid-area: bottom` it would land in an
+// implicit row and column, and the extra column gap would come out of the two deck columns.
+.mixer-grid--two.mixer-grid--no-browser {
+  grid-template-rows: auto;
+  grid-template-areas: 'd0 vs0 mx vs1 d1';
+  align-content: start;
+
+  @include styles.below-tablet {
+    grid-template-rows: repeat(3, auto);
+    grid-template-areas:
+      'd0 vs0'
+      'mx mx'
+      'd1 vs1';
+  }
+
+  .bottom-slot {
+    display: none;
+  }
+}
+
+// The band's sliding container: the host holds the grid area, and its inner box (100% of the
+// host) is what the band fills, so the listing and set rows keep their own scroll.
+.bottom-slot {
   grid-area: bottom;
-  display: flex;
-  flex-direction: row;
-  gap: var(--dj-card-gap);
   min-height: 0;
 
   // The floor belongs only to the stacked forms, whose rows are all content-sized and whose page
@@ -122,6 +142,14 @@
   @include styles.below-tablet {
     min-height: 11rem;
   }
+}
+
+.bottom-band {
+  display: flex;
+  flex-direction: row;
+  gap: var(--dj-card-gap);
+  height: 100%;
+  min-height: 0;
 
   @include styles.below-phone {
     flex-direction: column;
@@ -173,4 +201,35 @@
     flex: 0 0 auto;
     height: auto;
   }
+}
+
+// The set card raised over the bottom of the grid while the browser is hidden. Out of flow, so it
+// never moves a deck; above the decks' scaling containers (1000) and under the mapping overlay
+// layer (1001). The sliding container's host stays after the slide-away, so the wrapper lets clicks
+// through and only the card takes them.
+.set-peek {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 19.75rem;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.set-peek > lib-sliding-container {
+  display: block;
+  height: 100%;
+}
+
+.set-peek-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
+  background: var(--synth-face);
+  border: 1px solid rgba(var(--color-highlight-rgb), 0.45);
+  border-radius: 6px;
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
 }

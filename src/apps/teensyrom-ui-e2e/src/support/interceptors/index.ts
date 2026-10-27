@@ -3,8 +3,10 @@
 // =========================================================================
 export * from './connectDevice.interceptors';
 export * from './disconnectDevice.interceptors';
+export * from './djLibrary.interceptors';
 export * from './findDevices.interceptors';
 export * from './getDirectory.interceptors';
+export * from './getFileContent.interceptors';
 export * from './indexAllStorage.interceptors';
 export * from './indexStorage.interceptors';
 export * from './launchFile.interceptors';

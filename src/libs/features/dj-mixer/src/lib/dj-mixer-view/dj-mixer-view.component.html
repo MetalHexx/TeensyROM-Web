@@ -1,61 +1,90 @@
 <div class="dj-mixer-view">
-  <div #mixerGrid class="mixer-grid" [class.mixer-grid--two]="decks.length === 2">
+  <div
+    #mixerGrid
+    class="mixer-grid"
+    [class.mixer-grid--two]="decks.length === 2"
+    [class.mixer-grid--no-browser]="browserCollapsed()"
+  >
     @for (deck of decks; track deck.index) {
     <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
     }
     <lib-dj-sid-panel
       [decks]="decks"
       [bindingsOpen]="panelOpen()"
+      [browserShown]="browserShown()"
       (bindingsToggle)="togglePanel()"
+      (browserToggle)="toggleBrowser()"
     ></lib-dj-sid-panel>
-    <div class="bottom-band">
-      <lib-scaling-compact-card
-        class="browse-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
-      >
-        <lib-dj-browse-trees
-          [devices]="enabledDevices()"
-          [sets]="setsBranch()"
-          [activeStorage]="activeStorage()"
-          (storageSelect)="onStorageSelect($event)"
-          (setSelect)="onSetSelect($event)"
-        ></lib-dj-browse-trees>
-      </lib-scaling-compact-card>
-      @if (enabledDevices().length === 0) {
+    <lib-sliding-container
+      class="bottom-slot"
+      animationDirection="from-bottom"
+      containerHeight="100%"
+      [animationTrigger]="browserShown()"
+      [animationDuration]="panelAnimationDuration()"
+      (animationComplete)="onBandAnimationComplete()"
+    >
+      <div class="bottom-band">
+        <lib-scaling-compact-card
+          class="browse-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+        >
+          <lib-dj-browse-trees
+            [devices]="enabledDevices()"
+            [sets]="setsBranch()"
+            [activeStorage]="activeStorage()"
+            (storageSelect)="onStorageSelect($event)"
+            (setSelect)="onSetSelect($event)"
+          ></lib-dj-browse-trees>
+        </lib-scaling-compact-card>
+        @if (enabledDevices().length === 0) {
 
-      <lib-empty-state-message
-        icon="devices"
-        title="No Enabled Devices"
-        message="Enable a TeensyROM device to get started."
-        secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
-      >
-      </lib-empty-state-message>
+        <lib-empty-state-message
+          icon="devices"
+          title="No Enabled Devices"
+          message="Enable a TeensyROM device to get started."
+          secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
+        >
+        </lib-empty-state-message>
 
-      } @else {
+        } @else {
 
-      <lib-scaling-compact-card
-        class="directory-listing-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
-      >
-        <lib-dj-directory-listing
-          [activeStorage]="activeStorage()"
-          (dragStarted)="dragging.set(true)"
-          (dragEnded)="dragging.set(false)"
-        ></lib-dj-directory-listing>
-      </lib-scaling-compact-card>
+        <lib-scaling-compact-card
+          class="directory-listing-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+        >
+          <lib-dj-directory-listing
+            [activeStorage]="activeStorage()"
+            (dragStarted)="dragging.set(true)"
+            (dragEnded)="dragging.set(false)"
+          ></lib-dj-directory-listing>
+        </lib-scaling-compact-card>
 
-      }
-      <lib-scaling-compact-card
-        class="set-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
+        }
+        <lib-scaling-compact-card
+          class="set-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+        >
+          <lib-dj-set-card [listingDragActive]="dragging()"></lib-dj-set-card>
+        </lib-scaling-compact-card>
+      </div>
+    </lib-sliding-container>
+    @if (peekEverShown()) {
+    <div class="set-peek">
+      <lib-sliding-container
+        animationDirection="from-bottom"
+        containerHeight="100%"
+        [animationTrigger]="peekShown()"
+        [animationDuration]="panelAnimationDuration()"
       >
-        <lib-dj-set-card [listingDragActive]="dragging()"></lib-dj-set-card>
-      </lib-scaling-compact-card>
+        <div class="set-peek-card">
+          <lib-dj-set-card></lib-dj-set-card>
+        </div>
+      </lib-sliding-container>
     </div>
-    @if (mappingMode()) {
+    } @if (mappingMode()) {
     <lib-mapping-overlay-layer
       [targets]="overlayTargets()"
       [scope]="mixerGrid"

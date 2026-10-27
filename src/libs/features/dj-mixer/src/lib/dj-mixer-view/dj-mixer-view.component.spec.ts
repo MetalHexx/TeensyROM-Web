@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
-import { signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -206,8 +206,9 @@ const SAVED_SETS: SetTreeSummary = {
   ],
 };
 
-function createDjStoreStub(loops: DeckLoopsSummary = NO_LOOPS) {
+function createDjStoreStub(loops: DeckLoopsSummary = NO_LOOPS, selectTurns = signal(0)) {
   return {
+    sets: computed(() => ({ selectTurns: selectTurns() })),
     setCardSummary: () => signal(EMPTY_SET),
     setTreeSummary: () => signal(SAVED_SETS),
     deckSetSummary: () => signal(NO_DECK_SET),
@@ -319,6 +320,7 @@ function render(
   }: { reducedMotion?: boolean; loops?: DeckLoopsSummary } = {}
 ) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
+  const selectTurns = signal(0);
   const djSets = { openSet: vi.fn().mockResolvedValue(undefined) };
   const midi = createMidiStubs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -330,7 +332,7 @@ function render(
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices), usableDevices } },
       { provide: StorageStore, useValue: storageStore },
-      { provide: DjStore, useValue: createDjStoreStub(loops) },
+      { provide: DjStore, useValue: createDjStoreStub(loops, selectTurns) },
       { provide: DeckService, useValue: createDeckServiceStub() },
       { provide: DjSets, useValue: djSets },
       { provide: MixerService, useValue: createMixerServiceStub() },
@@ -358,6 +360,7 @@ function render(
     component: fixture.componentInstance,
     storageStore,
     djSets,
+    selectTurns,
     midi,
     midiStore: TestBed.inject(MidiMappingStore),
   };
@@ -643,6 +646,172 @@ describe('DjMixerViewComponent', () => {
     });
   });
 
+  describe('hiding the browser', () => {
+    function browserButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(
+        'lib-dj-sid-panel button[aria-label$="the browser"]'
+      );
+    }
+
+    function press(fixture: ComponentFixture<DjMixerViewComponent>): void {
+      browserButton(fixture).click();
+      fixture.detectChanges();
+    }
+
+    function slot(fixture: ComponentFixture<DjMixerViewComponent>): SlidingContainerComponent {
+      return fixture.debugElement.query(By.css('.bottom-slot'))
+        .componentInstance as SlidingContainerComponent;
+    }
+
+    const grid = (fixture: ComponentFixture<DjMixerViewComponent>): HTMLElement =>
+      fixture.nativeElement.querySelector('.mixer-grid');
+
+    it('shows the browser at first, with the button lit and offering to hide it', () => {
+      const { fixture, component } = render([device()]);
+
+      expect(component.browserShown()).toBe(true);
+      expect(slot(fixture).animationTrigger()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.bottom-band')).toBeTruthy();
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Hide the browser');
+    });
+
+    it('slides the band out from the button', () => {
+      const { fixture } = render([device()]);
+
+      press(fixture);
+
+      expect(slot(fixture).animationTrigger()).toBe(false);
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Show the browser');
+    });
+
+    it('drops the band from the grid once the exit has finished', async () => {
+      const { fixture } = render([device()]);
+
+      press(fixture);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.bottom-band')).toBeNull();
+      expect(grid(fixture).classList).toContain('mixer-grid--no-browser');
+    });
+
+    it('restores the grid before the entry begins, and does not drop it again after the entry', async () => {
+      const { fixture, component } = render([device()]);
+      press(fixture);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      browserButton(fixture).click();
+
+      expect(component.browserCollapsed()).toBe(false);
+      expect(component.browserShown()).toBe(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(grid(fixture).classList).not.toContain('mixer-grid--no-browser');
+      expect(fixture.nativeElement.querySelector('.bottom-band')).toBeTruthy();
+    });
+
+    it('ignores the finish of an entry', () => {
+      const { component } = render([device()]);
+
+      component.onBandAnimationComplete();
+
+      expect(component.browserCollapsed()).toBe(false);
+    });
+
+    it('slides for 400ms, and not at all for reduced motion', () => {
+      const normal = render([device()]);
+      expect(slot(normal.fixture).animationDuration()).toBe(400);
+      expect(slot(normal.fixture).containerHeight()).toBe('100%');
+      TestBed.resetTestingModule();
+
+      const reduced = render([device()], {}, { reducedMotion: true });
+      expect(slot(reduced.fixture).animationDuration()).toBe(0);
+    });
+  });
+
+  describe('the set peek', () => {
+    function peek(fixture: ComponentFixture<DjMixerViewComponent>): Element | null {
+      return fixture.nativeElement.querySelector('.mixer-grid > .set-peek');
+    }
+
+    function peekSlot(fixture: ComponentFixture<DjMixerViewComponent>): SlidingContainerComponent {
+      return fixture.debugElement.query(By.css('.set-peek lib-sliding-container'))
+        .componentInstance as SlidingContainerComponent;
+    }
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    function selectWhile(hidden: boolean, ctx: ReturnType<typeof render>, turns: number): void {
+      if (hidden && ctx.component.browserShown()) ctx.component.toggleBrowser();
+      ctx.selectTurns.set(turns);
+      ctx.fixture.detectChanges();
+    }
+
+    it('is not created until a Select press while the browser is hidden', () => {
+      const ctx = render([device()]);
+
+      selectWhile(false, ctx, 1);
+
+      expect(peek(ctx.fixture)).toBeNull();
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('slides up inside the grid when Select is pressed while the browser is hidden', () => {
+      const ctx = render([device()]);
+
+      selectWhile(true, ctx, 1);
+
+      expect(ctx.component.peekShown()).toBe(true);
+      expect(peek(ctx.fixture)).toBeTruthy();
+      expect(peekSlot(ctx.fixture).animationTrigger()).toBe(true);
+      expect(peekSlot(ctx.fixture).containerHeight()).toBe('100%');
+      expect(peek(ctx.fixture)?.querySelector('lib-dj-set-card')).toBeTruthy();
+    });
+
+    it('leaves 1.5s after the last press, each press restarting the wait', () => {
+      const ctx = render([device()]);
+      selectWhile(true, ctx, 1);
+
+      vi.advanceTimersByTime(1000);
+      selectWhile(true, ctx, 2);
+      vi.advanceTimersByTime(1000);
+      expect(ctx.component.peekShown()).toBe(true);
+
+      vi.advanceTimersByTime(500);
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('is put away at once when the browser is shown', () => {
+      const ctx = render([device()]);
+      selectWhile(true, ctx, 1);
+
+      ctx.component.toggleBrowser();
+
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('does not show for a press made while the browser was shown', () => {
+      const ctx = render([device()]);
+      selectWhile(false, ctx, 1);
+
+      ctx.component.toggleBrowser();
+      ctx.fixture.detectChanges();
+
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('slides for no time under reduced motion', () => {
+      const ctx = render([device()], {}, { reducedMotion: true });
+      selectWhile(true, ctx, 1);
+
+      expect(peekSlot(ctx.fixture).animationDuration()).toBe(0);
+    });
+  });
+
   describe('the bindings panel', () => {
     function bindingsButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
       return fixture.nativeElement.querySelector(
@@ -656,7 +825,7 @@ describe('DjMixerViewComponent', () => {
     }
 
     function slot(fixture: ComponentFixture<DjMixerViewComponent>): SlidingContainerComponent {
-      return fixture.debugElement.query(By.directive(SlidingContainerComponent))
+      return fixture.debugElement.query(By.css('.panel-slot'))
         .componentInstance as SlidingContainerComponent;
     }
 
@@ -664,7 +833,7 @@ describe('DjMixerViewComponent', () => {
       const { fixture, component } = render([]);
 
       expect(component.panelOpen()).toBe(false);
-      expect(fixture.nativeElement.querySelector('lib-sliding-container')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.panel-slot')).toBeNull();
       expect(fixture.nativeElement.querySelector('lib-dj-bindings-panel')).toBeNull();
       expect(bindingsButton(fixture).getAttribute('aria-label')).toBe('Open bindings panel');
     });

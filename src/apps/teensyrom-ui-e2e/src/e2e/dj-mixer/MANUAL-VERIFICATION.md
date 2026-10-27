@@ -405,6 +405,116 @@ kB on `main`; that warning is already on `main` and `project.json`'s budgets are
 - [ ] GBL toggled mid-set on the running loop A/Bs between its own settings and the main track's.
 - [ ] Play-now and GBL are learned and played from the controller.
 
+## Sets
+
+Browser check of the hideable browser, the set card's peek and the set card itself in the DJ view, the
+bundle check, and the operator's bench list.
+
+**How it was driven, and how it differs from the earlier sections.** The mockup page for this change
+was not in the workspace this run had, so no mockup-side measurement was taken; the view was
+measured against the sizes the plan states (tree 212, set card 680, peek 316) and against itself
+(frame A against frames B and C). The view was not driven through the `chrome-devtools-mcp`
+same-origin iframe: it was driven with a throwaway Cypress spec in Electron at **1920 x 1080**
+(deleted after the run, not committed), served by `pnpm nx run teensyrom-ui:serve` on port 4210,
+with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }` injected, the
+library interceptors serving a saved set "Friday" with three rows, one device, and `Still_Time.sid`
+in the listing. Every number is `getBoundingClientRect()` on the live DOM. `moveSelection` was
+reached through `ng.getComponent(document.querySelector('lib-dj-mixer-view')).djSets`, as
+planned. API port 10213 was not used: another checkout's API was listening there, so the DJ library
+was never written to a real host.
+
+**Frames.**
+
+| frame | what was checked                                                                                                     | how                                                                             |
+| ----- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| A     | full view: tree, listing, set card, the browser button lit, each deck's set row                                      | measured                                                                        |
+| B     | browser hidden: decks, speed strips and SID panel unchanged, freed height empty                                      | measured                                                                        |
+| C     | peek: slides up over the bottom, follows Select, leaves after the last, decks unmoved, deck controls clickable after | measured, screenshot                                                            |
+| D     | set card: new empty set, a drag in with a pending row then the analysed row, rename, reorder                         | drag in measured and screenshotted; rename and reorder in `dj-mixer-sets.cy.ts` |
+| E     | load a saved set from the tree, the delete confirm                                                                   | `dj-mixer-sets.cy.ts` (accessible names), not screenshotted                     |
+| F     | naming loops in place, names on the tiles and the sign                                                               | **not driven in this run**; left to the operator below                          |
+
+D's mapping mode with the Set group was not driven live either (the controls' overlays are covered
+by the view spec's anchor and overlay cases). F needs a tune playing on a deck and was not reached.
+
+**Frames A, B, C measured** (px, 1920 x 1080; A at rest, B 300 ms after Hide, C 600 ms after the
+first Select press):
+
+| element                                      | A                                                | B (hidden)                | C (peek up)                                           |
+| -------------------------------------------- | ------------------------------------------------ | ------------------------- | ----------------------------------------------------- |
+| transport A, x y / w x h                     | 129 75 / 440 x 163.8                             | same                      | same                                                  |
+| transport B                                  | 1447 75 / 440 x 163.8                            | same                      | same                                                  |
+| speed strip A / B                            | 628 372.6 / 28 x 96.1 and 1360 372.6 / 28 x 96.1 | same                      | same                                                  |
+| SID panel                                    | 698 66 / 620 x 555.8                             | same                      | same                                                  |
+| grid                                         | 112 66 / 1792 x 998                              | same                      | same                                                  |
+| band (tree + listing + set card)             | 112 633.8 / 1792 x 430.2                         | removed                   | removed                                               |
+| tree / listing / set card (w x h)            | 212 x 430.2 / 876 x 430.2 / 680 x 430.2          | removed                   | removed                                               |
+| header buttons: browser, bindings (x, w x h) | 972, 32 x 32; 1012, 32 x 32 (wrapper 72 x 32)    | same                      | same                                                  |
+| browser button                               | "Hide the browser", `aria-expanded` true         | "Show the browser", false | same as B                                             |
+| peek                                         | none                                             | none                      | 112 748 / 1792 x 316 (bottom 1064, the grid's bottom) |
+| deck set rows                                | 2                                                | 2                         | 2                                                     |
+
+The deck, speed strip, SID panel and grid rects are identical to the pixel in A, B and C, and again
+after Show (the grid was measured mid-entry, the band 0 high, and the decks had not moved). The
+tree is 212 and the set card 680 as planned. The freed 430.2 px stays empty.
+
+**Peek timing.** The peek card was up 600 ms after the first press; a second press 1.6 s later
+kept it up another second (so it restarted rather than leaving at 1.5 s from the first); it was gone
+1.9 s after the second press. After it left, `elementFromPoint(300, 1000)`, a point it had covered,
+was `.mixer-grid`, and Deck A's Panic took a click. The wrapper is `pointer-events: none` and the
+card `auto`, as planned.
+
+**Deviations.** The peek spans the grid's whole width (`inset-inline: 0`, 1792) as the handoff
+states; its cyan edge, opaque face and top shadow are the view's own tokens (`--synth-face`,
+`--color-highlight-rgb`) and were not compared against the mockup. The Browser button sits before
+Bindings in the header's centre cell; the mockup's order could not be confirmed.
+
+**Storybook.** No new component, so no new story. `pnpm nx run ui-components:build-storybook`
+passes.
+
+**Automated.** `pnpm nx test dj-mixer` (11 files, 246 specs run green; locally the `nx` process does
+not exit after reporting, so it was run under a timeout), `pnpm nx lint dj-mixer`, `tsc` on the
+library's `tsconfig.lib.json`, `eslint` on the e2e project (no errors in the new files), `pnpm nx
+build teensyrom-ui`, `pnpm nx run ui-components:build-storybook`, and the six DJ specs against a
+`serve` on port 4210 (`dj-mixer-sets.cy.ts` 9 tests, the five earlier specs 43; 52 passing).
+`dj-mixer-sets.cy.ts` covers the saved set in the card, rename (`PUT` with the new name), Alt+ArrowDown
+on a handle (`PUT` with the new order), the tree listing the sets and loading another with its
+own `GET`, delete (Cancel sends nothing, Delete sends `DELETE` then a `PUT` of a fresh "Set N"), the
+New key, hiding and showing the browser with the deck, speed strip and SID panel rects unchanged, and
+a SID dragged from the listing into the card (pending row, then the titled row, then the `PUT`).
+
+### Bundle check (sets)
+
+`pnpm nx build teensyrom-ui` on this branch against `main` (615a260b), the initial chunks only, as
+printed by the build:
+
+| chunk                                | main        | this branch        |
+| ------------------------------------ | ----------- | ------------------ |
+| shared ui / vendor chunk             | 1.36 MB     | 1.36 MB (same)     |
+| `main`                               | 420.34 kB   | 431.58 kB (+11.24) |
+| shared application chunk             | 195.83 kB   | 223.48 kB (+27.65) |
+| other initial chunks and `polyfills` | 133.34 kB   | 129.63 kB (-3.71)  |
+| `styles`                             | 35.13 kB    | 35.13 kB (0)       |
+| **initial total**                    | **2.14 MB** | **2.18 MB**        |
+
+The initial total is over the 2.00 MB budget by 143.08 kB on `main` and 184.77 kB on this branch
+(+41.69 kB). This branch carries the whole of ASID-DJ-12 so far (the sets model, the application's
+current set and the set components), not only this task, so the delta is the project's, not this
+task's alone. That warning is already on `main`, and `project.json`'s budgets are unchanged.
+
+### Bench checklist (operator, real hardware, sets)
+
+- [ ] A set prepared, with the speeds pre-beatmatched, loops and cues named and settings per
+      subtune, then the page refreshed and the set found as it was left.
+- [ ] The browser cache cleared: the tunes and their settings come back, re-fetched from the device.
+- [ ] Select, Load A, Load B, previous and next work from the screen and from a controller.
+- [ ] One row loaded on both decks for beat juggling.
+- [ ] The peek appears on Select while the browser is hidden, follows it, and leaves after the last.
+- [ ] Hiding and showing the browser stretches or moves nothing, and every deck control still takes
+      clicks after the peek has left.
+- [ ] Naming loops in place shows the names on the tiles and the sign (frame F, not driven here).
+- [ ] No audible glitch or timing slip from any load, restore or save.
+
 ## Byte fidelity (P03-T02)
 
 Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM
