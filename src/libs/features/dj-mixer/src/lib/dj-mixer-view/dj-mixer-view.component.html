@@ -23,7 +23,7 @@
       [animationDuration]="panelAnimationDuration()"
       (animationComplete)="onBandAnimationComplete()"
     >
-      <div class="bottom-band">
+      <div class="bottom-band" [style.--fold-duration]="panelAnimationDuration() + 'ms'">
         <lib-scaling-compact-card
           class="browse-card"
           cardClass="compact-card--fill"
@@ -53,12 +53,32 @@
           class="directory-listing-card"
           cardClass="compact-card--fill"
           animationEntry="from-bottom"
+          [class.directory-listing-card--folded]="listingFoldedEffective()"
+          (transitionend)="onListingCardTransitionEnd($event)"
         >
-          <lib-dj-directory-listing
-            [activeStorage]="activeStorage()"
-            (dragStarted)="dragging.set(true)"
-            (dragEnded)="dragging.set(false)"
-          ></lib-dj-directory-listing>
+          @if (!stacked()) {
+          <lib-fold-handle
+            label="File listing"
+            foldAccessibleName="Collapse the file listing"
+            unfoldAccessibleName="Expand the file listing"
+            [folded]="listingFoldedEffective()"
+            [animationDuration]="panelAnimationDuration()"
+            (foldedChange)="foldListing($event)"
+          ></lib-fold-handle>
+          }
+          <div
+            #listingBody
+            class="listing-body"
+            [attr.inert]="listingFoldedEffective() ? '' : null"
+            [style.width.px]="listingBodyWidth()"
+            [style.min-width.px]="listingBodyWidth()"
+          >
+            <lib-dj-directory-listing
+              [activeStorage]="activeStorage()"
+              (dragStarted)="dragging.set(true)"
+              (dragEnded)="dragging.set(false)"
+            ></lib-dj-directory-listing>
+          </div>
         </lib-scaling-compact-card>
 
         }

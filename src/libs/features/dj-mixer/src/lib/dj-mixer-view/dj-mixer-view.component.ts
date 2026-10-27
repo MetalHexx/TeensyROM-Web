@@ -35,7 +35,7 @@ import {
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
-import type { SetsTreeBranchModel } from '@teensyrom-nx/ui/components/dj';
+import { FoldHandleComponent, type SetsTreeBranchModel } from '@teensyrom-nx/ui/components/dj';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjSidPanelComponent } from '../sid-panel/dj-sid-panel.component';
 import { DjBindingsPanelComponent } from '../bindings-panel/dj-bindings-panel.component';
@@ -52,6 +52,9 @@ import type { DeckRef } from '../deck-ref';
 /** How long the peek stays after the last Select press. */
 const PEEK_DURATION_MS = 1500;
 
+/** The query the `below-phone` mixin uses (`$bp-phone` is 640px), below which the band stacks. */
+const STACKED_QUERY = '(max-width: 639px)';
+
 @Component({
   selector: 'lib-dj-mixer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -66,6 +69,7 @@ const PEEK_DURATION_MS = 1500;
     DjBindingsPanelComponent,
     MappingOverlayLayerComponent,
     SlidingContainerComponent,
+    FoldHandleComponent,
   ],
   templateUrl: './dj-mixer-view.component.html',
   styleUrl: './dj-mixer-view.component.scss',
@@ -82,6 +86,7 @@ export class DjMixerViewComponent {
   private readonly midiLearn = inject(MidiLearn);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
+  private readonly breakpoints = inject(BreakpointObserver);
 
   private readonly sidPanel = viewChild(DjSidPanelComponent);
   private readonly bindingsPanel = viewChild(DjBindingsPanelComponent);
@@ -127,14 +132,38 @@ export class DjMixerViewComponent {
 
   /** Whether the user prefers no motion, which makes the panel's slide instant. */
   readonly reducedMotion = toSignal(
-    inject(BreakpointObserver)
+    this.breakpoints
       .observe('(prefers-reduced-motion: reduce)')
       .pipe(map((state) => state.matches)),
     { initialValue: false }
   );
 
+  /** Whether the band has stacked its three cards (below the phone breakpoint). */
+  readonly stacked = toSignal(
+    this.breakpoints.observe(STACKED_QUERY).pipe(map((state) => state.matches)),
+    { initialValue: false }
+  );
+
   /** How long the panel's slide and its card's own entry take: instant for reduced motion. */
   readonly panelAnimationDuration = computed(() => (this.reducedMotion() ? 0 : 400));
+
+  /** Whether the file listing is folded into its strip; session only, independent of
+   *  `browserShown`. Read through `listingFoldedEffective`, which ignores it when stacked. */
+  readonly listingFolded = signal(false);
+
+  /** Whether the listing is folded as far as the layout is concerned: never when stacked. */
+  readonly listingFoldedEffective = computed(() => this.listingFolded() && !this.stacked());
+
+  /** The listing body's open width, held when a fold starts so the listing does not reflow into
+   *  the shrinking card; `null` once an unfold releases it. */
+  private readonly heldListingWidth = signal<number | null>(null);
+
+  /** The width the listing body is held at while folded; none when it is not. */
+  protected readonly listingBodyWidth = computed(() =>
+    this.listingFoldedEffective() ? this.heldListingWidth() : null
+  );
+
+  private readonly listingBody = viewChild<ElementRef<HTMLElement>>('listingBody');
 
   /** Whether the browser (trees, listing and set card) is shown; session only. */
   readonly browserShown = signal(true);
@@ -313,6 +342,28 @@ export class DjMixerViewComponent {
     this.peekShown.set(false);
   }
 
+  /** Folds the file listing into its strip, or unfolds it. A fold holds the body at the width it
+   *  has now; an unfold releases it. With no motion there is no transition to wait for, so the
+   *  overlays are asked to measure again at once. */
+  foldListing(folded: boolean): void {
+    if (this.listingFolded() === folded) return;
+    this.heldListingWidth.set(
+      folded ? this.listingBody()?.nativeElement.offsetWidth ?? null : null
+    );
+    this.listingFolded.set(folded);
+    if (this.panelAnimationDuration() === 0) {
+      this.bandSettled.update((count) => count + 1);
+    }
+  }
+
+  /** The listing card's own width transition finished: the set card's controls have moved, so the
+   *  overlays measure again. Transitions bubbling from the card's content are not its own. */
+  onListingCardTransitionEnd(event: TransitionEvent): void {
+    if (event.target === event.currentTarget && event.propertyName === 'flex-basis') {
+      this.bandSettled.update((count) => count + 1);
+    }
+  }
+
   /** The band's slide finished: after an exit, the grid drops its row. An entry's finish is
    *  ignored — the row was restored before it began. */
   onBandAnimationComplete(): void {
@@ -351,7 +402,9 @@ export class DjMixerViewComponent {
     this.midiLearn.cancel();
   }
 
+  /** Choosing a storage asks to see its files, so a folded listing opens. */
   onStorageSelect(event: DjStorageSelectEvent): void {
+    this.foldListing(false);
     this.activeStorage.set(event);
     const path = this.storageStore.storageEntries()[activeStorageKey(event)]?.currentPath ?? '/';
     void this.storageStore.navigateToDirectory({ ...event, path });

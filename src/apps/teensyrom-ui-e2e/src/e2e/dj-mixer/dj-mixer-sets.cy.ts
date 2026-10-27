@@ -207,6 +207,129 @@ describe('DJ Mixer — sets', () => {
     });
   });
 
+  describe('the band widths and the listing fold', () => {
+    const LONG_NAME = 'abcdefghij'.repeat(6) + 'abcd';
+    const LONG_ID = '6f1c2a40-0b7e-4d57-9a53-1f0d5d9b0a03';
+    const LISTING = '.directory-listing-card';
+    const SET_CARD = '.set-card';
+    const COLLAPSE = 'button[aria-label="Collapse the file listing"]';
+    const EXPAND = 'button[aria-label="Expand the file listing"]';
+
+    const widthIn = ($el: JQuery<HTMLElement>): number => $el[0].getBoundingClientRect().width;
+
+    function widthOf(selector: string): Cypress.Chainable<number> {
+      return cy.get(selector).then(widthIn);
+    }
+
+    /** Retried until the fold's transition has ended. */
+    function expectWidth(selector: string, expected: number): void {
+      cy.get(selector).should(($el) => {
+        expect(widthIn($el)).to.be.closeTo(expected, 1);
+      });
+    }
+
+    function freezeScaling(): void {
+      // The scaling containers' entry animation still moves their rects; measure the layout itself.
+      cy.document().then((doc) => {
+        const style = doc.createElement('style');
+        style.textContent =
+          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; }';
+        doc.head.appendChild(style);
+      });
+    }
+
+    function expectEqualHalves(): void {
+      cy.get(LISTING).should(($listing) => {
+        const setCard = $listing[0].ownerDocument.querySelector(SET_CARD) as HTMLElement;
+        expect(setCard.getBoundingClientRect().width).to.be.closeTo(widthIn($listing), 1);
+      });
+    }
+
+    describe('with short names', () => {
+      beforeEach(() => {
+        visitDjMixer({ sets: [FRIDAY, SATURDAY], currentSetId: FRIDAY_ID });
+        freezeScaling();
+        cy.get(LISTING).should('exist');
+      });
+
+      it('makes the tree 212 wide and splits the rest evenly between the listing and the set card', () => {
+        expectWidth('.browse-card', 212);
+        expectEqualHalves();
+      });
+
+      it('folds the listing to a 44px strip, gives the set card the rest, and restores the split', () => {
+        widthOf(LISTING).then((open) => {
+          cy.get(COLLAPSE).click();
+
+          cy.get(EXPAND).should('have.attr', 'aria-expanded', 'false');
+          expectWidth(LISTING, 44);
+          cy.get(SET_CARD).should(($card) => {
+            expect(widthIn($card)).to.be.greaterThan(open);
+          });
+
+          layoutRects().then((folded) => {
+            cy.get(EXPAND).click();
+
+            cy.get(COLLAPSE).should('have.attr', 'aria-expanded', 'true');
+            expectWidth(LISTING, open);
+            expectEqualHalves();
+            layoutRects().should('deep.equal', folded);
+          });
+        });
+      });
+
+      it('leaves the decks and the SID panel where they were across a fold', () => {
+        layoutRects().then((open) => {
+          cy.get(COLLAPSE).click();
+          cy.get(EXPAND).should('exist');
+          expectWidth(LISTING, 44);
+          layoutRects().should('deep.equal', open);
+        });
+      });
+
+      it('opens a folded listing on choosing a storage, but not on choosing a set', () => {
+        cy.get(COLLAPSE).click();
+        expectWidth(LISTING, 44);
+
+        cy.get('[role="treeitem"][aria-label="Set Saturday"]').click();
+        waitForGetDjSet(SATURDAY_ID);
+        cy.get(EXPAND).should('exist');
+        expectWidth(LISTING, 44);
+
+        cy.get('lib-browse-tree').contains('SD Storage').click();
+        cy.get(COLLAPSE).should('exist');
+        expectEqualHalves();
+      });
+    });
+
+    describe('with a 64-character set name', () => {
+      beforeEach(() => {
+        visitDjMixer({
+          sets: [savedSet(LONG_ID, LONG_NAME, []), FRIDAY],
+          currentSetId: FRIDAY_ID,
+        });
+        freezeScaling();
+        cy.get(LISTING).should('exist');
+      });
+
+      it('stops the tree at 360, ellipsises the name and never scrolls it sideways', () => {
+        expectWidth('.browse-card', 360);
+        cy.get(`[role="treeitem"][aria-label="Set ${LONG_NAME}"] .icon-label-text`).should(
+          ($text) => {
+            const [text] = $text.get();
+            expect(text.scrollWidth).to.be.greaterThan(text.clientWidth);
+            expect(text.title).to.equal(LONG_NAME);
+          }
+        );
+        cy.get('lib-dj-browse-trees').should(($tree) => {
+          const [tree] = $tree.get();
+          expect(tree.scrollWidth).to.be.at.most(tree.clientWidth);
+        });
+        expectEqualHalves();
+      });
+    });
+  });
+
   describe('the set peek', () => {
     /** The part of Angular's dev-mode debug API the case uses; absent from a production build. */
     interface NgDebug {

@@ -1,0 +1,5 @@
+// The listing card's fold handle sits over the trail's right end; this keeps it clear of the chips.
+:host {
+  display: block;
+  padding-inline-end: 3.5rem;
+}

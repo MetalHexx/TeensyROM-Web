@@ -151,6 +151,13 @@
   height: 100%;
   min-height: 0;
 
+  // The tree is as wide as its widest row, between these two; the listing and the set card share
+  // the rest evenly.
+  --browse-card-min: 212px;
+  --browse-card-max: 360px;
+  // The folded listing's strip, which the fold handle reads too.
+  --fold-strip-width: 44px;
+
   @include styles.below-phone {
     flex-direction: column;
   }
@@ -163,14 +170,21 @@
   height: 100%;
 }
 
+// `lib-scaling-compact-card`'s host is `width: 100%`; the explicit `width: auto` is what lets the
+// basis follow the widest row.
 .browse-card {
-  flex: 0 0 212px;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: var(--browse-card-min);
+  max-width: var(--browse-card-max);
 
   @include styles.below-phone {
-    // 212px is a width while the band is a row; once it stacks, that basis would become a height.
+    // Once the band stacks, the card spans it like the other two; its auto basis is a height.
     flex: 0 0 auto;
     height: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
 }
 
@@ -182,22 +196,42 @@
 .directory-listing-card {
   flex: 1 1 0;
   min-width: 0;
+  transition: flex-basis var(--fold-duration) cubic-bezier(0.4, 0, 0.2, 1),
+    flex-grow var(--fold-duration) cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.directory-listing-card--folded {
+    flex: 0 0 var(--fold-strip-width);
+  }
 
   @include styles.below-phone {
     flex: 1 1 auto;
   }
 }
 
+// Takes over the sole-content flex chain the listing relies on, and clips it while the card
+// narrows. It is clipped here rather than through the card's `enableOverflow`, which would stop
+// the listing scrolling.
+.listing-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: opacity var(--fold-duration) ease, visibility var(--fold-duration) linear;
+}
+
+.directory-listing-card--folded .listing-body {
+  opacity: 0;
+  visibility: hidden;
+}
+
 .set-card {
-  flex: 0 0 680px;
+  flex: 1 1 0;
   min-width: 0;
 
-  @include styles.below-desktop {
-    flex: 0 1 680px;
-  }
-
   @include styles.below-phone {
-    // 680px is a width while the band is a row; once it stacks, that basis would become a height.
+    // Once the band stacks, the zero basis would become a height.
     flex: 0 0 auto;
     height: auto;
   }

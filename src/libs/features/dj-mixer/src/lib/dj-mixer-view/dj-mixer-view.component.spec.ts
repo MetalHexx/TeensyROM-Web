@@ -36,6 +36,7 @@ import {
   MappingOverlayLayerComponent,
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
+import { FoldHandleComponent } from '@teensyrom-nx/ui/components/dj';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
 import { anchorFor } from '../mapping/control-anchors';
@@ -320,8 +321,9 @@ function render(
   storageStoreOverrides: Record<string, unknown> = {},
   {
     reducedMotion = false,
+    stacked = false,
     loops = NO_LOOPS,
-  }: { reducedMotion?: boolean; loops?: DeckLoopsSummary } = {}
+  }: { reducedMotion?: boolean; stacked?: boolean; loops?: DeckLoopsSummary } = {}
 ) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
   const selectTurns = signal(0);
@@ -350,7 +352,12 @@ function render(
         provide: BreakpointObserver,
         useValue: {
           observe: (query: string) =>
-            of({ matches: reducedMotion && query.includes('reduced-motion'), breakpoints: {} }),
+            of({
+              matches: query.includes('reduced-motion')
+                ? reducedMotion
+                : query.includes('max-width') && stacked,
+              breakpoints: {},
+            }),
         },
       },
     ],
@@ -735,6 +742,168 @@ describe('DjMixerViewComponent', () => {
 
       const reduced = render([device()], {}, { reducedMotion: true });
       expect(slot(reduced.fixture).animationDuration()).toBe(0);
+    });
+  });
+
+  describe('folding the file listing', () => {
+    const card = (fixture: ComponentFixture<DjMixerViewComponent>): HTMLElement =>
+      fixture.nativeElement.querySelector('.directory-listing-card');
+    const body = (fixture: ComponentFixture<DjMixerViewComponent>): HTMLElement =>
+      fixture.nativeElement.querySelector('.listing-body');
+    const handle = (fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector('lib-fold-handle button');
+    const bandStyle = (fixture: ComponentFixture<DjMixerViewComponent>, name: string): string =>
+      fixture.nativeElement.querySelector('.bottom-band').style.getPropertyValue(name);
+
+    /** jsdom has no TransitionEvent, so the one property the view reads is put on a plain event. */
+    const transitionEnd = (propertyName: string, bubbles = false): Event =>
+      Object.assign(new Event('transitionend', { bubbles }), { propertyName });
+
+    function finishFold(fixture: ComponentFixture<DjMixerViewComponent>): void {
+      card(fixture).dispatchEvent(transitionEnd('flex-basis'));
+      fixture.detectChanges();
+    }
+
+    it('offers a handle named for the state once a device is enabled, first inside the card', () => {
+      const { fixture } = render([device()]);
+
+      expect(handle(fixture)?.getAttribute('aria-label')).toBe('Collapse the file listing');
+      expect(card(fixture).querySelector('lib-fold-handle')?.nextElementSibling).toBe(
+        body(fixture)
+      );
+    });
+
+    it('offers no handle without a device', () => {
+      const { fixture } = render([]);
+
+      expect(fixture.nativeElement.querySelector('lib-fold-handle')).toBeNull();
+    });
+
+    it('folds the card and makes the listing inert, and unfolds both again', () => {
+      const { fixture, component } = render([device()]);
+
+      handle(fixture)?.click();
+      fixture.detectChanges();
+
+      expect(component.listingFolded()).toBe(true);
+      expect(card(fixture).classList).toContain('directory-listing-card--folded');
+      expect(body(fixture).hasAttribute('inert')).toBe(true);
+      expect(handle(fixture)?.getAttribute('aria-label')).toBe('Expand the file listing');
+      expect(handle(fixture)?.getAttribute('aria-expanded')).toBe('false');
+
+      component.foldListing(false);
+      fixture.detectChanges();
+
+      expect(card(fixture).classList).not.toContain('directory-listing-card--folded');
+      expect(body(fixture).hasAttribute('inert')).toBe(false);
+      expect(handle(fixture)?.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('keeps the listing instance alive across a fold', () => {
+      const { fixture, component } = render([device()]);
+      const before = fixture.debugElement.query(By.directive(DjDirectoryListingComponent));
+
+      component.foldListing(true);
+      fixture.detectChanges();
+      component.foldListing(false);
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.query(By.directive(DjDirectoryListingComponent))).toBe(before);
+    });
+
+    it('is not folded, hidden or inert when stacked, whatever was chosen, and has no handle', () => {
+      const { fixture, component } = render([device()], {}, { stacked: true });
+
+      component.foldListing(true);
+      fixture.detectChanges();
+
+      expect(component.listingFolded()).toBe(true);
+      expect(component.listingFoldedEffective()).toBe(false);
+      expect(card(fixture).classList).not.toContain('directory-listing-card--folded');
+      expect(body(fixture).hasAttribute('inert')).toBe(false);
+      expect(body(fixture).style.width).toBe('');
+      expect(fixture.nativeElement.querySelector('lib-fold-handle')).toBeNull();
+    });
+
+    it('opens on choosing a storage, but not on choosing a set', () => {
+      const { fixture, component } = render([device()]);
+      component.foldListing(true);
+
+      component.onSetSelect('s1');
+      expect(component.listingFolded()).toBe(true);
+
+      component.onStorageSelect({ deviceId: 'device-a', storageType: StorageType.Usb });
+      fixture.detectChanges();
+
+      expect(component.listingFolded()).toBe(false);
+      expect(card(fixture).classList).not.toContain('directory-listing-card--folded');
+    });
+
+    it('survives hiding and showing the browser', () => {
+      const { component } = render([device()]);
+      component.foldListing(true);
+
+      component.toggleBrowser();
+      component.toggleBrowser();
+
+      expect(component.listingFolded()).toBe(true);
+    });
+
+    it('hands the handle and the band the fold duration, none for reduced motion', () => {
+      const handleOf = (fixture: ComponentFixture<DjMixerViewComponent>) =>
+        fixture.debugElement.query(By.directive(FoldHandleComponent))
+          .componentInstance as FoldHandleComponent;
+      const normal = render([device()]);
+      expect(handleOf(normal.fixture).animationDuration()).toBe(400);
+      expect(bandStyle(normal.fixture, '--fold-duration')).toBe('400ms');
+      TestBed.resetTestingModule();
+
+      const reduced = render([device()], {}, { reducedMotion: true });
+      expect(handleOf(reduced.fixture).animationDuration()).toBe(0);
+      expect(bandStyle(reduced.fixture, '--fold-duration')).toBe('0ms');
+    });
+
+    describe('the mapping overlays', () => {
+      function targets(fixture: ComponentFixture<DjMixerViewComponent>) {
+        return (
+          fixture.debugElement.query(By.directive(MappingOverlayLayerComponent))
+            .componentInstance as MappingOverlayLayerComponent
+        ).targets();
+      }
+
+      it('measure again when the card finishes its own width transition, and not before', async () => {
+        const { fixture, component, midiStore } = render([device()]);
+        midiStore.setMappingMode({ on: true });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const before = targets(fixture);
+
+        component.foldListing(true);
+        fixture.detectChanges();
+        expect(targets(fixture)).toBe(before);
+
+        body(fixture).dispatchEvent(transitionEnd('flex-basis', true));
+        fixture.detectChanges();
+        expect(targets(fixture)).toBe(before);
+
+        finishFold(fixture);
+        expect(targets(fixture)).not.toBe(before);
+      });
+
+      it('measure again at once when there is no motion to wait for', async () => {
+        const { fixture, component, midiStore } = render([device()], {}, { reducedMotion: true });
+        midiStore.setMappingMode({ on: true });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const before = targets(fixture);
+
+        component.foldListing(true);
+        fixture.detectChanges();
+
+        expect(targets(fixture)).not.toBe(before);
+      });
     });
   });
 

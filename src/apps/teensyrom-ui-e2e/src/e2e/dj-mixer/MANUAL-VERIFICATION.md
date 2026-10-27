@@ -441,7 +441,7 @@ another checkout's API was listening there, so the DJ library was never written 
 | deck column A / B                 | 112 and 1430, 474 wide, 614.5 high                       | transport 129 and 1447, 440 x 163.8                                                  |
 | SID panel                         | 698 66 / 620 x 614.5                                     | 698 66 / 620 x 555.8                                                                 |
 | band (tree + listing + set card)  | 112 692.5 / 1792 x 371.5, ends at 1064                   | 112 633.8 / 1792 x 430.2, ends at 1064                                               |
-| tree / listing / set card (width) | 212 / 876 / 680, 12 apart                                | 212 / 876 / 680, 12 apart (same)                                                     |
+| tree / listing / set card (width) | 212 / 876 / 680, 12 apart                                | 212 / 778 / 778, 12 apart (the even split; see the widths table below)               |
 | header buttons: bindings, browser | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32          | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32 (same)                               |
 | browser button                    | `Hide the browser`, engaged (lit)                        | `Hide the browser`, lit, `aria-expanded` true; `Show the browser`, false once hidden |
 | B (hidden)                        | decks, speed strips and SID panel as in A; band absent   | same as A to the pixel; band removed, the freed height empty                         |
@@ -450,7 +450,43 @@ another checkout's API was listening there, so the DJ library was never written 
 | deck set rows                     | in each deck stack                                       | 129 212.8 and 1447 212.8, 440 x 26                                                   |
 
 The deck, speed strip, SID panel and grid rects are identical to the pixel in A, B and C, and again
-after Show. The tree is 212 and the set card 680, as in the mockup. The freed band height stays empty.
+after Show. The tree is 212 (short names) and the listing and the set card 778 each, no longer the
+mockup's 876 and 680. The freed band height stays empty.
+
+**The band's widths and the listing's fold.** Measured with `getBoundingClientRect()` in a same-origin
+frame of exactly the stated viewport, loaded in a tab against the running `pnpm start` on port 4200
+and its API, with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }`
+injected. The deck, speed strip and SID panel rects were read before and after each fold and unfold
+and compared: identical in every state. The run's rendering was slow (a fold took a few seconds to
+settle), so each state was read after waiting it out, not mid-transition.
+
+| viewport    | state                              | tree         | listing | set card | tree scroller (scroll / client)     |
+| ----------- | ---------------------------------- | ------------ | ------- | -------- | ----------------------------------- |
+| 1920 x 1080 | open, short names                  | 212          | 778     | 778      | 179 / 179                           |
+| 1920 x 1080 | folded                             | 212          | 44      | 1512     | 179 / 179                           |
+| 1920 x 1080 | unfolded again                     | 212          | 778     | 778      | 179 / 179                           |
+| 1920 x 1080 | a 64-character set name (see note) | 360 (cap)    | 704     | 704      | 327 / 327                           |
+| 1366 x 768  | open, short names                  | 212          | 504.9   | 504.9    | 187 / 187                           |
+| 1366 x 768  | folded                             | 212          | 44      | 965.8    | 187 / 187                           |
+| 1366 x 768  | unfolded again                     | 212          | 504.9   | 504.9    | 187 / 187                           |
+| 1366 x 768  | a 64-character set name (see note) | 360 (cap)    | 430.9   | 430.9    | 335 / 335                           |
+| 400 x 800   | stacked, `listingFolded` true      | 358.5 (full) | 358.5   | 358.5    | no handle, not inert, listing shown |
+
+At 1920 the widths are (1792 - 212 - 24) / 2 = 778 and, folded, 1792 - 212 - 44 - 24 = 1512; at 1366
+the gap is 8 (below desktop), so 504.9 and 965.8. The handle's button is 32 x 32, 6 px from the card's
+right edge and 8 px from its top, open (1920: 1076, 640.2 in a card ending at 1114) and folded (342 in
+a card from 336 to 380). Unfolding returned the same directory and the same scroll position (200 px)
+and the same rendered rows. A folded listing is `inert` and `visibility: hidden`; the handle's button
+is the only stop. With mapping mode on (the bindings panel open, which narrows the grid) the Select
+overlay followed its key through a fold and an unfold: key at x 969, 413 wide open and overlay at
+966, 419 wide (a 3 px outset); folded, key at 421, 961 wide and overlay at 418, 967; back to the open
+numbers after the unfold. Load A and Load B did not move in that layout (the set card's right edge is
+fixed), so they were not a test of the re-measure, which the view spec pins.
+
+*Note, the long name.* The live API holds no 64-character set, so that row's text was lengthened
+in the DOM and the widths read from the live layout; the committed case in `dj-mixer-sets.cy.ts`
+serves a real 64-character set and checks the 360 width, the ellipsis (the text's `scrollWidth`
+exceeds its `clientWidth`, `title` the full name) and the tree's overflow.
 
 **Frame E.** Delete asks inline: the confirm row measures 1236 679.8 / 656 x 36, directly under the
 header, with Cancel focused. Cancel sends nothing; Delete sends the `DELETE` (`dj-mixer-sets.cy.ts`).
@@ -473,6 +509,18 @@ bench list for real hardware. `dj-mixer-sets.cy.ts` now commits the peek case (i
 
 **Deviations from the mockup, and why.**
 
+- **The even split.** The listing and the set card share what the tree leaves equally (778 each at
+  1920) where the mockup draws 876 and 680, and below desktop the set card no longer holds 680 as its
+  basis. The operator asked for it after bench testing.
+- **A tree as wide as its widest row.** It is 212 at the least and 360 at the most, where the mockup
+  and requirement R5 have it narrower than the old tree and fixed; a long set name is cut with an
+  ellipsis at the cap (its full name in `title`) rather than widening it further, and it never
+  scrolls sideways. The storage rows are block-level so a device's SD and USB rows do not sit side by
+  side and set the width. The operator's request after bench testing.
+- **The folding listing.** The file listing folds into a 44 px strip from a handle in its top-right
+  corner, which the mockup frames A to C show but the requirements do not ask for; the set card takes
+  the room. Choosing a storage unfolds it, choosing a set does not, and below the phone breakpoint
+  there is no handle and nothing folds. Also the operator's request after bench testing.
 - **Band height 430.2 against 371.5.** The grid's top row is sized by the decks' and the SID panel's
   real content (555.8) and the band takes what remains; the mockup draws that row at 614.5. That row
   is not this phase's to change; the band's width, its gaps and its bottom edge match.
@@ -561,6 +609,8 @@ task's alone. That warning is already on `main`, and `project.json`'s budgets ar
 - [ ] The peek rises promptly with a tune playing on a deck (it started late in the software-rendered run).
 - [ ] A failed save while the browser is hidden raises the peek and is announced.
 - [ ] No audible glitch or timing slip from any load, restore or save.
+- [ ] Fold and unfold the listing on a large real directory and find the scroll position where it
+      was left, with the same rows and selection.
 
 ## Byte fidelity (P03-T02)
 
