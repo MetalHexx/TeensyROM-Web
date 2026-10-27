@@ -2155,6 +2155,414 @@
         }
       }
     },
+    "/api/dj/tunes/{sidHash}/memory": {
+      "put": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Save Tune Memory",
+        "description": "Saves the memory kept for one tune, replacing any stored memory for the same SID hash.\n\n**Validation:**\n- The route SID hash and the body SID hash are the same 32 lowercase hexadecimal characters\n- Last subtune is 1-256; memory subtunes are unique and within 1-256\n- Updated is an ISO-8601 timestamp\n- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores\n- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2\n- Settings values are null or at most 8192 characters of JSON\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "operationId": "SaveTuneMemory",
+        "parameters": [
+          {
+            "name": "sidHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DjTuneMemoryDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveTuneMemoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Get Tune Memory",
+        "description": "Reads the memory kept for one tune: last subtune, loop markers and settings per subtune.\n\nThe memory is null when none exists for the tune or its file is corrupt; a corrupt file is left on disk.\n\n**Validation:**\n- The SID hash is 32 lowercase hexadecimal characters",
+        "operationId": "GetTuneMemory",
+        "parameters": [
+          {
+            "name": "sidHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTuneMemoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dj/sets/{setId}": {
+      "put": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Save DJ Set",
+        "description": "Saves a DJ set, replacing any stored set with the same id.\n\n**Validation:**\n- The set id and the body id are the same lowercase GUID\n- Name and placeholder are 1-64 characters after trimming, with no control characters\n- Created and updated are ISO-8601 timestamps\n- At most 1000 sets in the library and 1000 rows per set; row ids are unique GUIDs and each SID appears once\n- Tune: SID hash is 32 lowercase hex characters; title, author and released are at most 64 characters; 1-256 subtunes; 1-1048576 bytes\n- Copied-from SID hash equals the SID hash of the row tune\n- Last subtune and each memory subtune are within 1 to the subtune count; memory subtunes are unique\n- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores\n- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2\n- Host and settings values are null or at most 8192 characters of JSON\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "operationId": "SaveDjSet",
+        "parameters": [
+          {
+            "name": "setId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DjSetDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveDjSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Get DJ Set",
+        "description": "Reads one DJ set with its rows and their memory.\n\nThe set is null when none exists with that id or its file is corrupt; a corrupt file is left on disk.\n\n**Validation:**\n- The set id is a lowercase GUID in the hyphenated format",
+        "operationId": "GetDjSet",
+        "parameters": [
+          {
+            "name": "setId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDjSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Delete DJ Set",
+        "description": "Deletes a DJ set file. Deleting a set that does not exist succeeds.\n\nTune memory is kept.\n\n**Validation:**\n- The set id is a lowercase GUID in the hyphenated format",
+        "operationId": "DeleteDjSet",
+        "parameters": [
+          {
+            "name": "setId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteDjSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dj/library": {
+      "put": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Save DJ Library State",
+        "description": "Saves which set is current.\n\n**Validation:**\n- The current set id is null or a lowercase GUID in the hyphenated format\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "operationId": "SaveDjLibraryState",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DjLibraryStateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveDjLibraryStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Get DJ Library State",
+        "description": "Reads which set is current. The current set id is null when none was saved or the file is corrupt.",
+        "operationId": "GetDjLibraryState",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDjLibraryStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dj/sets": {
+      "get": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "List DJ Sets",
+        "description": "Lists a summary of every stored DJ set: id, name, row count and last update.\n\nSets live as files under the engine home. A set whose file is corrupt is skipped and left on disk.",
+        "operationId": "ListDjSets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDjSetsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audio/devices": {
       "get": {
         "tags": [
@@ -2541,6 +2949,17 @@
           }
         }
       },
+      "DeleteDjSetResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "DeviceSettingsDto": {
         "required": [
           "deviceId",
@@ -2587,6 +3006,339 @@
             "type": "string"
           }
         }
+      },
+      "DjLibraryStateDto": {
+        "type": "object",
+        "properties": {
+          "currentSetId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DjLoopBoundaryDto": {
+        "required": [
+          "frame",
+          "offsetFrames"
+        ],
+        "type": "object",
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offsetFrames": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DjLoopBoundaryDto2": {
+        "required": [
+          "frame",
+          "offsetFrames"
+        ],
+        "type": "object",
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offsetFrames": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "nullable": true
+      },
+      "DjLoopMarkerDto": {
+        "required": [
+          "id",
+          "start",
+          "voices"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "start": {
+            "$ref": "#/components/schemas/DjLoopBoundaryDto"
+          },
+          "end": {
+            "$ref": "#/components/schemas/DjLoopBoundaryDto2"
+          },
+          "voices": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/NullableOfJsonElement"
+          },
+          "usesOwnSettings": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "DjMemoryLinkDto": {
+        "required": [
+          "sidHash",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "nullable": true
+      },
+      "DjRowTuneDto": {
+        "required": [
+          "sidHash",
+          "title",
+          "author",
+          "released",
+          "subtuneCount",
+          "byteLength"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "released": {
+            "type": "string"
+          },
+          "subtuneCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DjSetDto": {
+        "required": [
+          "id",
+          "name",
+          "placeholder",
+          "rows",
+          "created",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSetRowDto"
+            }
+          },
+          "created": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        }
+      },
+      "DjSetDto2": {
+        "required": [
+          "id",
+          "name",
+          "placeholder",
+          "rows",
+          "created",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSetRowDto"
+            }
+          },
+          "created": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "nullable": true
+      },
+      "DjSetRowDto": {
+        "required": [
+          "id",
+          "tune",
+          "lastSubtune",
+          "subtunes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tune": {
+            "$ref": "#/components/schemas/DjRowTuneDto"
+          },
+          "copiedFrom": {
+            "$ref": "#/components/schemas/DjMemoryLinkDto"
+          },
+          "lastSubtune": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subtunes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSubtuneMemoryDto"
+            }
+          },
+          "host": {
+            "$ref": "#/components/schemas/NullableOfJsonElement"
+          }
+        }
+      },
+      "DjSetSummaryDto": {
+        "required": [
+          "id",
+          "name",
+          "rowCount",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "string"
+          }
+        }
+      },
+      "DjSubtuneMemoryDto": {
+        "required": [
+          "subtune",
+          "markers"
+        ],
+        "type": "object",
+        "properties": {
+          "subtune": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjLoopMarkerDto"
+            }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/NullableOfJsonElement"
+          }
+        }
+      },
+      "DjTuneMemoryDto": {
+        "required": [
+          "sidHash",
+          "lastSubtune",
+          "subtunes",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "lastSubtune": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subtunes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSubtuneMemoryDto"
+            }
+          },
+          "updated": {
+            "type": "string"
+          }
+        }
+      },
+      "DjTuneMemoryDto2": {
+        "required": [
+          "sidHash",
+          "lastSubtune",
+          "subtunes",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "lastSubtune": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subtunes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSubtuneMemoryDto"
+            }
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "nullable": true
       },
       "FileItemDto": {
         "required": [
@@ -2837,6 +3589,23 @@
           }
         }
       },
+      "GetDjLibraryStateResponse": {
+        "type": "object",
+        "properties": {
+          "currentSetId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "GetDjSetResponse": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "$ref": "#/components/schemas/DjSetDto2"
+          }
+        }
+      },
       "GetJobResponse": {
         "required": [
           "job"
@@ -2903,6 +3672,14 @@
           },
           "appSettings": {
             "$ref": "#/components/schemas/AppSettingsDto"
+          }
+        }
+      },
+      "GetTuneMemoryResponse": {
+        "type": "object",
+        "properties": {
+          "memory": {
+            "$ref": "#/components/schemas/DjTuneMemoryDto2"
           }
         }
       },
@@ -3108,6 +3885,20 @@
           }
         }
       },
+      "ListDjSetsResponse": {
+        "required": [
+          "sets"
+        ],
+        "type": "object",
+        "properties": {
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSetSummaryDto"
+            }
+          }
+        }
+      },
       "ListJobsResponse": {
         "required": [
           "jobs"
@@ -3196,6 +3987,9 @@
             "format": "int32"
           }
         }
+      },
+      "NullableOfJsonElement": {
+        "nullable": true
       },
       "NullableOfTeensyFilterType": {
         "enum": [
@@ -3367,6 +4161,28 @@
           }
         }
       },
+      "SaveDjLibraryStateResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SaveDjSetResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "SaveFavoriteResponse": {
         "required": [
           "message",
@@ -3456,6 +4272,17 @@
         }
       },
       "SaveSettingsResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SaveTuneMemoryResponse": {
         "required": [
           "message"
         ],
@@ -4250,6 +5077,9 @@
     },
     {
       "name": "Engine"
+    },
+    {
+      "name": "DjLibrary"
     },
     {
       "name": "Audio"

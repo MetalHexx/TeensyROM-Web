@@ -2,6 +2,7 @@
 /* eslint-disable */
 export * from './AudioApiService';
 export * from './DevicesApiService';
+export * from './DjLibraryApiService';
 export * from './EngineApiService';
 export * from './FilesApiService';
 export * from './MidiSettingsApiService';
