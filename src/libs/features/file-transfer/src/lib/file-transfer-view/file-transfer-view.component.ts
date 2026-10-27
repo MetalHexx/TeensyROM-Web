@@ -11,6 +11,7 @@ import { DeviceStore, StorageStore, TransferStore } from '@teensyrom-nx/applicat
 import { Device, StorageType } from '@teensyrom-nx/domain';
 import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 import { DropzoneCardComponent } from './dropzone-card/dropzone-card.component';
+import { TransfersCardComponent } from './transfers-card/transfers-card.component';
 import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
 import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
@@ -24,6 +25,7 @@ import { TransferDirectoryListingComponent } from './transfer-directory-listing/
   selector: 'lib-file-transfer-view',
   imports: [
     DropzoneCardComponent,
+    TransfersCardComponent,
     TransferToolbarComponent,
     EmptyStateMessageComponent,
     DirectoryTreeContainerComponent,

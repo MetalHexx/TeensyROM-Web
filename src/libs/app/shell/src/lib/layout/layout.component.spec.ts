@@ -196,7 +196,7 @@ describe('LayoutComponent', () => {
     const transferModalCalls = () =>
       mockDialog.open.mock.calls.filter(([componentType]) => componentType === TransferModalComponent);
 
-    it('opens the transfer modal, disabling close, once store state says a transfer is live', () => {
+    it('opens the details dialog, disabling close, on the device of the user’s own drop', () => {
       transferStore.setTargetDevice({ deviceId });
       transferStore.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
       fixture.detectChanges();
@@ -208,9 +208,9 @@ describe('LayoutComponent', () => {
       expect(config.restoreFocus).toBe(true);
       expect(config.panelClass).toBe('glassy-dialog');
       expect(config.backdropClass).toBe('busy-dialog-backdrop');
-      expect(config.ariaLabel).toContain('Transferring files to');
+      expect(config.ariaLabel).toBe('Transfer details');
       // Material's default 80vw dialog cap would otherwise silently defeat the terminal shape's
-      // content-driven width; `width` itself stays unset so that width wins.
+      // content-driven width; width itself stays unset so that width wins.
       expect(config.maxWidth).toBe('95vw');
       expect(config.width).toBeUndefined();
     });
@@ -225,7 +225,7 @@ describe('LayoutComponent', () => {
       expect(transferModalCalls().length).toBe(1);
     });
 
-    it('closes the dialog once the store clears the transfer', () => {
+    it('closes the dialog once cancelling during a scan clears the transfer', () => {
       const dialogRef = { close: vi.fn() };
       mockDialog.open.mockReturnValue(dialogRef);
 
@@ -237,6 +237,49 @@ describe('LayoutComponent', () => {
       fixture.detectChanges();
 
       expect(dialogRef.close).toHaveBeenCalled();
+    });
+
+    it('opens nothing for a transfer snapshot that arrives from elsewhere', () => {
+      transferStore.setTargetDevice({ deviceId });
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      fixture.detectChanges();
+
+      expect(transferModalCalls().length).toBe(0);
+    });
+
+    it('opens on a foreign transfer once the user asks for its details, and closes again on hide', () => {
+      const dialogRef = { close: vi.fn() };
+      mockDialog.open.mockReturnValue(dialogRef);
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      fixture.detectChanges();
+
+      transferStore.showTransferDetails({ deviceId });
+      fixture.detectChanges();
+
+      expect(transferModalCalls().length).toBe(1);
+      expect(dialogRef.close).not.toHaveBeenCalled();
+
+      transferStore.hideTransferDetails();
+      fixture.detectChanges();
+
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the same dialog open while switching between two transfers', () => {
+      const dialogRef = { close: vi.fn() };
+      mockDialog.open.mockReturnValue(dialogRef);
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot({ deviceId: 'device-2', jobId: 'job-2' }),
+      });
+      transferStore.showTransferDetails({ deviceId });
+      fixture.detectChanges();
+
+      transferStore.showTransferDetails({ deviceId: 'device-2' });
+      fixture.detectChanges();
+
+      expect(transferModalCalls().length).toBe(1);
+      expect(dialogRef.close).not.toHaveBeenCalled();
     });
   });
 

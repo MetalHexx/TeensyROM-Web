@@ -10,6 +10,8 @@ export interface TransferProgressVm {
   deviceName: string;
   destinationLabel: string;
   droppedRootName: string | null;
+  /** The watch folder's last path segment for a watched transfer; null for every other. */
+  originLabel: string | null;
   scanFound: number;
   scanTotal: number;
   uploaded: number;
@@ -33,11 +35,11 @@ export interface TransferProgressVm {
 }
 
 /** Which family of frame a state renders — several states share the same layout shape. */
-type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'terminal';
+export type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'terminal';
 
 type BottomBarMode = 'determinate' | 'indeterminate' | null;
 
-const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
+export const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
   scanning: 'scan',
   starting: 'scan',
   'device-busy': 'busy-refusal',
@@ -167,6 +169,7 @@ export class TransferProgressComponent {
   cancelRequested = output<void>();
   retryRequested = output<void>();
   closeRequested = output<void>();
+  hideRequested = output<void>();
 
   private readonly announcement = signal('');
   readonly liveRegionText = this.announcement.asReadonly();
@@ -187,6 +190,10 @@ export class TransferProgressComponent {
     const vm = this.vm();
     if (vm.state === 'scanning' && vm.droppedRootName) {
       return `${vm.droppedRootName} → ${vm.destinationLabel}`;
+    }
+    const shape = STATE_SHAPES[vm.state];
+    if ((shape === 'active' || shape === 'terminal') && vm.originLabel) {
+      return `${vm.originLabel} → ${vm.destinationLabel}`;
     }
     return vm.destinationLabel;
   });
@@ -254,5 +261,9 @@ export class TransferProgressComponent {
 
   onClose(): void {
     this.closeRequested.emit();
+  }
+
+  onHide(): void {
+    this.hideRequested.emit();
   }
 }

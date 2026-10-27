@@ -24,6 +24,23 @@
   flex-shrink: 0;
 }
 
+.transfer-header-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--spacing-lg);
+
+  lib-dropzone-card,
+  lib-transfers-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  @include styles.below-desktop {
+    flex-direction: column;
+  }
+}
+
 .content-row {
   display: flex;
   flex-direction: row;

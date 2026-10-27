@@ -1,4 +1,4 @@
-import { Component, computed, inject, Signal, effect, untracked } from '@angular/core';
+import { Component, computed, inject, Signal, effect } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { HeaderComponent } from '../components/header/header.component';
 import { NavigationService, NAV_ITEMS } from '@teensyrom-nx/app/navigation';
@@ -53,7 +53,7 @@ export class LayoutComponent {
   showSlowLoadingDialog: Signal<boolean>;
   showSlowFavoriteDialog: Signal<boolean>;
   showTransferDialog = computed(() => {
-    const deviceId = this.transferStore.getTargetDeviceId()();
+    const deviceId = this.transferStore.getDetailsDeviceId()();
     return deviceId !== null && this.transferStore.isTransferModalOpen(deviceId)();
   });
   private indexDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
@@ -139,20 +139,16 @@ export class LayoutComponent {
       }
     });
 
-    // Transfer modal effect — driven by store state alone, never by a click handler, so a later
-    // iteration can re-raise it after a reload with no new machinery.
+    // Transfer details dialog — driven by store state alone (`detailsDeviceId`, set only by the
+    // user's own drop or a card row), so a watched or trom transfer never opens it.
     effect(() => {
       const shouldShow = this.showTransferDialog();
       if (shouldShow && !this.transferDialogRef) {
-        const deviceName = untracked(() => {
-          const deviceId = this.transferStore.getTargetDeviceId()();
-          return this.deviceStore.devices().find((d) => d.deviceId === deviceId)?.name || deviceId || 'the device';
-        });
         this.transferDialogRef = this.dialog.open(TransferModalComponent, {
           disableClose: true,
           panelClass: 'glassy-dialog',
           backdropClass: 'busy-dialog-backdrop',
-          ariaLabel: `Transferring files to ${deviceName}`,
+          ariaLabel: 'Transfer details',
           restoreFocus: true,
           // Material's dialog defaults to `max-width: 80vw`, which would silently cap the
           // terminal shape's 900px width on smaller displays. `width` stays unset so the

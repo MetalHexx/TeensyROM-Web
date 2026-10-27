@@ -1,5 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { filter } from 'rxjs';
 import { ConfirmationDialogComponent } from '@teensyrom-nx/ui/components';
 import {
   DeviceStore,
@@ -9,7 +20,13 @@ import {
   TransferModalState,
   TransferStore,
 } from '@teensyrom-nx/application';
-import { TransferProgressComponent, TransferProgressVm } from './transfer-progress/transfer-progress.component';
+import { watchFolderLabel } from '../transfer-origin-label';
+import {
+  STATE_SHAPES,
+  TransferProgressComponent,
+  TransferProgressVm,
+} from './transfer-progress/transfer-progress.component';
+import { TransferTabsComponent, transferTabId } from './transfer-tabs/transfer-tabs.component';
 
 /**
  * The dropzone card's file picker button — the focus-return anchor for a drop, which is a
@@ -21,14 +38,15 @@ const DROPZONE_PICKER_BUTTON_SELECTOR = '[data-testid="dropzone-choose-files"] b
 const TERMINAL_MODAL_STATES = new Set<TransferModalState>(['completed', 'cancelled', 'aborted', 'abandoned']);
 
 /**
- * Thin host that binds `TransferStore` state to `TransferProgressComponent`. Owns no metric
+ * Thin host that binds `TransferStore` state to `TransferProgressComponent` and follows the
+ * store's `detailsDeviceId`, so the tab row can switch it between transfers. Owns no metric
  * arithmetic — every view-model field is read straight from a selector — and owns exactly the
- * three side effects the presentational component can't: cancel's confirm-before-abort gate,
- * retry, and closing itself out through `ITransferContext`.
+ * side effects the presentational component can't: cancel's confirm-before-abort gate, retry,
+ * hiding, and closing itself out through `ITransferContext`.
  */
 @Component({
   selector: 'lib-transfer-modal',
-  imports: [TransferProgressComponent],
+  imports: [TransferProgressComponent, TransferTabsComponent],
   templateUrl: './transfer-modal.component.html',
   styleUrl: './transfer-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,13 +59,22 @@ export class TransferModalComponent {
   private readonly dialogRef = inject(MatDialogRef<TransferModalComponent>);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Resolved once — the modal is scoped to a single device for its whole lifetime. */
-  private readonly deviceId = this.transferStore.getTargetDeviceId()() ?? '';
+  /** The device whose transfer is shown; empty once the dialog has been hidden or closed. */
+  readonly deviceId = computed(() => this.transferStore.getDetailsDeviceId()() ?? '');
 
-  private readonly modalState = this.transferStore.getTransferModalState(this.deviceId);
-  private readonly deviceTransfer = this.transferStore.getDeviceTransfer(this.deviceId);
-  private readonly metrics = this.transferStore.getTransferMetrics(this.deviceId);
-  private readonly summary = this.transferStore.getTransferSummary(this.deviceId);
+  private readonly modalState = computed(() => this.transferStore.getTransferModalState(this.deviceId())());
+  private readonly deviceTransfer = computed(() => this.transferStore.getDeviceTransfer(this.deviceId())());
+  private readonly metrics = computed(() => this.transferStore.getTransferMetrics(this.deviceId())());
+  private readonly summary = computed(() => this.transferStore.getTransferSummary(this.deviceId())());
+
+  readonly tabs = this.transferStore.getTransferTabs();
+  readonly tabDeviceNames = computed(() =>
+    Object.fromEntries(this.deviceStore.devices().map((d) => [d.deviceId, d.name]))
+  );
+  readonly panelLabelledBy = computed(() => transferTabId(this.deviceId()));
+
+  /** Whether the transfer last shown was this tab's own; `afterClosed` fires after the store has reset. */
+  private lastShownStartedHere = false;
 
   // `getTransferSummary`'s elapsedLabel only re-evaluates when `transfers` changes, so it would
   // sit frozen between sparse snapshots. This ticker drives the readout independently, one second
@@ -60,23 +87,32 @@ export class TransferModalComponent {
     return startedAt == null ? null : formatElapsedLabel(startedAt, this.tick());
   });
 
+  /** Held so the frame keeps its last content while the dialog fades out after a hide or close. */
+  private lastVm: TransferProgressVm | null = null;
+
   readonly vm = computed<TransferProgressVm>(() => {
+    if (this.modalState() === null && this.lastVm) {
+      return this.lastVm;
+    }
     const transfer = this.deviceTransfer();
     const job = transfer?.job ?? null;
     const metrics = this.metrics();
     const summary = this.summary();
-    const device = this.deviceStore.devices().find((d) => d.deviceId === this.deviceId);
+    const deviceId = this.deviceId();
+    const device = this.deviceStore.devices().find((d) => d.deviceId === deviceId);
 
-    return {
+    this.lastVm = {
       // Non-null by construction: the shell only opens this dialog while a modal state exists.
       state: this.modalState() as TransferModalState,
-      deviceName: device?.name || this.deviceId,
+      deviceName: device?.name || deviceId,
       destinationLabel: job
         ? `${job.storageType} · ${job.destinationDirectory}`
         : transfer?.destinationLabel ?? '',
       droppedRootName: transfer?.droppedRootName ?? null,
+      originLabel: job ? watchFolderLabel(job.origin) : null,
       scanFound: transfer?.scanFound ?? 0,
-      scanTotal: transfer?.scanTotal ?? 0,
+      // A transfer started elsewhere never scanned here, so its manifest size is the job's own total.
+      scanTotal: transfer && !transfer.startedHere ? metrics.total : transfer?.scanTotal ?? 0,
       uploaded: metrics.uploaded,
       written: metrics.written,
       failed: metrics.failed,
@@ -96,6 +132,7 @@ export class TransferModalComponent {
       elapsedLabel: this.elapsedLabel(),
       reason: summary.reason,
     };
+    return this.lastVm;
   });
 
   constructor() {
@@ -109,10 +146,30 @@ export class TransferModalComponent {
     });
     this.destroyRef.onDestroy(() => this.stopTicker());
 
-    // Whatever restoreFocus captured at open time (nothing, for a drop gesture), this always wins.
-    this.dialogRef.afterClosed().subscribe(() => {
-      document.querySelector<HTMLElement>(DROPZONE_PICKER_BUTTON_SELECTOR)?.focus();
+    effect(() => {
+      const transfer = this.deviceTransfer();
+      if (transfer) {
+        untracked(() => (this.lastShownStartedHere = transfer.startedHere));
+      }
     });
+
+    // Whatever restoreFocus captured at open time (nothing, for a drop gesture), this always wins —
+    // but only for the user's own drop; a transfer started elsewhere has no drop to return from.
+    this.dialogRef.afterClosed().subscribe(() => {
+      if (this.lastShownStartedHere) {
+        document.querySelector<HTMLElement>(DROPZONE_PICKER_BUTTON_SELECTOR)?.focus();
+      }
+    });
+
+    // Escape follows the same rule as the buttons: it hides a running transfer, closes an ended
+    // or refused one, and does nothing while a scan or create is still in flight.
+    this.dialogRef
+      .keydownEvents()
+      .pipe(
+        filter((event) => event.key === 'Escape'),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => this.onEscape());
   }
 
   private startTicker(): void {
@@ -130,10 +187,11 @@ export class TransferModalComponent {
   }
 
   onCancelRequested(): void {
+    const deviceId = this.deviceId();
     const hasJob = this.deviceTransfer()?.job != null;
 
     if (!hasJob) {
-      void this.transferContext.cancelTransfer(this.deviceId);
+      void this.transferContext.cancelTransfer(deviceId);
       return;
     }
 
@@ -156,7 +214,7 @@ export class TransferModalComponent {
 
     confirmRef.componentInstance.confirmed.subscribe(() => {
       confirmRef.close();
-      void this.transferContext.cancelTransfer(this.deviceId);
+      void this.transferContext.cancelTransfer(deviceId);
     });
     confirmRef.componentInstance.cancelled.subscribe(() => {
       confirmRef.close();
@@ -164,11 +222,35 @@ export class TransferModalComponent {
   }
 
   onRetryRequested(): void {
-    void this.transferContext.retryCreate(this.deviceId);
+    void this.transferContext.retryCreate(this.deviceId());
+  }
+
+  onHideRequested(): void {
+    void this.transferContext.hideDetails();
+  }
+
+  onTabSelected(deviceId: string): void {
+    void this.transferContext.showDetails(deviceId);
   }
 
   async onCloseRequested(): Promise<void> {
-    await this.transferContext.closeTransfer(this.deviceId);
+    await this.transferContext.closeTransfer(this.deviceId());
     this.dialogRef.close();
+  }
+
+  private onEscape(): void {
+    const state = this.modalState();
+    if (state === null) {
+      return;
+    }
+    switch (STATE_SHAPES[state]) {
+      case 'active':
+        this.onHideRequested();
+        return;
+      case 'scan':
+        return;
+      default:
+        void this.onCloseRequested();
+    }
   }
 }

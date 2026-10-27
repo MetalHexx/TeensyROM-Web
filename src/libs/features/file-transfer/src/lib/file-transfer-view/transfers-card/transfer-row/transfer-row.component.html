@@ -1,0 +1,34 @@
+<div class="transfer-row" data-testid="transfer-row">
+  <div class="row-top">
+    <span class="row-device" data-testid="transfer-row-device">{{ deviceName() }}</span>
+    <lib-icon-label
+      class="row-origin"
+      data-testid="transfer-row-origin"
+      [icon]="watched() ? 'visibility' : 'upload_file'"
+      [label]="originLabel()"
+      size="small"
+    ></lib-icon-label>
+    <span class="row-percent" data-testid="transfer-row-percent" aria-hidden="true">{{ transfer().devicePercent }}%</span>
+    <lib-icon-button
+      icon="open_in_full"
+      size="small"
+      data-testid="transfer-row-show"
+      [ariaLabel]="showLabel()"
+      (buttonClick)="showRequested.emit()"
+    ></lib-icon-button>
+  </div>
+
+  <mat-progress-bar
+    class="row-bar"
+    data-testid="transfer-row-bar"
+    mode="determinate"
+    [attr.aria-label]="barLabel()"
+    [value]="transfer().devicePercent"
+  ></mat-progress-bar>
+
+  <div class="row-stats">
+    <span data-testid="transfer-row-files">{{ transfer().filesSent | number }} of {{ transfer().fileTotal | number }} files</span>
+    <span data-testid="transfer-row-rate">{{ kilobytesPerSecond() | number: '1.0-0' }} KB/s</span>
+    <span data-testid="transfer-row-elapsed">{{ elapsedLabel() }}</span>
+  </div>
+</div>

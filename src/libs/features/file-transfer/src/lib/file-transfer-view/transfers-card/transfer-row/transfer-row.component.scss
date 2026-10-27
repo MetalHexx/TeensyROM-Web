@@ -1,0 +1,55 @@
+:host {
+  display: block;
+}
+
+.transfer-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.row-top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.row-device {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-origin {
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--color-dimmed-light);
+}
+
+.row-percent {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-bar {
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+  --mdc-linear-progress-active-indicator-height: 6px;
+  --mdc-linear-progress-track-height: 6px;
+  --mdc-linear-progress-track-color: rgba(255, 255, 255, 0.12);
+}
+
+.row-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-lg);
+  font-size: 0.75rem;
+  color: var(--color-dimmed-light);
+  font-variant-numeric: tabular-nums;
+}

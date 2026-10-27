@@ -144,8 +144,13 @@ describe('TransferModalComponent', () => {
   let transferStore: InstanceType<typeof TransferStore>;
   let mockTransferContext: ITransferContext;
   let mockDialog: { open: ReturnType<typeof vi.fn> };
-  let mockOwnDialogRef: { close: ReturnType<typeof vi.fn>; afterClosed: () => Subject<void> };
+  let mockOwnDialogRef: {
+    close: ReturnType<typeof vi.fn>;
+    afterClosed: () => Subject<void>;
+    keydownEvents: () => Subject<KeyboardEvent>;
+  };
   let afterClosedSubject: Subject<void>;
+  let keydown$: Subject<KeyboardEvent>;
   const deviceId = 'device-1';
 
   const setup = async (devices: Device[] = [createDevice({ deviceId })]) => {
@@ -164,9 +169,11 @@ describe('TransferModalComponent', () => {
     mockDialog = { open: vi.fn() };
 
     afterClosedSubject = new Subject<void>();
+    keydown$ = new Subject<KeyboardEvent>();
     mockOwnDialogRef = {
       close: vi.fn(),
       afterClosed: () => afterClosedSubject,
+      keydownEvents: () => keydown$,
     };
 
     await TestBed.configureTestingModule({
@@ -476,5 +483,238 @@ describe('TransferModalComponent', () => {
 
       expect(focusSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('leaves focus alone when the shown transfer was started elsewhere', async () => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-testid', 'dropzone-choose-files');
+      const button = document.createElement('button');
+      wrapper.appendChild(button);
+      document.body.appendChild(wrapper);
+      const focusSpy = vi.spyOn(button, 'focus');
+
+      await setup();
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+
+      afterClosedSubject.next();
+
+      expect(focusSpy).not.toHaveBeenCalled();
+    });
+
+    it('still returns focus once the store has reset the entry by the time the dialog closes', async () => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-testid', 'dropzone-choose-files');
+      const button = document.createElement('button');
+      wrapper.appendChild(button);
+      document.body.appendChild(wrapper);
+      const focusSpy = vi.spyOn(button, 'focus');
+
+      await setup();
+      driveToState(transferStore, deviceId, 'completed');
+      createFixture();
+
+      transferStore.clearTransfer({ deviceId });
+      fixture.detectChanges();
+      afterClosedSubject.next();
+
+      expect(focusSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('details target', () => {
+    it('follows the store’s details device, not the transfer target', async () => {
+      await setup([createDevice({ deviceId }), createDevice({ deviceId: 'device-2', name: 'Second TR' })]);
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId: 'device-2', jobId: 'job-2' }) });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+      expect(component.vm().deviceName).toBe('My TeensyROM');
+
+      transferStore.showTransferDetails({ deviceId: 'device-2' });
+      fixture.detectChanges();
+
+      expect(component.vm().deviceName).toBe('Second TR');
+    });
+
+    it('takes the upload tile’s total from the job for a transfer started elsewhere', async () => {
+      await setup();
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId, totalFiles: 5 }) });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+
+      expect(component.vm().scanTotal).toBe(transferStore.getTransferMetrics(deviceId)().total);
+      expect(component.vm().scanTotal).toBeGreaterThan(0);
+    });
+
+    it('names the watch folder for a watched transfer and nothing for an upload', async () => {
+      await setup();
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId,
+          origin: {
+            kind: TransferOriginKind.WatchFolder,
+            watchFolderId: 'wf-1',
+            watchFolderPath: '/home/me/Downloads/',
+          },
+        }),
+      });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+
+      expect(component.vm().originLabel).toBe('Downloads');
+
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId,
+          origin: { kind: TransferOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
+        }),
+      });
+      fixture.detectChanges();
+
+      expect(component.vm().originLabel).toBeNull();
+    });
+
+    it('cancels the shown device, whoever started the transfer', async () => {
+      await setup();
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+      const confirmed = new Subject<void>();
+      mockDialog.open.mockReturnValue({
+        close: vi.fn(),
+        componentInstance: { confirmed, cancelled: new Subject<void>() },
+        componentRef: { setInput: vi.fn() },
+      });
+
+      component.onCancelRequested();
+      confirmed.next();
+
+      expect(mockTransferContext.cancelTransfer).toHaveBeenCalledWith(deviceId);
+    });
+  });
+
+  describe('tab row', () => {
+    const tabButtons = () => Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('[role="tab"]'));
+
+    it('lists every transfer under way as a tab, the shown one selected', async () => {
+      await setup([createDevice({ deviceId }), createDevice({ deviceId: 'device-2', name: 'Second TR' })]);
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId: 'device-2',
+          jobId: 'job-2',
+          startedUtc: new Date('2026-01-01T00:00:05Z'),
+        }),
+      });
+      transferStore.showTransferDetails({ deviceId: 'device-2' });
+      createFixture();
+
+      expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeTruthy();
+      expect(tabButtons().length).toBe(2);
+      expect(tabButtons().map((b) => b.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+      expect(tabButtons()[1].textContent).toContain('Second TR');
+    });
+
+    it('asks the context to show the device of the picked tab', async () => {
+      await setup([createDevice({ deviceId }), createDevice({ deviceId: 'device-2', name: 'Second TR' })]);
+      transferStore.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId }) });
+      transferStore.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId: 'device-2',
+          jobId: 'job-2',
+          startedUtc: new Date('2026-01-01T00:00:05Z'),
+        }),
+      });
+      transferStore.showTransferDetails({ deviceId });
+      createFixture();
+
+      tabButtons()[1].click();
+
+      expect(mockTransferContext.showDetails).toHaveBeenCalledWith('device-2');
+    });
+
+    it('shows the one tab for a single transfer', async () => {
+      await setup();
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      expect(tabButtons().length).toBe(1);
+    });
+  });
+
+  describe('hide and escape', () => {
+    const escape = () => keydown$.next(new KeyboardEvent('keydown', { key: 'Escape' }));
+    const hideButton = () =>
+      Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('lib-action-button'))
+        .find((host) => host.querySelector('.icon-label-text.primary')?.textContent?.trim() === 'Hide')
+        ?.querySelector('button') ?? null;
+
+    it('offers Hide only once a job exists, and Hide hides without cancelling', async () => {
+      await setup();
+      driveToState(transferStore, deviceId, 'scanning');
+      createFixture();
+      expect(hideButton()).toBeNull();
+
+      await setup();
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+      hideButton()?.click();
+
+      expect(mockTransferContext.hideDetails).toHaveBeenCalledTimes(1);
+      expect(mockTransferContext.cancelTransfer).not.toHaveBeenCalled();
+    });
+
+    it('hides on Escape while the transfer is active, never cancelling', async () => {
+      await setup();
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      escape();
+
+      expect(mockTransferContext.hideDetails).toHaveBeenCalledTimes(1);
+      expect(mockTransferContext.cancelTransfer).not.toHaveBeenCalled();
+      expect(mockTransferContext.closeTransfer).not.toHaveBeenCalled();
+    });
+
+    it('ignores keys other than Escape', async () => {
+      await setup();
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      keydown$.next(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+      expect(mockTransferContext.hideDetails).not.toHaveBeenCalled();
+    });
+
+    it('does nothing on Escape while scanning or starting', async () => {
+      for (const state of ['scanning', 'starting'] as const) {
+        await setup();
+        driveToState(transferStore, deviceId, state);
+        createFixture();
+
+        escape();
+
+        expect(mockTransferContext.hideDetails).not.toHaveBeenCalled();
+        expect(mockTransferContext.closeTransfer).not.toHaveBeenCalled();
+        expect(mockTransferContext.cancelTransfer).not.toHaveBeenCalled();
+        fixture.destroy();
+      }
+    });
+
+    it.each(['completed', 'device-busy', 'nothing-to-transfer'] as const)(
+      'acts as Close on Escape in the %s state',
+      async (state) => {
+        await setup();
+        driveToState(transferStore, deviceId, state);
+        createFixture();
+
+        escape();
+
+        expect(mockTransferContext.closeTransfer).toHaveBeenCalledWith(deviceId);
+        expect(mockTransferContext.hideDetails).not.toHaveBeenCalled();
+        expect(mockTransferContext.cancelTransfer).not.toHaveBeenCalled();
+      }
+    );
   });
 });

@@ -156,6 +156,18 @@ describe('FileTransferViewComponent', () => {
       expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
     });
 
+    it('places the drop zone and the transfers card side by side, ahead of the toolbar', async () => {
+      await setup([createDevice()]);
+      createFixture();
+      const native = fixture.nativeElement as HTMLElement;
+
+      const row = native.querySelector('[data-testid="transfer-header-row"]');
+      expect(row?.querySelector('lib-dropzone-card')).toBeTruthy();
+      expect(row?.querySelector('lib-transfers-card')).toBeTruthy();
+      expect(row?.querySelector('lib-transfer-toolbar')).toBeFalsy();
+      expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
+    });
+
     it('should render the empty-state message instead of the rows when there are no enabled devices', async () => {
       await setup([createDevice({ isEnabled: false })]);
       createFixture();

@@ -1,6 +1,18 @@
-<lib-transfer-progress
-  [vm]="vm()"
-  (cancelRequested)="onCancelRequested()"
-  (retryRequested)="onRetryRequested()"
-  (closeRequested)="onCloseRequested()"
-/>
+@if (tabs().length > 0) {
+  <lib-transfer-tabs
+    [tabs]="tabs()"
+    [selected]="deviceId()"
+    [deviceNames]="tabDeviceNames()"
+    panelId="transfer-details-panel"
+    (select)="onTabSelected($event)"
+  />
+}
+<div id="transfer-details-panel" role="tabpanel" [attr.aria-labelledby]="panelLabelledBy()">
+  <lib-transfer-progress
+    [vm]="vm()"
+    (cancelRequested)="onCancelRequested()"
+    (retryRequested)="onRetryRequested()"
+    (closeRequested)="onCloseRequested()"
+    (hideRequested)="onHideRequested()"
+  />
+</div>
