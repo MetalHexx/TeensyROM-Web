@@ -116,7 +116,21 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             }
         }
 
-        public uint ReadIntBytes(short byteLength) => 0;
+        /// <summary>Mirrors the real ports: reads the current segment low byte first, and a short read is a timeout.</summary>
+        public uint ReadIntBytes(short byteLength)
+        {
+            if (BytesToRead < byteLength)
+            {
+                throw new TimeoutException();
+            }
+
+            uint result = 0;
+            for (var byteNum = 0; byteNum < byteLength; byteNum++)
+            {
+                result |= (uint)_currentSegment!.Dequeue() << (8 * byteNum);
+            }
+            return result;
+        }
 
         public int Read(byte[] buffer, int offset, int count)
         {

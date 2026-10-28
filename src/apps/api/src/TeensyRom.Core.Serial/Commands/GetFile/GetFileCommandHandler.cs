@@ -19,6 +19,21 @@ namespace TeensyRom.Core.Commands.GetFile
 
     public class GetFileCommandHandler() : IRequestHandler<GetFileCommand, GetFileResult>
     {
+        /// <summary>How long the file length may take to follow the Ack. The firmware sends it as soon as the file is open.</summary>
+        public const int LengthWaitMs = 5_000;
+
+        /// <summary>
+        /// The firmware reads the whole file to sum it before it sends the checksum, so the checksum's wait
+        /// starts from this base and grows by <see cref="ChecksumWaitMsPerMegabyte"/> with the file's size.
+        /// </summary>
+        public const int ChecksumBaseWaitMs = 5_000;
+        public const int ChecksumWaitMsPerMegabyte = 1_000;
+
+        /// <summary>How long the file body may go without a byte arriving before the device counts as stalled.</summary>
+        public const int BodyStallMs = 5_000;
+
+        private const int BytesPerMegabyte = 1_048_576;
+
         private ICommunicationPort _communicationPort = null!;
         public async Task<GetFileResult> Handle(GetFileCommand r, CancellationToken cancellationToken)
         {
@@ -63,9 +78,15 @@ namespace TeensyRom.Core.Commands.GetFile
                 };
             }
 
+            // Every read below waits for its bytes first: a serial read has no timeout of its own, and a
+            // TCP read gives up after 500 ms, well short of the time the firmware spends summing a large file.
+            await _communicationPort.WaitForSerialDataAsync(numBytes: 4, LengthWaitMs, cancellationToken);
             var fileLength = _communicationPort.ReadIntBytes(4);
+
+            await _communicationPort.WaitForSerialDataAsync(numBytes: 4, ChecksumWaitMs(fileLength), cancellationToken);
             var checksum = _communicationPort.ReadIntBytes(4);
-            var buffer = GetFileBytes(fileLength);
+
+            var buffer = await GetFileBytes(fileLength, cancellationToken);
             _communicationPort.HandleAck();
 
             var receivedChecksum = buffer.CalculateChecksum();
@@ -80,7 +101,14 @@ namespace TeensyRom.Core.Commands.GetFile
             };
         }
 
-        private byte[] GetFileBytes(uint fileLength)
+        public static int ChecksumWaitMs(uint fileLength) =>
+            ChecksumBaseWaitMs + (int)((long)fileLength * ChecksumWaitMsPerMegabyte / BytesPerMegabyte);
+
+        /// <summary>
+        /// Reads the body as it arrives. A gap of <see cref="BodyStallMs"/> with nothing to read throws a
+        /// <see cref="TimeoutException"/>, which the command pipeline treats as a suspect link.
+        /// </summary>
+        private async Task<byte[]> GetFileBytes(uint fileLength, CancellationToken ct)
         {
             if (!fileLength.TryParseInt(out int fileLengthInt))
             {
@@ -90,9 +118,16 @@ namespace TeensyRom.Core.Commands.GetFile
             var buffer = new byte[fileLength];
             int bytesRead = 0;
 
-            while (bytesRead < fileLength)
+            while (bytesRead < fileLengthInt)
             {
-              bytesRead += _communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
+                ct.ThrowIfCancellationRequested();
+
+                if (_communicationPort.BytesToRead == 0)
+                {
+                    await _communicationPort.WaitForSerialDataAsync(numBytes: 1, BodyStallMs, ct);
+                }
+
+                bytesRead += _communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
             }
 
             return buffer;
