@@ -416,6 +416,74 @@ describe('DJ Mixer — sets', () => {
     });
   });
 
+  describe('dragging a set row onto a deck', () => {
+    beforeEach(() => {
+      cy.viewport(VIEWPORT.width, VIEWPORT.height);
+      clearDjBindingsDatabase();
+      interceptDjLibrary();
+      interceptFindDevices();
+      interceptConnectDevice();
+      setupGetDirectoryWithFiles([
+        generateFileItem({
+          name: 'Still_Time.sid',
+          path: '/Still_Time.sid',
+          type: FileItemType.Song,
+          title: 'Still Time',
+        }),
+      ]);
+      interceptGetFileContent({ bytes: stillTimeSidBytes() });
+      cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
+    });
+
+    it('loads that row onto the deck, declaring the effects the browser needs, and clears the overlays at the end', () => {
+      cy.window().then((win) => {
+        const listingTransfer = new win.DataTransfer();
+        cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragstart', {
+          dataTransfer: listingTransfer,
+        });
+        cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer: listingTransfer });
+        cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer: listingTransfer });
+        cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragend', {
+          dataTransfer: listingTransfer,
+        });
+      });
+      cy.get(`${CARD} button[aria-label*="Still Time"]`, { timeout: 60000 }).should('exist');
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('not.exist');
+      cy.get(`${CARD} lib-set-row .deck`).should('not.exist');
+
+      // A constructed DataTransfer ignores effectAllowed and dropEffect (only a browser-made drag
+      // honours them), so the row drag shares a recording stand-in that keeps what both sides set.
+      const data = new Map<string, string>();
+      const dataTransfer = {
+        effectAllowed: 'uninitialized',
+        dropEffect: 'none',
+        get types() {
+          return [...data.keys()];
+        },
+        setData: (type: string, value: string) => void data.set(type, value),
+        getData: (type: string) => data.get(type) ?? '',
+        setDragImage: () => undefined,
+      };
+      cy.then(() => {
+        cy.get(`${CARD} lib-set-row .handle`).trigger('dragstart', { dataTransfer });
+        cy.wrap(dataTransfer).its('effectAllowed').should('eq', 'copyMove');
+
+        cy.get('[data-deck="B"] .drop-overlay').should('be.visible');
+        cy.get('[data-deck="A"] .drop-overlay').should('be.visible');
+        cy.get('[data-deck="B"] .drop-overlay').trigger('dragenter', { dataTransfer });
+        cy.get('[data-deck="B"] .drop-overlay').trigger('dragover', { dataTransfer });
+        cy.wrap(dataTransfer).its('dropEffect').should('eq', 'copy');
+        cy.get('[data-deck="B"] .drop-overlay').trigger('drop', { dataTransfer });
+        cy.get(`${CARD} lib-set-row .handle`).trigger('dragend', { dataTransfer });
+      });
+
+      cy.contains(`${CARD} lib-set-row .deck`, 'B', { timeout: 60000 })
+        .should('have.attr', 'data-light')
+        .and('not.eq', 'off');
+      cy.get('.drop-overlay').should('not.exist');
+    });
+  });
+
   describe('dragging a search result into the card', () => {
     beforeEach(() => {
       cy.viewport(VIEWPORT.width, VIEWPORT.height);

@@ -302,6 +302,22 @@ describe('DjSetCardComponent', () => {
     });
   });
 
+  describe('the row drag', () => {
+    it("passes the card's row drag start and end on", () => {
+      const { setCard, component } = render(summary([rowSummary()]));
+      const started = vi.fn();
+      const ended = vi.fn();
+      component.rowDragStart.subscribe(started);
+      component.rowDragEnd.subscribe(ended);
+
+      setCard.rowDragStart.emit();
+      setCard.rowDragEnd.emit();
+
+      expect(started).toHaveBeenCalledTimes(1);
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('the listing drop', () => {
     it('adds the dropped SID at the gap it landed in', () => {
       const { setCard, djSets } = render(summary([rowSummary()]), true);

@@ -28,6 +28,7 @@ import {
 } from '@teensyrom-nx/ui/components/dj';
 import { DjDeckColumnComponent } from './dj-deck-column.component';
 import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
+import { SET_ROW_DRAG_TYPE } from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
 
 type Store = InstanceType<typeof DjStore>;
@@ -147,6 +148,7 @@ function createDeckServiceStub() {
     renameMarker: vi.fn(),
     previousRow: vi.fn().mockResolvedValue(undefined),
     nextRow: vi.fn().mockResolvedValue(undefined),
+    loadSetRow: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -308,6 +310,17 @@ function dropEventWithPayload(payload: DjFileDragPayload | null): DragEvent {
     types: payload ? [DJ_FILE_DRAG_TYPE] : [],
     getData: (type: string) =>
       payload && type === DJ_FILE_DRAG_TYPE ? JSON.stringify(payload) : '',
+  } as unknown as DataTransfer;
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true });
+  return event;
+}
+
+/** A `drop` `DragEvent` carrying a set row's id under `SET_ROW_DRAG_TYPE`. */
+function dropEventWithRow(rowId: string): DragEvent {
+  const event = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+  const dataTransfer = {
+    types: [SET_ROW_DRAG_TYPE],
+    getData: (type: string) => (type === SET_ROW_DRAG_TYPE ? rowId : ''),
   } as unknown as DataTransfer;
   Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true });
   return event;
@@ -1327,6 +1340,59 @@ describe('DjDeckColumnComponent', () => {
       el.dispatchEvent(dropEventWithPayload(null));
 
       expect(deckService.load).not.toHaveBeenCalled();
+      expect(deckService.loadSetRow).not.toHaveBeenCalled();
+    });
+
+    describe('a set row drag', () => {
+      it('turns hot on dragenter and off on the matching dragleave', () => {
+        const { fixture } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+        const el = overlay(fixture) as HTMLElement;
+
+        el.dispatchEvent(dragEventWithTypes('dragenter', [SET_ROW_DRAG_TYPE]));
+        fixture.detectChanges();
+        expect(el.classList.contains('drop-overlay--hot')).toBe(true);
+
+        el.dispatchEvent(dragEventWithTypes('dragleave', [SET_ROW_DRAG_TYPE]));
+        fixture.detectChanges();
+        expect(el.classList.contains('drop-overlay--hot')).toBe(false);
+      });
+
+      it('is accepted on dragover with a copy effect', () => {
+        const { fixture } = render({ slot: 'B', letter: 'B', index: 1 }, { dropActive: true });
+        const event = dragEventWithTypes('dragover', [SET_ROW_DRAG_TYPE]);
+
+        (overlay(fixture) as HTMLElement).dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(event.dataTransfer?.dropEffect).toBe('copy');
+      });
+
+      it("loads the row onto this deck's slot on drop and clears hot", () => {
+        const { fixture, deckService } = render(
+          { slot: 'B', letter: 'B', index: 1 },
+          { dropActive: true }
+        );
+        const el = overlay(fixture) as HTMLElement;
+        el.dispatchEvent(dragEventWithTypes('dragenter', [SET_ROW_DRAG_TYPE]));
+
+        el.dispatchEvent(dropEventWithRow('row-7'));
+        fixture.detectChanges();
+
+        expect(deckService.loadSetRow).toHaveBeenCalledWith('B', 'row-7');
+        expect(deckService.load).not.toHaveBeenCalled();
+        expect(el.classList.contains('drop-overlay--hot')).toBe(false);
+      });
+
+      it('loads nothing when the dropped row id is empty', () => {
+        const { fixture, deckService } = render(
+          { slot: 'B', letter: 'B', index: 1 },
+          { dropActive: true }
+        );
+
+        (overlay(fixture) as HTMLElement).dispatchEvent(dropEventWithRow(''));
+
+        expect(deckService.loadSetRow).not.toHaveBeenCalled();
+      });
     });
   });
 });

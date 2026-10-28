@@ -42,6 +42,7 @@ import {
   formatElapsed,
 } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
+import { isSetRowDrag, readSetRowDragId } from '../drag/dj-set-row-drag';
 import type { DeckRef } from '../deck-ref';
 import { settingsSignModel } from '../settings-sign-model';
 
@@ -55,6 +56,11 @@ const STATE_LABELS: Record<DeckTransportState, string> = {
 };
 
 /** A tune that played to its end reads as stopped on the display. */
+/** Whether the drag is one a deck's overlay takes: a file from the listing or a row of the set. */
+function isDeckDrop(dt: DataTransfer): boolean {
+  return isDjFileDrag(dt) || isSetRowDrag(dt);
+}
+
 function transportState(led: DeckTransportSummary['led']): DeckTransportState {
   return led === 'ended' ? 'stopped' : led;
 }
@@ -370,26 +376,26 @@ export class DjDeckColumnComponent {
     };
   });
 
-  /** Whether the pointer is over this deck's own overlay while a SID drag is in flight. */
+  /** Whether the pointer is over this deck's own overlay while a SID or set row drag is in flight. */
   readonly hot = signal(false);
 
   private dragEnterCount = 0;
 
   onOverlayDragEnter(event: DragEvent): void {
-    if (!event.dataTransfer || !isDjFileDrag(event.dataTransfer)) return;
+    if (!event.dataTransfer || !isDeckDrop(event.dataTransfer)) return;
     event.preventDefault();
     this.dragEnterCount++;
     this.hot.set(true);
   }
 
   onOverlayDragOver(event: DragEvent): void {
-    if (!event.dataTransfer || !isDjFileDrag(event.dataTransfer)) return;
+    if (!event.dataTransfer || !isDeckDrop(event.dataTransfer)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
   }
 
   onOverlayDragLeave(event: DragEvent): void {
-    if (!event.dataTransfer || !isDjFileDrag(event.dataTransfer)) return;
+    if (!event.dataTransfer || !isDeckDrop(event.dataTransfer)) return;
     event.preventDefault();
     this.dragEnterCount = Math.max(0, this.dragEnterCount - 1);
     if (this.dragEnterCount === 0) {
@@ -398,7 +404,7 @@ export class DjDeckColumnComponent {
   }
 
   /** A drop is a plain load, played or not — no confirmation, no guard here; `DeckService.load`
-   *  stops whatever this deck is already playing before it loads the new source. */
+   *  and `loadSetRow` stop whatever this deck is already playing before they load the new source. */
   onOverlayDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragEnterCount = 0;
@@ -407,6 +413,12 @@ export class DjDeckColumnComponent {
     const payload = readDjFileDragData(event.dataTransfer);
     if (payload) {
       void this.deckService.load(this.deck().slot, payload);
+      return;
+    }
+
+    const rowId = readSetRowDragId(event.dataTransfer);
+    if (rowId) {
+      void this.deckService.loadSetRow(this.deck().slot, rowId);
     }
   }
 

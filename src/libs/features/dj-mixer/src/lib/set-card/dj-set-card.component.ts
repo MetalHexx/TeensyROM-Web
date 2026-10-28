@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import {
   DeckService,
   DjSets,
@@ -162,6 +162,12 @@ export class DjSetCardComponent {
 
   /** Whether a SID drag from the file listing is in flight. */
   readonly listingDragActive = input<boolean>(false);
+
+  /** A row's drag began. */
+  readonly rowDragStart = output<void>();
+
+  /** A row's drag ended, wherever it was dropped or cancelled. */
+  readonly rowDragEnd = output<void>();
 
   readonly model = computed<SetCardModel>(() => cardModel(this.summary()));
 

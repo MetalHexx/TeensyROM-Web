@@ -2510,6 +2510,17 @@ describe('DeckService', () => {
       });
     });
 
+    describe('loadSetRow without a current set', () => {
+      it('does nothing and does not throw', async () => {
+        expect(store.sets.currentSetId()).toBeNull();
+
+        await expect(service.loadSetRow('A', 'any-row')).resolves.toBeUndefined();
+
+        expect(store.sets.holdings().A).toBeNull();
+        expect(store.deck('A')().status).toBe('empty');
+      });
+    });
+
     describe('the set commands', () => {
       /** Three tunes dropped onto deck A in turn, so the current set holds three rows and A the last. */
       async function threeRows(): Promise<string[]> {
@@ -2540,6 +2551,26 @@ describe('DeckService', () => {
         expect(store.sets.selectedRowId()).toBeNull();
 
         await service.loadSelected('B');
+
+        expect(store.sets.holdings().B).toBeNull();
+        expect(store.deck('B')().status).toBe('empty');
+      });
+
+      it('loadSetRow loads the named row onto the deck and leaves the selection alone', async () => {
+        const [first, second] = await threeRows();
+        sets.selectRow(first);
+
+        await service.loadSetRow('B', second);
+
+        expect(holdingOf('B').rowId).toBe(second);
+        expect(store.deck('B')().status).toBe('playing');
+        expect(store.sets.selectedRowId()).toBe(first);
+      });
+
+      it('loadSetRow does nothing for an unknown row', async () => {
+        await threeRows();
+
+        await expect(service.loadSetRow('B', 'no-such-row')).resolves.toBeUndefined();
 
         expect(store.sets.holdings().B).toBeNull();
         expect(store.deck('B')().status).toBe('empty');

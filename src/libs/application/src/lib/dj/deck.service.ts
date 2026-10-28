@@ -153,6 +153,15 @@ export class DeckService {
     }
   }
 
+  /** Loads a row of the current set onto the deck, replacing whatever plays — what a row dragged
+   *  from the set list asks for. Nothing when there is no current set or it has no such row. */
+  async loadSetRow(slot: Slot, rowId: string): Promise<void> {
+    const set = this.currentSet();
+    if (set !== null && set.rows.some((row) => row.id === rowId)) {
+      await this.loadRow(slot, set.id, rowId);
+    }
+  }
+
   /** Loads the row before the one the deck holds in the current set — skipping nothing, even a row
    *  the other deck holds. Nothing on the first row, or when the deck holds no row of the current
    *  set. */

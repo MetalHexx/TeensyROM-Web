@@ -12,4 +12,6 @@
   (rowRemove)="onRowRemove($event)"
   (rowMove)="onRowMove($event)"
   (listingDrop)="onListingDrop($event)"
+  (rowDragStart)="rowDragStart.emit()"
+  (rowDragEnd)="rowDragEnd.emit()"
 ></lib-set-card>

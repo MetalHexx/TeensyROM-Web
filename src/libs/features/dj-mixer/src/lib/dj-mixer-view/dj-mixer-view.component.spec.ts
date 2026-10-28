@@ -663,6 +663,61 @@ describe('DjMixerViewComponent', () => {
     });
   });
 
+  describe('the set row drag bridge', () => {
+    function cards(fixture: ComponentFixture<DjMixerViewComponent>): DjSetCardComponent[] {
+      return fixture.debugElement
+        .queryAll(By.directive(DjSetCardComponent))
+        .map((el) => el.componentInstance as DjSetCardComponent);
+    }
+
+    function overlays(fixture: ComponentFixture<DjMixerViewComponent>): number {
+      return fixture.nativeElement.querySelectorAll('.drop-overlay').length;
+    }
+
+    it('lights every deck overlay while a row is dragged and clears them when it ends', () => {
+      const { fixture, component } = render([device()]);
+
+      cards(fixture)[0].rowDragStart.emit();
+      fixture.detectChanges();
+      expect(component.rowDragging()).toBe(true);
+      expect(overlays(fixture)).toBe(2);
+
+      cards(fixture)[0].rowDragEnd.emit();
+      fixture.detectChanges();
+      expect(component.rowDragging()).toBe(false);
+      expect(overlays(fixture)).toBe(0);
+    });
+
+    it("does not light the set card's listing drop state, nor does a listing drag raise rowDragging", () => {
+      const { fixture, component } = render([device()]);
+      const listing = fixture.debugElement.query(By.directive(DjDirectoryListingComponent))
+        .componentInstance as DjDirectoryListingComponent;
+
+      cards(fixture)[0].rowDragStart.emit();
+      fixture.detectChanges();
+      expect(component.dragging()).toBe(false);
+      expect(cards(fixture)[0].listingDragActive()).toBe(false);
+
+      cards(fixture)[0].rowDragEnd.emit();
+      listing.dragStarted.emit();
+      fixture.detectChanges();
+      expect(component.rowDragging()).toBe(false);
+    });
+
+    it('clears rowDragging when the browser is toggled mid-drag, either way', () => {
+      const { fixture, component } = render([device()]);
+
+      component.onRowDragStart();
+      component.toggleBrowser();
+      expect(component.rowDragging()).toBe(false);
+
+      component.onRowDragStart();
+      component.toggleBrowser();
+      fixture.detectChanges();
+      expect(component.rowDragging()).toBe(false);
+    });
+  });
+
   describe('hiding the browser', () => {
     function browserButton(fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement {
       return fixture.nativeElement.querySelector(
@@ -961,6 +1016,32 @@ describe('DjMixerViewComponent', () => {
       expect(ctx.component.peekShown()).toBe(true);
 
       vi.advanceTimersByTime(500);
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('holds while a row is dragged from it and goes 1.5s after the drag ends', () => {
+      const ctx = render([device()]);
+      selectWhile(true, ctx, 1);
+      const peekCard = ctx.fixture.debugElement.query(By.css('.set-peek lib-dj-set-card'))
+        .componentInstance as DjSetCardComponent;
+
+      peekCard.rowDragStart.emit();
+      vi.advanceTimersByTime(5000);
+      expect(ctx.component.peekShown()).toBe(true);
+
+      peekCard.rowDragEnd.emit();
+      vi.advanceTimersByTime(1400);
+      expect(ctx.component.peekShown()).toBe(true);
+      vi.advanceTimersByTime(100);
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
+    it('is not raised by a row drag that ends while it is down', () => {
+      const ctx = render([device()]);
+
+      ctx.component.onRowDragStart();
+      ctx.component.onRowDragEnd();
+
       expect(ctx.component.peekShown()).toBe(false);
     });
 
