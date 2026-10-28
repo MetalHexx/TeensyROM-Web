@@ -1,4 +1,7 @@
 :host {
+  --chip-focus-width: 2px;
+  --chip-focus-offset: 2px;
+
   display: block;
   min-width: 0;
 }
@@ -31,10 +34,10 @@
   width: 100%;
 }
 
-// The clip keeps the chips' focus ring (`.breadcrumb-chip:focus`, reaching 4px out): the padding is
-// the room inside it, the negative margin takes the same room back so the layout does not move.
+// The clip keeps the chips' focus ring (`.breadcrumb-chip:focus`): the padding is the room inside it,
+// the negative margin takes the same room back so the layout does not move.
 .breadcrumb-chips {
-  --focus-ring-reach: 4px;
+  --focus-ring-reach: calc(var(--chip-focus-width) + var(--chip-focus-offset));
 
   display: flex;
   flex-wrap: nowrap;
@@ -63,8 +66,9 @@ lib-dropdown-menu {
   }
 
   &:focus {
-    outline: 2px solid var(--mat-chip-focus-state-layer-color, rgba(0, 0, 0, 0.12));
-    outline-offset: 2px;
+    outline: var(--chip-focus-width) solid
+      var(--mat-chip-focus-state-layer-color, rgba(0, 0, 0, 0.12));
+    outline-offset: var(--chip-focus-offset);
   }
 }
 

@@ -12,6 +12,7 @@ import {
   setupGetDirectory,
 } from '../../support/interceptors/getDirectory.interceptors';
 import { interceptSearch } from '../../support/interceptors/search.interceptors';
+import { clearDjBindingsDatabase, stubNoMidiGrant } from '../../support/dj-mixer.helpers';
 import {
   createMockFilesystem,
   generateFileItem,
@@ -350,8 +351,8 @@ describe('DJ Mixer — responsive layout', () => {
 
   describe('the listing header is drawn whole', () => {
     const CHIP = '.breadcrumb-chips .breadcrumb-chip';
-    const JUMP_ICON =
-      'lib-dj-directory-listing button[aria-label="Go to containing folder"] mat-icon';
+    const JUMP_BUTTON = 'lib-dj-directory-listing button[aria-label="Go to containing folder"]';
+    const JUMP_ICON = `${JUMP_BUTTON} mat-icon`;
     // Three chips at 1920: the card is half the viewport, and a deeper path folds the leading chips away.
     const DEEP_PATH = ['/music', '/music/MUSICIANS'];
     const HEADER_WIDTHS = [SID_PANEL_VIEWPORT.width, 1400, 1100, VIEWPORT.TABLET.width] as const;
@@ -428,10 +429,12 @@ describe('DJ Mixer — responsive layout', () => {
 
     function freezeScaling(): void {
       // The cards enter with a scaling transform, which moves their rects; measure the layout itself.
+      // The alert toasts stack over the listing and would cover what the checks click and type into.
       cy.document().then((doc) => {
         const style = doc.createElement('style');
         style.textContent =
-          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; }';
+          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; } ' +
+          'lib-alert-container { display: none !important; }';
         doc.head.appendChild(style);
       });
     }
@@ -440,10 +443,11 @@ describe('DJ Mixer — responsive layout', () => {
       beforeEach(() => {
         cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
         interceptDjLibrary();
+        clearDjBindingsDatabase();
         interceptFindDevices({ fixture: twoDevices });
         interceptConnectDevice();
         setupGetDirectory(createMockFilesystem(MOCK_SEEDS.DEFAULT));
-        cy.visit(APP_ROUTES.djMixer);
+        cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
         freezeScaling();
 
         DEEP_PATH.forEach((path) => {
@@ -485,6 +489,7 @@ describe('DJ Mixer — responsive layout', () => {
       beforeEach(() => {
         cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
         interceptDjLibrary();
+        clearDjBindingsDatabase();
         interceptFindDevices({ fixture: twoDevices });
         interceptConnectDevice();
         interceptGetDirectory();
@@ -498,7 +503,7 @@ describe('DJ Mixer — responsive layout', () => {
             }),
           ],
         });
-        cy.visit(APP_ROUTES.djMixer);
+        cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
         freezeScaling();
       });
 
@@ -513,6 +518,15 @@ describe('DJ Mixer — responsive layout', () => {
             icon.clientHeight
           );
         });
+      });
+
+      it('names the button for assistive tech and shows a tooltip on hover', () => {
+        cy.get('lib-dj-search-toolbar input').type('still{enter}');
+
+        cy.get(JUMP_BUTTON)
+          .should('have.attr', 'aria-label', 'Go to containing folder')
+          .trigger('mouseenter');
+        cy.get('.lib-tooltip--visible').should('contain.text', 'Go to containing folder');
       });
     });
   });
