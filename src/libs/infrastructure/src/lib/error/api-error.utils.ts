@@ -1,5 +1,6 @@
 import { ResponseError, ProblemDetails } from '@teensyrom-nx/data-access/api-client';
-import { DEVICE_BUSY_PROBLEM_CODE } from '@teensyrom-nx/domain';
+import { Observable, from, switchMap, throwError } from 'rxjs';
+import { DEVICE_BUSY_PROBLEM_CODE, DeviceBusyError, IAlertService } from '@teensyrom-nx/domain';
 
 /** The engine's busy-with-a-transfer refusal, read from its 409 body. */
 export interface DeviceBusyProblem {
@@ -40,6 +41,30 @@ export async function readDeviceBusyProblem(error: unknown): Promise<DeviceBusyP
   } catch {
     return null;
   }
+}
+
+/**
+ * Answers the engine's busy refusal: warns the user and fails with a {@link DeviceBusyError}. Any other
+ * error is handed to `otherwise`, which supplies the failure the caller wants.
+ *
+ * @param error - The error thrown by the API client
+ * @param alertService - Where the busy warning is shown
+ * @param otherwise - Builds the failure for an error that is not the busy refusal
+ */
+export function failOnDeviceBusy(
+  error: unknown,
+  alertService: IAlertService,
+  otherwise: () => Observable<never>
+): Observable<never> {
+  return from(readDeviceBusyProblem(error)).pipe(
+    switchMap((busy) => {
+      if (!busy) {
+        return otherwise();
+      }
+      alertService.warning(busy.title);
+      return throwError(() => new DeviceBusyError(busy.deviceId, busy.activeJobId, busy.title));
+    })
+  );
 }
 
 /**

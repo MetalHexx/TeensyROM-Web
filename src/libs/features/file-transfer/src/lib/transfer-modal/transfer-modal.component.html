@@ -4,7 +4,7 @@
     [selected]="deviceId()"
     [deviceNames]="tabDeviceNames()"
     panelId="transfer-details-panel"
-    (select)="onTabSelected($event)"
+    (tabSelected)="onTabSelected($event)"
   />
 }
 <div id="transfer-details-panel" role="tabpanel" [attr.aria-labelledby]="panelLabelledBy()">

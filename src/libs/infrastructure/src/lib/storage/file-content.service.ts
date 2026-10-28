@@ -5,12 +5,11 @@ import {
   StorageType,
   IFileContentService,
   ALERT_SERVICE,
-  DeviceBusyError,
 } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
 import { Observable, from, map, switchMap, catchError, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
-import { readDeviceBusyProblem } from '../error/api-error.utils';
+import { failOnDeviceBusy } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class FileContentService implements IFileContentService {
@@ -44,15 +43,9 @@ export class FileContentService implements IFileContentService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`FileContentService.${methodName} error:`, error);
-    return from(readDeviceBusyProblem(error)).pipe(
-      switchMap((busy) => {
-        if (busy) {
-          this.alertService.warning(busy.title);
-          return throwError(() => new DeviceBusyError(busy.deviceId, busy.activeJobId, busy.title));
-        }
-        this.alertService.error(friendlyMessage);
-        return throwError(() => error);
-      })
-    );
+    return failOnDeviceBusy(error, this.alertService, () => {
+      this.alertService.error(friendlyMessage);
+      return throwError(() => error);
+    });
   }
 }

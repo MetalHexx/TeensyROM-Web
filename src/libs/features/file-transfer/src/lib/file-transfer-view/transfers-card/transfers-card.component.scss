@@ -26,6 +26,17 @@ lib-scaling-card {
   box-sizing: border-box;
 }
 
+.transfers-count {
+  display: grid;
+  place-items: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--border-radius-lg);
+  background: color-mix(in srgb, var(--color-primary-bright) 55%, transparent);
+  font-size: 0.6875rem;
+}
+
 .transfers-list {
   display: flex;
   flex-direction: column;

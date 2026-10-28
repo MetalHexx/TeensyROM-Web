@@ -1,5 +1,6 @@
 <lib-sliding-container animationDirection="from-top" containerHeight="100%" [animationTrigger]="true">
   <lib-scaling-card title="Transfers" animationEntry="from-top" animationParent="auto">
+    <span class="transfers-count" slot="corner" data-testid="transfers-count" role="img" [attr.aria-label]="rows().length + (rows().length === 1 ? ' transfer under way' : ' transfers under way')">{{ rows().length }}</span>
     <lib-icon-button
       slot="corner"
       icon="settings"

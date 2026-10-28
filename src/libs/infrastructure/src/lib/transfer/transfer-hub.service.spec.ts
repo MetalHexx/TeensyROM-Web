@@ -272,6 +272,29 @@ describe('TransferHubService', () => {
       expect(resynced).toEqual([['job-1', 'job-2']]);
     });
 
+    it('retries a failed rejoin after a reconnect and emits the list once it succeeds', async () => {
+      vi.useFakeTimers();
+      try {
+        mocks.__mockHubConnection.invoke.mockResolvedValue([]);
+        await service.subscribeAll();
+        const resynced: string[][] = [];
+        service.allResynced$.subscribe((list) => resynced.push(list.map((s) => s.jobId)));
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        mocks.__mockHubConnection.invoke
+          .mockRejectedValueOnce(new Error('engine unreachable'))
+          .mockResolvedValueOnce([{ ...jobDto, jobId: 'job-1' }]);
+        await mocks.__getReconnectedHandler()?.();
+        expect(resynced).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(resynced).toEqual([['job-1']]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('rejoins both a subscribed job and the all group on reconnect', async () => {
       mocks.__mockHubConnection.invoke.mockResolvedValue([]);
       await service.subscribeAll();

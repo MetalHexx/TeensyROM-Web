@@ -19,7 +19,7 @@ describe('TransferTabsComponent', () => {
     fixture.componentRef.setInput('selected', selected);
     fixture.componentRef.setInput('deviceNames', { a: 'TR-1', b: 'Workbench TR' });
     selectSpy = vi.fn();
-    fixture.componentInstance.select.subscribe(selectSpy);
+    fixture.componentInstance.tabSelected.subscribe(selectSpy);
     fixture.detectChanges();
   };
 

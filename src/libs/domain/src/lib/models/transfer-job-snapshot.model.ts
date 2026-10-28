@@ -76,7 +76,9 @@ export interface TransferJobSnapshot {
   /** Uncompressed bytes that archive declares. The expansion bar's denominator. */
   expansionBytesDeclared: number;
   /** Files expansion has yielded — null until every archive in the job has finished expanding. */
-  expandedFileCount: number | null;  launchState: TransferLaunchState;
+  expandedFileCount: number | null;
+  /** How the engine's launch of the transferred file went. */
+  launchState: TransferLaunchState;
   /** Path of the file the engine launched (or tried to); null when no launch applies. */
   launchedPath: string | null;
   launchError: string | null;

@@ -8,7 +8,11 @@ import {
   API_CONFIG,
   IApiConfig,
 } from '@teensyrom-nx/domain';
+import { logWarn } from '@teensyrom-nx/utils';
 import { TransferDtoMapper } from './transfer-dto.mapper';
+
+const REJOIN_MAX_ATTEMPTS = 4;
+const REJOIN_RETRY_MS = 5000;
 
 /**
  * Infrastructure implementation of ITransferHubService.
@@ -30,6 +34,7 @@ export class TransferHubService implements ITransferHubService, OnDestroy {
   private connectingPromise: Promise<signalR.HubConnection> | null = null;
   private readonly subscribedJobIds = new Set<string>();
   private wantsAll = false;
+  private rejoinTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly lastPushByJob = new Map<string, string>();
 
   get snapshots$(): Observable<TransferJobSnapshot> {
@@ -74,6 +79,10 @@ export class TransferHubService implements ITransferHubService, OnDestroy {
     this.subscribedJobIds.clear();
     this.wantsAll = false;
     this.lastPushByJob.clear();
+    if (this.rejoinTimer !== null) {
+      clearTimeout(this.rejoinTimer);
+      this.rejoinTimer = null;
+    }
     const connection = this.hubConnection;
     this.hubConnection = null;
     if (connection) {
@@ -158,14 +167,29 @@ export class TransferHubService implements ITransferHubService, OnDestroy {
 
   /**
    * Re-invokes SubscribeAll on a connection that lost its groups and emits the full list.
-   * A failure is left for the next connection or reconnect to retry.
+   * A failure is logged and retried a bounded number of times on a timer, so the caller is not held up.
    */
-  private async rejoinAll(connection: signalR.HubConnection): Promise<void> {
+  private async rejoinAll(connection: signalR.HubConnection, attempt = 1): Promise<void> {
+    if (this.rejoinTimer !== null) {
+      clearTimeout(this.rejoinTimer);
+      this.rejoinTimer = null;
+    }
     try {
       const dtos = await connection.invoke<TransferJobDto[]>('SubscribeAll');
       this.allResyncedSubject.next(dtos.map((dto) => TransferDtoMapper.toSnapshot(dto)));
-    } catch {
-      // The engine may be unreachable or the list unreadable; nothing to surface here.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logWarn(
+        `TransferHubService: Could not rejoin all transfers (attempt ${attempt} of ${REJOIN_MAX_ATTEMPTS}) - ${message}`
+      );
+      if (attempt < REJOIN_MAX_ATTEMPTS) {
+        this.rejoinTimer = setTimeout(() => {
+          this.rejoinTimer = null;
+          if (this.wantsAll && this.hubConnection === connection) {
+            void this.rejoinAll(connection, attempt + 1);
+          }
+        }, REJOIN_RETRY_MS);
+      }
     }
   }
 

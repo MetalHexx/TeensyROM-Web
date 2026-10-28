@@ -119,6 +119,7 @@ describe('TransfersCardComponent', () => {
     expect(native().querySelector('mat-card-title')?.textContent?.trim()).toBe('Transfers');
     expect(textOf('transfers-empty')).toContain('No active file transfers');
     expect(rows().length).toBe(0);
+    expect(textOf('transfers-count')).toBe('0');
   });
 
   it('lists one row per live transfer, from any source', async () => {
@@ -134,6 +135,7 @@ describe('TransfersCardComponent', () => {
     createFixture();
 
     expect(rows().length).toBe(2);
+    expect(textOf('transfers-count')).toBe('2');
     expect(native().querySelector('[data-testid="transfers-empty"]')).toBeNull();
     const names = Array.from(native().querySelectorAll('[data-testid="transfer-row-device"]')).map((el) =>
       el.textContent?.trim()
@@ -243,6 +245,7 @@ describe('TransfersCardComponent', () => {
     fixture.detectChanges();
 
     expect(rows().length).toBe(0);
+    expect(textOf('transfers-count')).toBe('0');
     expect(clearSpy).toHaveBeenCalled();
   });
 

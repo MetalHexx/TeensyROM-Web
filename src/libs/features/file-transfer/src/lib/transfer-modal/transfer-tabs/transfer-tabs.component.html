@@ -10,7 +10,7 @@
       [attr.aria-selected]="tab.deviceId === selected()"
       [attr.aria-controls]="panelId()"
       [attr.tabindex]="tab.deviceId === selected() ? 0 : -1"
-      (click)="select.emit(tab.deviceId)"
+      (click)="tabSelected.emit(tab.deviceId)"
       (keydown)="onKeydown($event, i)"
     >
       <span class="tab-name">{{ nameOf(tab.deviceId) }}</span>

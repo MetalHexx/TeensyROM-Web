@@ -26,7 +26,7 @@ export class TransferTabsComponent {
   deviceNames = input<Record<string, string>>({});
   panelId = input<string | null>(null);
 
-  select = output<string>();
+  tabSelected = output<string>();
 
   readonly tabId = transferTabId;
 
@@ -41,7 +41,7 @@ export class TransferTabsComponent {
       return;
     }
     event.preventDefault();
-    this.select.emit(this.tabs()[target].deviceId);
+    this.tabSelected.emit(this.tabs()[target].deviceId);
     this.host.nativeElement.querySelectorAll<HTMLElement>('[role="tab"]')[target]?.focus();
   }
 
