@@ -49,7 +49,8 @@ export function updateStorage(
 }
 
 /**
- * Helper to set loaded state with common success fields
+ * Helper to set loaded state with common success fields. When the update carries a freshly loaded
+ * folder, its subdirectories are also recorded in `directoryListings` under that path.
  */
 export function setStorageLoaded(
   store: WritableStore<StorageState>,
@@ -57,6 +58,15 @@ export function setStorageLoaded(
   additionalUpdates: Partial<StorageDirectoryState> = {},
   actionMessage: string
 ): void {
+  const { currentPath, directory } = additionalUpdates;
+  const directoryListings =
+    currentPath !== undefined && directory
+      ? {
+          ...getStorage(store, key)?.directoryListings,
+          [currentPath]: directory.directories,
+        }
+      : undefined;
+
   updateStorage(
     store,
     key,
@@ -66,6 +76,7 @@ export function setStorageLoaded(
       error: null,
       lastLoadTime: Date.now(),
       ...additionalUpdates,
+      ...(directoryListings && { directoryListings }),
     },
     actionMessage
   );

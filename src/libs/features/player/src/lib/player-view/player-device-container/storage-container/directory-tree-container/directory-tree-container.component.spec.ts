@@ -7,7 +7,9 @@ import {
   StorageType,
   STORAGE_SERVICE,
   type Device,
+  type StorageDirectory,
 } from '@teensyrom-nx/domain';
+import { of } from 'rxjs';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
 import { DirectoryTreeContainerComponent } from './directory-tree-container.component';
@@ -15,12 +17,15 @@ import { DirectoryTreeContainerComponent } from './directory-tree-container.comp
 describe('DirectoryTreeContainerComponent', () => {
   const deviceId = 'test-device-123';
 
-  function render(devices: Device[] = [{ deviceId, name: 'TR-1' } as Device]) {
+  function render(
+    devices: Device[] = [{ deviceId, name: 'TR-1' } as Device],
+    storageService = createMockStorageService()
+  ) {
     const devicesSignal = signal<Device[]>(devices);
     const result = renderPlayerComponent(DirectoryTreeContainerComponent, {
       inputs: { deviceId },
       providers: [
-        { provide: STORAGE_SERVICE, useValue: createMockStorageService() },
+        { provide: STORAGE_SERVICE, useValue: storageService },
         { provide: DeviceStore, useValue: { devices: devicesSignal } },
       ],
     });
@@ -55,6 +60,37 @@ describe('DirectoryTreeContainerComponent', () => {
 
       expect(component.nodes()[0].name).toBe('Living Room');
       expect(component.selectedNodeId()).toBe(selectedBefore);
+    });
+
+    it('still shows the root folders after the view is left and re-entered inside a subfolder', async () => {
+      const listing = (path: string, names: string[]): StorageDirectory => ({
+        path,
+        directories: names.map((name) => ({ name, path: `${path === '/' ? '' : path}/${name}` })),
+        files: [],
+      });
+      const getDirectory = vi
+        .fn()
+        .mockReturnValueOnce(of(listing('/', ['games'])))
+        .mockReturnValueOnce(of(listing('/games', ['demos'])));
+      const { fixture, storageStore } = render(
+        undefined,
+        createMockStorageService({ getDirectory })
+      );
+      await storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
+      await storageStore.navigateToDirectory({
+        deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
+
+      fixture.destroy();
+      const reentered = TestBed.createComponent(DirectoryTreeContainerComponent);
+      reentered.componentRef.setInput('deviceId', deviceId);
+      reentered.detectChanges();
+
+      const storageNode = reentered.componentInstance.nodes()[0].children?.[0];
+      expect(storageNode?.children?.map((n) => n.name)).toEqual(['games']);
+      expect(storageNode?.children?.[0].children?.map((n) => n.name)).toEqual(['demos']);
     });
   });
 

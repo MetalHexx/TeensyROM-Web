@@ -6,8 +6,9 @@ import {
   StorageType,
 } from '@teensyrom-nx/domain';
 import {
+  buildDirectoryListingCache,
   buildDirectoryTree,
-  mergeDirectoryListings,
+  directoryCacheKey,
   resolveSelectedNodeId,
   DirectoryListingCache,
 } from './directory-tree.model';
@@ -16,7 +17,9 @@ const DEVICE_ID = 'device-1';
 const DEVICE_NAME = 'TR-1';
 
 function cacheFrom(listings: DirectoryListing[]): DirectoryListingCache {
-  return mergeDirectoryListings(new Map(), listings);
+  return new Map(
+    listings.map((l) => [directoryCacheKey(l.deviceId, l.storageType, l.path), l.directories])
+  );
 }
 
 function findNode(nodes: DirectoryTreeNode[], id: string): DirectoryTreeNode | undefined {
@@ -304,51 +307,72 @@ describe('directory-tree.model', () => {
     });
   });
 
-  describe('mergeDirectoryListings', () => {
-    it('returns the identical cache reference when a listing adds nothing new', () => {
-      const initial = cacheFrom([
+  describe('buildDirectoryListingCache', () => {
+    it('keys every loaded folder of every storage the way buildDirectoryTree reads it', () => {
+      const cache = buildDirectoryListingCache([
         {
           deviceId: DEVICE_ID,
           storageType: StorageType.Sd,
-          path: '/',
-          directories: [{ name: 'games', path: '/games' }],
+          directoryListings: {
+            '/': [{ name: 'games', path: '/games' }],
+            '/games': [{ name: 'demos', path: '/games/demos' }],
+          },
         },
-      ]);
-
-      const merged = mergeDirectoryListings(initial, [
         {
           deviceId: DEVICE_ID,
-          storageType: StorageType.Sd,
-          path: '/',
-          // A fresh array instance with identical contents.
-          directories: [{ name: 'games', path: '/games' }],
+          storageType: StorageType.Usb,
+          directoryListings: { '/': [{ name: 'music', path: '/music' }] },
         },
       ]);
 
-      expect(merged).toBe(initial);
+      expect(cache.get(directoryCacheKey(DEVICE_ID, StorageType.Sd, '/'))).toEqual([
+        { name: 'games', path: '/games' },
+      ]);
+      expect(cache.get(directoryCacheKey(DEVICE_ID, StorageType.Sd, '/games'))).toEqual([
+        { name: 'demos', path: '/games/demos' },
+      ]);
+      expect(cache.get(directoryCacheKey(DEVICE_ID, StorageType.Usb, '/'))).toEqual([
+        { name: 'music', path: '/music' },
+      ]);
     });
 
-    it('returns a new cache reference when a listing adds or changes an entry', () => {
-      const initial = cacheFrom([
+    it('builds the full tree from a storage whose current folder is not the root', () => {
+      const cache = buildDirectoryListingCache([
         {
           deviceId: DEVICE_ID,
           storageType: StorageType.Sd,
-          path: '/',
-          directories: [{ name: 'games', path: '/games' }],
+          directoryListings: {
+            '/': [{ name: 'games', path: '/games' }],
+            '/games': [],
+          },
         },
       ]);
 
-      const merged = mergeDirectoryListings(initial, [
-        {
-          deviceId: DEVICE_ID,
-          storageType: StorageType.Sd,
-          path: '/',
-          directories: [{ name: 'demos', path: '/demos' }],
-        },
+      const nodes = buildDirectoryTree({
+        deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
+        storageTypes: [StorageType.Sd],
+        cache,
+      });
+
+      const storageNode = nodes[0].children?.[0];
+      expect(storageNode?.children?.map((n) => n.name)).toEqual(['games']);
+    });
+
+    it('leaves a storage without listings out of the cache, so its root keeps the placeholder', () => {
+      const cache = buildDirectoryListingCache([
+        { deviceId: DEVICE_ID, storageType: StorageType.Sd },
       ]);
 
-      expect(merged).not.toBe(initial);
-      expect(merged.get(`${DEVICE_ID}-${StorageType.Sd}-/`)).toEqual([{ name: 'demos', path: '/demos' }]);
+      const nodes = buildDirectoryTree({
+        deviceId: DEVICE_ID,
+        deviceName: DEVICE_NAME,
+        storageTypes: [StorageType.Sd],
+        cache,
+      });
+
+      expect(cache.size).toBe(0);
+      expect(nodes[0].children?.[0].children?.[0].type).toBe(DirectoryTreeNodeType.Placeholder);
     });
   });
 
