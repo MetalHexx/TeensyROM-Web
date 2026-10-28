@@ -151,14 +151,10 @@
   }
 }
 
-// Small panel (two devices side by side, or a small window): the info card needs about 400px
-// to fit its two-line message and a row at least ~235px tall (panel ~590px) to fit it
-// without scrolling. A full-size row (300px: 300 + 400 + gaps) leaves that width only in a
-// panel 1140px wide; a short panel has a shorter row, so 1000px is enough. Otherwise hide the
-// card and size the picture and CRT to fill the panel's width instead of leaving them to
-// overflow.
-@container device-panel
-  ((max-width: 1139px) and (min-height: 650px)) or (max-width: 999px) or (max-height: 589px) {
+// Narrow panel (two devices side by side, or a small window): below ~900px the info card
+// would be left under ~240px wide, too narrow to read. Hide it and size the picture and CRT
+// to fill the panel's width instead of leaving them to overflow.
+@container device-panel (max-width: 899px) {
   .device-container .device-header {
     --header-width-share: calc((100cqw - var(--spacing-lg)) * 3 / 7);
   }
