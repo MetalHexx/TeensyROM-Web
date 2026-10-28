@@ -68,9 +68,10 @@
   }
 
   // Medium size variant (default)
+  // --empty-state-padding-block lets a tight host trim the top and bottom padding
   &.size-medium {
     gap: var(--spacing-lg);
-    padding: var(--spacing-2xl);
+    padding: var(--empty-state-padding-block, var(--spacing-2xl)) var(--spacing-2xl);
 
     .empty-state-icon {
       font-size: 4rem;

@@ -3,22 +3,16 @@
 :host {
   display: block;
   min-width: 0;
+  // Height drives width via aspect-ratio, so the 4:3 screen never gets squeezed by its siblings
+  height: 100%; // Resolves against the row's explicit height
+  width: auto; // Let aspect-ratio compute width from height
+  flex: 0 0 auto; // Don't grow or shrink, size from the row's height
   aspect-ratio: 4 / 3;
-  flex: 0 1 520px;
 
   @include styles.below-phone {
     // Host fills swipe slot; inner .video-container preserves aspect ratio
     aspect-ratio: unset;
-  }
-}
-
-// Flip sizing axis when parent container is height-constrained:
-// Height drives width via aspect-ratio (instead of width driving height)
-@container device-panel (max-height: 768px) {
-  :host {
-    height: 100%; // Resolves against parent's explicit 40cqh height
-    width: auto; // Let aspect-ratio compute width from height
-    flex: 0 0 auto; // Don't grow or shrink, size from content
+    height: auto;
   }
 }
 
