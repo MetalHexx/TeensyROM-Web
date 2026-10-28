@@ -13,14 +13,12 @@
 }
 
 // The trail and the search box on one row, as the file-transfer view's `.header-toolbar` has them.
-// The card's fold handle is absolutely positioned over this row's top-right corner (see
-// `fold-handle.component.scss`: `top: 8px; right: 6px`, a medium icon button), so the row holds
-// the clearance and the vertical offset that put the box on the handle's centreline. Both are
-// written through the card's padding variable because the handle does not move with the padding
-// and the row does.
+// The card's fold handle is absolutely positioned over this row's top-right corner (a medium icon
+// button, `right: 6px`), so the row holds the clearance that keeps the box off it. The row sits at
+// the card's padding like the other views' header rows; the handle is placed on this row's
+// centreline instead (`--fold-handle-top`, set on the listing card in the mixer view).
 .listing-header {
   --listing-padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
-  --fold-handle-top: 8px;
   --fold-handle-right: 6px;
   --fold-handle-size: 32px;
   --fold-handle-gap: var(--spacing-sm);
@@ -34,10 +32,6 @@
   justify-content: space-between;
   gap: var(--spacing-sm) var(--spacing-md);
   min-height: var(--header-line-height);
-  margin-top: calc(
-    var(--fold-handle-top) + var(--fold-handle-size) / 2 - var(--listing-padding) -
-      var(--header-line-height) / 2
-  );
   padding-inline-end: calc(
     var(--fold-handle-right) + var(--fold-handle-size) + var(--fold-handle-gap) -
       var(--listing-padding)
@@ -64,7 +58,6 @@
     align-items: stretch;
     gap: var(--spacing-sm);
     min-height: 0;
-    margin-top: 0;
     padding-inline-end: 0;
 
     lib-dj-directory-trail {
