@@ -85,9 +85,11 @@ describe('DevicesTreeCardComponent', () => {
     fixture.detectChanges();
   });
 
-  it('draws one tree per device under a Devices title', () => {
+  it('draws one tree per device in one compact card with no nested cards', () => {
     expect(trees().map((tree) => tree.deviceId())).toEqual(['device-a', 'device-b']);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Devices');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('lib-scaling-card')
+    ).toHaveLength(0);
   });
 
   it('makes a device the target when its device node is activated', () => {

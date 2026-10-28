@@ -60,6 +60,8 @@ export class DirectoryTreeComponent implements AfterViewInit {
   nodes = input.required<DirectoryTreeNode[]>();
   /** The `id` of the node to render as selected, or `null` for no selection. Defaults to `null`. */
   selectedNodeId = input<string | null>(null);
+  /** Render the tree directly in its host instead of inside its own `lib-scaling-card`, for placing it in a card the caller already provides. Defaults to `false`. */
+  flat = input(false);
 
   /** Emitted when a node is clicked or activated via Enter/Space — the "navigate here" action for both leaf and expandable nodes. */
   nodeActivated = output<DirectoryTreeNode>();

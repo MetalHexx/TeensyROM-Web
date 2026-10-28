@@ -1,5 +1,10 @@
-<lib-scaling-card title="Devices" animationEntry="from-left" animationParent="auto">
-  <div class="devices-tree-card" data-testid="devices-tree-card">
+<lib-scaling-compact-card
+  cardClass="compact-card--fill"
+  animationEntry="from-left"
+  animationParent="auto"
+  data-testid="devices-tree-card"
+>
+  <div class="devices-tree-stack scroll-edge-end">
     @for (device of devices(); track device.deviceId) {
     <lib-directory-tree-container
       [deviceId]="device.deviceId"
@@ -8,4 +13,4 @@
     />
     }
   </div>
-</lib-scaling-card>
+</lib-scaling-compact-card>

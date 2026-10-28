@@ -117,7 +117,9 @@ describe('DropzoneCardComponent', () => {
   };
 
   const dropzoneEl = (): HTMLElement =>
-    (fixture.nativeElement as HTMLElement).querySelector('[data-testid="dropzone-card"]') as HTMLElement;
+    (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="dropzone-card"]'
+    ) as HTMLElement;
 
   const makeDataTransferEvent = (type: string, items: unknown[] = [{}]): DragEvent => {
     const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
@@ -136,7 +138,11 @@ describe('DropzoneCardComponent', () => {
   describe('at rest', () => {
     it('names the destination from the storage cursor', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -146,14 +152,18 @@ describe('DropzoneCardComponent', () => {
 
     it('names the target device in the idle message', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
       expect(fixture.componentInstance.message()).toBe(`${device.name} · SD · /games`);
     });
 
-    it('falls back to the destination alone when there is no target device', async () => {
+    it('has no message of its own when there is no target device', async () => {
       await setup([createDevice()], null);
 
       expect(fixture.componentInstance.message()).toBe('');
@@ -163,7 +173,11 @@ describe('DropzoneCardComponent', () => {
   describe('drag-over treatment', () => {
     it('applies the drag-over state class on dragenter and clears it on the matching dragleave', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -180,7 +194,11 @@ describe('DropzoneCardComponent', () => {
 
     it('mutates no store state on dragenter or dragleave', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -196,7 +214,11 @@ describe('DropzoneCardComponent', () => {
 
     it('uses a nested-enter counter so a dragleave over a child does not clear it early', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -210,12 +232,104 @@ describe('DropzoneCardComponent', () => {
     });
   });
 
+  describe('no destination', () => {
+    const noDestinationSetup = async () => {
+      const device = createDevice();
+      await setup([device], null);
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+      fixture.detectChanges();
+      return device;
+    };
+
+    const pickerButtons = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+          '[data-testid="dropzone-choose-files"] button, [data-testid="dropzone-choose-folder"] button'
+        )
+      );
+
+    it('prompts for a folder and disables both pickers', async () => {
+      await noDestinationSetup();
+
+      const native = fixture.nativeElement as HTMLElement;
+      expect(dropzoneEl().classList.contains('state-no-destination')).toBe(true);
+      expect(
+        native.querySelector('[data-testid="dropzone-no-destination-prompt"]')?.textContent
+      ).toContain('Select a folder');
+      expect(pickerButtons()).toHaveLength(2);
+      expect(pickerButtons().every((button) => button.disabled)).toBe(true);
+    });
+
+    it('prompts when the device is chosen but no storage is', async () => {
+      const device = createDevice();
+      await setup([device], { deviceId: device.deviceId, storageType: null, path: '/' });
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+      fixture.detectChanges();
+
+      expect(dropzoneEl().classList.contains('state-no-destination')).toBe(true);
+    });
+
+    it('shows no drag-over treatment and starts nothing on a drop', async () => {
+      await noDestinationSetup();
+
+      dropzoneEl().dispatchEvent(makeDataTransferEvent('dragenter'));
+      fixture.detectChanges();
+      expect(dropzoneEl().classList.contains('state-drag-over')).toBe(false);
+
+      dropzoneEl().dispatchEvent(makeDataTransferEvent('drop'));
+      fixture.detectChanges();
+      expect(transferContext.startTransfer).not.toHaveBeenCalled();
+    });
+
+    it('starts nothing when a file or folder is picked through the DOM anyway', async () => {
+      await noDestinationSetup();
+      const file = new File(['content'], 'game.prg');
+      const fileList = { 0: file, length: 1, item: () => file } as unknown as FileList;
+
+      for (const selector of [
+        'input[type="file"]:not([webkitdirectory])',
+        'input[webkitdirectory]',
+      ]) {
+        const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+          selector
+        );
+        Object.defineProperty(input as HTMLInputElement, 'files', {
+          value: fileList,
+          configurable: true,
+        });
+        input?.dispatchEvent(new Event('change'));
+      }
+      fixture.detectChanges();
+
+      expect(transferContext.startTransfer).not.toHaveBeenCalled();
+    });
+
+    it('returns to the idle card once a destination is selected', async () => {
+      const device = createDevice();
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+      fixture.detectChanges();
+
+      const native = fixture.nativeElement as HTMLElement;
+      expect(dropzoneEl().classList.contains('state-idle')).toBe(true);
+      expect(native.querySelector('[data-testid="dropzone-no-destination-prompt"]')).toBeNull();
+      expect(pickerButtons().every((button) => !button.disabled)).toBe(true);
+    });
+  });
+
   describe('device busy', () => {
     it('renders the refusal before any drag and disables the picker', async () => {
       const device = createDevice();
       await setup([device], null);
       transferStore.setTargetDevice({ deviceId: device.deviceId });
-      transferStore.setActiveForeignJob({ deviceId: device.deviceId, activeForeignJobId: 'foreign-job' });
+      transferStore.setActiveForeignJob({
+        deviceId: device.deviceId,
+        activeForeignJobId: 'foreign-job',
+      });
       fixture.detectChanges();
 
       const native = fixture.nativeElement as HTMLElement;
@@ -246,7 +360,10 @@ describe('DropzoneCardComponent', () => {
       const device = createDevice();
       await setup([device], null);
       transferStore.setTargetDevice({ deviceId: device.deviceId });
-      transferStore.setActiveForeignJob({ deviceId: device.deviceId, activeForeignJobId: 'foreign-job' });
+      transferStore.setActiveForeignJob({
+        deviceId: device.deviceId,
+        activeForeignJobId: 'foreign-job',
+      });
       fixture.detectChanges();
 
       dropzoneEl().dispatchEvent(makeDataTransferEvent('drop'));
@@ -259,7 +376,11 @@ describe('DropzoneCardComponent', () => {
   describe('starting a transfer', () => {
     it('a drop hands off to ITransferContext.startTransfer with the dropped items', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -272,12 +393,18 @@ describe('DropzoneCardComponent', () => {
 
     it('the file picker path produces the same context call as a drop', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
       const native = fixture.nativeElement as HTMLElement;
-      const fileInput = native.querySelector<HTMLInputElement>('input[type="file"]:not([webkitdirectory])');
+      const fileInput = native.querySelector<HTMLInputElement>(
+        'input[type="file"]:not([webkitdirectory])'
+      );
       expect(fileInput).toBeTruthy();
 
       const file = new File(['content'], 'game.prg');
@@ -291,7 +418,11 @@ describe('DropzoneCardComponent', () => {
 
     it('the folder picker path produces the same context call as a drop', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -312,7 +443,11 @@ describe('DropzoneCardComponent', () => {
   describe('drop outside the card', () => {
     it('is a no-op', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 
@@ -326,7 +461,11 @@ describe('DropzoneCardComponent', () => {
   describe('focus anchor', () => {
     it('renders the focus-return anchor as a focusable button element', async () => {
       const device = createDevice();
-      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      await setup([device], {
+        deviceId: device.deviceId,
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
       transferStore.setTargetDevice({ deviceId: device.deviceId });
       fixture.detectChanges();
 

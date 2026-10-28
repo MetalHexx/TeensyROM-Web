@@ -34,6 +34,12 @@ lib-sliding-container {
   }
 }
 
+.no-destination-prompt {
+  margin: 0;
+  color: var(--color-dimmed-light);
+  text-align: center;
+}
+
 .picker-actions {
   display: grid;
   grid-auto-flow: column;

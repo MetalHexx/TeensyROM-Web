@@ -1,5 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DeviceStore, StorageStore, TransferStore, TRANSFER_CONTEXT, ITransferContext } from '@teensyrom-nx/application';
+import {
+  DeviceStore,
+  StorageStore,
+  TransferStore,
+  TRANSFER_CONTEXT,
+  ITransferContext,
+} from '@teensyrom-nx/application';
 import {
   SlidingContainerComponent,
   ScalingCompactCardComponent,
@@ -7,15 +13,17 @@ import {
   EmptyStateMessageComponent,
 } from '@teensyrom-nx/ui/components';
 
-type DropzoneCardState = 'idle' | 'drag-over' | 'device-busy';
+type DropzoneCardState = 'idle' | 'drag-over' | 'device-busy' | 'no-destination';
 
 const BUSY_SECONDARY_MESSAGE = 'Wait for it to finish, or pick another device';
 
 /**
  * The view's only drop target. Renders the transfer destination at rest, a distinct treatment
  * while a drag is over the card, and a refusal — before any drag — when the target device
- * already has a transfer running, as recorded in `TransferStore`. Both the drag-and-drop path and the picker fallback hand off
- * to the same `ITransferContext.startTransfer` call.
+ * already has a transfer running, as recorded in `TransferStore`, or when no storage and folder
+ * is selected for the target device to receive files. A refused card is inert: the pickers are
+ * disabled and neither a drop nor a pick starts a transfer. Both the drag-and-drop path and the
+ * picker fallback hand off to the same `ITransferContext.startTransfer` call.
  */
 @Component({
   selector: 'lib-dropzone-card',
@@ -48,22 +56,32 @@ export class DropzoneCardComponent {
     return deviceId !== null && this.transferStore.isDeviceBusy(deviceId)();
   });
 
+  /** The target device's selected storage and folder, the same cursor a transfer is captured from. */
+  private readonly destination = computed(() => {
+    const deviceId = this.targetDeviceId();
+    if (!deviceId) return null;
+
+    const selected = this.storageStore.getSelectedDirectoryForDevice(deviceId);
+    return selected && selected.storageType !== null ? selected : null;
+  });
+
+  readonly hasDestination = computed(() => this.destination() !== null);
+
   private readonly isDragOver = signal(false);
 
   readonly cardState = computed<DropzoneCardState>(() => {
     if (this.isBusy()) return 'device-busy';
+    if (!this.hasDestination()) return 'no-destination';
     if (this.isDragOver()) return 'drag-over';
     return 'idle';
   });
 
+  /** Whether the pickers and the drop target are refused. */
+  readonly isInert = computed(() => this.cardState() === 'device-busy' || !this.hasDestination());
+
   readonly destinationLabel = computed(() => {
-    const deviceId = this.targetDeviceId();
-    if (!deviceId) return '';
-
-    const selected = this.storageStore.getSelectedDirectoryForDevice(deviceId);
-    if (!selected || selected.storageType === null) return '';
-
-    return `${selected.storageType} · ${selected.path}`;
+    const selected = this.destination();
+    return selected ? `${selected.storageType} · ${selected.path}` : '';
   });
 
   readonly icon = computed(() => (this.cardState() === 'device-busy' ? 'block' : 'upload_file'));
@@ -72,6 +90,8 @@ export class DropzoneCardComponent {
     switch (this.cardState()) {
       case 'device-busy':
         return "Can't transfer right now";
+      case 'no-destination':
+        return 'No destination selected';
       case 'drag-over':
         return 'Drop to transfer';
       default:
@@ -80,6 +100,7 @@ export class DropzoneCardComponent {
   });
 
   readonly message = computed(() => {
+    if (this.cardState() === 'no-destination') return '';
     if (this.cardState() === 'device-busy') {
       const deviceName = this.targetDevice()?.name ?? 'This device';
       return `${deviceName} already has a transfer in progress`;
@@ -97,7 +118,7 @@ export class DropzoneCardComponent {
   onDragEnter(event: DragEvent): void {
     event.preventDefault();
     this.dragEnterCount++;
-    if (!this.isBusy()) {
+    if (!this.isInert()) {
       this.isDragOver.set(true);
     }
   }
@@ -105,6 +126,9 @@ export class DropzoneCardComponent {
   onDragOver(event: DragEvent): void {
     // Required so the browser allows a drop instead of navigating to the dragged payload.
     event.preventDefault();
+    if (this.isInert() && event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'none';
+    }
   }
 
   onDragLeave(event: DragEvent): void {
@@ -120,7 +144,7 @@ export class DropzoneCardComponent {
     this.dragEnterCount = 0;
     this.isDragOver.set(false);
 
-    if (this.isBusy()) return;
+    if (this.isInert()) return;
 
     const deviceId = this.targetDeviceId();
     const items = event.dataTransfer?.items;
@@ -142,7 +166,7 @@ export class DropzoneCardComponent {
   }
 
   private async startFromPicker(files: FileList | null): Promise<void> {
-    if (this.isBusy() || !files || files.length === 0) return;
+    if (this.isInert() || !files || files.length === 0) return;
 
     const deviceId = this.targetDeviceId();
     if (!deviceId) return;

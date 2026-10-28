@@ -153,7 +153,7 @@
 
   // The tree is as wide as its widest row, between these two; the listing and the set card share
   // the rest evenly.
-  --browse-card-min: 212px;
+  --browse-card-min: var(--tree-panel-min-width);
   --browse-card-max: 360px;
   // The folded listing's strip, which the fold handle reads too.
   --fold-strip-width: 44px;

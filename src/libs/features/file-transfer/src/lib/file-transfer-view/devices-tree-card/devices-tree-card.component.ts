@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { TransferStore } from '@teensyrom-nx/application';
 import { Device } from '@teensyrom-nx/domain';
-import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { ScalingCompactCardComponent } from '@teensyrom-nx/ui/components';
 import { DirectoryTreeContainerComponent } from '../directory-tree-container/directory-tree-container.component';
 
 /**
- * Titled card stacking one directory tree per device. Activating any node in a tree makes that
+ * Untitled compact card stacking one directory tree per device. Activating any node in a tree makes that
  * device the transfer target; only the target's tree shows a selected node.
  */
 @Component({
   selector: 'lib-devices-tree-card',
-  imports: [ScalingCardComponent, DirectoryTreeContainerComponent],
+  imports: [ScalingCompactCardComponent, DirectoryTreeContainerComponent],
   templateUrl: './devices-tree-card.component.html',
   styleUrl: './devices-tree-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

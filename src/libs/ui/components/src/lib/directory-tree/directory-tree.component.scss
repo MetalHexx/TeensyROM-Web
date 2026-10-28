@@ -15,6 +15,11 @@
   width: 100%;
 }
 
+// Flat, the tree sits in a compact card beside rows that are 40px tall, so its rows match them.
+.directory-tree--flat {
+  --mat-tree-node-min-height: 40px;
+}
+
 mat-tree {
   background-color: transparent;
   height: 100%;
