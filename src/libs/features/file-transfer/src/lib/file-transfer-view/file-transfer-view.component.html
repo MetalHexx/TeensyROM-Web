@@ -13,9 +13,8 @@
     <div class="transfer-header" data-testid="transfer-header">
       <div class="transfer-header-row" data-testid="transfer-header-row">
         <lib-dropzone-card />
-        <lib-transfers-card />
+        <lib-transfers-card [settingsOpen]="panelOpen()" (settingsToggle)="togglePanel()" />
       </div>
-      <lib-transfer-toolbar [settingsOpen]="panelOpen()" (settingsToggle)="togglePanel()" />
     </div>
     <div class="content-row" data-testid="content-row">
       <div class="left-container" data-testid="left-container">

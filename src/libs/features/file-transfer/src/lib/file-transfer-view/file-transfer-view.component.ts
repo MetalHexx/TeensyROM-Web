@@ -21,7 +21,6 @@ import { Device, StorageType } from '@teensyrom-nx/domain';
 import { EmptyStateMessageComponent, SlidingContainerComponent } from '@teensyrom-nx/ui/components';
 import { DropzoneCardComponent } from './dropzone-card/dropzone-card.component';
 import { TransfersCardComponent } from './transfers-card/transfers-card.component';
-import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
 import { DevicesTreeCardComponent } from './devices-tree-card/devices-tree-card.component';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
 import { TransferSettingsPanelComponent } from '../transfer-settings-panel/transfer-settings-panel.component';
@@ -36,7 +35,6 @@ import { TransferSettingsPanelComponent } from '../transfer-settings-panel/trans
   imports: [
     DropzoneCardComponent,
     TransfersCardComponent,
-    TransferToolbarComponent,
     EmptyStateMessageComponent,
     DevicesTreeCardComponent,
     TransferDirectoryListingComponent,
@@ -55,7 +53,7 @@ export class FileTransferViewComponent {
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
 
-  private readonly toolbar = viewChild(TransferToolbarComponent);
+  private readonly transfersCard = viewChild(TransfersCardComponent);
   private readonly panel = viewChild(TransferSettingsPanelComponent);
   private readonly panelSlot = viewChild<unknown, ElementRef<HTMLElement>>('panelSlot', {
     read: ElementRef,
@@ -162,7 +160,7 @@ export class FileTransferViewComponent {
     const focusWasInPanel = this.panelSlot()?.nativeElement.contains(this.document.activeElement);
     this.panelOpen.set(false);
     if (focusWasInPanel) {
-      this.toolbar()?.focusSettingsButton();
+      this.transfersCard()?.focusSettingsButton();
     }
   }
 

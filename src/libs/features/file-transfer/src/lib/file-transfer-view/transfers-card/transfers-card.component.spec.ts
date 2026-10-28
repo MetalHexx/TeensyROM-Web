@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DeviceStore, ITransferContext, TRANSFER_CONTEXT, TransferStore } from '@teensyrom-nx/application';
 import {
   Device,
@@ -244,5 +244,49 @@ describe('TransfersCardComponent', () => {
 
     expect(rows().length).toBe(0);
     expect(clearSpy).toHaveBeenCalled();
+  });
+
+  describe('settings gear', () => {
+    beforeEach(async () => {
+      await setup();
+      createFixture();
+    });
+
+    const gear = () => native().querySelector<HTMLElement>('[data-testid="transfer-settings-button"]');
+    const gearButton = () => gear()?.querySelector('button') as HTMLButtonElement;
+
+    it('sits in the card corner, outside the list', () => {
+      expect(gear()?.closest('.corner-content')).toBeTruthy();
+      expect(gear()?.closest('[data-testid="transfers-card"]')).toBeNull();
+    });
+
+    it('labels the gear as opening the panel while it is closed', () => {
+      expect(gearButton().getAttribute('aria-label')).toBe('Open transfer settings');
+      expect(gearButton().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('reports the open state through the label, highlight and aria-expanded', () => {
+      fixture.componentRef.setInput('settingsOpen', true);
+      fixture.detectChanges();
+
+      expect(gearButton().getAttribute('aria-label')).toBe('Close transfer settings');
+      expect(gearButton().getAttribute('aria-expanded')).toBe('true');
+      expect(gear()?.querySelector('mat-icon')?.classList.contains('highlight')).toBe(true);
+    });
+
+    it('emits settingsToggle when the gear is pressed', () => {
+      const toggled = vi.fn();
+      fixture.componentInstance.settingsToggle.subscribe(toggled);
+
+      gearButton().click();
+
+      expect(toggled).toHaveBeenCalledTimes(1);
+    });
+
+    it('focuses the gear button', () => {
+      fixture.componentInstance.focusSettingsButton();
+
+      expect(document.activeElement).toBe(gearButton());
+    });
   });
 });

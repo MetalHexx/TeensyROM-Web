@@ -1,5 +1,15 @@
 <lib-sliding-container animationDirection="from-top" containerHeight="100%" [animationTrigger]="true">
   <lib-scaling-card title="Transfers" animationEntry="from-top" animationParent="auto">
+    <lib-icon-button
+      slot="corner"
+      icon="settings"
+      size="medium"
+      [color]="settingsOpen() ? 'highlight' : 'normal'"
+      [ariaLabel]="settingsOpen() ? 'Close transfer settings' : 'Open transfer settings'"
+      [ariaExpanded]="settingsOpen()"
+      data-testid="transfer-settings-button"
+      (buttonClick)="settingsToggle.emit()"
+    />
     <div class="transfers-card" data-testid="transfers-card">
       @if (rows().length > 0) {
         <div class="transfers-list">

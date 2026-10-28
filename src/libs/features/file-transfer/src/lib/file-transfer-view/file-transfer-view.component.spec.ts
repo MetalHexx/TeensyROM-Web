@@ -28,7 +28,7 @@ import {
   WATCH_FOLDER_SERVICE,
 } from '@teensyrom-nx/domain';
 import { FileTransferViewComponent } from './file-transfer-view.component';
-import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
+import { TransfersCardComponent } from './transfers-card/transfers-card.component';
 
 function createDevice(overrides: Partial<Device> = {}): Device {
   const deviceId = overrides.deviceId ?? 'device-1';
@@ -161,19 +161,20 @@ describe('FileTransferViewComponent', () => {
       expect(native.querySelector('[data-testid="left-container"]')).toBeTruthy();
       expect(native.querySelector('[data-testid="right-container"]')).toBeTruthy();
       expect(native.querySelector('lib-dropzone-card')).toBeTruthy();
-      expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
+      expect(native.querySelector('lib-transfers-card [data-testid="transfer-settings-button"]')).toBeTruthy();
     });
 
-    it('places the drop zone and the transfers card side by side, ahead of the toolbar', async () => {
+    it('places the drop zone and the transfers card side by side as the whole header', async () => {
       await setup([createDevice()]);
       createFixture();
       const native = fixture.nativeElement as HTMLElement;
 
+      const header = native.querySelector('[data-testid="transfer-header"]');
       const row = native.querySelector('[data-testid="transfer-header-row"]');
       expect(row?.querySelector('lib-dropzone-card')).toBeTruthy();
       expect(row?.querySelector('lib-transfers-card')).toBeTruthy();
-      expect(row?.querySelector('lib-transfer-toolbar')).toBeFalsy();
-      expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
+      expect(header?.children.length).toBe(1);
+      expect(header?.firstElementChild).toBe(row);
     });
 
     it('renders the Devices card with a tree per enabled device in the left column', async () => {
@@ -184,7 +185,6 @@ describe('FileTransferViewComponent', () => {
       const left = native.querySelector('[data-testid="left-container"]');
       expect(left?.querySelector('lib-devices-tree-card')).toBeTruthy();
       expect(left?.querySelectorAll('lib-directory-tree-container').length).toBe(2);
-      expect(native.querySelector('lib-device-selector')).toBeNull();
     });
 
     it('should render the empty-state message instead of the rows when there are no enabled devices', async () => {
@@ -421,8 +421,10 @@ describe('FileTransferViewComponent', () => {
   describe('transfer settings panel', () => {
     const gear = () =>
       (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="transfer-settings-button"] button'
+        'lib-transfers-card [data-testid="transfer-settings-button"] button'
       ) as HTMLButtonElement;
+    const transfersCard = () =>
+      fixture.debugElement.query(By.directive(TransfersCardComponent)).componentInstance as TransfersCardComponent;
     const panel = () =>
       (fixture.nativeElement as HTMLElement).querySelector('lib-transfer-settings-panel');
     const slot = () => (fixture.nativeElement as HTMLElement).querySelector('lib-sliding-container.panel-slot');
@@ -473,9 +475,7 @@ describe('FileTransferViewComponent', () => {
       gear().click();
       fixture.detectChanges();
       await fixture.whenStable();
-      const toolbar = fixture.debugElement.query(By.directive(TransferToolbarComponent))
-        .componentInstance as TransferToolbarComponent;
-      const refocus = vi.spyOn(toolbar, 'focusSettingsButton');
+      const refocus = vi.spyOn(transfersCard(), 'focusSettingsButton');
 
       fixture.componentInstance.closePanel();
 
@@ -489,9 +489,7 @@ describe('FileTransferViewComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       (document.activeElement as HTMLElement | null)?.blur();
-      const toolbar = fixture.debugElement.query(By.directive(TransferToolbarComponent))
-        .componentInstance as TransferToolbarComponent;
-      const refocus = vi.spyOn(toolbar, 'focusSettingsButton');
+      const refocus = vi.spyOn(transfersCard(), 'focusSettingsButton');
 
       gear().click();
 
