@@ -85,6 +85,9 @@ describe('DjDirectoryListingComponent', () => {
     const storageStore = {
       storageEntries: signal(entries),
       navigateToDirectory,
+      getSearchState: vi.fn(() => signal(null)),
+      searchFiles: vi.fn().mockResolvedValue(undefined),
+      clearSearch: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -118,6 +121,20 @@ describe('DjDirectoryListingComponent', () => {
     await setup(active, { 'device-1-SD': stateWith({}) });
 
     expect(fixture.nativeElement.querySelector('lib-dj-directory-trail')).toBeTruthy();
+  });
+
+  it('renders the search box in the header row beside the trail once a storage is active', async () => {
+    await setup(active, { 'device-1-SD': stateWith({}) });
+
+    const header = fixture.nativeElement.querySelector('.listing-header') as HTMLElement;
+    expect(header.children[0].tagName.toLowerCase()).toBe('lib-dj-directory-trail');
+    expect(header.children[1].tagName.toLowerCase()).toBe('lib-dj-search-toolbar');
+  });
+
+  it('renders no search box without an active storage', async () => {
+    await setup(null);
+
+    expect(fixture.nativeElement.querySelector('lib-dj-search-toolbar')).toBeFalsy();
   });
 
   it('shows a loading empty state while the entry is loading', async () => {

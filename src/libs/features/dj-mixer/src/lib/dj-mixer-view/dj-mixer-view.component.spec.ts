@@ -80,6 +80,9 @@ function createStorageStoreStub(overrides: Record<string, unknown> = {}) {
       >
     >({}),
     getSelectedDirectoryState: vi.fn(() => signal(null)),
+    getSearchState: vi.fn(() => signal(null)),
+    searchFiles: vi.fn().mockResolvedValue(undefined),
+    clearSearch: vi.fn(),
     initializeStorage: vi.fn().mockResolvedValue(undefined),
     navigateToDirectory: vi.fn().mockResolvedValue(undefined),
     navigateDirectoryBackward: vi.fn().mockResolvedValue(undefined),

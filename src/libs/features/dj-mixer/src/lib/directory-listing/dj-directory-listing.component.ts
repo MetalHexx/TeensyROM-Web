@@ -29,13 +29,14 @@ import {
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import { setDjFileDragData } from '../drag/dj-file-drag';
 import { DjDirectoryTrailComponent } from './dj-directory-trail.component';
+import { DjSearchToolbarComponent } from './dj-search-toolbar.component';
 
 type DirectoryRow = DirectoryItem & { readonly itemType: 'directory' };
 type FileRow = FileItem & { readonly itemType: 'file' };
 type ListingRow = DirectoryRow | FileRow;
 
 /**
- * The DJ view's directory listing: the active storage's trail plus its contents, folders
+ * The DJ view's directory listing: the active storage's trail and search box plus its contents, folders
  * before files. A thin container over `StorageStore`, mirroring the file-transfer view's
  * `transfer-directory-listing` — except a single click on a folder row navigates into it
  * (rather than the player's double-click), and a file row only selects.
@@ -46,6 +47,7 @@ type ListingRow = DirectoryRow | FileRow;
   imports: [
     ScrollingModule,
     DjDirectoryTrailComponent,
+    DjSearchToolbarComponent,
     DirectoryItemComponent,
     StorageItemComponent,
     StorageItemActionsComponent,

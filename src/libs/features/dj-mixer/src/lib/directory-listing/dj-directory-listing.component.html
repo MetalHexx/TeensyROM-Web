@@ -1,5 +1,8 @@
 @if (activeStorage(); as active) {
-<lib-dj-directory-trail [activeStorage]="active"></lib-dj-directory-trail>
+<div class="listing-header">
+  <lib-dj-directory-trail [activeStorage]="active"></lib-dj-directory-trail>
+  <lib-dj-search-toolbar [deviceId]="active.deviceId"></lib-dj-search-toolbar>
+</div>
 
 @if (isLoading()) {
 <lib-empty-state-message

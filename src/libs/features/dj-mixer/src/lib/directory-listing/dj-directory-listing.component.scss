@@ -1,3 +1,5 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 // Sole content of the directory-listing card's `.compact-card--fill` flex column: `flex: 1 1
 // auto` claims the column's full height and `min-height: 0` lets this element shrink below its
 // rows' natural height, so the inner viewport — not the outer `.compact-card`'s
@@ -10,8 +12,65 @@
   width: 100%;
 }
 
-lib-dj-directory-trail {
+// The trail and the search box on one row, as the file-transfer view's `.header-toolbar` has them.
+// The card's fold handle is absolutely positioned over this row's top-right corner (see
+// `fold-handle.component.scss`: `top: 8px; right: 6px`, a medium icon button), so the row holds
+// the clearance and the vertical offset that put the box on the handle's centreline. Both are
+// written through the card's padding variable because the handle does not move with the padding
+// and the row does.
+.listing-header {
+  --listing-padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
+  --fold-handle-top: 8px;
+  --fold-handle-right: 6px;
+  --fold-handle-size: 32px;
+  --fold-handle-gap: var(--spacing-sm);
+  // The row's first line: the trail's 40px, taller than the 36px search field it is centred with.
+  --header-line-height: 40px;
+
+  display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-md);
+  min-height: var(--header-line-height);
+  margin-top: calc(
+    var(--fold-handle-top) + var(--fold-handle-size) / 2 - var(--listing-padding) -
+      var(--header-line-height) / 2
+  );
+  padding-inline-end: calc(
+    var(--fold-handle-right) + var(--fold-handle-size) + var(--fold-handle-gap) -
+      var(--listing-padding)
+  );
+
+  lib-dj-directory-trail {
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  // `max-width` lets the box shrink in a card too narrow for its natural width instead of
+  // spilling out of it.
+  lib-dj-search-toolbar {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: auto;
+  }
+
+  // Stacked cards render no fold handle, so no clearance; the box takes its own full-width row.
+  @include styles.below-phone {
+    flex-wrap: nowrap;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    min-height: 0;
+    margin-top: 0;
+    padding-inline-end: 0;
+
+    lib-dj-directory-trail {
+      flex: 0 0 auto;
+    }
+  }
 }
 
 // The native drag image is snapshotted from this element on `dragstart`; off-screen rather than

@@ -6,6 +6,7 @@ import { generateDevice } from '../../support/test-data/generators/device.genera
 import { interceptDjLibrary } from '../../support/interceptors/djLibrary.interceptors';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
+import { interceptGetDirectory } from '../../support/interceptors/getDirectory.interceptors';
 
 // There is no two-device fixture in the suite (`singleDevice` has one, `multipleDevices` three).
 // The decks are a fixed pair (A and B) regardless of device count — this fixture exists only to
@@ -24,6 +25,7 @@ const KEY_MATCH_WIDTHS = [
   1100,
   VIEWPORT.TABLET.width,
 ] as const;
+const SEARCH_BOX_WIDTHS = [SID_PANEL_VIEWPORT.width, 1400, 1100, VIEWPORT.TABLET.width] as const;
 
 /**
  * `.router-content` is the shell's own scroll container here (unlike the DJ Poc route, which
@@ -262,6 +264,76 @@ describe('DJ Mixer — responsive layout', () => {
             .first()
             .find('.frame')
             .should(frameShown ? 'be.visible' : 'not.be.visible');
+        });
+      });
+    });
+  });
+
+  describe('the listing search box and the fold handle', () => {
+    const FOLD_BUTTON = 'button[aria-label="Collapse the file listing"]';
+    const SEARCH_BOX = 'lib-dj-search-toolbar .input-wrapper';
+
+    beforeEach(() => {
+      interceptDjLibrary();
+      interceptFindDevices({ fixture: twoDevices });
+      interceptConnectDevice();
+      interceptGetDirectory();
+      cy.visit(APP_ROUTES.djMixer);
+      // The cards enter with a scaling transform, which moves their rects; measure the layout itself.
+      cy.document().then((doc) => {
+        const style = doc.createElement('style');
+        style.textContent =
+          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; }';
+        doc.head.appendChild(style);
+      });
+    });
+
+    it('keeps the box clear of the fold handle, on its centreline and the same gap from it at every width', () => {
+      const gaps: number[] = [];
+
+      SEARCH_BOX_WIDTHS.forEach((width) => {
+        const height = width === VIEWPORT.TABLET.width ? VIEWPORT.TABLET.height : 1080;
+        cy.viewport(width, height);
+
+        // Retried via `.should()` so the layout can settle after the viewport change.
+        cy.get(SEARCH_BOX).should(([box]) => {
+          const boxRect = box.getBoundingClientRect();
+          const foldButton = box.ownerDocument.querySelector(FOLD_BUTTON);
+          expect(foldButton, 'the fold handle is rendered').to.not.equal(null);
+          const foldRect = (foldButton as Element).getBoundingClientRect();
+          const overlaps =
+            boxRect.left < foldRect.right &&
+            boxRect.right > foldRect.left &&
+            boxRect.top < foldRect.bottom &&
+            boxRect.bottom > foldRect.top;
+          expect(overlaps, `the box and the fold handle do not overlap at ${width}px`).to.equal(
+            false
+          );
+
+          if (boxRect.top < foldRect.bottom) {
+            expect(
+              Math.abs(boxRect.top + boxRect.height / 2 - (foldRect.top + foldRect.height / 2)),
+              `vertical offset between the centres at ${width}px`
+            ).to.be.at.most(1);
+            const gap = foldRect.left - boxRect.right;
+            expect(gap, `the box stops short of the handle at ${width}px`).to.be.greaterThan(0);
+            gaps[SEARCH_BOX_WIDTHS.indexOf(width)] = gap;
+          } else {
+            expect(boxRect.top, `a wrapped box sits below the handle at ${width}px`).to.be.at.least(
+              foldRect.bottom
+            );
+            delete gaps[SEARCH_BOX_WIDTHS.indexOf(width)];
+          }
+        });
+      });
+
+      cy.then(() => {
+        const measured = gaps.filter((gap) => gap !== undefined);
+        measured.forEach((gap) => {
+          expect(gap, 'horizontal gap to the handle, the same at every width').to.be.closeTo(
+            measured[0],
+            1
+          );
         });
       });
     });
