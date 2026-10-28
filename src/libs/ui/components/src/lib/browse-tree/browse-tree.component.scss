@@ -30,6 +30,10 @@
 }
 
 .storage-list {
+  // A leaf starts one tree level in from the device label: past the 24px chevron and its gap, then
+  // the 40px per-level indent the file-transfer `DirectoryTreeComponent` uses.
+  --storage-row-indent: calc(24px + var(--spacing-xs) + 40px);
+
   // Block-level, as the host is: in a tree as wide as its widest row, two inline buttons would
   // sit side by side and that one line would set the width.
   .storage-row {
@@ -37,7 +41,7 @@
     background: none;
     border: none;
     padding: 0;
-    margin-left: var(--spacing-lg);
+    margin-left: var(--storage-row-indent);
     cursor: pointer;
     text-align: left;
     font-family: inherit;

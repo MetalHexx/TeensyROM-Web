@@ -22,7 +22,9 @@
   color: var(--color-dimmed);
 }
 
+// A set starts one tree level in from the branch label: past the 24px chevron and its gap, then
+// the 40px per-level indent the file-transfer `DirectoryTreeComponent` uses.
 .set-list .set-row {
-  margin-left: var(--spacing-lg);
+  margin-left: calc(24px + var(--spacing-xs) + 40px);
   min-width: 0;
 }
