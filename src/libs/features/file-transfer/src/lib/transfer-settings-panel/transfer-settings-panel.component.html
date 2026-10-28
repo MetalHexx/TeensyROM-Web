@@ -91,7 +91,7 @@
           (formSubmit)="submitAddDevice(folder.id)"
           (formCancel)="closeForm()"
         />
-        } @else {
+        } @else if (canAddDevice(folder)) {
         <button
           type="button"
           class="link-button"

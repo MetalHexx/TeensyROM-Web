@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, FormGroup } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { StorageType } from '@teensyrom-nx/domain';
+import { Device, StorageType } from '@teensyrom-nx/domain';
 import { WatchFolderDeviceFormComponent } from './watch-folder-device-form.component';
 import { WatchFolderFormErrors } from '../watch-folder-form.util';
 
 describe('WatchFolderDeviceFormComponent', () => {
   let fixture: ComponentFixture<WatchFolderDeviceFormComponent>;
+  let group: FormGroup;
 
   const query = <T extends HTMLElement = HTMLElement>(testId: string) =>
     (fixture.nativeElement as HTMLElement).querySelector<T>(`[data-testid="${testId}"]`);
@@ -18,16 +19,12 @@ describe('WatchFolderDeviceFormComponent', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(WatchFolderDeviceFormComponent);
     fixture.componentRef.setInput('mode', mode);
-    fixture.componentRef.setInput(
-      'formGroup',
-      new FormGroup({
-        ...(mode === 'add'
-          ? { device: new FormControl(''), storage: new FormControl('') }
-          : {}),
-        devicePath: new FormControl('/auto-transfer'),
-        launch: new FormControl(false),
-      })
-    );
+    group = new FormGroup({
+      ...(mode === 'add' ? { device: new FormControl(''), storage: new FormControl('') } : {}),
+      devicePath: new FormControl('/auto-transfer'),
+      launch: new FormControl(false),
+    });
+    fixture.componentRef.setInput('formGroup', group);
     fixture.componentRef.setInput('deviceName', 'Rack');
     fixture.componentRef.setInput('storageType', StorageType.Usb);
     fixture.componentRef.setInput('errors', errors);
@@ -56,7 +53,11 @@ describe('WatchFolderDeviceFormComponent', () => {
     expect(query('form-device')).toBeNull();
     expect(query<HTMLInputElement>('form-device-readonly')?.readOnly).toBe(true);
     expect(query<HTMLInputElement>('form-device-readonly')?.value).toBe('Rack');
-    expect(query<HTMLInputElement>('form-storage-readonly')?.value).toBe('USB');
+    const storage = query('form-storage-readonly');
+    expect(storage?.querySelector('.mat-button-toggle-checked')?.textContent?.trim()).toBe('USB');
+    const toggles = Array.from(storage?.querySelectorAll('mat-button-toggle') ?? []);
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((toggle) => toggle.classList.contains('mat-button-toggle-disabled'))).toBe(true);
     expect(query('form-readonly-note')).not.toBeNull();
   });
 
@@ -65,5 +66,27 @@ describe('WatchFolderDeviceFormComponent', () => {
 
     expect(query('form-readonly-note')).toBeNull();
     expect(query('form-device')).not.toBeNull();
+  });
+
+  it('offers SD and USB in add mode, disabling the storage the chosen device lacks', async () => {
+    await render('add');
+    const rack = {
+      deviceId: 'dev-1',
+      name: 'Rack',
+      sdStorage: { available: true },
+      usbStorage: { available: false },
+    } as unknown as Device;
+    fixture.componentRef.setInput('devices', [rack]);
+    group.controls['device'].setValue('dev-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const toggles = Array.from(query('form-storage')?.querySelectorAll('mat-button-toggle') ?? []);
+    expect(toggles.map((toggle) => toggle.textContent?.trim())).toEqual(['SD', 'USB']);
+    expect(toggles.map((toggle) => toggle.classList.contains('mat-button-toggle-disabled'))).toEqual([
+      false,
+      true,
+    ]);
   });
 });

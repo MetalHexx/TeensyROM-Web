@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -34,6 +35,7 @@ import {
   selector: 'lib-watch-folder-device-form',
   imports: [
     ReactiveFormsModule,
+    MatButtonToggleModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -72,6 +74,8 @@ export class WatchFolderDeviceFormComponent {
   private readonly deviceId = controlValue<string>(this.formGroup, 'device');
 
   protected readonly canSubmit = computed(() => this.valid() && !this.submitting());
+  /** Both storages are always shown; the ones the chosen device lacks are disabled. */
+  protected readonly storageChoices = [StorageType.Sd, StorageType.Usb];
   protected readonly storageOptions = computed(() =>
     availableStorage(this.devices().find((device) => device.deviceId === this.deviceId()))
   );
@@ -80,7 +84,6 @@ export class WatchFolderDeviceFormComponent {
   );
 
   protected readonly deviceMatcher = engineErrorMatcher(this.errors, 'device');
-  protected readonly storageMatcher = engineErrorMatcher(this.errors, 'storage');
   protected readonly devicePathMatcher = engineErrorMatcher(this.errors, 'devicePath');
 
   constructor() {

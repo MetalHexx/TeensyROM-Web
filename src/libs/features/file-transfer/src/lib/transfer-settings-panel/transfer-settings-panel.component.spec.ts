@@ -391,6 +391,20 @@ describe('TransferSettingsPanelComponent', () => {
         ?.click();
       await settle();
     };
+    const selectedDevice = () =>
+      query('form-device')?.querySelector('.mat-mdc-select-value')?.textContent?.trim();
+    const storageToggle = (label: string) =>
+      Array.from(query('form-storage')?.querySelectorAll<HTMLElement>('mat-button-toggle') ?? []).find(
+        (toggle) => toggle.textContent?.trim() === label
+      );
+    const storageDisabled = (label: string) =>
+      storageToggle(label)?.classList.contains('mat-button-toggle-disabled');
+    const selectedStorage = () =>
+      query('form-storage')?.querySelector('.mat-button-toggle-checked')?.textContent?.trim();
+    const chooseStorage = async (label: string) => {
+      storageToggle(label)?.querySelector('button')?.click();
+      await settle();
+    };
     const submitButton = () => query('form-submit')?.querySelector('button');
     const submit = async () => {
       submitButton()?.click();
@@ -409,22 +423,33 @@ describe('TransferSettingsPanelComponent', () => {
     };
 
     describe('add folder', () => {
-      it('gates Add on the required fields and defaults the device folder and launch', async () => {
+      it('starts on the first connected device with its SD storage, /auto-transfer and launch off', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+        await settle();
+
+        expect(selectedDevice()).toBe('Rack TeensyROM');
+        expect(selectedStorage()).toBe('SD');
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+        expect(query('form-launch')?.querySelector('button')?.getAttribute('aria-checked')).toBe('false');
+      });
+
+      it('gates Add on the folder, since the rest starts filled in', async () => {
         await setup();
         clickButton(query('add-watch-folder'));
         await settle();
 
-        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
         expect(submitButton()?.disabled).toBe(true);
 
         await type('form-folder', '   ');
         expect(submitButton()?.disabled).toBe(true);
 
         await type('form-folder', 'D:\\Incoming');
-        expect(submitButton()?.disabled).toBe(true);
-
-        await choose('form-device', 'Bench TeensyROM');
         expect(submitButton()?.disabled).toBe(false);
+
+        await type('form-device-path', '  ');
+        expect(submitButton()?.disabled).toBe(true);
       });
 
       it('offers only the storage the chosen device has', async () => {
@@ -433,8 +458,25 @@ describe('TransferSettingsPanelComponent', () => {
         await settle();
 
         await choose('form-device', 'Rack TeensyROM');
-        await openSelect('form-storage');
-        expect(optionLabels()).toEqual(['SD']);
+        expect(storageDisabled('SD')).toBe(false);
+        expect(storageDisabled('USB')).toBe(true);
+
+        await choose('form-device', 'Bench TeensyROM');
+        expect(storageDisabled('SD')).toBe(false);
+        expect(storageDisabled('USB')).toBe(false);
+      });
+
+      it('keeps the chosen storage when the device has it, and falls back to its first when not', async () => {
+        await setup();
+        clickButton(query('add-watch-folder'));
+        await settle();
+
+        await choose('form-device', 'Bench TeensyROM');
+        await chooseStorage('USB');
+        expect(selectedStorage()).toBe('USB');
+
+        await choose('form-device', 'Rack TeensyROM');
+        expect(selectedStorage()).toBe('SD');
       });
 
       it('saves the trimmed folder and the chosen device, then closes and lists it', async () => {
@@ -551,6 +593,108 @@ describe('TransferSettingsPanelComponent', () => {
         expect(optionLabels()).toEqual(['Bench TeensyROM']);
       });
 
+      it('starts on the first device the folder is not yet on, with launch off', async () => {
+        await setup({ folders: [folder('a')] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+        await settle();
+
+        expect(selectedDevice()).toBe('Bench TeensyROM');
+        expect(query('form-launch')?.querySelector('button')?.getAttribute('aria-checked')).toBe('false');
+      });
+
+      it('takes the device folder and storage of the sharing first device', async () => {
+        const first = folder('a');
+        await setup({
+          folders: [
+            folder('a', {
+              destinations: [
+                { ...first.destinations[0], storageType: StorageType.Usb, path: '/music/new' },
+              ],
+            }),
+          ],
+        });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/music/new');
+        expect(selectedStorage()).toBe('USB');
+      });
+
+      it('uses the first available storage when the first device storage is not on the new device', async () => {
+        const first = folder('a');
+        await setup({
+          folders: [
+            folder('a', {
+              destinations: [
+                {
+                  ...first.destinations[0],
+                  deviceId: 'dev-2',
+                  deviceName: 'Bench TeensyROM',
+                  storageType: StorageType.Usb,
+                  path: '/music/new',
+                },
+              ],
+            }),
+          ],
+        });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+        await settle();
+
+        expect(selectedDevice()).toBe('Rack TeensyROM');
+        expect(selectedStorage()).toBe('SD');
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/music/new');
+      });
+
+      it('falls back to /auto-transfer and SD when the folder has no first device to follow', async () => {
+        await setup({ folders: [folder('a', { destinations: [] })] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+        expect(selectedStorage()).toBe('SD');
+      });
+
+      it('falls back to /auto-transfer when the first device has no device folder', async () => {
+        const first = folder('a');
+        await setup({ folders: [folder('a', { destinations: [{ ...first.destinations[0], path: '' }] })] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+      });
+
+      it('starts afresh each time the form is opened', async () => {
+        await setup({ folders: [folder('a')] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+        await type('form-device-path', '/edited');
+
+        clickButton(query('form-cancel'));
+        await settle();
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
+      });
+
+      it('offers no Add device once the folder delivers to every connected device', async () => {
+        const first = folder('a');
+        await setup({
+          folders: [
+            folder('a', {
+              destinations: [
+                ...first.destinations,
+                { ...first.destinations[0], id: 'a-2', deviceId: 'dev-2', deviceName: 'Bench TeensyROM' },
+              ],
+            }),
+          ],
+        });
+
+        expect(query('add-device')).toBeNull();
+      });
+
       it('saves through add with the folder path and closes', async () => {
         await setup({ folders: [folder('a')] });
         watchFolders['add'].mockResolvedValue(
@@ -571,8 +715,7 @@ describe('TransferSettingsPanelComponent', () => {
         query<HTMLButtonElement>('add-device')?.click();
         await settle();
 
-        await choose('form-device', 'Bench TeensyROM');
-        await choose('form-storage', 'USB');
+        await chooseStorage('USB');
         await submit();
 
         expect(watchFolders['add']).toHaveBeenCalledWith({
@@ -584,6 +727,43 @@ describe('TransferSettingsPanelComponent', () => {
         });
         expect(query('watch-folder-device-form')).toBeNull();
         expect(queryAll('watch-folder-device-row')).toHaveLength(2);
+      });
+
+      it('returns focus to the last device when adding it leaves nothing more to add', async () => {
+        await setup({ folders: [folder('a')] });
+        watchFolders['add'].mockResolvedValue(
+          folder('a', {
+            destinations: [
+              ...folder('a').destinations,
+              {
+                id: 'a-2',
+                deviceId: 'dev-2',
+                deviceName: 'Bench TeensyROM',
+                storageType: StorageType.Sd,
+                path: '/auto-transfer',
+                launch: false,
+              },
+            ],
+          })
+        );
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        await submit();
+
+        expect(query('add-device')).toBeNull();
+        const rows = queryAll('watch-folder-device-row');
+        expect(rows[rows.length - 1].contains(document.activeElement)).toBe(true);
+      });
+
+      it('returns focus to Add device when the form is cancelled', async () => {
+        await setup({ folders: [folder('a')] });
+        query<HTMLButtonElement>('add-device')?.click();
+        await settle();
+
+        clickButton(query('form-cancel'));
+        await settle();
+
         expect(query('add-device')?.contains(document.activeElement)).toBe(true);
       });
 
@@ -593,7 +773,6 @@ describe('TransferSettingsPanelComponent', () => {
         query<HTMLButtonElement>('add-device')?.click();
         await settle();
 
-        await choose('form-device', 'Bench TeensyROM');
         await submit();
 
         expect(errorText('error-device-path')).toBe('Not a valid device folder');
@@ -606,7 +785,6 @@ describe('TransferSettingsPanelComponent', () => {
         query<HTMLButtonElement>('add-device')?.click();
         await settle();
 
-        await choose('form-device', 'Bench TeensyROM');
         await submit();
 
         expect(errorText('error-form')).toBe('Folder is gone');
@@ -625,7 +803,9 @@ describe('TransferSettingsPanelComponent', () => {
 
         expect(queryAll('watch-folder-device-row')).toHaveLength(0);
         expect(query<HTMLInputElement>('form-device-readonly')?.value).toBe('Rack TeensyROM');
-        expect(query<HTMLInputElement>('form-storage-readonly')?.value).toBe('SD');
+        expect(
+          query('form-storage-readonly')?.querySelector('.mat-button-toggle-checked')?.textContent?.trim()
+        ).toBe('SD');
         expect(query('form-readonly-note')?.textContent).toContain('remove this and add it again');
         expect(query<HTMLInputElement>('form-device-path')?.value).toBe('/auto-transfer');
         expect(document.activeElement).toBe(query('form-device-path'));

@@ -1,5 +1,5 @@
 <div
-  class="device-form"
+  class="form-box device-form"
   role="group"
   [attr.aria-label]="formLabel()"
   [formGroup]="formGroup()"
@@ -7,61 +7,74 @@
   (keydown.escape)="onEscape($event)"
 >
   @if (mode() === 'add') {
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Device</mat-label>
-    <mat-select
-      #deviceField
-      formControlName="device"
-      [errorStateMatcher]="deviceMatcher"
-      data-testid="form-device"
-    >
-      @for (device of devices(); track device.deviceId) {
-      <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+  <div class="field-row">
+    <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+      <mat-label>Device</mat-label>
+      <mat-select
+        #deviceField
+        formControlName="device"
+        [errorStateMatcher]="deviceMatcher"
+        data-testid="form-device"
+      >
+        @for (device of devices(); track device.deviceId) {
+        <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+        }
+      </mat-select>
+      @if (errors().device; as message) {
+      <mat-error data-testid="error-device">{{ message }}</mat-error>
       }
-    </mat-select>
-    @if (errors().device; as message) {
-    <mat-error data-testid="error-device">{{ message }}</mat-error>
-    }
-  </mat-form-field>
+    </mat-form-field>
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Storage</mat-label>
-    <mat-select
+    <mat-button-toggle-group
+      class="storage-toggle"
       formControlName="storage"
-      [errorStateMatcher]="storageMatcher"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
       data-testid="form-storage"
     >
-      @for (storage of storageOptions(); track storage) {
-      <mat-option [value]="storage">{{ storage }}</mat-option>
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage" [disabled]="!storageOptions().includes(storage)">{{
+        storage
+      }}</mat-button-toggle>
       }
-    </mat-select>
-    @if (errors().storage; as message) {
-    <mat-error data-testid="error-storage">{{ message }}</mat-error>
-    }
-  </mat-form-field>
+    </mat-button-toggle-group>
+  </div>
+  @if (errors().storage; as message) {
+  <p class="form-error" role="alert" data-testid="error-storage">{{ message }}</p>
+  }
   } @else {
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Device</mat-label>
-    <input matInput type="text" readonly [value]="deviceName()" data-testid="form-device-readonly" />
-  </mat-form-field>
+  <div class="field-row field-row--locked">
+    <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+      <mat-label>Device</mat-label>
+      <input
+        matInput
+        type="text"
+        readonly
+        [value]="deviceName()"
+        data-testid="form-device-readonly"
+      />
+    </mat-form-field>
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Storage</mat-label>
-    <input
-      matInput
-      type="text"
-      readonly
-      [value]="storageType() ?? ''"
+    <mat-button-toggle-group
+      class="storage-toggle"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
+      disabled
+      [value]="storageType()"
       data-testid="form-storage-readonly"
-    />
-  </mat-form-field>
+    >
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage">{{ storage }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
 
   <p class="note" data-testid="form-readonly-note">
     To change the device or storage, remove this and add it again.
   </p>
   }
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
     <mat-label>Device folder</mat-label>
     <input
       #pathField

@@ -1,12 +1,12 @@
 <div
-  class="watch-form"
+  class="form-box watch-form"
   role="group"
   aria-label="Add watch folder"
   [formGroup]="formGroup()"
   data-testid="watch-folder-form"
   (keydown.escape)="onEscape($event)"
 >
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
     <mat-label>Folder to watch</mat-label>
     <input
       #firstField
@@ -24,39 +24,42 @@
     }
   </mat-form-field>
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Device</mat-label>
-    <mat-select
-      formControlName="device"
-      [errorStateMatcher]="deviceMatcher"
-      data-testid="form-device"
-    >
-      @for (device of devices(); track device.deviceId) {
-      <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+  <div class="field-row">
+    <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+      <mat-label>Device</mat-label>
+      <mat-select
+        formControlName="device"
+        [errorStateMatcher]="deviceMatcher"
+        data-testid="form-device"
+      >
+        @for (device of devices(); track device.deviceId) {
+        <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+        }
+      </mat-select>
+      @if (errors().device; as message) {
+      <mat-error data-testid="error-device">{{ message }}</mat-error>
       }
-    </mat-select>
-    @if (errors().device; as message) {
-    <mat-error data-testid="error-device">{{ message }}</mat-error>
-    }
-  </mat-form-field>
+    </mat-form-field>
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
-    <mat-label>Storage</mat-label>
-    <mat-select
+    <mat-button-toggle-group
+      class="storage-toggle"
       formControlName="storage"
-      [errorStateMatcher]="storageMatcher"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
       data-testid="form-storage"
     >
-      @for (storage of storageOptions(); track storage) {
-      <mat-option [value]="storage">{{ storage }}</mat-option>
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage" [disabled]="!storageOptions().includes(storage)">{{
+        storage
+      }}</mat-button-toggle>
       }
-    </mat-select>
-    @if (errors().storage; as message) {
-    <mat-error data-testid="error-storage">{{ message }}</mat-error>
-    }
-  </mat-form-field>
+    </mat-button-toggle-group>
+  </div>
+  @if (errors().storage; as message) {
+  <p class="form-error" role="alert" data-testid="error-storage">{{ message }}</p>
+  }
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic">
+  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
     <mat-label>Device folder</mat-label>
     <input
       matInput

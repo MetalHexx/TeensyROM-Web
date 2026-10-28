@@ -219,14 +219,32 @@ export class TransferSettingsPanelComponent {
     );
   }
 
+  /** Whether a connected device is left that the folder is not yet delivering to. */
+  protected canAddDevice(folder: WatchFolder): boolean {
+    const taken = new Set(folder.destinations.map((destination) => destination.deviceId));
+    return this.connectedDevices().some((device) => !taken.has(device.deviceId));
+  }
+
+  /** Opens with the first connected device and its first storage chosen. */
   protected openAddFolder(): void {
     this.addFolderForm.reset();
     this.show({ kind: 'add-folder' });
+    this.addFolderForm.controls.device.setValue(this.connectedDevices()[0]?.deviceId ?? '');
   }
 
+  /**
+   * Opens with the folder's first device as the pattern: the device folder and storage it uses,
+   * falling back to the defaults, and the first device the folder is not yet delivering to.
+   */
   protected openAddDevice(watchFolderId: string): void {
+    const first = this.folders().find((folder) => folder.id === watchFolderId)?.destinations[0];
     this.addDeviceForm.reset();
+    this.addDeviceForm.patchValue({
+      storage: first?.storageType ?? StorageType.Sd,
+      devicePath: first?.path || DEFAULT_DEVICE_PATH,
+    });
     this.show({ kind: 'add-device', watchFolderId });
+    this.addDeviceForm.controls.device.setValue(this.addDeviceChoices()[0]?.deviceId ?? '');
   }
 
   protected openEditDevice(watchFolderId: string, deviceId: string): void {
@@ -357,11 +375,22 @@ export class TransferSettingsPanelComponent {
     switch (opener.kind) {
       case 'add-folder':
         return find('[data-testid="add-watch-folder"] button');
-      case 'add-device':
-        return find(
+      case 'add-device': {
+        const link = find(
           '[data-testid="add-device"]',
           (el) => el.dataset['folderId'] === opener.watchFolderId
         );
+        if (link) return link;
+        // The link is gone once the folder delivers to every connected device; land on its last one.
+        const rows = Array.from(
+          host.querySelectorAll<HTMLElement>('lib-watch-folder-device-row')
+        ).filter((el) => el.dataset['folderId'] === opener.watchFolderId);
+        return (
+          rows[rows.length - 1]?.querySelector<HTMLElement>(
+            '[data-testid="watch-folder-device-edit"] button'
+          ) ?? null
+        );
+      }
       case 'edit-device':
         return (
           find(
