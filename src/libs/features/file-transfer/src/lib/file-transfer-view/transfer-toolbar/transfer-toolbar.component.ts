@@ -5,11 +5,10 @@ import {
   ProgressBarComponent,
   IconButtonComponent,
 } from '@teensyrom-nx/ui/components';
-import { DeviceSelectorComponent } from './device-selector/device-selector.component';
 
 /**
  * Toolbar shell for the transfer view, structurally mirroring the player toolbar: a card housing
- * an (unbound, in this iteration) progress bar, the device selector and, in the actions slot, the
+ * an (unbound, in this iteration) progress bar and, in the actions slot, the
  * gear that opens and closes the transfer settings panel. The desktop and tablet layouts each
  * carry the gear; only one is visible at a time.
  */
@@ -19,7 +18,6 @@ import { DeviceSelectorComponent } from './device-selector/device-selector.compo
     ScalingCompactCardComponent,
     SlidingContainerComponent,
     ProgressBarComponent,
-    DeviceSelectorComponent,
     IconButtonComponent,
   ],
   templateUrl: './transfer-toolbar.component.html',

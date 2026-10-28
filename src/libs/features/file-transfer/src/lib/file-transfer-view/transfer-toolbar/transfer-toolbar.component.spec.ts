@@ -7,7 +7,6 @@ import { DeviceStore, TransferStore } from '@teensyrom-nx/application';
 import { Device } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from '@teensyrom-nx/ui/components';
 import { TransferToolbarComponent } from './transfer-toolbar.component';
-import { DeviceSelectorComponent } from './device-selector/device-selector.component';
 
 describe('TransferToolbarComponent', () => {
   let fixture: ComponentFixture<TransferToolbarComponent>;
@@ -32,8 +31,8 @@ describe('TransferToolbarComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('renders the device selector', () => {
-    expect(fixture.debugElement.query(By.directive(DeviceSelectorComponent))).toBeTruthy();
+  it('renders no device selector', () => {
+    expect((fixture.nativeElement as HTMLElement).querySelector('lib-device-selector')).toBeNull();
   });
 
   it('renders a progress bar bound to show=false', () => {

@@ -188,6 +188,60 @@ describe('DirectoryTreeContainerComponent', () => {
     });
   });
 
+  describe('nodeActivated output', () => {
+    const emitted = () => {
+      const spy = vi.fn();
+      component.nodeActivated.subscribe(spy);
+      return spy;
+    };
+
+    it('emits the device id when the device node is activated', () => {
+      const spy = emitted();
+
+      component.onNodeActivated({
+        id: 'device-test-device-123',
+        name: 'TR-1',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+        deviceId: 'test-device-123',
+      });
+
+      expect(spy).toHaveBeenCalledWith('test-device-123');
+    });
+
+    it('emits the device id when a folder node is activated', () => {
+      const spy = emitted();
+
+      component.onNodeActivated({
+        id: 'n',
+        name: 'games',
+        type: DirectoryTreeNodeType.Directory,
+        icon: 'folder',
+        deviceId: 'test-device-123',
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
+
+      expect(spy).toHaveBeenCalledWith('test-device-123');
+    });
+
+    it('does not emit when a node is only expanded', () => {
+      const spy = emitted();
+
+      component.onNodeExpansionNeedsData({
+        id: 'n',
+        name: 'games',
+        type: DirectoryTreeNodeType.Directory,
+        icon: 'folder',
+        deviceId: 'test-device-123',
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('onNodeExpansionNeedsData', () => {
     it('should navigate to directory for a storage node', () => {
       component.onNodeExpansionNeedsData({
@@ -261,6 +315,20 @@ describe('DirectoryTreeContainerComponent', () => {
       createComponent('test-device-123');
 
       expect(component.selectedNodeId()).toBe('test-device-123-SD-/games');
+    });
+  });
+
+  describe('showSelection', () => {
+    it('leaves no node selected while off', () => {
+      mockStorageStore.getSelectedDirectoryState = vi.fn().mockReturnValue(() => ({
+        deviceId: 'test-device-123',
+        storageType: StorageType.Sd,
+        currentPath: '/',
+      }));
+      createComponent('test-device-123');
+      componentRef.setInput('showSelection', false);
+
+      expect(component.selectedNodeId()).toBeNull();
     });
   });
 });

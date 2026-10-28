@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import { DirectoryTreeNode, DirectoryTreeNodeType } from '@teensyrom-nx/domain';
 import { LogType, logInfo } from '@teensyrom-nx/utils';
@@ -19,6 +19,12 @@ import {
 })
 export class DirectoryTreeContainerComponent {
   deviceId = input.required<string>();
+
+  /** Whether this tree marks its current node as selected. Off, no node is highlighted. */
+  readonly showSelection = input(true);
+
+  /** Emits the tree's device id whenever a node is activated, whatever its type. */
+  readonly nodeActivated = output<string>();
 
   private readonly storageStore = inject(StorageStore);
   private readonly deviceStore = inject(DeviceStore);
@@ -42,6 +48,8 @@ export class DirectoryTreeContainerComponent {
   });
 
   readonly selectedNodeId = computed(() => {
+    if (!this.showSelection()) return null;
+
     const state = this.storageStore.getSelectedDirectoryState(this.deviceId())();
 
     return resolveSelectedNodeId({
@@ -54,6 +62,7 @@ export class DirectoryTreeContainerComponent {
 
   onNodeActivated(node: DirectoryTreeNode): void {
     logInfo(LogType.Select, `Directory selected: ${node.name}`, node);
+    this.nodeActivated.emit(this.deviceId());
 
     // Handle device node click - navigate to device level
     if (node.type === DirectoryTreeNodeType.Device && node.deviceId) {

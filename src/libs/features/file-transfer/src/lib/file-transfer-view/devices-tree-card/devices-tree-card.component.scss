@@ -1,0 +1,22 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+lib-scaling-card {
+  display: block;
+}
+
+// One block per device, stacked and spaced like the DJ view's browse trees.
+.devices-tree-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+lib-directory-tree-container {
+  height: auto;
+}

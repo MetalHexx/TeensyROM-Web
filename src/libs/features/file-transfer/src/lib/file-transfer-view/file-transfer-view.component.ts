@@ -22,13 +22,13 @@ import { EmptyStateMessageComponent, SlidingContainerComponent } from '@teensyro
 import { DropzoneCardComponent } from './dropzone-card/dropzone-card.component';
 import { TransfersCardComponent } from './transfers-card/transfers-card.component';
 import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
-import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
+import { DevicesTreeCardComponent } from './devices-tree-card/devices-tree-card.component';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
 import { TransferSettingsPanelComponent } from '../transfer-settings-panel/transfer-settings-panel.component';
 
 /**
  * Top-level view for the File Transfer feature. Resolves and persists the
- * transfer target, seeds its storage so the tree has roots to render, and
+ * transfer target, seeds every enabled device's storage so each tree has roots to render, and
  * holds its navigation pin for exactly as long as this view is mounted.
  */
 @Component({
@@ -38,7 +38,7 @@ import { TransferSettingsPanelComponent } from '../transfer-settings-panel/trans
     TransfersCardComponent,
     TransferToolbarComponent,
     EmptyStateMessageComponent,
-    DirectoryTreeContainerComponent,
+    DevicesTreeCardComponent,
     TransferDirectoryListingComponent,
     SlidingContainerComponent,
     TransferSettingsPanelComponent,
@@ -107,11 +107,14 @@ export class FileTransferViewComponent {
       }
     });
 
-    // Seed the target device's available storages only — never every device. untracked() keeps
-    // the store's internal signal reads/writes from being tracked as this effect's dependencies.
+    // Seed every enabled device's available storages. A device with a transfer running answers
+    // 409 and every failed read raises its own warning, so it is skipped until its transfer ends:
+    // the busy read is tracked, so the effect re-runs and seeds the device once it goes idle.
+    // untracked() keeps the store's internal signal reads/writes from being tracked as this
+    // effect's dependencies.
     effect(() => {
-      const device = this.targetDevice();
-      if (device) {
+      for (const device of this.enabledDevices()) {
+        if (this.transferStore.isDeviceBusy(device.deviceId)()) continue;
         untracked(() => void this.seedStorage(device));
       }
     });

@@ -143,6 +143,21 @@ describe('DropzoneCardComponent', () => {
       expect(fixture.componentInstance.destinationLabel()).toBe('SD · /games');
       expect(dropzoneEl().classList.contains('state-idle')).toBe(true);
     });
+
+    it('names the target device in the idle message', async () => {
+      const device = createDevice();
+      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.message()).toBe(`${device.name} · SD · /games`);
+    });
+
+    it('falls back to the destination alone when there is no target device', async () => {
+      await setup([createDevice()], null);
+
+      expect(fixture.componentInstance.message()).toBe('');
+    });
   });
 
   describe('drag-over treatment', () => {

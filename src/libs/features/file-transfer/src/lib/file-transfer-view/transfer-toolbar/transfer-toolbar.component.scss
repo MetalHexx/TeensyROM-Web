@@ -13,21 +13,11 @@
   gap: var(--spacing-lg);
 }
 
-.device-selector-section {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
 .desktop-layout {
   display: none;
 
   @include styles.screen-tablet {
     display: flex;
-  }
-
-  .device-selector-section {
-    flex: 1 1 auto;
   }
 
   .toolbar-actions-section {
@@ -44,10 +34,6 @@
 
   @include styles.screen-between(styles.$bp-phone, styles.$bp-tablet) {
     display: flex;
-  }
-
-  .device-selector-section {
-    flex: 1 1 auto;
   }
 
   .toolbar-actions-section {

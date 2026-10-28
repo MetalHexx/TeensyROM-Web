@@ -19,9 +19,7 @@
     </div>
     <div class="content-row" data-testid="content-row">
       <div class="left-container" data-testid="left-container">
-        @if (targetDevice(); as device) {
-        <lib-directory-tree-container [deviceId]="device.deviceId" />
-        }
+        <lib-devices-tree-card [devices]="enabledDevices()" />
       </div>
       <div class="right-container" data-testid="right-container">
         @if (targetDevice(); as device) {

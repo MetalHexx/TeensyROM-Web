@@ -176,6 +176,17 @@ describe('FileTransferViewComponent', () => {
       expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
     });
 
+    it('renders the Devices card with a tree per enabled device in the left column', async () => {
+      await setup([createDevice({ deviceId: 'a' }), createDevice({ deviceId: 'b' })]);
+      createFixture();
+      const native = fixture.nativeElement as HTMLElement;
+
+      const left = native.querySelector('[data-testid="left-container"]');
+      expect(left?.querySelector('lib-devices-tree-card')).toBeTruthy();
+      expect(left?.querySelectorAll('lib-directory-tree-container').length).toBe(2);
+      expect(native.querySelector('lib-device-selector')).toBeNull();
+    });
+
     it('should render the empty-state message instead of the rows when there are no enabled devices', async () => {
       await setup([createDevice({ isEnabled: false })]);
       createFixture();
@@ -252,14 +263,40 @@ describe('FileTransferViewComponent', () => {
       );
     });
 
-    it('does not seed a non-target enabled device', async () => {
+    it('seeds every enabled device, not just the target', async () => {
       const target = createDevice({ deviceId: 'target-device' });
       const other = createDevice({ deviceId: 'other-device' });
       await setup([target, other]);
 
       createFixture();
 
-      expect(getDirectoryMock).not.toHaveBeenCalledWith('other-device', expect.anything(), expect.anything());
+      expect(getDirectoryMock).toHaveBeenCalledWith('target-device', StorageType.Sd, '/');
+      expect(getDirectoryMock).toHaveBeenCalledWith('other-device', StorageType.Sd, '/');
+    });
+
+    it('does not seed a disabled device', async () => {
+      await setup([createDevice({ deviceId: 'on' }), createDevice({ deviceId: 'off', isEnabled: false })]);
+
+      createFixture();
+
+      expect(getDirectoryMock).not.toHaveBeenCalledWith('off', expect.anything(), expect.anything());
+    });
+
+    it('holds back a busy device and seeds it once its transfer ends', async () => {
+      await setup([createDevice({ deviceId: 'idle-device' }), createDevice({ deviceId: 'busy-device' })]);
+      transferStore.setActiveForeignJob({ deviceId: 'busy-device', activeForeignJobId: 'foreign-job' });
+
+      createFixture();
+
+      expect(getDirectoryMock).toHaveBeenCalledWith('idle-device', StorageType.Sd, '/');
+      expect(getDirectoryMock).not.toHaveBeenCalledWith('busy-device', expect.anything(), expect.anything());
+
+      transferStore.setActiveForeignJob({ deviceId: 'busy-device', activeForeignJobId: null });
+      fixture.detectChanges();
+
+      await vi.waitFor(() =>
+        expect(getDirectoryMock).toHaveBeenCalledWith('busy-device', StorageType.Sd, '/')
+      );
     });
   });
 

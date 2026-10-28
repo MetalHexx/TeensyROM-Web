@@ -84,7 +84,10 @@ export class DropzoneCardComponent {
       const deviceName = this.targetDevice()?.name ?? 'This device';
       return `${deviceName} already has a transfer in progress`;
     }
-    return this.destinationLabel();
+    const destination = this.destinationLabel();
+    const deviceName = this.targetDevice()?.name;
+    if (!deviceName) return destination;
+    return destination ? `${deviceName} · ${destination}` : deviceName;
   });
 
   readonly secondaryMessage = computed(() =>

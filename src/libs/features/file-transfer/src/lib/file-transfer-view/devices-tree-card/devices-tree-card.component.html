@@ -1,0 +1,11 @@
+<lib-scaling-card title="Devices" animationEntry="from-left" animationParent="auto">
+  <div class="devices-tree-card" data-testid="devices-tree-card">
+    @for (device of devices(); track device.deviceId) {
+    <lib-directory-tree-container
+      [deviceId]="device.deviceId"
+      [showSelection]="device.deviceId === targetDeviceId()"
+      (nodeActivated)="onNodeActivated($event)"
+    />
+    }
+  </div>
+</lib-scaling-card>
