@@ -1,6 +1,5 @@
 import {
   DirectoryItem,
-  DirectoryListing,
   DirectoryTreeNode,
   DirectoryTreeNodeType,
   StorageType,
@@ -12,39 +11,26 @@ export function directoryCacheKey(deviceId: string, storageType: StorageType, pa
   return `${deviceId}-${storageType}-${path}`;
 }
 
-function directoriesEqual(a: readonly DirectoryItem[], b: readonly DirectoryItem[]): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every((item, index) => item.name === b[index].name && item.path === b[index].path);
+/** The slice of a storage entry the tree reads: every folder loaded so far, keyed by path. */
+export interface StorageDirectoryListings {
+  deviceId: string;
+  storageType: StorageType;
+  directoryListings?: Record<string, DirectoryItem[]>;
 }
 
-/** Accumulating merge. Returns `cache` unchanged (same reference) when no listing adds or
- *  replaces an entry. */
-export function mergeDirectoryListings(
-  cache: DirectoryListingCache,
-  listings: readonly DirectoryListing[]
+/** Flattens each storage's accumulated folder listings into the cache `buildDirectoryTree` reads. */
+export function buildDirectoryListingCache(
+  entries: readonly StorageDirectoryListings[]
 ): DirectoryListingCache {
-  let next: Map<string, readonly DirectoryItem[]> | null = null;
+  const cache = new Map<string, readonly DirectoryItem[]>();
 
-  for (const listing of listings) {
-    const key = directoryCacheKey(listing.deviceId, listing.storageType, listing.path);
-    const existing = cache.get(key);
-
-    if (existing && directoriesEqual(existing, listing.directories)) {
-      continue;
+  for (const { deviceId, storageType, directoryListings } of entries) {
+    for (const [path, directories] of Object.entries(directoryListings ?? {})) {
+      cache.set(directoryCacheKey(deviceId, storageType, path), directories);
     }
-
-    if (!next) {
-      next = new Map(cache);
-    }
-    next.set(key, listing.directories);
   }
 
-  return next ?? cache;
+  return cache;
 }
 
 function getStorageTypeIcon(storageType: StorageType): string {

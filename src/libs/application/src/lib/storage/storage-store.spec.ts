@@ -821,6 +821,85 @@ describe('StorageStore (NgRx Signal Store)', () => {
   });
 
   // -----------------------------------------
+  // directoryListings - every loaded folder is kept so the tree can be rebuilt on a remount
+  // -----------------------------------------
+  describe('directoryListings', () => {
+    const deviceId = 'device-1';
+    const storageType = StorageType.Sd;
+    const key = StorageKeyUtil.create(deviceId, storageType);
+
+    const directoryWith = (path: string, names: string[]): StorageDirectory => ({
+      path,
+      directories: names.map((name) => ({ name, path: `${path === '/' ? '' : path}/${name}` })),
+      files: [],
+    });
+
+    beforeEach(async () => {
+      getDirectoryMock.mockReturnValue(of(directoryWith('/', ['games', 'music'])));
+      await store.initializeStorage({ deviceId, storageType });
+    });
+
+    it('keeps the root listing after the user navigates into a subfolder', async () => {
+      getDirectoryMock.mockReturnValue(of(directoryWith('/games', ['demos'])));
+
+      await store.navigateToDirectory({ deviceId, storageType, path: '/games' });
+
+      const entry = store.storageEntries()[key];
+      expect(entry.currentPath).toBe('/games');
+      expect(entry.directoryListings).toEqual({
+        '/': [
+          { name: 'games', path: '/games' },
+          { name: 'music', path: '/music' },
+        ],
+        '/games': [{ name: 'demos', path: '/games/demos' }],
+      });
+    });
+
+    it('replaces only the refreshed path and leaves the other listings alone', async () => {
+      getDirectoryMock.mockReturnValue(of(directoryWith('/games', ['demos'])));
+      await store.navigateToDirectory({ deviceId, storageType, path: '/games' });
+
+      getDirectoryMock.mockReturnValue(of(directoryWith('/games', ['demos', 'tools'])));
+      await store.refreshDirectory({ deviceId, storageType });
+
+      const listings = store.storageEntries()[key].directoryListings;
+      expect(listings?.['/games']).toEqual([
+        { name: 'demos', path: '/games/demos' },
+        { name: 'tools', path: '/games/tools' },
+      ]);
+      expect(listings?.['/']).toHaveLength(2);
+    });
+
+    it('keeps earlier listings when a navigation fails', async () => {
+      getDirectoryMock.mockReturnValue(throwError(() => new Error('API Error')));
+
+      await store.navigateToDirectory({ deviceId, storageType, path: '/broken' });
+
+      const entry = store.storageEntries()[key];
+      expect(entry.error).toBe('Failed to navigate to directory');
+      expect(entry.directoryListings?.['/']).toHaveLength(2);
+      expect(entry.directoryListings?.['/broken']).toBeUndefined();
+    });
+
+    it('starts from the root listing alone once the storage is removed and initialized again', async () => {
+      getDirectoryMock.mockReturnValue(of(directoryWith('/games', ['demos'])));
+      await store.navigateToDirectory({ deviceId, storageType, path: '/games' });
+
+      store.removeStorage({ deviceId, storageType });
+      getDirectoryMock.mockReturnValue(of(directoryWith('/', ['games', 'music'])));
+      await store.initializeStorage({ deviceId, storageType });
+
+      expect(Object.keys(store.storageEntries()[key].directoryListings ?? {})).toEqual(['/']);
+    });
+
+    it('drops every listing of a device when all its storage is removed', async () => {
+      store.removeAllStorage({ deviceId });
+
+      expect(store.getDeviceStorageEntries(deviceId)()).toEqual({});
+    });
+  });
+
+  // -----------------------------------------
   // Task 2: Computed Signals
   // -----------------------------------------
   describe('computed signals', () => {

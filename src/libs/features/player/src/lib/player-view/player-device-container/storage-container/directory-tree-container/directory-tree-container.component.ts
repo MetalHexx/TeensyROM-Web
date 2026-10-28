@@ -1,27 +1,12 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
-import {
-  DirectoryListing,
-  DirectoryTreeNode,
-  DirectoryTreeNodeType,
-  StorageType,
-} from '@teensyrom-nx/domain';
+import { DirectoryTreeNode, DirectoryTreeNodeType } from '@teensyrom-nx/domain';
 import { LogType, logInfo } from '@teensyrom-nx/utils';
 import {
   DirectoryTreeComponent,
+  buildDirectoryListingCache,
   buildDirectoryTree,
-  mergeDirectoryListings,
   resolveSelectedNodeId,
-  type DirectoryListingCache,
 } from '@teensyrom-nx/ui/components';
 
 /** Smart container wiring the presentational directory tree to StorageStore. */
@@ -39,43 +24,21 @@ export class DirectoryTreeContainerComponent {
   private readonly storageStore = inject(StorageStore);
   private readonly deviceStore = inject(DeviceStore);
 
-  private readonly cache = signal<DirectoryListingCache>(new Map());
-
   private readonly deviceName = computed(
     () =>
       this.deviceStore.devices().find((d) => d.deviceId === this.deviceId())?.name ??
       this.deviceId()
   );
 
-  // Use effect to sync store data to cache (cannot write to signals in computed)
-  private readonly cacheSync = effect(() => {
-    const deviceDirectories = this.storageStore.getDeviceDirectories(this.deviceId())();
-    const listings: DirectoryListing[] = [];
-
-    deviceDirectories.forEach((entry) => {
-      if (entry.directory) {
-        listings.push({
-          deviceId: entry.deviceId,
-          storageType: entry.storageType,
-          path: entry.currentPath,
-          directories: entry.directory.directories,
-        });
-      }
-    });
-
-    this.cache.update((current) => mergeDirectoryListings(current, listings));
-  });
-
+  // The folder listings live in the store, so the tree is rebuilt from them on every mount.
   readonly nodes = computed(() => {
-    const storageTypes: StorageType[] = Object.values(
-      this.storageStore.getDeviceStorageEntries(this.deviceId())()
-    ).map((entry) => entry.storageType);
+    const entries = Object.values(this.storageStore.getDeviceStorageEntries(this.deviceId())());
 
     return buildDirectoryTree({
       deviceId: this.deviceId(),
       deviceName: this.deviceName(),
-      storageTypes,
-      cache: this.cache(),
+      storageTypes: entries.map((entry) => entry.storageType),
+      cache: buildDirectoryListingCache(entries),
     });
   });
 

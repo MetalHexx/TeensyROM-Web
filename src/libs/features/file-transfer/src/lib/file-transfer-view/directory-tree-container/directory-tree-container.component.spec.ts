@@ -7,7 +7,6 @@ import { DirectoryTreeNodeType, StorageType, type Device } from '@teensyrom-nx/d
 import { DirectoryTreeContainerComponent } from './directory-tree-container.component';
 
 interface MockStorageStore {
-  getDeviceDirectories: ReturnType<typeof vi.fn>;
   navigateToDirectory: ReturnType<typeof vi.fn>;
   navigateToDeviceLevel: ReturnType<typeof vi.fn>;
   isDeviceLevelView: ReturnType<typeof vi.fn>;
@@ -33,7 +32,6 @@ describe('DirectoryTreeContainerComponent', () => {
   beforeEach(async () => {
     devices = signal<Device[]>([{ deviceId: 'test-device-123', name: 'TR-1' } as Device]);
     mockStorageStore = {
-      getDeviceDirectories: vi.fn().mockReturnValue(() => []),
       navigateToDirectory: vi.fn(),
       navigateToDeviceLevel: vi.fn(),
       isDeviceLevelView: vi.fn().mockReturnValue(() => false),
@@ -73,6 +71,43 @@ describe('DirectoryTreeContainerComponent', () => {
 
       expect(component.nodes()[0].name).toBe('Living Room');
       expect(component.nodes()[0].id).toBe('device-test-device-123');
+    });
+
+    describe('when the storage was left inside a subfolder', () => {
+      function useEntryInSubfolder() {
+        mockStorageStore.getDeviceStorageEntries = vi.fn().mockReturnValue(() => ({
+          'test-device-123-SD': {
+            deviceId: 'test-device-123',
+            storageType: StorageType.Sd,
+            currentPath: '/games',
+            directoryListings: {
+              '/': [{ name: 'games', path: '/games' }],
+              '/games': [{ name: 'demos', path: '/games/demos' }],
+            },
+          },
+        }));
+      }
+
+      it('shows the root folders under the storage node instead of a placeholder', () => {
+        useEntryInSubfolder();
+        createComponent();
+
+        const storageNode = component.nodes()[0].children?.[0];
+
+        expect(storageNode?.children?.map((n) => n.name)).toEqual(['games']);
+        expect(storageNode?.children?.[0].children?.map((n) => n.name)).toEqual(['demos']);
+      });
+
+      it('builds the same tree for a freshly created container as for the one it replaces', () => {
+        useEntryInSubfolder();
+        createComponent();
+        const before = component.nodes();
+        fixture.destroy();
+
+        createComponent();
+
+        expect(component.nodes()).toEqual(before);
+      });
     });
   });
 

@@ -1,6 +1,6 @@
 import { signalStore, withState } from '@ngrx/signals';
 import { withDevtools } from '@angular-architects/ngrx-toolkit';
-import { StorageType, PlayerFilterType, FileItem } from '@teensyrom-nx/domain';
+import { StorageType, PlayerFilterType, FileItem, DirectoryItem } from '@teensyrom-nx/domain';
 import { StorageDirectory } from '@teensyrom-nx/domain';
 import { withStorageActions } from './actions';
 import { withStorageSelectors } from './selectors';
@@ -10,6 +10,8 @@ export interface StorageDirectoryState {
   storageType: StorageType;
   currentPath: string;
   directory: StorageDirectory | null; // could be null if there was an error in the api call.
+  /** Subdirectories of every folder loaded for this storage, keyed by path. Unlike `directory`, which holds only the current folder, this accumulates so the tree survives a view remount. */
+  directoryListings?: Record<string, DirectoryItem[]>;
   isLoaded: boolean;
   isLoading: boolean;
   error: string | null;
