@@ -116,7 +116,7 @@ describe('TransfersCardComponent', () => {
     await setup();
     createFixture();
 
-    expect(textOf('transfers-empty')).toContain('Nothing is being sent');
+    expect(textOf('transfers-empty')).toContain('No active file transfers');
     expect(textOf('transfers-count')).toBe('0');
     expect(rows().length).toBe(0);
   });

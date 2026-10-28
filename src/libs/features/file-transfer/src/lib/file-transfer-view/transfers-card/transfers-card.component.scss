@@ -1,18 +1,24 @@
 :host {
   display: block;
   width: 100%;
+  height: 100%;
   min-width: 0;
+}
+
+// Fills the stretched header row, so this card matches the drop zone beside it at any height.
+lib-sliding-container {
+  display: block;
+  height: 100%;
 }
 
 .transfers-card {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--spacing-md);
   width: 100%;
   padding: var(--spacing-lg);
   box-sizing: border-box;
-  // Roughly the drop zone's height, so the empty card holds its place and the header never jumps.
-  min-height: 12rem;
 }
 
 .transfers-header {

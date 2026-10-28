@@ -1,5 +1,5 @@
-<lib-sliding-container animationDirection="from-top" [animationTrigger]="true">
-  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
+<lib-sliding-container animationDirection="from-top" containerHeight="100%" [animationTrigger]="true">
+  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card compact-card--fill">
     <div class="transfers-card" data-testid="transfers-card">
       <div class="transfers-header">
         <span>Transfers</span>
@@ -20,7 +20,7 @@
           }
         </div>
       } @else {
-        <p class="transfers-empty" data-testid="transfers-empty">Nothing is being sent</p>
+        <p class="transfers-empty" data-testid="transfers-empty">No active file transfers</p>
       }
 
       <div class="visually-hidden" aria-live="polite" data-testid="transfers-live-region">{{ announcement() }}</div>
