@@ -69,7 +69,6 @@ public class StorageServiceReadDirectoryTests
     [InlineData(GetDirectoryErrorCode.PathParamError)]
     [InlineData(GetDirectoryErrorCode.DirectoryNotFoundError)]
     [InlineData(GetDirectoryErrorCode.NotADirectoryError)]
-    [InlineData(GetDirectoryErrorCode.EmptyDirectory)]
     public async Task ReadDirectory_MissingDirectoryCodes_AreNotFound(GetDirectoryErrorCode code)
     {
         GivenCommandResult(new GetDirectoryRecursiveResult { IsSuccess = false, Error = "nope", ErrorCode = code });
@@ -77,6 +76,20 @@ public class StorageServiceReadDirectoryTests
         var result = await NewService().ReadDirectory(Music);
 
         result.IsNotFound.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadDirectory_EmptyFolder_IsFoundEmptyAndCached()
+    {
+        GivenCommandResult(new GetDirectoryRecursiveResult { DirectoryContent = [new DirectoryContent { Path = Music }] });
+
+        var result = await NewService().ReadDirectory(Music);
+
+        result.IsNotFound.Should().BeFalse();
+        result.Failure.Should().BeNull();
+        result.Item!.Files.Should().BeEmpty();
+        result.Item.Directories.Should().BeEmpty();
+        _cache.Received(1).WriteToDisk();
     }
 
     [Fact]

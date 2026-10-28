@@ -130,7 +130,6 @@ namespace TeensyRom.Core.Storage
                     case GetDirectoryErrorCode.PathParamError:
                     case GetDirectoryErrorCode.DirectoryNotFoundError:
                     case GetDirectoryErrorCode.NotADirectoryError:
-                    case GetDirectoryErrorCode.EmptyDirectory:
                         return DirectoryReadResult.NotFound();
 
                     default:
