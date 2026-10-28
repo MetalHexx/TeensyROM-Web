@@ -25,8 +25,16 @@ namespace TeensyRom.Core.Serial
     {
       Encoding = Encoding.UTF8,
       BaudRate = 115200,
-      DtrEnable = false
+      DtrEnable = false,
+      WriteTimeout = WriteTimeoutMs
     };
+
+    /// <summary>
+    /// How long a write may wait for the device to drain the USB buffer. The default is infinite, so a device
+    /// that stops reading parked its transfer thread in <see cref="SerialPort.Write(byte[], int, int)"/> for
+    /// good. A normal chunk drains in milliseconds; reads are left unbounded on purpose.
+    /// </summary>
+    public const int WriteTimeoutMs = 10_000;
 
     private long _bytesWritten;
 
@@ -49,37 +57,53 @@ namespace TeensyRom.Core.Serial
     public void SendIntBytes(uint intToSend, short numBytes)
     {
       _bytesWritten += numBytes;
-      _serialPort.SendIntBytes(intToSend, numBytes);
+      GuardWrite(() => _serialPort.SendIntBytes(intToSend, numBytes));
     }
 
     public void SendSignedChar(sbyte charToSend)
     {
       _bytesWritten += 1;
-      _serialPort.SendSignedChar(charToSend);
+      GuardWrite(() => _serialPort.SendSignedChar(charToSend));
     }
 
     public void SendSignedShort(short value)
     {
       _bytesWritten += 2;
-      _serialPort.SendSignedShort(value);
+      GuardWrite(() => _serialPort.SendSignedShort(value));
     }
 
     public void Write(string text)
     {
       _bytesWritten += Encoding.UTF8.GetByteCount(text);
-      _serialPort.Write(text);
+      GuardWrite(() => _serialPort.Write(text));
     }
 
     public void Write(byte[] buffer, int offset, int count)
     {
       _bytesWritten += count;
-      _serialPort.Write(buffer, offset, count);
+      GuardWrite(() => _serialPort.Write(buffer, offset, count));
     }
 
     public void Write(char[] buffer, int offset, int count)
     {
       _bytesWritten += count;
-      _serialPort.Write(buffer, offset, count);
+      GuardWrite(() => _serialPort.Write(buffer, offset, count));
+    }
+
+    /// <summary>
+    /// Turns the serial port's own write timeout into <see cref="TeensyWriteTimeoutException"/>, which names the
+    /// port and still counts as a <see cref="TimeoutException"/> to the command pipeline's link recovery.
+    /// </summary>
+    private void GuardWrite(Action write)
+    {
+      try
+      {
+        write();
+      }
+      catch (TimeoutException ex)
+      {
+        throw new TeensyWriteTimeoutException($"Write to {_serialPort.PortName} timed out after {WriteTimeoutMs} ms", ex);
+      }
     }
 
     public Unit SetPort(string port) => SetPort(port, isTeensyRomPort: false);
