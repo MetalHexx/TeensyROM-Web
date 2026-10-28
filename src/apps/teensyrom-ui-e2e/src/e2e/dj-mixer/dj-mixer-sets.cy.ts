@@ -435,7 +435,7 @@ describe('DJ Mixer — sets', () => {
       cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
     });
 
-    it('loads that row onto the deck, declaring the effects the browser needs, and clears the overlays at the end', () => {
+    it('loads that row onto the deck, setting the effects on a stand-in transfer, and clears the overlays at the end', () => {
       cy.window().then((win) => {
         const listingTransfer = new win.DataTransfer();
         cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragstart', {

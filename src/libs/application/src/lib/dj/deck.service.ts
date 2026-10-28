@@ -146,10 +146,9 @@ export class DeckService {
   /** Loads the current set's selected row onto the deck, replacing whatever plays. Nothing when none
    *  is selected. */
   async loadSelected(slot: Slot): Promise<void> {
-    const set = this.currentSet();
     const rowId = this.store.sets.selectedRowId();
-    if (set !== null && rowId !== null && set.rows.some((row) => row.id === rowId)) {
-      await this.loadRow(slot, set.id, rowId);
+    if (rowId !== null) {
+      await this.loadSetRow(slot, rowId);
     }
   }
 

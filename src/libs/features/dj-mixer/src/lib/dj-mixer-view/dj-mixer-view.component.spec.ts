@@ -1036,6 +1036,22 @@ describe('DjMixerViewComponent', () => {
       expect(ctx.component.peekShown()).toBe(false);
     });
 
+    it('holds through a Select press during a row drag and goes 1.5s after the drag ends', () => {
+      const ctx = render([device()]);
+      selectWhile(true, ctx, 1);
+
+      ctx.component.onRowDragStart();
+      selectWhile(true, ctx, 2);
+      vi.advanceTimersByTime(5000);
+      expect(ctx.component.peekShown()).toBe(true);
+
+      ctx.component.onRowDragEnd();
+      vi.advanceTimersByTime(1400);
+      expect(ctx.component.peekShown()).toBe(true);
+      vi.advanceTimersByTime(100);
+      expect(ctx.component.peekShown()).toBe(false);
+    });
+
     it('is not raised by a row drag that ends while it is down', () => {
       const ctx = render([device()]);
 

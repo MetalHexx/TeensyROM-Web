@@ -55,12 +55,12 @@ const STATE_LABELS: Record<DeckTransportState, string> = {
   empty: 'Stop',
 };
 
-/** A tune that played to its end reads as stopped on the display. */
 /** Whether the drag is one a deck's overlay takes: a file from the listing or a row of the set. */
 function isDeckDrop(dt: DataTransfer): boolean {
   return isDjFileDrag(dt) || isSetRowDrag(dt);
 }
 
+/** A tune that played to its end reads as stopped on the display. */
 function transportState(led: DeckTransportSummary['led']): DeckTransportState {
   return led === 'ended' ? 'stopped' : led;
 }

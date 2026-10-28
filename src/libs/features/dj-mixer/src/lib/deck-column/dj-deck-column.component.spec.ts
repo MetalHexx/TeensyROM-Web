@@ -25,10 +25,10 @@ import {
   DeckChannelStripComponent,
   DeckTransportComponent,
   LoopsCuesPlateComponent,
+  SET_ROW_DRAG_TYPE,
 } from '@teensyrom-nx/ui/components/dj';
 import { DjDeckColumnComponent } from './dj-deck-column.component';
 import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
-import { SET_ROW_DRAG_TYPE } from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
 
 type Store = InstanceType<typeof DjStore>;

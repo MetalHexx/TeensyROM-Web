@@ -397,6 +397,9 @@ export class DjMixerViewComponent {
     this.peekEverShown.set(true);
     this.peekShown.set(true);
     this.clearPeekTimer();
+    if (this.rowDragging()) {
+      return;
+    }
     this.peekTimer = setTimeout(() => {
       this.peekTimer = null;
       this.peekShown.set(false);
