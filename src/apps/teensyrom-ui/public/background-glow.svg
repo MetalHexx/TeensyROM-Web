@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+  <!-- Static synthwave backdrop: magenta and cyan glows on a transparent canvas.
+       The app's themed base surface shows through, so one image serves light and dark.
+       preserveAspectRatio="none" stretches the glows to any viewport, as the old CSS gradients did. -->
+  <defs>
+    <radialGradient id="glow-magenta-bottom" cx="0.5" cy="1" r="0.566"
+      gradientTransform="translate(0.5 1) scale(0.5 1) translate(-0.5 -1)">
+      <stop offset="0" stop-color="rgb(137,0,137)" stop-opacity="0.2" />
+      <stop offset="1" stop-color="rgb(137,0,137)" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="glow-cyan-right" cx="0.8" cy="0.5" r="0.566"
+      gradientTransform="translate(0.8 0.5) scale(1 0.625) translate(-0.8 -0.5)">
+      <stop offset="0" stop-color="rgb(0,247,255)" stop-opacity="0.25" />
+      <stop offset="1" stop-color="rgb(0,247,255)" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="glow-magenta-left" cx="0.2" cy="0.5" r="0.566"
+      gradientTransform="translate(0.2 0.5) scale(1 0.625) translate(-0.2 -0.5)">
+      <stop offset="0" stop-color="rgb(137,0,137)" stop-opacity="0.35" />
+      <stop offset="1" stop-color="rgb(137,0,137)" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="100" height="100" fill="url(#glow-magenta-bottom)" />
+  <rect width="100" height="100" fill="url(#glow-cyan-right)" />
+  <rect width="100" height="100" fill="url(#glow-magenta-left)" />
+</svg>

@@ -9,82 +9,13 @@
   overflow: hidden;
   position: relative;
 
-  // Synthwave background with animated gradient and grid
-  &::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
-    background: 
-      // Animated gradient overlay - MUCH more visible
-      radial-gradient(ellipse at 20% 50%, rgba(137, 0, 137, 0.35) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 50%, rgba(0, 247, 255, 0.25) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 100%, rgba(137, 0, 137, 0.2) 0%, transparent 40%),
-      // Grid pattern - more visible
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 50px,
-        rgba(var(--glassy-color), 0.08) 50px,
-        rgba(var(--glassy-color), 0.08) 52px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 50px,
-        rgba(var(--glassy-color), 0.08) 50px,
-        rgba(var(--glassy-color), 0.08) 52px
-      ),
-      // Base gradient with depth
-      linear-gradient(
-        180deg,
-        var(--mat-sys-surface-container-low) 0%,
-        color-mix(in srgb, var(--mat-sys-surface-container-low) 90%, var(--color-primary) 10%) 100%
-      );
-    animation: synthwave-pulse 8s ease-in-out infinite;
-  }
-
-  // Animated accent scanlines - more visible
-  &::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 4px,
-      rgba(137, 0, 137, 0.08) 4px,
-      rgba(137, 0, 137, 0.08) 5px
+  // Static synthwave background: glow image (public/background-glow.svg) over a themed base gradient
+  background: url('/background-glow.svg') center / 100% 100% no-repeat,
+    linear-gradient(
+      180deg,
+      var(--mat-sys-surface-container-low) 0%,
+      color-mix(in srgb, var(--mat-sys-surface-container-low) 90%, var(--color-primary) 10%) 100%
     );
-    opacity: 0.6;
-    animation: scanline-drift 20s linear infinite;
-    pointer-events: none;
-  }
-}
-
-@keyframes synthwave-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-
-@keyframes scanline-drift {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(100px);
-  }
 }
 
 lib-header {
