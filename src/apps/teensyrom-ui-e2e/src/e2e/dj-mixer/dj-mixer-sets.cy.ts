@@ -11,6 +11,7 @@ import { interceptFindDevices } from '../../support/interceptors/findDevices.int
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 import { setupGetDirectoryWithFiles } from '../../support/interceptors/getDirectory.interceptors';
 import { interceptGetFileContent } from '../../support/interceptors/getFileContent.interceptors';
+import { interceptSearch } from '../../support/interceptors/search.interceptors';
 import { generateFileItem } from '../../support/test-data/generators/storage.generators';
 import { stillTimeSidBytes } from '../../support/test-data/fixtures/still-time.fixture';
 
@@ -400,6 +401,52 @@ describe('DJ Mixer — sets', () => {
       cy.window().then((win) => {
         const dataTransfer = new win.DataTransfer();
         cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragstart', { dataTransfer });
+        cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer });
+        cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer });
+      });
+
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('exist');
+      cy.get(`${CARD} button[aria-label*="Still Time"]`, { timeout: 60000 }).should('exist');
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('not.exist');
+
+      waitForSaveWhere((set) => set.rows.length === 1, 60000).then((set) => {
+        expect(set.rows[0].tune.title).to.match(/Still Time/);
+        expect(set.rows[0].tune.sidHash).to.match(/^[0-9a-f]{32}$/);
+      });
+    });
+  });
+
+  describe('dragging a search result into the card', () => {
+    beforeEach(() => {
+      cy.viewport(VIEWPORT.width, VIEWPORT.height);
+      clearDjBindingsDatabase();
+      interceptDjLibrary();
+      interceptFindDevices();
+      interceptConnectDevice();
+      setupGetDirectoryWithFiles([]);
+      interceptSearch({
+        files: [
+          generateFileItem({
+            name: 'Still_Time.sid',
+            parentPath: '/hvsc',
+            path: '/hvsc/Still_Time.sid',
+            type: FileItemType.Song,
+            title: 'Still Time',
+          }),
+        ],
+      });
+      interceptGetFileContent({ bytes: stillTimeSidBytes() });
+      cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
+    });
+
+    it('shows a pending row, then the tune with its title, and saves it', () => {
+      cy.get('lib-dj-search-toolbar input').type('still{enter}');
+      cy.get('[data-item-path="/hvsc/Still_Time.sid"]').should('exist');
+
+      cy.get(`${CARD} [role="list"]`).should('not.exist');
+      cy.window().then((win) => {
+        const dataTransfer = new win.DataTransfer();
+        cy.get('[data-item-path="/hvsc/Still_Time.sid"]').trigger('dragstart', { dataTransfer });
         cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer });
         cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer });
       });

@@ -18,11 +18,13 @@ import {
   getFileIcon,
   type DirectoryItem,
   type FileItem,
+  type StorageType,
 } from '@teensyrom-nx/domain';
 import {
   DirectoryItemComponent,
   DragChipComponent,
   EmptyStateMessageComponent,
+  IconButtonComponent,
   StorageItemActionsComponent,
   StorageItemComponent,
 } from '@teensyrom-nx/ui/components';
@@ -52,6 +54,7 @@ type ListingRow = DirectoryRow | FileRow;
     StorageItemComponent,
     StorageItemActionsComponent,
     EmptyStateMessageComponent,
+    IconButtonComponent,
     DragChipComponent,
   ],
   templateUrl: './dj-directory-listing.component.html',
@@ -92,12 +95,27 @@ export class DjDirectoryListingComponent {
     ...this.files().map((f): FileRow => ({ ...f, itemType: 'file' })),
   ]);
 
+  private readonly searchState = computed(() => {
+    const active = this.activeStorage();
+    return active ? this.storageStore.getSearchState(active.deviceId)() : null;
+  });
+
+  readonly hasSearched = computed(() => this.searchState()?.hasSearched ?? false);
+  readonly isSearching = computed(() => this.searchState()?.isSearching ?? false);
+  readonly searchError = computed(() => this.searchState()?.error ?? null);
+  readonly searchResults = computed<FileItem[]>(() => this.searchState()?.results ?? []);
+
   private readonly selectedPath = signal<string | null>(null);
+  private readonly selectedResult = signal<{ path: string; storageType?: StorageType } | null>(null);
 
   protected readonly getFileIcon = getFileIcon;
   protected readonly formatFileSize = formatFileSize;
 
   trackByPath = (_index: number, row: ListingRow): string => row.path;
+
+  /** Search spans both storages, so the same path can appear twice; the storage keeps them apart. */
+  trackResultByKey = (_index: number, result: FileItem): string =>
+    `${result.storageType ?? ''}:${result.path}`;
 
   isDirectoryRow(row: ListingRow): row is DirectoryRow {
     return row.itemType === 'directory';
@@ -107,30 +125,48 @@ export class DjDirectoryListingComponent {
     return this.selectedPath() === row.path;
   }
 
-  /** Only a `.sid` song row is a drag source â€” directories and every other file type get nothing. */
+  isSelectedResult(result: FileItem): boolean {
+    const selected = this.selectedResult();
+    return selected?.path === result.path && selected.storageType === result.storageType;
+  }
+
+  /** Only a `.sid` song is a drag source — every other file type gets nothing. */
+  isDraggableFile(file: FileItem): boolean {
+    return file.type === FileItemType.Song;
+  }
+
+  /** Directories are never drag sources; a file row defers to `isDraggableFile`. */
   isDraggableRow(row: ListingRow): row is FileRow {
-    return !this.isDirectoryRow(row) && row.type === FileItemType.Song;
+    return !this.isDirectoryRow(row) && this.isDraggableFile(row);
   }
 
   onRowDragStart(event: DragEvent, row: ListingRow): void {
     const active = this.activeStorage();
-    if (!active || !this.isDraggableRow(row) || !event.dataTransfer) return;
+    if (!active || !this.isDraggableRow(row)) return;
+
+    this.onFileDragStart(event, row, active.storageType);
+  }
+
+  /** Starts a drag of `file` loaded from `storageType` — the storage it was listed or found on. */
+  onFileDragStart(event: DragEvent, file: FileItem, storageType: StorageType): void {
+    const active = this.activeStorage();
+    if (!active || !this.isDraggableFile(file) || !event.dataTransfer) return;
 
     setDjFileDragData(event.dataTransfer, {
       deviceId: active.deviceId,
-      storageType: active.storageType,
-      path: row.path,
-      fileName: row.name,
-      title: row.title || row.name,
-      author: row.creator,
-      playLength: row.playLength,
-      subtuneLengths: row.subtuneLengths,
+      storageType,
+      path: file.path,
+      fileName: file.name,
+      title: file.title || file.name,
+      author: file.creator,
+      playLength: file.playLength,
+      subtuneLengths: file.subtuneLengths,
     });
 
     // The label must be current before the browser snapshots the drag image, which happens
-    // synchronously when this handler returns â€” zoneless-coalesced change detection would
+    // synchronously when this handler returns — zoneless-coalesced change detection would
     // otherwise still show the previously-dragged row's name.
-    this.dragChipLabel.set(row.name);
+    this.dragChipLabel.set(file.name);
     this.changeDetectorRef.detectChanges();
 
     const chipEl = this.dragChipEl()?.nativeElement;
@@ -159,5 +195,21 @@ export class DjDirectoryListingComponent {
 
   onFileSelected(file: FileItem): void {
     this.selectedPath.set(file.path);
+  }
+
+  onResultSelected(result: FileItem): void {
+    this.selectedResult.set({ path: result.path, storageType: result.storageType });
+  }
+
+  /** Lands the listing in a result's containing folder; navigating also clears the search. */
+  onJumpToDirectory(file: FileItem): void {
+    const active = this.activeStorage();
+    if (!active) return;
+
+    void this.storageStore.navigateToDirectory({
+      deviceId: active.deviceId,
+      storageType: file.storageType ?? active.storageType,
+      path: file.parentPath,
+    });
   }
 }

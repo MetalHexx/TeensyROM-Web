@@ -709,3 +709,22 @@ involved, so a cartridge is only needed to load tunes.
 4. Switch the notation between Camelot and Note. The light does not change.
 5. Make the window 768 px wide, the narrowest width this check covers. The light still sits
    centred between the two Key sections.
+
+## File search (ASID-DJ-13)
+
+Not run. The search box in the listing's header searches the active device across SD and USB and
+shows the matches in place of the directory. The automated checks cover the states, the drag
+payload and a result dropped into the set list; what needs a bench is a device with a tune on each
+storage. Loading from the cartridge is the only hardware step.
+
+1. Search a name that exists on both SD and USB. Results from both storages appear, and each row
+   shows which storage it is on, so the two same-named matches can be told apart.
+2. Drag an SD result onto a deck and a USB result onto the other deck. Each loads and plays from
+   its own storage.
+3. Drag a result into the set list. It is added as a row, and the deck drop targets light up while
+   the drag is in flight and clear when it ends. The drag image is the small name chip.
+4. With the listing showing SD, use the jump button on a USB result. The listing moves to that
+   storage's folder, showing the result's containing folder, and the search box is cleared.
+5. Search again, then clear the search. The directory comes back.
+6. Fold and unfold the listing. The search box and its chevron are spaced and aligned as before.
+7. Make the window 768 px wide. The search box and the chevron still sit spaced and aligned.

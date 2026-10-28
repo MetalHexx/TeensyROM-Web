@@ -15,3 +15,4 @@ export * from './pingDevice.interceptors';
 export * from './player.interceptors';
 export * from './removeFavorite.interceptors';
 export * from './saveFavorite.interceptors';
+export * from './search.interceptors';
