@@ -40,6 +40,7 @@ html {
   --color-dimmed: #656363;
   --color-dimmed-light: rgba(255, 255, 255, 0.6); // Light grey - subtle disabled state
   --color-directory: #f5d76e;
+  --color-warning: #e8a838;
   --glassy-color: 255, 255, 255;
 
   // Synth panel tokens (SID panel and its parts)
@@ -136,6 +137,7 @@ html.dark-mode {
   --color-dimmed: #656363;
   --color-dimmed-light: rgba(255, 255, 255, 0.6); // Light grey - subtle disabled state
   --color-directory: #f5e29e;
+  --color-warning: #f5b942;
   --glassy-color: 255, 255, 255;
 
   // Synth panel tokens (SID panel and its parts)

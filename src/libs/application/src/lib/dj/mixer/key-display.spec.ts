@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { keyDisplayFor } from './key-display';
+import { keyDisplayFor, shiftedKeyFor } from './key-display';
 import type { DeckDetectedKey } from '../dj-store';
 
 function fakeKey(overrides: Partial<DeckDetectedKey> = {}): DeckDetectedKey {
@@ -45,5 +45,24 @@ describe('keyDisplayFor', () => {
 
   it('still falls back to null with no detected key, regardless of offset', () => {
     expect(keyDisplayFor(null, 'camelot', 5)).toBeNull();
+  });
+});
+
+describe('shiftedKeyFor', () => {
+  it('is null for no detected key', () => {
+    expect(shiftedKeyFor(null, 3)).toBeNull();
+  });
+
+  it('moves the tonic by the offset and keeps the mode', () => {
+    expect(shiftedKeyFor(fakeKey({ tonic: 1, mode: 'minor' }), 3)).toEqual({
+      tonic: 4,
+      mode: 'minor',
+    });
+  });
+
+  it('wraps past 11 and below 0', () => {
+    expect(shiftedKeyFor(fakeKey({ tonic: 10, mode: 'major' }), 4)?.tonic).toBe(2);
+    expect(shiftedKeyFor(fakeKey({ tonic: 2, mode: 'major' }), -5)?.tonic).toBe(9);
+    expect(shiftedKeyFor(fakeKey({ tonic: 0, mode: 'major' }), -12)?.tonic).toBe(0);
   });
 });

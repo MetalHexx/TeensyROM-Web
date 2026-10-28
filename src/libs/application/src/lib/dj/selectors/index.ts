@@ -4,7 +4,7 @@ import { deck } from './deck';
 import { binding } from './binding';
 import { transportSummary } from './transport-summary';
 import { bindingSummary } from './binding-summary';
-import { canShape, deckPanel, keyReadout } from './mixer';
+import { canShape, deckPanel, keyMatch, keyReadout } from './mixer';
 import { deckLoops } from './deck-loops';
 import { loopsSummary } from './loops-summary';
 import { loopLapPercent } from './loop-lap';
@@ -22,6 +22,7 @@ export function withDjSelectors() {
       ...deckPanel(writableStore),
       ...canShape(writableStore),
       ...keyReadout(writableStore),
+      ...keyMatch(writableStore),
       ...deckLoops(writableStore),
       ...loopsSummary(writableStore),
       ...loopLapPercent(writableStore),
