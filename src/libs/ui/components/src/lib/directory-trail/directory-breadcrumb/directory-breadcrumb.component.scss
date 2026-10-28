@@ -31,13 +31,19 @@
   width: 100%;
 }
 
+// The clip keeps the chips' focus ring (`.breadcrumb-chip:focus`, reaching 4px out): the padding is
+// the room inside it, the negative margin takes the same room back so the layout does not move.
 .breadcrumb-chips {
+  --focus-ring-reach: 4px;
+
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   overflow: hidden;
   flex: 1 1 auto;
   min-width: 0;
+  padding: var(--focus-ring-reach);
+  margin: calc(-1 * var(--focus-ring-reach));
 }
 
 lib-dropdown-menu {

@@ -210,14 +210,16 @@
 
 // Takes over the sole-content flex chain the listing relies on, and clips it while the card
 // narrows. It is clipped here rather than through the card's `enableOverflow`, which would stop
-// the listing scrolling.
+// the listing scrolling. Only the inline axis is clipped: the listing's header row sits above this
+// box's top edge (see `.listing-header`), and a vertical clip would cut its chips' borders.
 .listing-body {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   transition: opacity var(--fold-duration) ease, visibility var(--fold-duration) linear;
 }
 

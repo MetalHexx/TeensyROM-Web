@@ -27,6 +27,8 @@ import {
   IconButtonComponent,
   StorageItemActionsComponent,
   StorageItemComponent,
+  TooltipPosition,
+  type TooltipConfig,
 } from '@teensyrom-nx/ui/components';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import { setDjFileDragData } from '../drag/dj-file-drag';
@@ -107,6 +109,12 @@ export class DjDirectoryListingComponent {
 
   private readonly selectedPath = signal<string | null>(null);
   private readonly selectedResult = signal<{ path: string; storageType?: StorageType } | null>(null);
+
+  /** The jump button sits at the card's right edge, so its tooltip opens to the left. */
+  protected readonly jumpTooltip: TooltipConfig = {
+    body: 'Go to containing folder',
+    position: TooltipPosition.Left,
+  };
 
   protected readonly getFileIcon = getFileIcon;
   protected readonly formatFileSize = formatFileSize;

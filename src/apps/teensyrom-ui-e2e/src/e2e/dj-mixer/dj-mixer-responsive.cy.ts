@@ -1,4 +1,5 @@
-import { VIEWPORT } from '../../support/constants/test.constants';
+import { FileItemType } from '@teensyrom-nx/data-access/api-client';
+import { MOCK_SEEDS, VIEWPORT } from '../../support/constants/test.constants';
 import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 import { multipleDevices } from '../../support/test-data/fixtures';
 import type { MockDeviceFixture } from '../../support/test-data/fixtures/fixture.types';
@@ -6,7 +7,15 @@ import { generateDevice } from '../../support/test-data/generators/device.genera
 import { interceptDjLibrary } from '../../support/interceptors/djLibrary.interceptors';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
-import { interceptGetDirectory } from '../../support/interceptors/getDirectory.interceptors';
+import {
+  interceptGetDirectory,
+  setupGetDirectory,
+} from '../../support/interceptors/getDirectory.interceptors';
+import { interceptSearch } from '../../support/interceptors/search.interceptors';
+import {
+  createMockFilesystem,
+  generateFileItem,
+} from '../../support/test-data/generators/storage.generators';
 
 // There is no two-device fixture in the suite (`singleDevice` has one, `multipleDevices` three).
 // The decks are a fixed pair (A and B) regardless of device count — this fixture exists only to
@@ -333,6 +342,175 @@ describe('DJ Mixer — responsive layout', () => {
           expect(gap, 'horizontal gap to the handle, the same at every width').to.be.closeTo(
             measured[0],
             1
+          );
+        });
+      });
+    });
+  });
+
+  describe('the listing header is drawn whole', () => {
+    const CHIP = '.breadcrumb-chips .breadcrumb-chip';
+    const JUMP_ICON =
+      'lib-dj-directory-listing button[aria-label="Go to containing folder"] mat-icon';
+    // Three chips at 1920: the card is half the viewport, and a deeper path folds the leading chips away.
+    const DEEP_PATH = ['/music', '/music/MUSICIANS'];
+    const HEADER_WIDTHS = [SID_PANEL_VIEWPORT.width, 1400, 1100, VIEWPORT.TABLET.width] as const;
+    const PAINT_TOLERANCE = 0.5;
+
+    interface Extent {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    }
+
+    function windowOf(element: Element): Window {
+      const view = element.ownerDocument.defaultView;
+      if (!view) {
+        throw new Error('The element is not attached to a window');
+      }
+      return view;
+    }
+
+    /** The chip's border box, grown by its focus ring (outline width plus offset) when `focused`. */
+    function paintedExtent(chip: HTMLElement, focused: boolean): Extent {
+      const box = chip.getBoundingClientRect();
+      const style = windowOf(chip).getComputedStyle(chip);
+      if (focused) {
+        expect(style.outlineStyle, 'the focused chip draws a ring').to.not.equal('none');
+      }
+      const grow = focused ? parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset) : 0;
+      return {
+        top: box.top - grow,
+        right: box.right + grow,
+        bottom: box.bottom + grow,
+        left: box.left - grow,
+      };
+    }
+
+    /** Every ancestor clip, along the axes it clips, that the extent leaves by more than the tolerance. */
+    function clipViolations(chip: HTMLElement, extent: Extent): string[] {
+      const view = windowOf(chip);
+      const box = chip.getBoundingClientRect();
+      const violations: string[] = [];
+      for (let el = chip.parentElement; el; el = el.parentElement) {
+        const style = view.getComputedStyle(el);
+        const clip = el.getBoundingClientRect();
+        const name = `${el.tagName.toLowerCase()}.${el.className}`;
+        if (style.overflowY !== 'visible') {
+          if (extent.top < clip.top - PAINT_TOLERANCE) {
+            violations.push(`${name} cuts ${(clip.top - extent.top).toFixed(1)}px off the top`);
+          }
+          if (extent.bottom > clip.bottom + PAINT_TOLERANCE) {
+            violations.push(
+              `${name} cuts ${(extent.bottom - clip.bottom).toFixed(1)}px off the bottom`
+            );
+          }
+        }
+        // A chip wholly outside an inline clip's content box is hidden by it (the trail has no room
+        // left for it), not cut.
+        const contentLeft = clip.left + el.clientLeft + parseFloat(style.paddingLeft);
+        const contentRight = clip.right - el.clientLeft - parseFloat(style.paddingRight);
+        const shownInline = box.right > contentLeft && box.left < contentRight;
+        if (style.overflowX !== 'visible' && shownInline) {
+          if (extent.left < clip.left - PAINT_TOLERANCE) {
+            violations.push(`${name} cuts ${(clip.left - extent.left).toFixed(1)}px off the left`);
+          }
+          if (extent.right > clip.right + PAINT_TOLERANCE) {
+            violations.push(
+              `${name} cuts ${(extent.right - clip.right).toFixed(1)}px off the right`
+            );
+          }
+        }
+      }
+      return violations;
+    }
+
+    function freezeScaling(): void {
+      // The cards enter with a scaling transform, which moves their rects; measure the layout itself.
+      cy.document().then((doc) => {
+        const style = doc.createElement('style');
+        style.textContent =
+          'lib-scaling-container, lib-scaling-compact-card { transform: none !important; }';
+        doc.head.appendChild(style);
+      });
+    }
+
+    describe('the breadcrumb chips', () => {
+      beforeEach(() => {
+        cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
+        interceptDjLibrary();
+        interceptFindDevices({ fixture: twoDevices });
+        interceptConnectDevice();
+        setupGetDirectory(createMockFilesystem(MOCK_SEEDS.DEFAULT));
+        cy.visit(APP_ROUTES.djMixer);
+        freezeScaling();
+
+        DEEP_PATH.forEach((path) => {
+          cy.get(`lib-dj-directory-listing [data-item-path="${path}"]`).click();
+        });
+        cy.get(CHIP).should('have.length.at.least', 3);
+      });
+
+      HEADER_WIDTHS.forEach((width) => {
+        const height = width === VIEWPORT.TABLET.width ? VIEWPORT.TABLET.height : 1080;
+
+        it(`keeps every chip's border and focus ring inside every clip at ${width}px wide`, () => {
+          cy.viewport(width, height);
+          cy.get(CHIP).first().scrollIntoView();
+
+          // Retried via `.should()` so the layout can settle after the viewport change.
+          cy.get(CHIP).should(($chips) => {
+            expect($chips.length, 'chips are shown').to.be.at.least(1);
+            $chips.each((_, chip) => {
+              const violations = clipViolations(chip, paintedExtent(chip, false));
+              expect(violations, `border of "${chip.textContent?.trim()}"`).to.deep.equal([]);
+            });
+          });
+
+          // A chip takes no focus by itself; forcing it makes the stylesheet's `:focus` ring paint.
+          cy.get(CHIP).should(($chips) => {
+            $chips.each((_, chip) => {
+              chip.setAttribute('tabindex', '-1');
+              chip.focus();
+              const violations = clipViolations(chip, paintedExtent(chip, true));
+              expect(violations, `focus ring of "${chip.textContent?.trim()}"`).to.deep.equal([]);
+            });
+          });
+        });
+      });
+    });
+
+    describe('the go-to-folder button', () => {
+      beforeEach(() => {
+        cy.viewport(SID_PANEL_VIEWPORT.width, SID_PANEL_VIEWPORT.height);
+        interceptDjLibrary();
+        interceptFindDevices({ fixture: twoDevices });
+        interceptConnectDevice();
+        interceptGetDirectory();
+        interceptSearch({
+          files: [
+            generateFileItem({
+              name: 'Still_Time.sid',
+              parentPath: '/hvsc',
+              path: '/hvsc/Still_Time.sid',
+              type: FileItemType.Song,
+            }),
+          ],
+        });
+        cy.visit(APP_ROUTES.djMixer);
+        freezeScaling();
+      });
+
+      it('holds the whole glyph inside its icon box', () => {
+        cy.get('lib-dj-search-toolbar input').type('still{enter}');
+
+        cy.get(JUMP_ICON).should(([icon]) => {
+          expect(icon.scrollWidth, 'the glyph is not cut at the sides').to.be.at.most(
+            icon.clientWidth
+          );
+          expect(icon.scrollHeight, 'the glyph is not cut at the top or bottom').to.be.at.most(
+            icon.clientHeight
           );
         });
       });

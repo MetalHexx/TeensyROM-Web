@@ -633,11 +633,15 @@ lib-compact-card-layout:has(.compact-card--fill) {
   background-color: transparent;
 }
 
+// The box fits the glyph: `.mat-icon` clips its overflow and the icon font's content area is taller
+// than its 16px em, and the button keeps Material's 8px padding, which leaves a content box too
+// small for the icon, so it must not flex-shrink into it.
 .icon-button-small .mat-icon {
   font-size: 16px;
   line-height: 1;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 20px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
