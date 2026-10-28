@@ -10,10 +10,11 @@
         #globalSwitch
         [checked]="autoLaunch()"
         [disabled]="!settingsReady()"
+        [libTooltip]="autoLaunchTooltip"
         data-testid="auto-launch-switch"
         (change)="onAutoLaunchChange($event.checked)"
       >
-        Launch after transfer
+        Auto launch
       </mat-slide-toggle>
       @if (settingsError(); as message) {
       <p class="group-error" role="alert" data-testid="settings-error">{{ message }}</p>
@@ -27,6 +28,7 @@
           icon="add"
           size="small"
           ariaLabel="Add watch folder"
+          [tooltip]="addFolderTooltip"
           data-testid="add-watch-folder"
           (buttonClick)="openAddFolder()"
         />
@@ -95,6 +97,7 @@
         <button
           type="button"
           class="link-button"
+          [libTooltip]="addDeviceTooltip"
           data-testid="add-device"
           [attr.data-folder-id]="folder.id"
           (click)="openAddDevice(folder.id)"

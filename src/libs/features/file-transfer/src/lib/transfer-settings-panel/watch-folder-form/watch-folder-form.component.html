@@ -6,7 +6,13 @@
   data-testid="watch-folder-form"
   (keydown.escape)="onEscape($event)"
 >
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+  <mat-form-field
+    appearance="fill"
+    class="field"
+    subscriptSizing="dynamic"
+    hideRequiredMarker
+    [libTooltip]="folderTooltip"
+  >
     <mat-label>Folder to watch</mat-label>
     <input
       #firstField
@@ -25,7 +31,13 @@
   </mat-form-field>
 
   <div class="field-row">
-    <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+    <mat-form-field
+      appearance="fill"
+      class="field"
+      subscriptSizing="dynamic"
+      hideRequiredMarker
+      [libTooltip]="deviceTooltip"
+    >
       <mat-label>Device</mat-label>
       <mat-select
         formControlName="device"
@@ -46,6 +58,7 @@
       formControlName="storage"
       aria-label="Storage"
       hideSingleSelectionIndicator
+      [libTooltip]="storageTooltip"
       data-testid="form-storage"
     >
       @for (storage of storageChoices; track storage) {
@@ -59,7 +72,13 @@
   <p class="form-error" role="alert" data-testid="error-storage">{{ message }}</p>
   }
 
-  <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+  <mat-form-field
+    appearance="fill"
+    class="field"
+    subscriptSizing="dynamic"
+    hideRequiredMarker
+    [libTooltip]="devicePathTooltip"
+  >
     <mat-label>Device folder</mat-label>
     <input
       matInput
@@ -75,7 +94,9 @@
     }
   </mat-form-field>
 
-  <mat-slide-toggle formControlName="launch" data-testid="form-launch">Launch</mat-slide-toggle>
+  <mat-slide-toggle formControlName="launch" [libTooltip]="launchTooltip" data-testid="form-launch"
+    >Auto launch</mat-slide-toggle
+  >
 
   @if (errors().form; as message) {
   <p class="form-error" role="alert" data-testid="error-form">{{ message }}</p>
@@ -87,6 +108,7 @@
       label="Cancel"
       color="normal"
       [fullWidth]="false"
+      [tooltip]="cancelTooltip"
       data-testid="form-cancel"
       (buttonClick)="formCancel.emit()"
     />
@@ -96,6 +118,7 @@
       variant="flat"
       [fullWidth]="false"
       [disabled]="!canSubmit()"
+      [tooltip]="submitTooltip"
       data-testid="form-submit"
       (buttonClick)="onSubmit()"
     />

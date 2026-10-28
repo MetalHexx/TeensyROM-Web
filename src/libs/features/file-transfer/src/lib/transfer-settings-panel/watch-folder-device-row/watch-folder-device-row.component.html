@@ -6,13 +6,19 @@
     >
   </div>
   @if (destination().launch) {
-  <span class="launch-tag" data-testid="watch-folder-device-launch">Launch</span>
+  <span
+    class="launch-tag"
+    [libTooltip]="launchTooltip"
+    data-testid="watch-folder-device-launch"
+    >Auto launch</span
+  >
   }
   <lib-icon-button
     icon="edit"
     size="small"
     [ariaLabel]="'Edit ' + deviceLabel()"
     [disabled]="pending()"
+    [tooltip]="editTooltip"
     data-testid="watch-folder-device-edit"
     (buttonClick)="edit.emit()"
   />
@@ -23,6 +29,7 @@
       color="error"
       [ariaLabel]="'Remove ' + deviceLabel()"
       [disabled]="pending()"
+      [tooltip]="deleteTooltip"
       data-testid="watch-folder-device-delete"
       (buttonClick)="confirm.open()"
     />

@@ -15,7 +15,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Device, StorageType } from '@teensyrom-nx/domain';
-import { ActionButtonComponent } from '@teensyrom-nx/ui/components';
+import {
+  ActionButtonComponent,
+  TooltipConfig,
+  TooltipDirective,
+  TooltipPosition,
+} from '@teensyrom-nx/ui/components';
 import {
   WatchFolderFormErrors,
   availableStorage,
@@ -41,6 +46,7 @@ import {
     MatSelectModule,
     MatSlideToggleModule,
     ActionButtonComponent,
+    TooltipDirective,
   ],
   templateUrl: './watch-folder-device-form.component.html',
   styleUrl: './watch-folder-device-form.component.scss',
@@ -72,6 +78,31 @@ export class WatchFolderDeviceFormComponent {
 
   private readonly valid = formValid(this.formGroup);
   private readonly deviceId = controlValue<string>(this.formGroup, 'device');
+
+  protected readonly deviceTooltip: TooltipConfig = {
+    body: 'The TeensyROM the files are copied to.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly storageTooltip: TooltipConfig = {
+    body: 'The device storage the files are copied to.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly devicePathTooltip: TooltipConfig = {
+    body: 'Folder on the device the files are copied into.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly launchTooltip: TooltipConfig = {
+    body: 'Start each file on the device once it is copied.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly cancelTooltip: TooltipConfig = {
+    body: 'Close the form without saving.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly submitTooltip: TooltipConfig = {
+    body: 'Save this device.',
+    position: TooltipPosition.Top,
+  };
 
   protected readonly canSubmit = computed(() => this.valid() && !this.submitting());
   /** Both storages are always shown; the ones the chosen device lacks are disabled. */

@@ -8,6 +8,7 @@
     [checked]="folder().enabled"
     [disabled]="pending()"
     [aria-label]="'Watch ' + folder().path"
+    [libTooltip]="enableTooltip"
     data-testid="watch-folder-switch"
     (change)="onToggle(enabledSwitch, $event.checked)"
   />
@@ -18,6 +19,7 @@
       color="error"
       [ariaLabel]="'Stop watching ' + folder().path"
       [disabled]="pending()"
+      [tooltip]="deleteTooltip"
       data-testid="watch-folder-delete"
       (buttonClick)="confirm.open()"
     />

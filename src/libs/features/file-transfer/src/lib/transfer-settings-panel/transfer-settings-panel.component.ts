@@ -28,7 +28,13 @@ import {
   WatchFolderRejection,
   WatchFolderState,
 } from '@teensyrom-nx/domain';
-import { IconButtonComponent, SidePanelComponent } from '@teensyrom-nx/ui/components';
+import {
+  IconButtonComponent,
+  SidePanelComponent,
+  TooltipConfig,
+  TooltipDirective,
+  TooltipPosition,
+} from '@teensyrom-nx/ui/components';
 import { WatchFolderRowComponent } from './watch-folder-row/watch-folder-row.component';
 import { WatchFolderDeviceRowComponent } from './watch-folder-device-row/watch-folder-device-row.component';
 import { WatchFolderFormComponent } from './watch-folder-form/watch-folder-form.component';
@@ -58,6 +64,7 @@ type OpenForm =
     MatSlideToggleModule,
     SidePanelComponent,
     IconButtonComponent,
+    TooltipDirective,
     WatchFolderRowComponent,
     WatchFolderDeviceRowComponent,
     WatchFolderFormComponent,
@@ -86,6 +93,19 @@ export class TransferSettingsPanelComponent {
   readonly closePanel = output<void>();
 
   protected readonly WatchFolderState = WatchFolderState;
+
+  protected readonly autoLaunchTooltip: TooltipConfig = {
+    body: 'Start a transferred file on the device when its transfer finishes.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly addFolderTooltip: TooltipConfig = {
+    body: 'Watch another folder on this computer.',
+    position: TooltipPosition.Left,
+  };
+  protected readonly addDeviceTooltip: TooltipConfig = {
+    body: "Send this folder's files to another device too.",
+    position: TooltipPosition.Top,
+  };
 
   protected readonly folders = this.watchFolderStore.getFolders();
   protected readonly error = this.watchFolderStore.error;

@@ -3,17 +3,25 @@ import {
   ConfirmationDialogComponent,
   DropdownDialogComponent,
   IconButtonComponent,
+  TooltipConfig,
+  TooltipDirective,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { WatchFolderDestination } from '@teensyrom-nx/domain';
 
 /**
- * One device a watched folder delivers to: its name, where on the device the files land, a Launch
+ * One device a watched folder delivers to: its name, where on the device the files land, an Auto launch
  * tag when they are launched, and edit and delete buttons. Delete asks before it emits, and warns
  * when removing this device also removes its folder.
  */
 @Component({
   selector: 'lib-watch-folder-device-row',
-  imports: [IconButtonComponent, DropdownDialogComponent, ConfirmationDialogComponent],
+  imports: [
+    IconButtonComponent,
+    TooltipDirective,
+    DropdownDialogComponent,
+    ConfirmationDialogComponent,
+  ],
   templateUrl: './watch-folder-device-row.component.html',
   styleUrl: './watch-folder-device-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +37,19 @@ export class WatchFolderDeviceRowComponent {
   readonly edit = output<void>();
   /** Emits once the user has confirmed removing the device. */
   readonly deleteConfirmed = output<void>();
+
+  protected readonly launchTooltip: TooltipConfig = {
+    body: 'Files from this folder start on this device once copied.',
+    position: TooltipPosition.Top,
+  };
+  protected readonly editTooltip: TooltipConfig = {
+    body: "Change this device's folder and launch setting.",
+    position: TooltipPosition.Left,
+  };
+  protected readonly deleteTooltip: TooltipConfig = {
+    body: 'Stop sending this folder to this device.',
+    position: TooltipPosition.Left,
+  };
 
   protected readonly deviceLabel = computed(
     () => this.destination().deviceName ?? this.destination().deviceId

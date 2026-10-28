@@ -4,6 +4,9 @@ import {
   ConfirmationDialogComponent,
   DropdownDialogComponent,
   IconButtonComponent,
+  TooltipConfig,
+  TooltipDirective,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { WatchFolder, WatchFolderState } from '@teensyrom-nx/domain';
 
@@ -17,6 +20,7 @@ import { WatchFolder, WatchFolderState } from '@teensyrom-nx/domain';
   imports: [
     MatSlideToggleModule,
     IconButtonComponent,
+    TooltipDirective,
     DropdownDialogComponent,
     ConfirmationDialogComponent,
   ],
@@ -35,6 +39,15 @@ export class WatchFolderRowComponent {
   readonly deleteConfirmed = output<void>();
 
   protected readonly WatchFolderState = WatchFolderState;
+
+  protected readonly enableTooltip: TooltipConfig = {
+    body: 'Turn watching this folder on or off.',
+    position: TooltipPosition.Left,
+  };
+  protected readonly deleteTooltip: TooltipConfig = {
+    body: 'Stop watching this folder.',
+    position: TooltipPosition.Left,
+  };
 
   /**
    * The slide toggle flips itself before it emits, but the engine decides the folder's state: put
