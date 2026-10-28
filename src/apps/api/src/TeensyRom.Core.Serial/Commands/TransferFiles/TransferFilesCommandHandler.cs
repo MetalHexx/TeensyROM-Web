@@ -130,6 +130,13 @@ namespace TeensyRom.Core.Commands
                 {
                     throw;
                 }
+                catch (TeensyWriteTimeoutException ex)
+                {
+                    // The device stopped draining bytes. Retrying would stall for the same timeout on every
+                    // attempt of every remaining file; the pipeline's link recovery decides what happens next.
+                    logService.InternalError($"Save Failed: {file.TargetPath.Value} - {ex.Message}", deviceId);
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     retry++;
@@ -152,7 +159,7 @@ namespace TeensyRom.Core.Commands
                         TryDelete(port, file, deviceId);
                         continue;
                     }
-                    logService.InternalError($"Save Retry: {retry} seconds to retry.", deviceId);
+                    logService.InternalError($"Save Retry: {retry} seconds to retry. {ex.GetType().Name}: {ex.Message}", deviceId);
 
                     if (retry < _retryLimit)
                     {

@@ -13,6 +13,27 @@ export enum TransferJobState {
   Aborted = 'Aborted',
 }
 
+/** Where a transfer job came from: a browser upload or a watched folder. */
+export enum TransferOriginKind {
+  Upload = 'Upload',
+  WatchFolder = 'WatchFolder',
+}
+
+export interface TransferOrigin {
+  kind: TransferOriginKind;
+  watchFolderId: string | null;
+  watchFolderPath: string | null;
+}
+
+/** Progress of the post-transfer launch of the transferred file on the device. */
+export enum TransferLaunchState {
+  None = 'None',
+  Pending = 'Pending',
+  Launched = 'Launched',
+  Incompatible = 'Incompatible',
+  Failed = 'Failed',
+}
+
 /** Outcome of a single file's upload within a transfer job. */
 export interface TransferFileCompletion {
   jobId: string;
@@ -37,9 +58,12 @@ export interface TransferJobSnapshot {
   filesReceived: number;
   filesSent: number;
   filesFailed: number;
+  bytesSent: number;
   totalFiles: number | null;
   currentFile: string | null;
+  origin: TransferOrigin;
   startedUtc: Date;
+  lastActivityUtc: Date;
   error: string | null;
   failures: TransferFileCompletion[];
   recentCompletions: TransferFileCompletion[]; // newest-first, server-bounded
@@ -53,4 +77,9 @@ export interface TransferJobSnapshot {
   expansionBytesDeclared: number;
   /** Files expansion has yielded — null until every archive in the job has finished expanding. */
   expandedFileCount: number | null;
+  /** How the engine's launch of the transferred file went. */
+  launchState: TransferLaunchState;
+  /** Path of the file the engine launched (or tried to); null when no launch applies. */
+  launchedPath: string | null;
+  launchError: string | null;
 }

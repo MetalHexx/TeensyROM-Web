@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Tests.Unit.Endpoints;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Games;
@@ -29,7 +30,8 @@ public class StorageServiceUpsertTransferredFileTests
         _log,
         _sidMetadata,
         _gameMetadata,
-        _port);
+        _port,
+        LeaseDoubles.Free());
 
     [Fact]
     public void UpsertTransferredFile_SidExtension_ProducesEnrichedSongItem()

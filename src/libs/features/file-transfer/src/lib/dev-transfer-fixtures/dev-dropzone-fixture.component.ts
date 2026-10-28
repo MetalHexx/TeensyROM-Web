@@ -34,7 +34,9 @@ const NO_OP_TRANSFER_CONTEXT: ITransferContext = {
   retryCreate: async () => undefined,
   cancelTransfer: async () => undefined,
   closeTransfer: async () => undefined,
-  refreshDeviceBusyState: async () => undefined,
+  showDetails: async () => undefined,
+  hideDetails: async () => undefined,
+  releaseOwnRecords: async () => undefined,
 };
 
 /**

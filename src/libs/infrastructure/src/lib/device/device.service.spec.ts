@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DevicesApiService, ResponseError } from '@teensyrom-nx/data-access/api-client';
 import { DeviceService } from './device.service';
-import { ALERT_SERVICE } from '@teensyrom-nx/domain';
+import { ALERT_SERVICE, DeviceBusyError } from '@teensyrom-nx/domain';
 
 // Helper to create unavailable storage (backend always returns an object, never null)
 const unavailableStorage = (deviceId: string, type: 'SD' | 'USB') => ({
@@ -892,5 +892,77 @@ sdStorage: unavailableStorage('device-1', 'SD'),
         );
       });
     });
+  });
+});
+
+const busyBody = {
+  type: 'https://tools.ietf.org/html/rfc9110#section-15.5.10',
+  title: 'Alpha is busy with a transfer.',
+  status: 409,
+  code: 'deviceBusyWithTransfer',
+  deviceId: 'device-1',
+  activeJobId: 'job-7',
+};
+
+const busyResponseError = (): ResponseError =>
+  new ResponseError(
+    new Response(JSON.stringify(busyBody), {
+      status: 409,
+      headers: { 'content-type': 'application/problem+json' },
+    }),
+    'Response returned an error code'
+  );
+
+const expectBusyRefusal = async (
+  action: () => Promise<unknown>,
+  alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> }
+) => {
+  const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  await expect(action()).rejects.toMatchObject({
+    name: 'DeviceBusyError',
+    deviceId: 'device-1',
+    activeJobId: 'job-7',
+    message: 'Alpha is busy with a transfer.',
+  });
+  expect(alert.warning).toHaveBeenCalledTimes(1);
+  expect(alert.warning).toHaveBeenCalledWith('Alpha is busy with a transfer.');
+  expect(alert.error).not.toHaveBeenCalled();
+  logSpy.mockRestore();
+};
+
+describe('DeviceService - device busy', () => {
+  let service: DeviceService;
+  let mockApi: { resetDevice: ReturnType<typeof vi.fn>; pingDevice: ReturnType<typeof vi.fn> };
+  let alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    mockApi = { resetDevice: vi.fn(), pingDevice: vi.fn() };
+    alert = { error: vi.fn(), warning: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceService,
+        { provide: DevicesApiService, useValue: mockApi },
+        { provide: ALERT_SERVICE, useValue: alert },
+      ],
+    });
+    service = TestBed.inject(DeviceService);
+  });
+
+  it('warns once and throws DeviceBusyError when reset is refused', async () => {
+    mockApi.resetDevice.mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(() => new Promise((resolve, reject) => service.resetDevice('device-1').subscribe({ next: resolve, error: reject })), alert);
+  });
+
+  it('warns once and throws DeviceBusyError when ping is refused', async () => {
+    mockApi.pingDevice.mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(() => new Promise((resolve, reject) => service.pingDevice('device-1').subscribe({ next: resolve, error: reject })), alert);
+  });
+
+  it('throws a DeviceBusyError instance', async () => {
+    mockApi.pingDevice.mockRejectedValue(busyResponseError());
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(new Promise((resolve, reject) => service.pingDevice('device-1').subscribe({ next: resolve, error: reject }))).rejects.toBeInstanceOf(DeviceBusyError);
+    logSpy.mockRestore();
   });
 });

@@ -446,6 +446,66 @@ public class TransferFilesCommandHandlerTests : IDisposable
         port.AttemptCount.Should().Be(3);
     }
 
+    [Fact]
+    public async Task Handle_WriteTimesOutOnAFile_PropagatesWithoutRetryAndLeavesTheRestUnattempted()
+    {
+        var file1 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/one.prg"), TeensyStorageType.SD);
+        var file2 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/stuck.prg"), TeensyStorageType.SD);
+        var file3 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/three.prg"), TeensyStorageType.SD);
+
+        var timeout = new TeensyWriteTimeoutException("Write to COM12 timed out after 10000 ms", new TimeoutException());
+        var port = new RecordingCommunicationPort
+        {
+            FailFor = path => path == file2.TargetPath.Value ? timeout : null
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+        var outcomes = new List<TransferFileOutcome>();
+
+        Func<Task> act = () => handler.Handle(new TransferFilesCommand
+        {
+            Files = [file1, file2, file3],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = (outcome, _) =>
+            {
+                outcomes.Add(outcome);
+                return Task.CompletedTask;
+            }
+        }, CancellationToken.None);
+
+        // A device that stopped draining bytes is not a bad file: retrying it would cost three attempts
+        // on every remaining file, so the timeout leaves for the pipeline's link recovery untouched.
+        (await act.Should().ThrowAsync<TeensyWriteTimeoutException>()).Which.Should().BeSameAs(timeout);
+
+        outcomes.Should().ContainSingle(o => o.File == file1 && o.Saved);
+        port.AttemptCount.Should().Be(2);
+        port.Received.Should().ContainSingle(f => f.Path == file1.TargetPath.Value);
+    }
+
+    [Fact]
+    public async Task Handle_AttemptFails_RetryLogNamesTheExceptionAndItsMessage()
+    {
+        var file = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/flaky.prg"), TeensyStorageType.SD);
+        var port = new RecordingCommunicationPort
+        {
+            ExceptionForAckCall = ackCallNumber => ackCallNumber == 1 ? new IOException("cable wiggled") : null
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+
+        var result = await handler.Handle(new TransferFilesCommand
+        {
+            Files = [file],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = NoOp
+        }, CancellationToken.None);
+
+        result.Outcomes.Should().ContainSingle(o => o.Saved);
+        _log.Received().InternalError(
+            Arg.Is<string>(m => m.Contains(nameof(IOException)) && m.Contains("cable wiggled")),
+            "DEVICEID");
+    }
+
     private (string Path, byte[] Bytes) WriteTestFile(int size)
     {
         var bytes = new byte[size];

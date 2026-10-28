@@ -50,4 +50,18 @@ public class ResetDeviceEndpointTests
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
         endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("Unable to connect to COM7");
     }
+
+    [Fact]
+    public async Task Handle_DeviceBusyWithTransfer_SendsTheSharedConflict()
+    {
+        GivenDevice();
+        _mediator.Send(Arg.Any<ResetCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new ResetResult { IsSuccess = false, Error = "busy", ActiveTransferJobId = LeaseDoubles.JobId });
+        var endpoint = EndpointFactory.CreateEndpoint<ResetDeviceEndpoint>(_deviceManager, _mediator);
+
+        await endpoint.Handle(new ResetDeviceRequest { DeviceId = DeviceId }, CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
+    }
 }

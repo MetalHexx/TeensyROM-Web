@@ -213,6 +213,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Starts a new file transfer job for a device's storage.
         /// <br/>
         /// <br/>- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// <br/>- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.
         /// </remarks>
         /// <returns>OK</returns>
@@ -246,8 +247,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
-        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
+        /// <br/>  - Auto-launch flag
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -277,7 +278,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -295,6 +296,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Resets a TeensyROM device.
         /// <br/>
         /// <br/>- Works the same as clicking the cartridge reset button.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -337,6 +339,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Pings a TeensyROM device to check if it is responsive.
         /// <br/>
         /// <br/>- Works the same as clicking the cartridge reset button.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -366,6 +369,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
         /// <br/>- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.
         /// <br/>- Offline units are listed after the online ones, with deviceState ConnectionLost.
+        /// <br/>- A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -377,6 +381,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Toggles the play/pause state of the currently playing music on the TeensyRom device.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -397,6 +403,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games.
         /// <br/>- Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc).
         /// <br/>- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -408,6 +415,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Launches a file given a valid path to a file stored on the TeensyRom.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -489,6 +498,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Providing a path will index starting at that directory and all subdirectories below it.
         /// <br/>- Providing no path will index the whole storage device.
         /// <br/>- Don't touch your commodore while indexing is in progress.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -505,6 +515,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Multiple devices will be indexed in parallel, one device type at a time.
         /// <br/>- This could take a few minutes if you have a lot of data.
         /// <br/>- Don't touch your commodores while indexing is in progress.
+        /// <br/>- A device busy with a transfer is skipped and the other devices are still indexed; its id is listed in busyDeviceIds.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -520,6 +532,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Byte-identical to the file on the cartridge.
         /// <br/>- Refused with 413 above 10 MB.
         /// <br/>- The path must be a Unix-style file path with no '..' segment.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -535,6 +548,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Returns metadata for all files in the directory.
         /// <br/>- This is not recursive and will only include the files for the requested directory.
         /// <br/>- Make another request to get subdirectory content.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -546,6 +560,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Saves a file as a favorite, creating a copy in the appropriate favorites directory.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -557,6 +573,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -568,6 +586,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2017,6 +2037,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Starts a new file transfer job for a device's storage.
         /// <br/>
         /// <br/>- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// <br/>- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.
         /// </remarks>
         /// <returns>OK</returns>
@@ -2255,8 +2276,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>  - TCP: Host address, port (1-65535), and timeout values (milliseconds)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
         /// <br/>  - Repeat mode, play timer, mute settings, startup filter and launch options
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
-        /// <br/>  - Auto-launch, navigate-on-launch, and sync flags
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
+        /// <br/>  - Auto-launch flag
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>  - Search weights must be &gt;= 0 with at least one &gt; 0
         /// <br/>  - Stop words, banned directories, and banned files lists
@@ -2379,7 +2400,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>**Settings Categories:**
         /// <br/>- **Connection Settings**: Device connectivity preferences (Serial/TCP)
         /// <br/>- **Player Settings**: Playback behavior and startup preferences
-        /// <br/>- **File Transfer Settings**: Auto-launch and synchronization configuration
+        /// <br/>- **File Transfer Settings**: Auto-launch configuration
         /// <br/>- **Search Settings**: Search weights, stop words, and content exclusions
         /// <br/>- **App Settings**: Application lifecycle state
         /// <br/>
@@ -2473,6 +2494,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Resets a TeensyROM device.
         /// <br/>
         /// <br/>- Works the same as clicking the cartridge reset button.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2549,6 +2571,16 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 502)
@@ -2817,6 +2849,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// Pings a TeensyROM device to check if it is responsive.
         /// <br/>
         /// <br/>- Works the same as clicking the cartridge reset button.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2892,6 +2925,16 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 502)
@@ -3047,6 +3090,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.
         /// <br/>- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.
         /// <br/>- Offline units are listed after the online ones, with deviceState ConnectionLost.
+        /// <br/>- A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -3150,6 +3194,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Toggles the play/pause state of the currently playing music on the TeensyRom device.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -3228,6 +3274,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 502)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -3272,6 +3328,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games.
         /// <br/>- Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc).
         /// <br/>- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -3369,6 +3426,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 502)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -3404,6 +3471,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Launches a file given a valid path to a file stored on the TeensyRom.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -3491,6 +3560,16 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<string>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 502)
@@ -3973,6 +4052,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Providing a path will index starting at that directory and all subdirectories below it.
         /// <br/>- Providing no path will index the whole storage device.
         /// <br/>- Don't touch your commodore while indexing is in progress.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4052,6 +4132,36 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Internal Server Error", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         {
                             var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
                             throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
@@ -4082,6 +4192,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Multiple devices will be indexed in parallel, one device type at a time.
         /// <br/>- This could take a few minutes if you have a lot of data.
         /// <br/>- Don't touch your commodores while indexing is in progress.
+        /// <br/>- A device busy with a transfer is skipped and the other devices are still indexed; its id is listed in busyDeviceIds.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4145,6 +4257,26 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Internal Server Error", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         {
                             var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
                             throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
@@ -4174,6 +4306,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Byte-identical to the file on the cartridge.
         /// <br/>- Refused with 413 above 10 MB.
         /// <br/>- The path must be a Unix-style file path with no '..' segment.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4260,6 +4393,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 413)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -4319,6 +4462,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Returns metadata for all files in the directory.
         /// <br/>- This is not recursive and will only include the files for the requested directory.
         /// <br/>- Make another request to get subdirectory content.
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4407,6 +4551,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<string>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 502)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -4442,6 +4596,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Saves a file as a favorite, creating a copy in the appropriate favorites directory.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4531,6 +4687,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 502)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -4566,6 +4732,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4654,6 +4822,16 @@ namespace TeensyRom.Cli.Api.Generated
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 502)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -4689,6 +4867,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// </summary>
         /// <remarks>
         /// Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+        /// <br/>
+        /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -4776,6 +4956,16 @@ namespace TeensyRom.Cli.Api.Generated
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 502)
@@ -6235,6 +6425,9 @@ namespace TeensyRom.Cli.Api.Generated
         [System.ComponentModel.DataAnnotations.Required]
         public CartStorageDto UsbStorage { get; set; } = new CartStorageDto();
 
+        [System.Text.Json.Serialization.JsonPropertyName("activeTransferJobId")]
+        public string? ActiveTransferJobId { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -7074,12 +7267,6 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("autoLaunchOnCopyEnabled")]
         public bool AutoLaunchOnCopyEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("navToDirOnLaunch")]
-        public bool NavToDirOnLaunch { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("syncFilesEnabled")]
-        public bool SyncFilesEnabled { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

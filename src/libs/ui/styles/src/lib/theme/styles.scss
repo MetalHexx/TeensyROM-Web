@@ -82,6 +82,7 @@ html {
   --spacing-page-gutter: var(--spacing-xl); // viewport-to-content distance
   --spacing-card-padding: var(--spacing-md); // standard card internal padding (12px)
   --spacing-card-padding-compact: var(--spacing-md); // compact card padding (12px)
+  --tree-panel-min-width: 250px; // narrowest a device tree panel gets (Player, File Transfer, DJ Mixer)
   --spacing-section-gap: var(--spacing-lg); // gap between sibling cards/sections
   --spacing-content-gap: var(--spacing-md); // gap between elements within a card
 
@@ -177,6 +178,7 @@ html.dark-mode {
   --spacing-page-gutter: var(--spacing-xl);
   --spacing-card-padding: var(--spacing-md);
   --spacing-card-padding-compact: var(--spacing-md);
+  --tree-panel-min-width: 250px;
   --spacing-section-gap: var(--spacing-lg);
   --spacing-content-gap: var(--spacing-md);
 
@@ -511,6 +513,18 @@ lib-compact-card-layout:has(.compact-card--fill) {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+// For a scroll container inside a compact card: its right edge reaches the card's edge, so the
+// scrollbar sits flush there, and the same width is padded back inside so the content keeps its
+// inset. The inset is the card's own padding (a single value, as the cards that use this set it);
+// a container sitting in a different padding sets `--scroll-edge-inset` itself. The container must
+// size by stretching (no fixed width), and every ancestor up to the card must leave its overflow
+// visible, or the extension is clipped.
+.scroll-edge-end {
+  --scroll-edge-inset: var(--compact-card-padding, var(--spacing-card-padding-compact));
+  margin-right: calc(-1 * var(--scroll-edge-inset));
+  padding-right: var(--scroll-edge-inset);
 }
 
 .compact-section-width {

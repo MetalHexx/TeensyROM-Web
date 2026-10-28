@@ -41,8 +41,6 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
   } as PlayerSettingsDto,
   fileTransferSettings: {
     autoLaunchOnCopyEnabled: true,
-    navToDirOnLaunch: false,
-    syncFilesEnabled: false,
   } as FileTransferSettingsDto,
   searchSettings: {
     searchWeights: {
@@ -76,8 +74,6 @@ const createDomainSettings = (): Settings => ({
   },
   fileTransferSettings: {
     autoLaunchOnCopyEnabled: true,
-    navToDirOnLaunch: false,
-    syncFilesEnabled: false,
   },
   searchSettings: {
     weights: {

@@ -1,0 +1,6 @@
+@use '../form-shared';
+
+// Sits under its folder, in line with the device rows it joins.
+:host {
+  margin-left: var(--spacing-md);
+}

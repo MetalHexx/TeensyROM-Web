@@ -75,7 +75,11 @@ internal sealed class FileLaunchOneShotCommand(
 
         Player.SetDirectoryMode(path);
 
-        if (!await Player.LaunchItem(item)) throw new CliException(CliExitCode.Failed, $"Couldn't play {path}.");
+        var played = await Player.LaunchItem(item);
+
+        ThrowWhenBusy();
+
+        if (!played) throw new CliException(CliExitCode.Failed, $"Couldn't play {path}.");
 
         return ShowPlayer(context, playerCommand);
     }

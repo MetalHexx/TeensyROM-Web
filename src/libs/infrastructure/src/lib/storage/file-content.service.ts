@@ -1,9 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 import { FilesApiService } from '@teensyrom-nx/data-access/api-client';
-import { FileContent, StorageType, IFileContentService, ALERT_SERVICE } from '@teensyrom-nx/domain';
+import {
+  FileContent,
+  StorageType,
+  IFileContentService,
+  ALERT_SERVICE,
+} from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
 import { Observable, from, map, switchMap, catchError, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
+import { failOnDeviceBusy } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class FileContentService implements IFileContentService {
@@ -37,7 +43,9 @@ export class FileContentService implements IFileContentService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`FileContentService.${methodName} error:`, error);
-    this.alertService.error(friendlyMessage);
-    return throwError(() => error);
+    return failOnDeviceBusy(error, this.alertService, () => {
+      this.alertService.error(friendlyMessage);
+      return throwError(() => error);
+    });
   }
 }

@@ -182,6 +182,12 @@ export interface CartDto {
      * @memberof CartDto
      */
     usbStorage: CartStorageDto;
+    /**
+     * 
+     * @type {string}
+     * @memberof CartDto
+     */
+    activeTransferJobId?: string | null;
 }
 
 
@@ -240,6 +246,7 @@ export function CartDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean): C
         'todClockHz': json['todClockHz'] == null ? undefined : json['todClockHz'],
         'sdStorage': CartStorageDtoFromJSON(json['sdStorage']),
         'usbStorage': CartStorageDtoFromJSON(json['usbStorage']),
+        'activeTransferJobId': json['activeTransferJobId'] == null ? undefined : json['activeTransferJobId'],
     };
 }
 
@@ -274,6 +281,7 @@ export function CartDtoToJSONTyped(value?: CartDto | null, ignoreDiscriminator: 
         'todClockHz': value['todClockHz'],
         'sdStorage': CartStorageDtoToJSON(value['sdStorage']),
         'usbStorage': CartStorageDtoToJSON(value['usbStorage']),
+        'activeTransferJobId': value['activeTransferJobId'],
     };
 }
 

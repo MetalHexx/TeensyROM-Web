@@ -22,6 +22,7 @@ import {
   FileItem,
   ALERT_SERVICE,
   IAlertService,
+  DeviceBusyError,
   API_CONFIG,
   IApiConfig,
 } from '@teensyrom-nx/domain';
@@ -1455,5 +1456,128 @@ describe('StorageService', () => {
         expect(mockAlertService.error).toHaveBeenCalledTimes(1);
       });
     });
+  });
+});
+
+const busyBody = {
+  type: 'https://tools.ietf.org/html/rfc9110#section-15.5.10',
+  title: 'Alpha is busy with a transfer.',
+  status: 409,
+  code: 'deviceBusyWithTransfer',
+  deviceId: 'device-1',
+  activeJobId: 'job-7',
+};
+
+const busyResponseError = (): ResponseError =>
+  new ResponseError(
+    new Response(JSON.stringify(busyBody), {
+      status: 409,
+      headers: { 'content-type': 'application/problem+json' },
+    }),
+    'Response returned an error code'
+  );
+
+const expectBusyRefusal = async (
+  action: () => Promise<unknown>,
+  alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> }
+) => {
+  const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  await expect(action()).rejects.toMatchObject({
+    name: 'DeviceBusyError',
+    deviceId: 'device-1',
+    activeJobId: 'job-7',
+    message: 'Alpha is busy with a transfer.',
+  });
+  expect(alert.warning).toHaveBeenCalledTimes(1);
+  expect(alert.warning).toHaveBeenCalledWith('Alpha is busy with a transfer.');
+  expect(alert.error).not.toHaveBeenCalled();
+  logSpy.mockRestore();
+};
+
+describe('StorageService - device busy', () => {
+  let service: StorageService;
+  let mockApi: Record<
+    'getDirectory' | 'index' | 'indexAll' | 'saveFavorite' | 'removeFavorite',
+    ReturnType<typeof vi.fn>
+  >;
+  let alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    mockApi = {
+      getDirectory: vi.fn(),
+      index: vi.fn(),
+      indexAll: vi.fn(),
+      saveFavorite: vi.fn(),
+      removeFavorite: vi.fn(),
+    };
+    alert = { error: vi.fn(), warning: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        StorageService,
+        { provide: FilesApiService, useValue: mockApi },
+        { provide: ALERT_SERVICE, useValue: alert },
+        { provide: API_CONFIG, useValue: createMockApiConfig() },
+      ],
+    });
+    service = TestBed.inject(StorageService);
+  });
+
+  const cases: [keyof typeof mockApi, (s: StorageService) => Promise<unknown>][] = [
+    [
+      'getDirectory',
+      (s) =>
+        new Promise((resolve, reject) =>
+          s
+            .getDirectory('device-1', StorageType.Sd, '/')
+            .subscribe({ next: resolve, error: reject })
+        ),
+    ],
+    [
+      'index',
+      (s) =>
+        new Promise((resolve, reject) =>
+          s.index('device-1', StorageType.Sd).subscribe({ next: resolve, error: reject })
+        ),
+    ],
+    [
+      'indexAll',
+      (s) =>
+        new Promise((resolve, reject) => s.indexAll().subscribe({ next: resolve, error: reject })),
+    ],
+    [
+      'saveFavorite',
+      (s) =>
+        new Promise((resolve, reject) =>
+          s
+            .saveFavorite('device-1', StorageType.Sd, '/a.sid')
+            .subscribe({ next: resolve, error: reject })
+        ),
+    ],
+    [
+      'removeFavorite',
+      (s) =>
+        new Promise((resolve, reject) =>
+          s
+            .removeFavorite('device-1', StorageType.Sd, '/a.sid')
+            .subscribe({ next: resolve, error: reject })
+        ),
+    ],
+  ];
+
+  it.each(cases)('warns once and throws DeviceBusyError when %s is refused', async (name, run) => {
+    mockApi[name].mockRejectedValue(busyResponseError());
+    await expectBusyRefusal(() => run(service), alert);
+  });
+
+  it('throws a DeviceBusyError instance', async () => {
+    mockApi.indexAll.mockRejectedValue(busyResponseError());
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(
+      new Promise((resolve, reject) =>
+        service.indexAll().subscribe({ next: resolve, error: reject })
+      )
+    ).rejects.toBeInstanceOf(DeviceBusyError);
+    logSpy.mockRestore();
   });
 });

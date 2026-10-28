@@ -4,6 +4,8 @@ import {
   ResponseError,
   TeensyStorageType,
   TransferJobState as ApiTransferJobState,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/data-access/api-client';
 import {
   IApiConfig,
@@ -88,6 +90,7 @@ describe('TransferService', () => {
     bytesSent: 0,
     totalFiles: null,
     currentFile: null,
+    origin: { kind: TransferOriginKind.Upload },
     startedUtc: new Date('2026-01-01T00:00:00Z'),
     lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
     error: null,
@@ -95,6 +98,9 @@ describe('TransferService', () => {
     recentCompletions: [],
     bytesPerSecond: 0,
     filesPerSecond: 0,
+    expansionBytesWritten: 0,
+    expansionBytesDeclared: 0,
+    launchState: TransferLaunchState.None,
   };
 
   beforeEach(() => {

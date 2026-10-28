@@ -220,6 +220,7 @@ public class CliOutputTests
     [InlineData((int)CliExitCode.EngineUnavailable, "engineUnavailable")]
     [InlineData((int)CliExitCode.NoDevice, "noDevice")]
     [InlineData((int)CliExitCode.NotFound, "notFound")]
+    [InlineData((int)CliExitCode.DeviceBusy, "deviceBusy")]
     public void TheJsonErrorCodeIsTheCamelCasedName(int code, string expected)
     {
         var output = Output();

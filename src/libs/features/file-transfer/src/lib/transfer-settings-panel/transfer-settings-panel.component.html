@@ -1,0 +1,114 @@
+<lib-side-panel
+  heading="Transfer Settings"
+  [animationDuration]="animationDuration()"
+  (closePanel)="closePanel.emit()"
+>
+  <div class="panel-content">
+    <section class="group" data-testid="global-group">
+      <h3 class="group-title">Global</h3>
+      <mat-slide-toggle
+        #globalSwitch
+        [checked]="autoLaunch()"
+        [disabled]="!settingsReady()"
+        [libTooltip]="autoLaunchTooltip"
+        data-testid="auto-launch-switch"
+        (change)="onAutoLaunchChange($event.checked)"
+      >
+        Auto launch
+      </mat-slide-toggle>
+      @if (settingsError(); as message) {
+      <p class="group-error" role="alert" data-testid="settings-error">{{ message }}</p>
+      }
+    </section>
+
+    <section class="group" data-testid="watch-folders-group">
+      <div class="group-header">
+        <h3 class="group-title">Watch Folders</h3>
+        <lib-icon-button
+          icon="add"
+          size="small"
+          ariaLabel="Add watch folder"
+          [tooltip]="addFolderTooltip"
+          data-testid="add-watch-folder"
+          (buttonClick)="openAddFolder()"
+        />
+      </div>
+
+      @if (openForm()?.kind === 'add-folder') {
+      <lib-watch-folder-form
+        [formGroup]="addFolderForm"
+        [errors]="formErrors()"
+        [devices]="connectedDevices()"
+        [submitting]="submitting()"
+        (formSubmit)="submitAddFolder()"
+        (formCancel)="closeForm()"
+      />
+      }
+
+      @if (error(); as message) {
+      <p class="group-error" role="alert" data-testid="watch-folders-error">{{ message }}</p>
+      }
+
+      @for (folder of folders(); track folder.id) {
+      <div
+        class="folder-block"
+        [class.folder-block--off]="isDimmed(folder)"
+        data-testid="watch-folder"
+      >
+        <lib-watch-folder-row
+          [folder]="folder"
+          [pending]="isPending(folder.id)"
+          (enabledChange)="onEnabledChange(folder.id, $event)"
+          (deleteConfirmed)="onDeleteFolder(folder.id)"
+        />
+        @for (destination of folder.destinations; track destination.id) {
+        @if (isEditingDevice(folder.id, destination.deviceId)) {
+        <lib-watch-folder-device-form
+          mode="edit"
+          [formGroup]="editDeviceForm"
+          [errors]="formErrors()"
+          [deviceName]="destination.deviceName ?? destination.deviceId"
+          [storageType]="destination.storageType"
+          [submitting]="submitting()"
+          (formSubmit)="submitEditDevice(folder.id, destination.deviceId)"
+          (formCancel)="closeForm()"
+        />
+        } @else {
+        <lib-watch-folder-device-row
+          [attr.data-folder-id]="folder.id"
+          [attr.data-device-id]="destination.deviceId"
+          [destination]="destination"
+          [isLastDevice]="folder.destinations.length === 1"
+          [pending]="isPending(folder.id)"
+          (edit)="openEditDevice(folder.id, destination.deviceId)"
+          (deleteConfirmed)="onDeleteDevice(folder.id, destination.deviceId)"
+        />
+        } } @if (isAddingDevice(folder.id)) {
+        <lib-watch-folder-device-form
+          mode="add"
+          [formGroup]="addDeviceForm"
+          [errors]="formErrors()"
+          [devices]="addDeviceChoices()"
+          [submitting]="submitting()"
+          (formSubmit)="submitAddDevice(folder.id)"
+          (formCancel)="closeForm()"
+        />
+        } @else if (canAddDevice(folder)) {
+        <button
+          type="button"
+          class="link-button"
+          [libTooltip]="addDeviceTooltip"
+          data-testid="add-device"
+          [attr.data-folder-id]="folder.id"
+          (click)="openAddDevice(folder.id)"
+        >
+          Add device
+        </button>
+        }
+      </div>
+      } @empty { @if (!isLoading()) {
+      <p class="group-empty" data-testid="watch-folders-empty">No watch folders yet</p>
+      } }
+    </section>
+  </div>
+</lib-side-panel>

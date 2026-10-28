@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { TransferFeedEntry } from '@teensyrom-nx/application';
+import { TransferFeedEntry, TransferTab } from '@teensyrom-nx/application';
 import { ConfirmationDialogComponent } from '@teensyrom-nx/ui/components';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import {
   TransferProgressComponent,
   TransferProgressVm,
 } from '../transfer-modal/transfer-progress/transfer-progress.component';
+import { TransferTabsComponent } from '../transfer-modal/transfer-tabs/transfer-tabs.component';
 import { DevDropzoneFixtureComponent } from './dev-dropzone-fixture.component';
+import { DevTransfersCardFixtureComponent } from './dev-transfers-card-fixture.component';
 
 interface ProgressFixture {
   label: string;
@@ -32,6 +34,7 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     deviceName: DEVICE_NAME,
     destinationLabel: DESTINATION_LABEL,
     droppedRootName: DROPPED_ROOT,
+    originLabel: null,
     scanFound: 12480,
     scanTotal: 12480,
     uploaded: 8412,
@@ -283,6 +286,23 @@ const SCAN_THROUGH_DRAINING: ProgressFixture[] = [
     }),
   },
   {
+    label: 'receiving — watched folder (subtitle names the folder)',
+    vm: baseVm({
+      droppedRootName: null,
+      originLabel: 'Downloads',
+      destinationLabel: 'SD · /auto-transfer/',
+      scanTotal: 12,
+      uploaded: 12,
+      written: 8,
+      failed: 0,
+      apiPercent: 100,
+      devicePercent: 67,
+      feed: [feedEntry(1), feedEntry(2)],
+      failures: [],
+      elapsedLabel: '0:42 elapsed',
+    }),
+  },
+  {
     label: 'draining',
     vm: baseVm({
       state: 'draining',
@@ -407,6 +427,18 @@ const PHONE_WIDTH_FIXTURES: ProgressFixture[] = [
   },
 ];
 
+const TAB_ROW_TABS: TransferTab[] = [
+  { deviceId: 'tr-1', percent: 56, ended: false },
+  { deviceId: 'tr-2', percent: 33, ended: false },
+  { deviceId: 'tr-3', percent: 100, ended: true },
+];
+
+const TAB_ROW_DEVICE_NAMES: Record<string, string> = {
+  'tr-1': DEVICE_NAME,
+  'tr-2': 'TR-2',
+  'tr-3': 'Bench TR',
+};
+
 /**
  * Throwaway dev-only page — reachable only by typing `/dev/transfer-states` in the browser.
  * Renders every ephemeral file-transfer UI state as a static fixture card so UI refinement work
@@ -414,7 +446,13 @@ const PHONE_WIDTH_FIXTURES: ProgressFixture[] = [
  */
 @Component({
   selector: 'lib-dev-transfer-fixtures',
-  imports: [TransferProgressComponent, ConfirmationDialogComponent, DevDropzoneFixtureComponent],
+  imports: [
+    TransferProgressComponent,
+    TransferTabsComponent,
+    ConfirmationDialogComponent,
+    DevDropzoneFixtureComponent,
+    DevTransfersCardFixtureComponent,
+  ],
   templateUrl: './dev-transfer-fixtures.component.html',
   styleUrl: './dev-transfer-fixtures.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -428,4 +466,7 @@ export class DevTransferFixturesComponent {
   readonly terminalStates = TERMINAL_STATES;
   readonly phoneWidthFixtures = PHONE_WIDTH_FIXTURES;
   readonly confirmCancelFixture = CONFIRM_CANCEL_FIXTURE;
+  readonly tabRowTabs = TAB_ROW_TABS;
+  readonly tabRowDeviceNames = TAB_ROW_DEVICE_NAMES;
+  readonly tabRowVm = baseVm();
 }

@@ -99,6 +99,8 @@ internal sealed class FileRandomOneShotCommand(
 
         var picked = await Player.PlayRandom();
 
+        ThrowWhenBusy();
+
         NoticeWhenIndexIncomplete();
 
         if (picked is null or { Status: LaunchStatus.NotFound }) throw new CliException(CliExitCode.NotFound, LaunchOutcome.NoFilesFoundMessage);

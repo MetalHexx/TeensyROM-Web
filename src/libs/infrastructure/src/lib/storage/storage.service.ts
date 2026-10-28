@@ -18,7 +18,7 @@ import {
 import { DomainMapper } from '../domain.mapper';
 import { Observable, map, catchError, from, switchMap, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
-import { extractProblemMessage } from '../error/api-error.utils';
+import { extractProblemMessage, failOnDeviceBusy } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class StorageService implements IStorageService {
@@ -130,11 +130,13 @@ export class StorageService implements IStorageService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`StorageService.${methodName} error:`, error);
-    return from(extractProblemMessage(error)).pipe(
-      switchMap((apiMessage) => {
-        this.alertService.error(apiMessage ?? friendlyMessage);
-        return throwError(() => error);
-      })
+    return failOnDeviceBusy(error, this.alertService, () =>
+      from(extractProblemMessage(error)).pipe(
+        switchMap((apiMessage) => {
+          this.alertService.error(apiMessage ?? friendlyMessage);
+          return throwError(() => error);
+        })
+      )
     );
   }
 }

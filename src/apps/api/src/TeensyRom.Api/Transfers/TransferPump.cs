@@ -256,6 +256,7 @@ namespace TeensyRom.Api.Transfers
                         Files = transfers,
                         DeviceId = firstEntry.Job.DeviceId,
                         CommunicationPort = firstEntry.Device.CommunicationPort,
+                        TransferJobId = firstEntry.Job.JobId,
                         OnFileCompleted = (outcome, _) => HandleOutcome(outcome, stagedByTransfer, pending),
                         ShouldSkip = transfer => IsJobInactive(stagedByTransfer, pending, transfer)
                     }, ct);
@@ -427,7 +428,8 @@ namespace TeensyRom.Api.Transfers
                 var result = await mediator.Send(new ResetCommand
                 {
                     DeviceId = job.DeviceId,
-                    CommunicationPort = device.CommunicationPort
+                    CommunicationPort = device.CommunicationPort,
+                    TransferJobId = job.JobId
                 }, ct);
 
                 if (!result.IsSuccess)

@@ -1,0 +1,24 @@
+<div class="transfer-tabs" role="tablist" aria-label="Transfers" data-testid="transfer-tabs">
+  @for (tab of tabs(); track tab.deviceId; let i = $index) {
+    <button
+      type="button"
+      role="tab"
+      class="transfer-tab"
+      data-testid="transfer-tab"
+      [id]="tabId(tab.deviceId)"
+      [class.selected]="tab.deviceId === selected()"
+      [attr.aria-selected]="tab.deviceId === selected()"
+      [attr.aria-controls]="panelId()"
+      [attr.tabindex]="tab.deviceId === selected() ? 0 : -1"
+      (click)="tabSelected.emit(tab.deviceId)"
+      (keydown)="onKeydown($event, i)"
+    >
+      <span class="tab-name">{{ nameOf(tab.deviceId) }}</span>
+      @if (tab.ended) {
+        <span class="tab-status tab-done" data-testid="transfer-tab-done">Done</span>
+      } @else {
+        <span class="tab-status" data-testid="transfer-tab-percent">{{ tab.percent }}%</span>
+      }
+    </button>
+  }
+</div>

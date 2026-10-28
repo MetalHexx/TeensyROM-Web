@@ -88,9 +88,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new FileTransferSettingsDto
             {
-                AutoLaunchOnCopyEnabled = entity.AutoLaunchOnCopyEnabled,
-                NavToDirOnLaunch = entity.NavToDirOnLaunch,
-                SyncFilesEnabled = entity.SyncFilesEnabled
+                AutoLaunchOnCopyEnabled = entity.AutoLaunchOnCopyEnabled
             };
         }
 

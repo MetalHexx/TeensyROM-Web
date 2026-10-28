@@ -7,7 +7,7 @@ using TeensyRom.Core.Music;
 
 namespace TeensyRom.Core.Storage
 {
-    public class StorageFactory(IMediator mediator, IGameMetadataService gameMetadata, ISidMetadataService sidMetadata, ILoggingService log, ISearchSettingsProvider searchSettings) : IStorageFactory
+    public class StorageFactory(IMediator mediator, IGameMetadataService gameMetadata, ISidMetadataService sidMetadata, ILoggingService log, ISearchSettingsProvider searchSettings, IDeviceTransferLease transferLease) : IStorageFactory
     {
         public IStorageService Create(CartStorage cartStorage, ICommunicationPort communicationPort)
         {
@@ -17,7 +17,7 @@ namespace TeensyRom.Core.Storage
                 BanSource = searchSettings.GetSearchSettings,
             };
             var storageCache = new SimpleStorageCache(cartStorage, settings);
-            var storageService = new StorageService(storageCache, settings, mediator, log, sidMetadata, gameMetadata, communicationPort);
+            var storageService = new StorageService(storageCache, settings, mediator, log, sidMetadata, gameMetadata, communicationPort, transferLease);
             return storageService;
         }
     }

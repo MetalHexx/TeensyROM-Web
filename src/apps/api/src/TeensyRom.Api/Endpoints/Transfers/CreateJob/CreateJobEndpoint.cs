@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
 {
-    public class CreateJobEndpoint(ITransferJobService jobs) : RadEndpoint<CreateJobRequest, CreateJobResponse>
+    public class CreateJobEndpoint(ITransferJobService jobs, IDeviceConnectionManager deviceManager) : RadEndpoint<CreateJobRequest, CreateJobResponse>
     {
         public override void Configure()
         {
@@ -22,6 +24,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                     "Starts a new file transfer job for a device's storage.\n\n" +
                     "- Acquires an exclusive lease on the device for the lifetime of the job - a device " +
                     "can only have one active transfer at a time.\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.\n" +
                     "- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file."
                 )
                 .WithTags("Transfers");
@@ -44,12 +47,11 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                         SendValidationError(result.Message!);
                         break;
                     default:
-                        SendProblem(TypedResults.Problem(
-                            title: "Device already has an active transfer.",
-                            statusCode: StatusCodes.Status409Conflict,
-                            detail: result.Message,
-                            extensions: new Dictionary<string, object?> { ["activeJobId"] = result.ActiveJobId }
-                        ));
+                        SendProblem(DeviceBusyProblem.Create(
+                            r.DeviceId,
+                            deviceManager.GetAvailableDevice(r.DeviceId)?.Cart.Name,
+                            result.ActiveJobId!,
+                            detail: result.Message));
                         break;
                 }
 

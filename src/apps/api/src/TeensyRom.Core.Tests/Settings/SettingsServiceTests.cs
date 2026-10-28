@@ -186,7 +186,7 @@ public class SettingsServiceTests : IDisposable
             },
             FileTransferSettings = new FileTransferSettings 
             { 
-                SyncFilesEnabled = true
+                AutoLaunchOnCopyEnabled = false
             },
             SearchSettings = new SearchSettings 
             { 
@@ -205,7 +205,7 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         actualSettings.PlayerSettings.RepeatModeOnStartup.Should().Be(expectedSettings.PlayerSettings.RepeatModeOnStartup);
-        actualSettings.FileTransferSettings.SyncFilesEnabled.Should().Be(expectedSettings.FileTransferSettings.SyncFilesEnabled);
+        actualSettings.FileTransferSettings.AutoLaunchOnCopyEnabled.Should().Be(expectedSettings.FileTransferSettings.AutoLaunchOnCopyEnabled);
         actualSettings.SearchSettings.BannedFiles.Should().BeEquivalentTo(expectedSettings.SearchSettings.BannedFiles);
         actualSettings.AppSettings.FirstTimeSetup.Should().Be(expectedSettings.AppSettings.FirstTimeSetup);
     }
@@ -233,7 +233,6 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         settings.FileTransferSettings.AutoLaunchOnCopyEnabled.Should().BeFalse();
-        settings.FileTransferSettings.SyncFilesEnabled.Should().BeTrue();
         settings.WatchFolders.Should().BeEmpty();
     }
 
@@ -1396,8 +1395,6 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         fileTransferSettings.AutoLaunchOnCopyEnabled.Should().BeTrue();
-        fileTransferSettings.NavToDirOnLaunch.Should().BeTrue();
-        fileTransferSettings.SyncFilesEnabled.Should().BeFalse();
     }
 
     [Fact]
@@ -1567,7 +1564,7 @@ public class SettingsServiceTests : IDisposable
         {
             FileTransferSettings = settings.FileTransferSettings with
             {
-                SyncFilesEnabled = !settings.FileTransferSettings.SyncFilesEnabled
+                AutoLaunchOnCopyEnabled = !settings.FileTransferSettings.AutoLaunchOnCopyEnabled
             }
         };
 

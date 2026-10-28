@@ -8,7 +8,8 @@ import {
   TransferJobSnapshot,
   TransferManifestEntry,
 } from '@teensyrom-nx/domain';
-import { TransferStore } from './transfer-store';
+import { DeviceTransferState, TransferStore } from './transfer-store';
+import { isTerminalJobState } from './transfer-helpers';
 import { DropScanner } from './drop-scanner';
 import { UploadPool } from './upload-pool';
 import { TransferHubListener } from './transfer-hub-listener';
@@ -41,10 +42,11 @@ function holdUntil(startedAt: number, minMs: number): Promise<void> {
 
 /**
  * Turns a drop into a completed transfer by sequencing its collaborators: `DropScanner` walks,
- * `TransferHubListener` folds the live job, `UploadPool` drives the HTTP uploads, and
+ * `TransferHubListener` holds this tab's own job subscriptions, `UploadPool` drives the HTTP uploads, and
  * `ITransferService` owns job lifecycle calls. This service does none of that work itself — it
  * only orders it and retains the scanned manifest so a device-busy conflict can be retried
- * without re-scanning.
+ * without re-scanning. It also steers the details dialog and cancels a transfer by whoever
+ * started it.
  */
 @Injectable({ providedIn: 'root' })
 export class TransferContextService implements ITransferContext {
@@ -62,6 +64,7 @@ export class TransferContextService implements ITransferContext {
     if (!destination) {
       logError(`TransferContextService: No destination selected for device ${deviceId}`);
       this.store.setTransferError({ deviceId, error: 'No destination selected for this device.' });
+      this.surfaceOutcome(deviceId);
       return;
     }
 
@@ -115,6 +118,7 @@ export class TransferContextService implements ITransferContext {
 
     if (scanResult.entries.length === 0) {
       logInfo(LogType.Finish, `TransferContextService: Nothing to transfer for device ${deviceId}`);
+      this.surfaceOutcome(deviceId);
       return;
     }
 
@@ -135,42 +139,129 @@ export class TransferContextService implements ITransferContext {
     await this.createAndRun(deviceId, pending);
   }
 
+  /**
+   * Cancels the transfer on a device. This tab's own scan, create or upload takes the local path
+   * (abort, then cancel the job); a transfer started elsewhere is cancelled by its job id. A
+   * retained record left over from an earlier own job never redirects the cancel to that job.
+   */
   async cancelTransfer(deviceId: string): Promise<void> {
     const pending = this.pending.get(deviceId);
+    const job = this.store.transfers()[deviceId]?.job ?? null;
 
-    if (!pending || pending.jobId === null) {
-      pending?.scanAbort.abort();
-      if (pending) {
-        pending.cancelled = true;
-      }
-      this.pending.delete(deviceId);
-      this.store.clearTransfer({ deviceId });
+    if (pending && pending.jobId === null) {
+      this.discardLocally(deviceId, pending);
       return;
     }
 
-    pending.cancelled = true;
-    pending.uploadAbort.abort();
-    try {
-      const snapshot = await this.transferService.cancelJob(pending.jobId);
-      this.store.applyJobSnapshot({ deviceId, snapshot });
-    } catch (error) {
-      logError(`TransferContextService: Failed to cancel job ${pending.jobId} for device ${deviceId}`, error);
-      this.store.setCancelError({
-        deviceId,
-        error: error instanceof Error ? error.message : 'Failed to cancel transfer.',
-      });
+    if (pending && pending.jobId === job?.jobId) {
+      await this.cancelOwnJob(deviceId, pending, pending.jobId);
+      return;
     }
+
+    if (job && !isTerminalJobState(job.state)) {
+      await this.cancelForeignJob(deviceId, job.jobId);
+      return;
+    }
+
+    this.discardLocally(deviceId, pending);
   }
 
   async closeTransfer(deviceId: string): Promise<void> {
-    await this.hubListener.stop();
+    await this.releaseOwnRecords(deviceId);
+    this.store.clearTransfer({ deviceId });
+  }
+
+  async releaseOwnRecords(deviceId: string): Promise<void> {
+    await this.hubListener.stop(deviceId);
+    this.pending.delete(deviceId);
+  }
+
+  async showDetails(deviceId: string): Promise<void> {
+    const shownDeviceId = this.store.detailsDeviceId();
+    if (shownDeviceId !== null && shownDeviceId !== deviceId) {
+      await this.closeShownIfEnded();
+    }
+    this.store.showTransferDetails({ deviceId });
+  }
+
+  /**
+   * Dropping an ended shown entry already settles where the details go, to another waiting own
+   * refusal or nowhere, so only a transfer that stays is hidden explicitly.
+   */
+  async hideDetails(): Promise<void> {
+    if (!(await this.closeShownIfEnded())) {
+      this.store.hideTransferDetails();
+    }
+  }
+
+  private discardLocally(deviceId: string, pending: PendingTransfer | undefined): void {
+    if (pending) {
+      pending.scanAbort.abort();
+      pending.cancelled = true;
+    }
     this.pending.delete(deviceId);
     this.store.clearTransfer({ deviceId });
   }
 
-  async refreshDeviceBusyState(deviceId: string): Promise<void> {
-    const job = await this.transferService.getActiveJob(deviceId);
-    this.store.setActiveForeignJob({ deviceId, activeForeignJobId: job?.jobId ?? null });
+  private async cancelOwnJob(
+    deviceId: string,
+    pending: PendingTransfer,
+    jobId: string
+  ): Promise<void> {
+    pending.cancelled = true;
+    pending.uploadAbort.abort();
+    try {
+      const snapshot = await this.transferService.cancelJob(jobId);
+      this.store.applyJobSnapshot({ deviceId, snapshot });
+    } catch (error) {
+      this.recordCancelFailure(deviceId, jobId, error);
+    }
+  }
+
+  private async cancelForeignJob(deviceId: string, jobId: string): Promise<void> {
+    try {
+      const snapshot = await this.transferService.cancelJob(jobId);
+      this.store.foldLiveSnapshot({ snapshot });
+    } catch (error) {
+      this.recordCancelFailure(deviceId, jobId, error);
+    }
+  }
+
+  private recordCancelFailure(deviceId: string, jobId: string, error: unknown): void {
+    logError(`TransferContextService: Failed to cancel job ${jobId} for device ${deviceId}`, error);
+    this.store.setCancelError({
+      deviceId,
+      error: error instanceof Error ? error.message : 'Failed to cancel transfer.',
+    });
+  }
+
+  /**
+   * Drops the shown entry once it has ended: an own one through `closeTransfer`, a foreign one
+   * directly. Reports whether it dropped one.
+   */
+  private async closeShownIfEnded(): Promise<boolean> {
+    const shownDeviceId = this.store.detailsDeviceId();
+    const entry = shownDeviceId === null ? undefined : this.store.transfers()[shownDeviceId];
+    if (!entry || !hasEnded(entry)) {
+      return false;
+    }
+
+    if (entry.startedHere) {
+      await this.closeTransfer(entry.deviceId);
+    } else {
+      this.store.clearTransfer({ deviceId: entry.deviceId });
+    }
+    return true;
+  }
+
+  /**
+   * Makes sure an own refusal or empty result is visible: with the dialog hidden it would have no
+   * tab to show it, and a refused device stays busy until it is dismissed.
+   */
+  private surfaceOutcome(deviceId: string): void {
+    if (this.store.detailsDeviceId() === null) {
+      this.store.showTransferDetails({ deviceId });
+    }
   }
 
   private async createAndRun(deviceId: string, pending: PendingTransfer): Promise<void> {
@@ -199,10 +290,12 @@ export class TransferContextService implements ITransferContext {
           activeForeignJobId: error.activeJobId,
           error: error.message,
         });
+        this.surfaceOutcome(deviceId);
         return;
       }
       if (error instanceof TransferCreateRejectedError) {
         this.store.setTransferError({ deviceId, error: error.message });
+        this.surfaceOutcome(deviceId);
         return;
       }
       throw error;
@@ -226,6 +319,9 @@ export class TransferContextService implements ITransferContext {
     }
 
     pending.jobId = snapshot.jobId;
+
+    // The entry only follows a job whose id it knows; until now `starting` ignored every push.
+    this.store.applyJobSnapshot({ deviceId, snapshot });
 
     // Subscribe before the first upload so the seed snapshot and group membership exist from the outset.
     await this.hubListener.start(deviceId, snapshot.jobId);
@@ -277,6 +373,16 @@ export class TransferContextService implements ITransferContext {
 
     return { storageType: selected.storageType, path: selected.path };
   }
+}
+
+/** A terminal job, a refusal or empty result, or a failed cancel whose job has since finished. */
+function hasEnded(entry: DeviceTransferState): boolean {
+  if (entry.job !== null && isTerminalJobState(entry.job.state)) {
+    return true;
+  }
+  return (
+    entry.phase === 'nothing-to-transfer' || entry.phase === 'failed' || entry.phase === 'device-busy'
+  );
 }
 
 function isDataTransferItemList(

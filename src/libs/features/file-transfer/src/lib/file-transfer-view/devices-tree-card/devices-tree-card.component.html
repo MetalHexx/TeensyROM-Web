@@ -1,0 +1,16 @@
+<lib-scaling-compact-card
+  cardClass="compact-card--fill"
+  animationEntry="from-left"
+  animationParent="auto"
+  data-testid="devices-tree-card"
+>
+  <div class="devices-tree-stack scroll-edge-end">
+    @for (device of devices(); track device.deviceId) {
+    <lib-directory-tree-container
+      [deviceId]="device.deviceId"
+      [showSelection]="device.deviceId === targetDeviceId()"
+      (nodeActivated)="onNodeActivated($event)"
+    />
+    }
+  </div>
+</lib-scaling-compact-card>

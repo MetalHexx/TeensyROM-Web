@@ -1,4 +1,71 @@
 import { ResponseError, ProblemDetails } from '@teensyrom-nx/data-access/api-client';
+import { Observable, from, switchMap, throwError } from 'rxjs';
+import { DEVICE_BUSY_PROBLEM_CODE, DeviceBusyError, IAlertService } from '@teensyrom-nx/domain';
+
+/** The engine's busy-with-a-transfer refusal, read from its 409 body. */
+export interface DeviceBusyProblem {
+  deviceId: string;
+  activeJobId: string | null;
+  title: string;
+}
+
+/**
+ * Recognizes the engine's busy-with-a-transfer refusal by its problem code, never by text.
+ *
+ * @param error - The error thrown by the API client
+ * @returns The busy problem, or null for any other error
+ */
+export async function readDeviceBusyProblem(error: unknown): Promise<DeviceBusyProblem | null> {
+  if (!(error instanceof ResponseError) || error.response?.status !== 409) {
+    return null;
+  }
+
+  try {
+    const body = (await error.response.clone().json()) as {
+      code?: unknown;
+      deviceId?: unknown;
+      activeJobId?: unknown;
+      title?: unknown;
+    } | null;
+    if (body?.code !== DEVICE_BUSY_PROBLEM_CODE) {
+      return null;
+    }
+    return {
+      deviceId: typeof body.deviceId === 'string' ? body.deviceId : '',
+      activeJobId: typeof body.activeJobId === 'string' ? body.activeJobId : null,
+      title:
+        typeof body.title === 'string' && body.title.trim()
+          ? body.title
+          : 'Device is busy with a transfer.',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Answers the engine's busy refusal: warns the user and fails with a {@link DeviceBusyError}. Any other
+ * error is handed to `otherwise`, which supplies the failure the caller wants.
+ *
+ * @param error - The error thrown by the API client
+ * @param alertService - Where the busy warning is shown
+ * @param otherwise - Builds the failure for an error that is not the busy refusal
+ */
+export function failOnDeviceBusy(
+  error: unknown,
+  alertService: IAlertService,
+  otherwise: () => Observable<never>
+): Observable<never> {
+  return from(readDeviceBusyProblem(error)).pipe(
+    switchMap((busy) => {
+      if (!busy) {
+        return otherwise();
+      }
+      alertService.warning(busy.title);
+      return throwError(() => new DeviceBusyError(busy.deviceId, busy.activeJobId, busy.title));
+    })
+  );
+}
 
 /**
  * The API's own message from a JSON response body. The API answers 502 with a ProblemDetails object (its

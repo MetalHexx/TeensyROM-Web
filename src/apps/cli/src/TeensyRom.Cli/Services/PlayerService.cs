@@ -281,31 +281,46 @@ namespace TeensyRom.Cli.Services
             }
         }
 
+        public TeensyApiException? LastBusyRefusal { get; private set; }
+
+        public bool AnnounceBusyRefusals { get; set; } = true;
+
         private async Task Guarded(Func<Task> operation)
         {
+            LastBusyRefusal = null;
+
             try
             {
                 await operation();
             }
             catch (TeensyApiException ex)
             {
-                _alert.PublishError(ex.Message);
-                StopStream();
+                Refused(ex);
             }
         }
 
         private async Task<T?> Guarded<T>(Func<Task<T>> operation)
         {
+            LastBusyRefusal = null;
+
             try
             {
                 return await operation();
             }
             catch (TeensyApiException ex)
             {
-                _alert.PublishError(ex.Message);
-                StopStream();
+                Refused(ex);
                 return default;
             }
+        }
+
+        private void Refused(TeensyApiException ex)
+        {
+            if (ex.IsDeviceBusy) LastBusyRefusal = ex;
+
+            if (!ex.IsDeviceBusy || AnnounceBusyRefusals) _alert.PublishError(ex.Message);
+
+            StopStream();
         }
 
         public Task<LaunchOutcome?> PlayRandom() => Guarded(async () =>

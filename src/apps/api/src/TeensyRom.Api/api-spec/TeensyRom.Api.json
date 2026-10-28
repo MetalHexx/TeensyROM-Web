@@ -595,7 +595,7 @@
           "Transfers"
         ],
         "summary": "Create Transfer Job",
-        "description": "Starts a new file transfer job for a device's storage.\n\n- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.\n- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.",
+        "description": "Starts a new file transfer job for a device's storage.\n\n- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.\n- Issues no device traffic - the device reset, when the device isn't idle, happens on the first uploaded file.",
         "operationId": "CreateTransferJob",
         "parameters": [
           {
@@ -727,7 +727,7 @@
           "Settings"
         ],
         "summary": "Save User Settings",
-        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n  - Auto-launch, navigate-on-launch, and sync flags\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
+        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-launch configuration\n  - Auto-launch flag\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
         "operationId": "SaveSettings",
         "requestBody": {
           "content": {
@@ -777,7 +777,7 @@
           "Settings"
         ],
         "summary": "Get User Settings",
-        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-launch and synchronization configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
+        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-launch configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
         "operationId": "GetSettings",
         "responses": {
           "200": {
@@ -809,7 +809,7 @@
           "Devices"
         ],
         "summary": "Reset Device",
-        "description": "Resets a TeensyROM device.\n\n- Works the same as clicking the cartridge reset button.",
+        "description": "Resets a TeensyROM device.\n\n- Works the same as clicking the cartridge reset button.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "ResetDevice",
         "parameters": [
           {
@@ -844,6 +844,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -995,7 +1005,7 @@
           "Devices"
         ],
         "summary": "Ping Device",
-        "description": "Pings a TeensyROM device to check if it is responsive.\n\n- Works the same as clicking the cartridge reset button.",
+        "description": "Pings a TeensyROM device to check if it is responsive.\n\n- Works the same as clicking the cartridge reset button.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "PingDevice",
         "parameters": [
           {
@@ -1030,6 +1040,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1119,7 +1139,7 @@
           "Devices"
         ],
         "summary": "Find Devices",
-        "description": "Returns all available and connected TeensyROM devices, followed by every known offline unit.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.\n- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.\n- Offline units are listed after the online ones, with deviceState ConnectionLost.",
+        "description": "Returns all available and connected TeensyROM devices, followed by every known offline unit.\n\n- By default (fullScan=false), returns the devices already listed by the manager - no device is contacted.\n- Set fullScan=true to run a full discovery sweep: every COM port and the local subnet are scanned, and every currently connected device is momentarily disconnected while the sweep runs.\n- Only full scans are rate limited, to one per 5 seconds; a request over the limit is answered 503. A plain listing is never limited.\n- Offline units are listed after the online ones, with deviceState ConnectionLost.\n- A device busy with a transfer shows its job in activeTransferJobId; a full scan skips it.",
         "operationId": "FindDevices",
         "parameters": [
           {
@@ -1171,7 +1191,7 @@
           "Player"
         ],
         "summary": "Toggle Music Playback",
-        "description": "Toggles the play/pause state of the currently playing music on the TeensyRom device.",
+        "description": "Toggles the play/pause state of the currently playing music on the TeensyRom device.\n\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "ToggleMusic",
         "parameters": [
           {
@@ -1214,6 +1234,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Bad Gateway",
             "content": {
@@ -1233,7 +1263,7 @@
           "Player"
         ],
         "summary": "Launch Random File",
-        "description": "Launches a random file given a device, storage, filter and starting directory location.\n\n- Starting Directory: Starting directory to look for a random file.\n- Scope: `Storage` - Selects a random file anywhere on the specified storage device.\n- Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories.\n- Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included).\n- Filter: `All` - Any file type will be randomly selected.\n- Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games.\n- Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc).\n- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)",
+        "description": "Launches a random file given a device, storage, filter and starting directory location.\n\n- Starting Directory: Starting directory to look for a random file.\n- Scope: `Storage` - Selects a random file anywhere on the specified storage device.\n- Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories.\n- Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included).\n- Filter: `All` - Any file type will be randomly selected.\n- Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games.\n- Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc).\n- Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "LaunchRandom",
         "parameters": [
           {
@@ -1310,6 +1340,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Bad Gateway",
             "content": {
@@ -1329,7 +1369,7 @@
           "Player"
         ],
         "summary": "Launch File",
-        "description": "Launches a file given a valid path to a file stored on the TeensyRom.",
+        "description": "Launches a file given a valid path to a file stored on the TeensyRom.\n\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "LaunchFile",
         "parameters": [
           {
@@ -1384,6 +1424,16 @@
               "application/json": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1634,7 +1684,7 @@
           "Files"
         ],
         "summary": "Index",
-        "description": "Indexes the directory structure of a given TeensyROM device and storage type.\n\n- Providing a path will index starting at that directory and all subdirectories below it.\n- Providing no path will index the whole storage device.\n- Don't touch your commodore while indexing is in progress.",
+        "description": "Indexes the directory structure of a given TeensyROM device and storage type.\n\n- Providing a path will index starting at that directory and all subdirectories below it.\n- Providing no path will index the whole storage device.\n- Don't touch your commodore while indexing is in progress.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "Index",
         "parameters": [
           {
@@ -1681,6 +1731,36 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1691,7 +1771,7 @@
           "Files"
         ],
         "summary": "Index All",
-        "description": "Indexes all storage for all connected TeensyROM devices.\n\n- This will recursively index all storage devices.\n- Multiple devices will be indexed in parallel, one device type at a time.\n- This could take a few minutes if you have a lot of data.\n- Don't touch your commodores while indexing is in progress.",
+        "description": "Indexes all storage for all connected TeensyROM devices.\n\n- This will recursively index all storage devices.\n- Multiple devices will be indexed in parallel, one device type at a time.\n- This could take a few minutes if you have a lot of data.\n- Don't touch your commodores while indexing is in progress.\n- A device busy with a transfer is skipped and the other devices are still indexed; its id is listed in busyDeviceIds.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "IndexAll",
         "responses": {
           "200": {
@@ -1713,6 +1793,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1723,7 +1823,7 @@
           "Files"
         ],
         "summary": "Get File Content",
-        "description": "Returns a file's raw bytes (application/octet-stream) from a device's storage.\n\n- Byte-identical to the file on the cartridge.\n- Refused with 413 above 10 MB.\n- The path must be a Unix-style file path with no '..' segment.",
+        "description": "Returns a file's raw bytes (application/octet-stream) from a device's storage.\n\n- Byte-identical to the file on the cartridge.\n- Refused with 413 above 10 MB.\n- The path must be a Unix-style file path with no '..' segment.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "GetFileContent",
         "parameters": [
           {
@@ -1781,6 +1881,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Payload Too Large",
             "content": {
@@ -1820,7 +1930,7 @@
           "Files"
         ],
         "summary": "Get Directory",
-        "description": "Gets a directory for given storage device.\n\n- Returns metadata for all files in the directory.\n- This is not recursive and will only include the files for the requested directory.\n- Make another request to get subdirectory content.",
+        "description": "Gets a directory for given storage device.\n\n- Returns metadata for all files in the directory.\n- This is not recursive and will only include the files for the requested directory.\n- Make another request to get subdirectory content.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "GetDirectory",
         "parameters": [
           {
@@ -1878,6 +1988,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Bad Gateway",
             "content": {
@@ -1897,7 +2017,7 @@
           "Files"
         ],
         "summary": "Save Favorite",
-        "description": "Saves a file as a favorite, creating a copy in the appropriate favorites directory.",
+        "description": "Saves a file as a favorite, creating a copy in the appropriate favorites directory.\n\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "SaveFavorite",
         "parameters": [
           {
@@ -1956,6 +2076,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Bad Gateway",
             "content": {
@@ -1973,7 +2103,7 @@
           "Files"
         ],
         "summary": "Remove Favorite",
-        "description": "Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.",
+        "description": "Removes a file from favorites, deleting the favorite copy and updating the original file's favorite status.\n\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "RemoveFavorite",
         "parameters": [
           {
@@ -2032,6 +2162,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Bad Gateway",
             "content": {
@@ -2051,7 +2191,7 @@
           "Files"
         ],
         "summary": "Ban File",
-        "description": "Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.",
+        "description": "Adds a file's name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.\n\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
         "operationId": "BanFile",
         "parameters": [
           {
@@ -2102,6 +2242,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2836,6 +2986,10 @@
           },
           "usbStorage": {
             "$ref": "#/components/schemas/CartStorageDto"
+          },
+          "activeTransferJobId": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -3520,19 +3674,11 @@
       },
       "FileTransferSettingsDto": {
         "required": [
-          "autoLaunchOnCopyEnabled",
-          "navToDirOnLaunch",
-          "syncFilesEnabled"
+          "autoLaunchOnCopyEnabled"
         ],
         "type": "object",
         "properties": {
           "autoLaunchOnCopyEnabled": {
-            "type": "boolean"
-          },
-          "navToDirOnLaunch": {
-            "type": "boolean"
-          },
-          "syncFilesEnabled": {
             "type": "boolean"
           }
         }

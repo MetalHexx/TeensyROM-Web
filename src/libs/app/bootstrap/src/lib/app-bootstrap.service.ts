@@ -6,7 +6,7 @@ import {
   Injector,
   untracked,
 } from '@angular/core';
-import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
+import { DeviceStore, SettingsStore, TransferTracker } from '@teensyrom-nx/application';
 import {
   ALERT_SERVICE,
   DEVICE_LOGS_SERVICE,
@@ -26,6 +26,7 @@ export class AppBootstrapService {
   private readonly alertService: IAlertService = inject(ALERT_SERVICE);
   private readonly audioBootstrapService = inject(AudioBootstrapService);
   private readonly djBootstrapService = inject(DjBootstrapService);
+  private readonly transferTracker = inject(TransferTracker);
 
   async init(): Promise<void> {
     logInfo(LogType.Start, 'AppBootstrap: Application bootstrap started');
@@ -49,6 +50,14 @@ export class AppBootstrapService {
         });
       });
       this.deviceLogsService.connect();
+      // Non-critical: a missing engine must not hold up the app, and the tracker retries on its own.
+      void this.transferTracker
+        .start()
+        .catch((error) =>
+          logWarn(
+            `AppBootstrap: Transfer tracking failed to start - ${error instanceof Error ? error.message : String(error)}`
+          )
+        );
       // Quick scan on bootstrap - don't do full network scan
       this.deviceStore.findDevices(false);
       this.audioBootstrapService.init();

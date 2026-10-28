@@ -39,9 +39,7 @@ namespace TeensyRom.Api.Tests.Integration
                 },
                 FileTransferSettings = new FileTransferSettingsDto
                 {
-                    AutoLaunchOnCopyEnabled = true,
-                    NavToDirOnLaunch = true,
-                    SyncFilesEnabled = false
+                    AutoLaunchOnCopyEnabled = true
                 },
                 SearchSettings = new SearchSettingsDto
                 {

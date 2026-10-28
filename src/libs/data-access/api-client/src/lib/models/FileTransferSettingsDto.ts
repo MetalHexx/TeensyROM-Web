@@ -25,18 +25,6 @@ export interface FileTransferSettingsDto {
      * @memberof FileTransferSettingsDto
      */
     autoLaunchOnCopyEnabled: boolean;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof FileTransferSettingsDto
-     */
-    navToDirOnLaunch: boolean;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof FileTransferSettingsDto
-     */
-    syncFilesEnabled: boolean;
 }
 
 /**
@@ -44,8 +32,6 @@ export interface FileTransferSettingsDto {
  */
 export function instanceOfFileTransferSettingsDto(value: object): value is FileTransferSettingsDto {
     if (!('autoLaunchOnCopyEnabled' in value) || value['autoLaunchOnCopyEnabled'] === undefined) return false;
-    if (!('navToDirOnLaunch' in value) || value['navToDirOnLaunch'] === undefined) return false;
-    if (!('syncFilesEnabled' in value) || value['syncFilesEnabled'] === undefined) return false;
     return true;
 }
 
@@ -60,8 +46,6 @@ export function FileTransferSettingsDtoFromJSONTyped(json: any, ignoreDiscrimina
     return {
         
         'autoLaunchOnCopyEnabled': json['autoLaunchOnCopyEnabled'],
-        'navToDirOnLaunch': json['navToDirOnLaunch'],
-        'syncFilesEnabled': json['syncFilesEnabled'],
     };
 }
 
@@ -77,8 +61,6 @@ export function FileTransferSettingsDtoToJSONTyped(value?: FileTransferSettingsD
     return {
         
         'autoLaunchOnCopyEnabled': value['autoLaunchOnCopyEnabled'],
-        'navToDirOnLaunch': value['navToDirOnLaunch'],
-        'syncFilesEnabled': value['syncFilesEnabled'],
     };
 }
 

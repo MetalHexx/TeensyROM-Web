@@ -1,11 +1,20 @@
-<lib-sliding-container animationDirection="from-top" [animationTrigger]="true">
-  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
+<lib-sliding-container
+  animationDirection="from-top"
+  containerHeight="100%"
+  [animationTrigger]="true"
+>
+  <lib-scaling-compact-card
+    animationEntry="from-top"
+    animationParent="auto"
+    cardClass="glassy-card compact-card--fill"
+  >
     <div
       class="dropzone-card"
       data-testid="dropzone-card"
       [class.state-idle]="cardState() === 'idle'"
       [class.state-drag-over]="cardState() === 'drag-over'"
       [class.state-device-busy]="cardState() === 'device-busy'"
+      [class.state-no-destination]="cardState() === 'no-destination'"
       (dragenter)="onDragEnter($event)"
       (dragover)="onDragOver($event)"
       (dragleave)="onDragLeave($event)"
@@ -20,9 +29,29 @@
         data-testid="dropzone-message"
       ></lib-empty-state-message>
 
+      @if (cardState() === 'no-destination') {
+      <p class="no-destination-prompt" data-testid="dropzone-no-destination-prompt">
+        Select a folder in a device tree to choose where files go
+      </p>
+      }
+
       <div class="picker-actions">
-        <lib-action-button icon="upload_file" label="Choose Files…"   [fullWidth]="false" data-testid="dropzone-choose-files"  [disabled]="cardState() === 'device-busy'" (buttonClick)="fileInput.click()" />
-        <lib-action-button icon="folder_open" label="Choose Folder…" [fullWidth]="false" data-testid="dropzone-choose-folder" [disabled]="cardState() === 'device-busy'" (buttonClick)="folderInput.click()" />
+        <lib-action-button
+          icon="upload_file"
+          label="Choose Files…"
+          [fullWidth]="false"
+          data-testid="dropzone-choose-files"
+          [disabled]="isInert()"
+          (buttonClick)="fileInput.click()"
+        />
+        <lib-action-button
+          icon="folder_open"
+          label="Choose Folder…"
+          [fullWidth]="false"
+          data-testid="dropzone-choose-folder"
+          [disabled]="isInert()"
+          (buttonClick)="folderInput.click()"
+        />
       </div>
 
       <input

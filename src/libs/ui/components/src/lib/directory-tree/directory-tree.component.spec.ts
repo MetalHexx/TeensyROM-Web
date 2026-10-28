@@ -74,6 +74,22 @@ describe('DirectoryTreeComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('Card wrapper', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+
+    it('wraps the tree in its own card by default', () => {
+      expect(host().querySelector('lib-scaling-card mat-tree')).not.toBeNull();
+    });
+
+    it('renders the tree without a card of its own when flat', () => {
+      componentRef.setInput('flat', true);
+      fixture.detectChanges();
+
+      expect(host().querySelector('lib-scaling-card')).toBeNull();
+      expect(host().querySelector('mat-tree')).not.toBeNull();
+    });
+  });
+
   describe('Placeholder identification', () => {
     it('should identify placeholder nodes', () => {
       const placeholder: DirectoryTreeNode = {

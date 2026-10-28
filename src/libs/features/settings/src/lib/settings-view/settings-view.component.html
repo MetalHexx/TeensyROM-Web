@@ -27,13 +27,6 @@
           [color]="activeSection() === 'devices' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('devices')" />
         <lib-action-button
-          icon="folder"
-          label="File Transfer"
-          ariaLabel="Navigate to file transfer settings"
-          [tooltip]="fileTransferNavigateTooltip"
-          [color]="activeSection() === 'fileTransfer' ? 'highlight' : 'normal'"
-          (buttonClick)="setActiveSection('fileTransfer')" />
-        <lib-action-button
           icon="search"
           label="Search"
           ariaLabel="Navigate to search settings"
@@ -57,10 +50,6 @@
           [devices]="devices()"
           [createDefaultGroup]="createDefaultDeviceGroup"
           [animationTrigger]="activeSection() === 'devices'" />
-
-        <lib-file-transfer-settings-section
-          [formGroup]="getFileTransferSettings()"
-          [animationTrigger]="activeSection() === 'fileTransfer'" />
 
         <lib-search-settings-section
           [formGroup]="getSearchSettings()"

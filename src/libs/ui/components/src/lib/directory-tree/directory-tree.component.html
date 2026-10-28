@@ -1,83 +1,91 @@
-<div class="directory-tree">
+<div class="directory-tree" [class.directory-tree--flat]="flat()">
+  @if (flat()) {
+  <ng-container *ngTemplateOutlet="treeBody" />
+  } @else {
   <lib-scaling-card>
-    <mat-tree
-      #tree
-      [dataSource]="nodes()"
-      [childrenAccessor]="childrenAccessor"
-      [trackBy]="trackByFn"
-      [expansionKey]="expansionKeyFn"
-    >
-      <!-- Placeholder nodes -->
-      <mat-tree-node *matTreeNodeDef="let node; when: isPlaceholder" matTreeNodePadding>
-        <button mat-icon-button disabled>
-          <mat-icon>{{ node.icon }}</mat-icon>
-        </button>
-        <span class="placeholder-text">{{ node.name }}</span>
-      </mat-tree-node>
-
-      <!-- Leaf nodes without children -->
-      <mat-tree-node
-        *matTreeNodeDef="let node"
-        matTreeNodePadding
-        tabindex="0"
-        role="treeitem"
-        [attr.aria-label]="node.name"
-        [attr.aria-pressed]="isNodeSelected(node)"
-        (click)="onDirectoryClick(node)"
-        (keydown)="onNodeKeyDown($event, node)"
-      >
-        <div class="tree-node-spacer" aria-hidden="true"></div>
-        <lib-directory-tree-node
-          [icon]="node.icon"
-          [text]="node.name"
-          [isSelected]="isNodeSelected(node)"
-          [nodeType]="node.type"
-        ></lib-directory-tree-node>
-        @if (node.isLoading) {
-        <mat-icon class="loading-icon">hourglass_empty</mat-icon>
-        } @if (node.error) {
-        <mat-icon class="error-icon" color="warn">error</mat-icon>
-        }
-      </mat-tree-node>
-      <!-- Expandable nodes with children -->
-      <mat-tree-node
-        *matTreeNodeDef="let node; when: hasChild"
-        matTreeNodePadding
-        matTreeNodeToggle
-        [cdkTreeNodeTypeaheadLabel]="node.name"
-        tabindex="0"
-        role="treeitem"
-        [attr.aria-label]="node.name"
-        [attr.aria-pressed]="isNodeSelected(node)"
-        (click)="onDirectoryClick(node)"
-        (keydown)="onNodeKeyDown($event, node)"
-      >
-        @if (shouldShowExpansionButton(node)) {
-        <button
-          mat-icon-button
-          matTreeNodeToggle
-          [attr.aria-label]="'Toggle ' + node.name"
-          (click)="onToggleClick(node)"
-        >
-          <mat-icon class="mat-icon-rtl-mirror">
-            {{ tree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-          </mat-icon>
-        </button>
-        } @else {
-        <div class="tree-node-spacer" aria-hidden="true"></div>
-        }
-        <lib-directory-tree-node
-          [icon]="node.icon"
-          [text]="node.name"
-          [isSelected]="isNodeSelected(node)"
-          [nodeType]="node.type"
-        ></lib-directory-tree-node>
-        @if (node.isLoading) {
-        <mat-icon class="loading-icon">hourglass_empty</mat-icon>
-        } @if (node.error) {
-        <mat-icon class="error-icon" color="warn">error</mat-icon>
-        }
-      </mat-tree-node>
-    </mat-tree>
+    <ng-container *ngTemplateOutlet="treeBody" />
   </lib-scaling-card>
+  }
 </div>
+
+<ng-template #treeBody>
+  <mat-tree
+    #tree
+    [dataSource]="nodes()"
+    [childrenAccessor]="childrenAccessor"
+    [trackBy]="trackByFn"
+    [expansionKey]="expansionKeyFn"
+  >
+    <!-- Placeholder nodes -->
+    <mat-tree-node *matTreeNodeDef="let node; when: isPlaceholder" matTreeNodePadding>
+      <button mat-icon-button disabled>
+        <mat-icon>{{ node.icon }}</mat-icon>
+      </button>
+      <span class="placeholder-text">{{ node.name }}</span>
+    </mat-tree-node>
+
+    <!-- Leaf nodes without children -->
+    <mat-tree-node
+      *matTreeNodeDef="let node"
+      matTreeNodePadding
+      tabindex="0"
+      role="treeitem"
+      [attr.aria-label]="node.name"
+      [attr.aria-pressed]="isNodeSelected(node)"
+      (click)="onDirectoryClick(node)"
+      (keydown)="onNodeKeyDown($event, node)"
+    >
+      <div class="tree-node-spacer" aria-hidden="true"></div>
+      <lib-directory-tree-node
+        [icon]="node.icon"
+        [text]="node.name"
+        [isSelected]="isNodeSelected(node)"
+        [nodeType]="node.type"
+      ></lib-directory-tree-node>
+      @if (node.isLoading) {
+      <mat-icon class="loading-icon">hourglass_empty</mat-icon>
+      } @if (node.error) {
+      <mat-icon class="error-icon" color="warn">error</mat-icon>
+      }
+    </mat-tree-node>
+    <!-- Expandable nodes with children -->
+    <mat-tree-node
+      *matTreeNodeDef="let node; when: hasChild"
+      matTreeNodePadding
+      matTreeNodeToggle
+      [cdkTreeNodeTypeaheadLabel]="node.name"
+      tabindex="0"
+      role="treeitem"
+      [attr.aria-label]="node.name"
+      [attr.aria-pressed]="isNodeSelected(node)"
+      (click)="onDirectoryClick(node)"
+      (keydown)="onNodeKeyDown($event, node)"
+    >
+      @if (shouldShowExpansionButton(node)) {
+      <button
+        mat-icon-button
+        matTreeNodeToggle
+        [attr.aria-label]="'Toggle ' + node.name"
+        (click)="onToggleClick(node)"
+      >
+        <mat-icon class="mat-icon-rtl-mirror">
+          {{ tree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+        </mat-icon>
+      </button>
+      } @else {
+      <div class="tree-node-spacer" aria-hidden="true"></div>
+      }
+      <lib-directory-tree-node
+        [icon]="node.icon"
+        [text]="node.name"
+        [isSelected]="isNodeSelected(node)"
+        [nodeType]="node.type"
+      ></lib-directory-tree-node>
+      @if (node.isLoading) {
+      <mat-icon class="loading-icon">hourglass_empty</mat-icon>
+      } @if (node.error) {
+      <mat-icon class="error-icon" color="warn">error</mat-icon>
+      }
+    </mat-tree-node>
+  </mat-tree>
+</ng-template>

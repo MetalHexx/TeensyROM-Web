@@ -6,6 +6,8 @@ import {
   TransferFileCompletion,
   TransferJobState,
   StorageType,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/domain';
 import { TransferStore, TransferModalState } from './transfer-store';
 import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP } from './transfer.constants';
@@ -28,9 +30,12 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   filesReceived: 0,
   filesSent: 0,
   filesFailed: 0,
+  bytesSent: 0,
   totalFiles: null,
   currentFile: null,
+  origin: { kind: TransferOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
   startedUtc: new Date('2026-01-01T00:00:00Z'),
+  lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
   error: null,
   failures: [],
   recentCompletions: [],
@@ -40,6 +45,9 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   expansionBytesWritten: 0,
   expansionBytesDeclared: 0,
   expandedFileCount: 0,
+  launchState: TransferLaunchState.None,
+  launchedPath: null,
+  launchError: null,
   ...overrides,
 });
 
@@ -497,6 +505,7 @@ describe('TransferStore', () => {
       store.recordUploadFailure({ deviceId, relativePath: 'x.sid', reason: 'timeout' });
 
       expect(store.getTransferMetrics(deviceId)()).toEqual({
+        total: 0,
         uploaded: 0,
         written: 0,
         failed: 1,
@@ -620,7 +629,8 @@ describe('TransferStore', () => {
       expect(store.getTransferMetrics(deviceId)().devicePct).not.toBe(100);
     });
 
-    it('yields 0 for both percentages when scanTotal is still 0', () => {
+    it('yields 0 for both percentages when this tab own scanTotal is still 0', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
       store.applyJobSnapshot({
         deviceId,
         snapshot: createSnapshot({
@@ -890,6 +900,390 @@ describe('TransferStore', () => {
       store.setDeviceBusy({ deviceId, activeForeignJobId: 'foreign-job', error: 'busy' });
       expect(store.isDeviceBusy(deviceId)()).toBe(true);
     });
+
+    it('is true while this tab is scanning or creating', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      expect(store.isDeviceBusy(deviceId)()).toBe(true);
+
+      store.completeScan({ deviceId, scanTotal: 2 });
+      store.beginJob({ deviceId });
+      expect(store.isDeviceBusy(deviceId)()).toBe(true);
+    });
+
+    it('is true for a transfer started elsewhere, until its end push lands', () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot() });
+      expect(store.isDeviceBusy(deviceId)()).toBe(true);
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ state: TransferJobState.Completed }) });
+      expect(store.isDeviceBusy(deviceId)()).toBe(false);
+    });
+
+    it('stays true for this tab own job while the dialog is hidden, and ends with the job', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+      store.hideTransferDetails();
+      expect(store.isDeviceBusy(deviceId)()).toBe(true);
+
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ state: TransferJobState.Completed }) });
+      expect(store.isDeviceBusy(deviceId)()).toBe(false);
+    });
+
+    it('is false for an idle entry or a refusal that is not a conflict', () => {
+      store.setTransferError({ deviceId, error: 'nope' });
+      expect(store.isDeviceBusy(deviceId)()).toBe(false);
+    });
+  });
+
+  describe('foldLiveSnapshot', () => {
+    const startOwnCreate = (id = deviceId) => {
+      store.beginScan({ deviceId: id, droppedRootName: 'games', destinationLabel: '/games' });
+      store.completeScan({ deviceId: id, scanTotal: 4 });
+      store.beginJob({ deviceId: id });
+    };
+
+    it('starts a foreign entry for a snapshot on an untracked device, without opening the details', () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ filesSent: 2 }) });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.startedHere).toBe(false);
+      expect(entry.phase).toBe('running');
+      expect(entry.job?.filesSent).toBe(2);
+      expect(store.detailsDeviceId()).toBeNull();
+    });
+
+    it('ignores every snapshot while this tab create is still in flight', () => {
+      startOwnCreate();
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ filesSent: 2 }) });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.phase).toBe('starting');
+      expect(entry.job).toBeNull();
+      expect(entry.startedHere).toBe(true);
+    });
+
+    it('follows its own job to the end once the create response has been applied', () => {
+      startOwnCreate();
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ state: TransferJobState.Created }) });
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ filesSent: 3 }) });
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ filesSent: 4, state: TransferJobState.Completed }),
+      });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.job?.state).toBe(TransferJobState.Completed);
+      expect(entry.job?.filesSent).toBe(4);
+      expect(entry.startedHere).toBe(true);
+      expect(entry.scanTotal).toBe(4);
+    });
+
+    it('keeps a cancel-failed entry following its job', () => {
+      startOwnCreate();
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+      store.setCancelError({ deviceId, error: 'unreachable' });
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+
+      expect(store.transfers()[deviceId].job?.state).toBe(TransferJobState.Cancelled);
+    });
+
+    it('never lets another job displace this tab own job that is still under way', () => {
+      startOwnCreate();
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ jobId: 'mine' }) });
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ jobId: 'other' }) });
+
+      expect(store.transfers()[deviceId].job?.jobId).toBe('mine');
+    });
+
+    it('only records a foreign job on this tab own refusal, leaving the refusal itself alone', () => {
+      startOwnCreate();
+      store.setDeviceBusy({ deviceId, activeForeignJobId: null, error: 'busy' });
+      store.showTransferDetails({ deviceId });
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ jobId: 'foreign' }) });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.phase).toBe('device-busy');
+      expect(entry.error).toBe('busy');
+      expect(entry.job).toBeNull();
+      expect(entry.activeForeignJobId).toBe('foreign');
+    });
+
+    it('records a foreign job while this tab is still scanning', () => {
+      store.beginScan({ deviceId, droppedRootName: 'games', destinationLabel: '/games' });
+
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ jobId: 'foreign' }) });
+
+      expect(store.transfers()[deviceId].phase).toBe('scanning');
+      expect(store.transfers()[deviceId].activeForeignJobId).toBe('foreign');
+    });
+
+    it('clears the foreign id when that job ends, but not on a late end push of an older job', () => {
+      startOwnCreate();
+      store.setDeviceBusy({ deviceId, activeForeignJobId: 'newer', error: 'busy' });
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'older', state: TransferJobState.Completed }),
+      });
+      expect(store.transfers()[deviceId].activeForeignJobId).toBe('newer');
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'newer', state: TransferJobState.Completed }),
+      });
+      expect(store.transfers()[deviceId].activeForeignJobId).toBeNull();
+      expect(store.transfers()[deviceId].phase).toBe('device-busy');
+    });
+
+    it('replaces an ended foreign entry with a newer job, even while the dialog shows it', () => {
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          jobId: 'old',
+          state: TransferJobState.Completed,
+          recentCompletions: [createCompletion({ jobId: 'old' })],
+        }),
+      });
+      store.showTransferDetails({ deviceId });
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'new', startedUtc: new Date('2026-01-01T00:05:00Z') }),
+      });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.job?.jobId).toBe('new');
+      expect(entry.feed).toEqual([]);
+      expect(store.detailsDeviceId()).toBe(deviceId);
+    });
+
+    it('replaces this tab own ended entry with a newer foreign job', () => {
+      startOwnCreate();
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ jobId: 'mine', state: TransferJobState.Completed }),
+      });
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'theirs', startedUtc: new Date('2026-01-01T00:05:00Z') }),
+      });
+
+      const entry = store.transfers()[deviceId];
+      expect(entry.job?.jobId).toBe('theirs');
+      expect(entry.startedHere).toBe(false);
+      expect(entry.scanTotal).toBe(0);
+    });
+
+    it('ignores a late push of a job older than the one the entry holds', () => {
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'new', startedUtc: new Date('2026-01-01T00:05:00Z') }),
+      });
+
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'old', state: TransferJobState.Completed }),
+      });
+
+      expect(store.transfers()[deviceId].job?.jobId).toBe('new');
+    });
+
+    it('applying the same snapshot twice adds nothing to the feed', () => {
+      const snapshot = createSnapshot({ recentCompletions: [createCompletion()] });
+
+      store.foldLiveSnapshot({ snapshot });
+      store.foldLiveSnapshot({ snapshot });
+
+      expect(store.transfers()[deviceId].feed).toHaveLength(1);
+    });
+  });
+
+  describe('transfer details', () => {
+    it('beginScan opens the details for its device', () => {
+      store.beginScan({ deviceId, droppedRootName: 'games', destinationLabel: '/games' });
+
+      expect(store.getDetailsDeviceId()()).toBe(deviceId);
+      expect(store.transfers()[deviceId].startedHere).toBe(true);
+    });
+
+    it('shows and hides the details for a device', () => {
+      store.showTransferDetails({ deviceId: 'device-2' });
+      expect(store.getDetailsDeviceId()()).toBe('device-2');
+
+      store.hideTransferDetails();
+      expect(store.getDetailsDeviceId()()).toBeNull();
+    });
+
+    it('clearing the shown device closes the details', () => {
+      store.beginScan({ deviceId, droppedRootName: 'games', destinationLabel: '/games' });
+
+      store.clearTransfer({ deviceId });
+
+      expect(store.getDetailsDeviceId()()).toBeNull();
+    });
+
+    it('clearing another device leaves the details where they are', () => {
+      store.beginScan({ deviceId, droppedRootName: 'games', destinationLabel: '/games' });
+
+      store.clearTransfer({ deviceId: 'device-2' });
+
+      expect(store.getDetailsDeviceId()()).toBe(deviceId);
+    });
+
+    it('moves the details to another own refusal when the shown one is cleared or hidden', () => {
+      store.beginScan({ deviceId: 'device-2', droppedRootName: 'a', destinationLabel: '/a' });
+      store.setDeviceBusy({ deviceId: 'device-2', activeForeignJobId: 'x', error: 'busy' });
+      store.beginScan({ deviceId, droppedRootName: 'b', destinationLabel: '/b' });
+      expect(store.getDetailsDeviceId()()).toBe(deviceId);
+
+      store.clearTransfer({ deviceId });
+      expect(store.getDetailsDeviceId()()).toBe('device-2');
+
+      store.showTransferDetails({ deviceId });
+      store.hideTransferDetails();
+      expect(store.getDetailsDeviceId()()).toBe('device-2');
+    });
+
+    it('does not move the details to a refusal that is not this tab own', () => {
+      store.setTransferError({ deviceId: 'device-2', error: 'nope' });
+      store.beginScan({ deviceId, droppedRootName: 'b', destinationLabel: '/b' });
+
+      store.clearTransfer({ deviceId });
+
+      expect(store.getDetailsDeviceId()()).toBeNull();
+    });
+  });
+
+  describe('foreign transfer metrics', () => {
+    const foldForeign = (overrides: Partial<TransferJobSnapshot>) =>
+      store.foldLiveSnapshot({ snapshot: createSnapshot(overrides) });
+
+    it('reads progress from the job own totals rather than a scan that never happened', () => {
+      foldForeign({ totalFiles: 10, filesReceived: 8, filesSent: 5, expandedFileCount: 0 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.total).toBe(10);
+      expect(metrics.devicePct).toBe(50);
+      expect(metrics.apiPct).toBe(80);
+      expect(metrics.written).toBe(5);
+    });
+
+    it('adds the extracted entries of a job with archives to the job total', () => {
+      foldForeign({ totalFiles: 3, filesReceived: 3, filesSent: 3, expandedFileCount: 7 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.total).toBe(10);
+      expect(metrics.devicePct).toBe(30);
+    });
+
+    it('falls back to the files received while the job does not know its total yet', () => {
+      foldForeign({ totalFiles: null, filesReceived: 4, filesSent: 2, expandedFileCount: 0 });
+
+      expect(store.getTransferMetrics(deviceId)().total).toBe(4);
+    });
+
+    it('pins the device bar at 100 once completed', () => {
+      foldForeign({
+        totalFiles: 10,
+        filesSent: 9,
+        state: TransferJobState.Completed,
+        expandedFileCount: 0,
+      });
+
+      expect(store.getTransferMetrics(deviceId)().devicePct).toBe(100);
+    });
+
+    it('keeps the scan as the total for this tab own drop', () => {
+      store.beginScan({ deviceId, droppedRootName: 'games', destinationLabel: '/games' });
+      store.completeScan({ deviceId, scanTotal: 8 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ totalFiles: 3, filesSent: 4, expandedFileCount: null }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.total).toBe(8);
+      expect(metrics.devicePct).toBe(50);
+    });
+  });
+
+  describe('getLiveTransfers and getTransferTabs', () => {
+    it('lists only transfers under way, oldest first, with the progress the card reads', () => {
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId: 'device-b',
+          jobId: 'job-b',
+          startedUtc: new Date('2026-01-01T00:10:00Z'),
+        }),
+      });
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId: 'device-a',
+          jobId: 'job-a',
+          totalFiles: 4,
+          filesSent: 2,
+          expandedFileCount: 0,
+          state: TransferJobState.Sealed,
+        }),
+      });
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({
+          deviceId: 'device-c',
+          jobId: 'job-c',
+          state: TransferJobState.Completed,
+        }),
+      });
+
+      const live = store.getLiveTransfers()();
+
+      expect(live.map((t) => t.deviceId)).toEqual(['device-a', 'device-b']);
+      expect(live[0]).toMatchObject({
+        jobId: 'job-a',
+        state: TransferJobState.Sealed,
+        fileTotal: 4,
+        devicePercent: 50,
+        startedHere: false,
+        totalFiles: 4,
+      });
+    });
+
+    it('offers a tab for each live transfer, each own entry before its job, and the shown ended one', () => {
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ deviceId: 'live', jobId: 'job-live', filesSent: 1, totalFiles: 2, expandedFileCount: 0 }),
+      });
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ deviceId: 'ended', jobId: 'job-ended', state: TransferJobState.Completed }),
+      });
+      store.beginScan({ deviceId: 'scanning', droppedRootName: 'a', destinationLabel: '/a' });
+
+      expect(store.getTransferTabs()().map((t) => t.deviceId).sort()).toEqual(['live', 'scanning']);
+
+      store.showTransferDetails({ deviceId: 'ended' });
+      const tabs = store.getTransferTabs()();
+      expect(tabs.find((t) => t.deviceId === 'ended')).toEqual({
+        deviceId: 'ended',
+        percent: 100,
+        ended: true,
+      });
+      expect(tabs.find((t) => t.deviceId === 'live')).toEqual({
+        deviceId: 'live',
+        percent: 50,
+        ended: false,
+      });
+      expect(tabs.find((t) => t.deviceId === 'scanning')).toEqual({
+        deviceId: 'scanning',
+        percent: 0,
+        ended: false,
+      });
+    });
+
+    it('keeps an own cancel-failed entry among the tabs', () => {
+      store.beginScan({ deviceId, droppedRootName: 'a', destinationLabel: '/a' });
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+      store.setCancelError({ deviceId, error: 'unreachable' });
+      store.hideTransferDetails();
+
+      expect(store.getTransferTabs()().map((t) => t.deviceId)).toEqual([deviceId]);
+    });
   });
 
   describe('feed and failure caps', () => {
@@ -942,6 +1336,9 @@ describe('TransferStore', () => {
       store.clearTransfer({ deviceId });
       store.setTargetDevice({ deviceId });
       store.clearTargetDevice();
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId: 'device-2' }) });
+      store.showTransferDetails({ deviceId: 'device-2' });
+      store.hideTransferDetails();
 
       const expectedNames = [
         'begin-scan',
@@ -958,6 +1355,10 @@ describe('TransferStore', () => {
         'clear-transfer',
         'set-target-device',
         'clear-target-device',
+        'fold-live-snapshot',
+        'apply-job-snapshot',
+        'show-transfer-details',
+        'hide-transfer-details',
       ];
 
       expect(createActionSpy).toHaveBeenCalledTimes(expectedNames.length);

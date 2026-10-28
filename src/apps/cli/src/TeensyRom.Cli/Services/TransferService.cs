@@ -23,6 +23,10 @@ internal sealed class TransferService(ITeensyRomApiClient api, IDeviceService de
 
             return created.Job;
         }
+        catch (TeensyApiException ex) when (ex.IsDeviceBusy)
+        {
+            throw new CliException(CliExitCode.DeviceBusy, ex.Message);
+        }
         catch (TeensyApiException ex) when (ex.StatusCode == 409)
         {
             var device = devices.SelectedDevice?.Name ?? deviceId;

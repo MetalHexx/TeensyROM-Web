@@ -110,7 +110,7 @@ export interface SearchRequest {
 export class FilesApiService extends runtime.BaseAPI {
 
     /**
-     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Ban File
      */
     async banFileRaw(requestParameters: BanFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BanFileResponse>> {
@@ -154,7 +154,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.
+     * Adds a file\'s name to the banned files list so it is hidden from listings and search. Banning an already banned file changes nothing.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Ban File
      */
     async banFile(requestParameters: BanFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BanFileResponse> {
@@ -163,7 +163,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.
+     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Get Directory
      */
     async getDirectoryRaw(requestParameters: GetDirectoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetDirectoryResponse>> {
@@ -200,7 +200,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.
+     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Get Directory
      */
     async getDirectory(requestParameters: GetDirectoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetDirectoryResponse> {
@@ -209,7 +209,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns a file\'s raw bytes (application/octet-stream) from a device\'s storage.  - Byte-identical to the file on the cartridge. - Refused with 413 above 10 MB. - The path must be a Unix-style file path with no \'..\' segment.
+     * Returns a file\'s raw bytes (application/octet-stream) from a device\'s storage.  - Byte-identical to the file on the cartridge. - Refused with 413 above 10 MB. - The path must be a Unix-style file path with no \'..\' segment. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Get File Content
      */
     async getFileContentRaw(requestParameters: GetFileContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
@@ -246,7 +246,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns a file\'s raw bytes (application/octet-stream) from a device\'s storage.  - Byte-identical to the file on the cartridge. - Refused with 413 above 10 MB. - The path must be a Unix-style file path with no \'..\' segment.
+     * Returns a file\'s raw bytes (application/octet-stream) from a device\'s storage.  - Byte-identical to the file on the cartridge. - Refused with 413 above 10 MB. - The path must be a Unix-style file path with no \'..\' segment. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Get File Content
      */
     async getFileContent(requestParameters: GetFileContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
@@ -255,7 +255,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress.
+     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Index
      */
     async indexRaw(requestParameters: IndexRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexResponse>> {
@@ -292,7 +292,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress.
+     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Index
      */
     async index(requestParameters: IndexRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<IndexResponse> {
@@ -301,7 +301,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress.
+     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress. - A device busy with a transfer is skipped and the other devices are still indexed; its id is listed in busyDeviceIds. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Index All
      */
     async indexAllRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexAllResponse>> {
@@ -320,7 +320,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress.
+     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress. - A device busy with a transfer is skipped and the other devices are still indexed; its id is listed in busyDeviceIds. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Index All
      */
     async indexAll(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<IndexAllResponse> {
@@ -379,7 +379,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.
+     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Remove Favorite
      */
     async removeFavoriteRaw(requestParameters: RemoveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RemoveFavoriteResponse>> {
@@ -423,7 +423,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.
+     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Remove Favorite
      */
     async removeFavorite(requestParameters: RemoveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RemoveFavoriteResponse> {
@@ -432,7 +432,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.
+     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Save Favorite
      */
     async saveFavoriteRaw(requestParameters: SaveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveFavoriteResponse>> {
@@ -476,7 +476,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.
+     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.  - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
      * Save Favorite
      */
     async saveFavorite(requestParameters: SaveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SaveFavoriteResponse> {

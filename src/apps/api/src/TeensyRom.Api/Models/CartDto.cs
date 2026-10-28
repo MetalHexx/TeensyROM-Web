@@ -110,6 +110,11 @@ namespace TeensyRom.Api.Models
         [Required] public CartStorageDto UsbStorage { get; set; } = null!;
 
         /// <summary>
+        /// The id of the transfer job holding the device. Null when the device is not busy with a transfer.
+        /// </summary>
+        public string? ActiveTransferJobId { get; set; }
+
+        /// <summary>
         /// Creates a <see cref="CartDto"/> from a <see cref="Cart"/> entity.
         /// </summary>
         public static async Task<CartDto> FromDevice(TeensyRomDevice device, IDeviceSettingsProvider settingsProvider)

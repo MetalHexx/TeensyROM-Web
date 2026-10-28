@@ -1,0 +1,30 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+lib-scaling-compact-card {
+  height: 100%;
+}
+
+// Sole content of the card's `.compact-card--fill` flex column: it claims the column's height and
+// shrinks below its trees' natural height, so this element is what scrolls. Its gutter is reserved
+// so a vertical scrollbar does not clip the widest row.
+.devices-tree-stack {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
+}
+
+lib-directory-tree-container {
+  height: auto;
+  flex-shrink: 0;
+}

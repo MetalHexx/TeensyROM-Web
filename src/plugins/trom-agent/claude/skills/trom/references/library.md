@@ -26,7 +26,7 @@ Copy between this computer and the TeensyROM with `trom file upload` and `trom f
 - An upload resets the TeensyROM unless the engine believes it is idle with nothing launched on it, and a reset stops whatever is playing. Say so when you confirm, and don't copy during a timed set unless the user wants the set to end.
 - When the "Auto-launch after copy" setting is on, an upload also launches one file once it lands: games first, never `.trh`. Say so when you confirm a copy.
 - Report the summary, and each failure in plain words.
-- A busy device means "try again when the other transfer finishes".
+- A busy device (exit 6, code `deviceBusy`) is in the middle of a transfer: wait for it to finish, then try again, or use another TeensyROM.
 - To copy and launch one file, see `dj.md` (Launching). `--launch` asks the engine to launch that file once it lands, whatever the setting says.
 
 ## Curating

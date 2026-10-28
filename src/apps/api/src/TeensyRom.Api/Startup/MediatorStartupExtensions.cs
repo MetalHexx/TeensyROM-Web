@@ -14,6 +14,7 @@ namespace TeensyRom.Api.Startup
             services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<CoreSerialAssemblyMarker>());
             services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
             services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(ExceptionBehavior<,>));
+            services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(TransferLockoutBehavior<,>));
             services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(CommunicationPortBehavior<,>));
             return services;
         }

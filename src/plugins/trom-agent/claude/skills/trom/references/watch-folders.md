@@ -63,6 +63,8 @@ A TeensyROM takes one transfer at a time. If a file lands while its TeensyROM is
 
 The engine logs a line for each skip and will not retry. The file is still in the watched folder, so the user can copy it with `trom file upload` once the TeensyROM is free. That copy is a normal upload and needs their confirmation. To find the log line, `trom engine status --json` gives the engine's `logFile`.
 
+While a folder is sending to a TeensyROM, every command to that TeensyROM exits 6.
+
 ## Transfer list
 
 `trom transfer list --json` shows every transfer the engine is running or has just finished, including ones the user didn't start. Watch-folder transfers appear here too. Each transfer has:

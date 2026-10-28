@@ -1,0 +1,50 @@
+:host {
+  display: block;
+}
+
+.transfer-tabs {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg) 0;
+  overflow-x: auto;
+}
+
+.transfer-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+  background: transparent;
+  color: var(--color-dimmed-light);
+  font: inherit;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: -2px;
+  }
+
+  &.selected {
+    color: inherit;
+    border-bottom-color: var(--color-primary-bright);
+  }
+}
+
+.tab-status {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-dimmed-light);
+
+  &.tab-done {
+    color: var(--color-success);
+  }
+}

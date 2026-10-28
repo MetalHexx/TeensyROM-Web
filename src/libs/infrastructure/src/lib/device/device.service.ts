@@ -6,11 +6,16 @@ import {
   RenameDeviceResponse,
   ResponseError,
 } from '@teensyrom-nx/data-access/api-client';
-import { Device, IDeviceService, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import {
+  Device,
+  IDeviceService,
+  ALERT_SERVICE,
+  IAlertService,
+} from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
 import { Observable, map, from, catchError, switchMap, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
-import { extractProblemMessage } from '../error/api-error.utils';
+import { extractProblemMessage, failOnDeviceBusy } from '../error/api-error.utils';
 
 @Injectable()
 export class DeviceService implements IDeviceService {
@@ -83,11 +88,13 @@ export class DeviceService implements IDeviceService {
     friendlyMessage: string
   ): Observable<never> {
     logError(`DeviceService.${methodName} error:`, error);
-    return from(extractProblemMessage(error)).pipe(
-      switchMap((apiMessage) => {
-        this.alertService.error(apiMessage ?? friendlyMessage);
-        return throwError(() => error);
-      })
+    return failOnDeviceBusy(error, this.alertService, () =>
+      from(extractProblemMessage(error)).pipe(
+        switchMap((apiMessage) => {
+          this.alertService.error(apiMessage ?? friendlyMessage);
+          return throwError(() => error);
+        })
+      )
     );
   }
 

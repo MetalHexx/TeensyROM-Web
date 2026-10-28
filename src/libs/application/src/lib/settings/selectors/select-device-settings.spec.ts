@@ -22,8 +22,6 @@ describe('selectDeviceSettings', () => {
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: false,
-      navToDirOnLaunch: false,
-      syncFilesEnabled: false,
     },
     searchSettings: {
       weights: {

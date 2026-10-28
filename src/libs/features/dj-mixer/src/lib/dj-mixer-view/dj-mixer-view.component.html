@@ -30,6 +30,7 @@
           animationEntry="from-bottom"
         >
           <lib-dj-browse-trees
+            class="scroll-edge-end"
             [devices]="enabledDevices()"
             [sets]="setsBranch()"
             [activeStorage]="activeStorage()"
@@ -68,7 +69,7 @@
           }
           <div
             #listingBody
-            class="listing-body"
+            class="listing-body scroll-edge-end"
             [attr.inert]="listingFoldedEffective() ? '' : null"
             [style.width.px]="listingBodyWidth()"
             [style.min-width.px]="listingBodyWidth()"

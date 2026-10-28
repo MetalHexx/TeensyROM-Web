@@ -7,6 +7,8 @@ import {
   TransferJobSnapshot,
   TransferJobState,
   StorageType,
+  TransferLaunchState,
+  TransferOriginKind,
 } from '@teensyrom-nx/domain';
 import { TransferPlaybackGuard } from './transfer-playback-guard';
 import { TransferStore } from './transfer-store';
@@ -23,14 +25,24 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   filesReceived: 0,
   filesSent: 0,
   filesFailed: 0,
+  bytesSent: 0,
   totalFiles: null,
   currentFile: null,
+  origin: { kind: TransferOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
   startedUtc: new Date('2026-01-01T00:00:00Z'),
+  lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
   error: null,
   failures: [],
   recentCompletions: [],
   bytesPerSecond: 0,
   filesPerSecond: 0,
+  expandingArchive: null,
+  expansionBytesWritten: 0,
+  expansionBytesDeclared: 0,
+  expandedFileCount: null,
+  launchState: TransferLaunchState.None,
+  launchedPath: null,
+  launchError: null,
   ...overrides,
 });
 
@@ -83,7 +95,7 @@ describe('TransferPlaybackGuard', () => {
     expect(playerStore.players()[deviceId]?.status).toBe(PlayerStatus.Stopped);
   });
 
-  it('halts the timer for a job this client did not start (busy pre-check)', () => {
+  it('halts the timer for a job this client did not start (foreign job on the device)', () => {
     transferStore.setActiveForeignJob({ deviceId, activeForeignJobId: 'foreign-job' });
     TestBed.flushEffects();
 
@@ -122,6 +134,25 @@ describe('TransferPlaybackGuard', () => {
 
     // Loss doesn't itself create/restart a timer or issue another halt.
     expect(mockTimerManager.destroyTimer).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops suppressing once the job has ended, and halts again for the next job', () => {
+    transferStore.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+    TestBed.flushEffects();
+    expect(mockTimerManager.destroyTimer).toHaveBeenCalledTimes(1);
+
+    transferStore.applyJobSnapshot({
+      deviceId,
+      snapshot: createSnapshot({ state: TransferJobState.Completed }),
+    });
+    TestBed.flushEffects();
+    expect(mockTimerManager.destroyTimer).toHaveBeenCalledTimes(1);
+
+    transferStore.foldLiveSnapshot({
+      snapshot: createSnapshot({ jobId: 'job-2', startedUtc: new Date('2026-01-01T00:05:00Z') }),
+    });
+    TestBed.flushEffects();
+    expect(mockTimerManager.destroyTimer).toHaveBeenCalledTimes(2);
   });
 
   it('re-halts a device that regains an active job after losing the previous one', () => {

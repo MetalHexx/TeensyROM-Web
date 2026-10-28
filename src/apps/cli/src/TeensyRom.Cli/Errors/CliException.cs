@@ -12,7 +12,8 @@ internal enum CliExitCode
     Usage = 2,
     EngineUnavailable = 3,
     NoDevice = 4,
-    NotFound = 5
+    NotFound = 5,
+    DeviceBusy = 6
 }
 
 /// <summary>

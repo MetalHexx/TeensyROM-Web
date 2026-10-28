@@ -51,5 +51,8 @@ export * from './version.model';
 export * from './transfer-job-snapshot.model';
 export * from './transfer-manifest-entry.model';
 
+// Watch folder models
+export * from './watch-folder.model';
+
 // CRT models
 export * from './crt-settings.model';

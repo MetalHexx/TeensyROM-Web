@@ -106,9 +106,30 @@ public class ExitCodeMapperTests
     [InlineData((int)CliExitCode.EngineUnavailable, 3)]
     [InlineData((int)CliExitCode.NoDevice, 4)]
     [InlineData((int)CliExitCode.NotFound, 5)]
+    [InlineData((int)CliExitCode.DeviceBusy, 6)]
     public void TheExitCodeNumbersAreAStableContract(int code, int number)
     {
         code.Should().Be(number);
+    }
+
+    [Fact]
+    public void ABusyRefusal_IsDeviceBusy_WithItsSentence()
+    {
+        var mapped = ExitCodeMapper.Map(new TeensyApiException("Alpha is busy with a transfer — try again when it finishes.", 409, problemCode: "deviceBusyWithTransfer"));
+
+        mapped.Code.Should().Be(CliExitCode.DeviceBusy);
+        mapped.Message.Should().Be("Alpha is busy with a transfer — try again when it finishes.");
+    }
+
+    [Theory]
+    [InlineData(409, null)]
+    [InlineData(409, "somethingElse")]
+    [InlineData(500, "deviceBusyWithTransfer")]
+    [InlineData(503, null)]
+    [InlineData(500, null)]
+    public void AnythingElseTheEngineRefuses_StaysFailed(int status, string? problemCode)
+    {
+        ExitCodeMapper.Map(new TeensyApiException("x", status, problemCode: problemCode)).Code.Should().Be(CliExitCode.Failed);
     }
 
     // Spectre's exceptions have no public constructors, so the real ones are provoked.

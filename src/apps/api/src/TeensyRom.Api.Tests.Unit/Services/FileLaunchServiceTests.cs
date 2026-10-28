@@ -18,7 +18,7 @@ public class FileLaunchServiceTests
     private readonly IStorageService _sdStorage = Substitute.For<IStorageService>();
     private readonly IMediator _mediator = Substitute.For<IMediator>();
 
-    private FileLaunchService NewService(bool deviceExists = true, bool sdAvailable = true, bool usbAvailable = false)
+    private FileLaunchService NewService(bool deviceExists = true, bool sdAvailable = true, bool usbAvailable = false, IDeviceTransferLease? lease = null)
     {
         if (deviceExists)
         {
@@ -37,7 +37,7 @@ public class FileLaunchServiceTests
             .BuildServiceProvider()
             .GetRequiredService<IServiceScopeFactory>();
 
-        return new FileLaunchService(_deviceManager, scopeFactory);
+        return new FileLaunchService(_deviceManager, lease ?? Endpoints.LeaseDoubles.Free(), scopeFactory);
     }
 
     private static Task<FileLaunchOutcome> Launch(FileLaunchService service, TeensyStorageType storage = TeensyStorageType.SD) =>
@@ -121,4 +121,39 @@ public class FileLaunchServiceTests
             outcome.Item.Should().BeSameAs(item);
         }
     }
+
+    [Fact]
+    public async Task LaunchAsync_LaunchRefusedAsBusy_ReturnsDeviceBusyNeverIncompatible()
+    {
+        GivenLookup(FileLookupResult.Found(new LaunchableItem()));
+        _mediator.Send(Arg.Any<LaunchFileCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new LaunchFileResult
+            {
+                IsSuccess = false,
+                LaunchResult = LaunchFileResultType.SidError,
+                Error = "busy",
+                ActiveTransferJobId = "job-1"
+            });
+
+        var outcome = await Launch(NewService());
+
+        outcome.Status.Should().Be(FileLaunchStatus.DeviceBusy);
+        outcome.ActiveJobId.Should().Be("job-1");
+        outcome.DeviceName.Should().Be(DeviceNameOf());
+        outcome.Item.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LaunchAsync_LookupFailureWhileTheDeviceIsLeased_ReturnsDeviceBusy()
+    {
+        GivenLookup(FileLookupResult.Failed("refused"));
+
+        var outcome = await Launch(NewService(lease: Endpoints.LeaseDoubles.Busy("job-2")));
+
+        outcome.Status.Should().Be(FileLaunchStatus.DeviceBusy);
+        outcome.ActiveJobId.Should().Be("job-2");
+        await _mediator.DidNotReceiveWithAnyArgs().Send(default(LaunchFileCommand)!, default);
+    }
+
+    private string DeviceNameOf() => _deviceManager.GetAvailableDevice(DeviceId)!.Cart.Name;
 }

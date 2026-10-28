@@ -21,6 +21,7 @@ import {
   PlayerFilterType,
   FileItem,
   FileItemType,
+  DeviceBusyError,
 } from '@teensyrom-nx/domain';
 import { playerRouteResolver } from './player-route.resolver';
 
@@ -84,8 +85,6 @@ describe('playerRouteResolver', () => {
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: false,
-      navToDirOnLaunch: false,
-      syncFilesEnabled: false,
     },
     searchSettings: {
       weights: {
@@ -368,6 +367,64 @@ describe('playerRouteResolver', () => {
       deviceId: 'device-2',
       storageType: StorageType.Sd,
       path: '/',
+    });
+  });
+
+  describe('a startup launch refused as busy', () => {
+    const busy = () =>
+      new DeviceBusyError(deviceId, 'job-1', 'Test Device is busy with a transfer.');
+
+    const startupSettings = (startupLaunchRandom: boolean) =>
+      createMockSettings({
+        playerSettings: {
+          repeatModeOnStartup: false,
+          playTimerEnabled: false,
+          muteFastForward: false,
+          muteRandomSeek: false,
+          startupFilter: PlayerFilterType.All,
+          startupLaunchEnabled: true,
+          startupLaunchRandom,
+        },
+      });
+
+    it('does not retry a refused random launch', async () => {
+      mockSettingsStore.getSettings.mockReturnValue(signal<Settings | null>(startupSettings(true)));
+      mockPlayerContextService.launchRandomFile.mockRejectedValue(busy());
+
+      await runResolver(createRoute());
+      await waitUntil(() => mockPlayerContextService.launchRandomFile.mock.calls.length > 0);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockPlayerContextService.launchRandomFile).toHaveBeenCalledTimes(1);
+      expect(mockPlayerContextService.launchFileWithContext).not.toHaveBeenCalled();
+    });
+
+    it('does not retry a refused saved-file launch', async () => {
+      const file = createMockFileItem({ name: 'saved.sid', parentPath: '/music' });
+      mockSettingsStore.getSettings.mockReturnValue(
+        signal<Settings | null>(startupSettings(false))
+      );
+      mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+        directory: { files: [file] },
+      }));
+      mockPlayerStorage.load.mockReturnValue({
+        currentFile: {
+          storageKey: `${deviceId}-${StorageType.Sd}`,
+          file,
+          parentPath: '/music',
+          launchedAt: Date.now(),
+          isCompatible: true,
+        },
+        launchMode: undefined,
+      });
+      mockPlayerContextService.launchFileWithContext.mockRejectedValue(busy());
+
+      await runResolver(createRoute());
+      await waitUntil(() => mockPlayerContextService.launchFileWithContext.mock.calls.length > 0);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockPlayerContextService.launchFileWithContext).toHaveBeenCalledTimes(1);
+      expect(mockPlayerContextService.launchRandomFile).not.toHaveBeenCalled();
     });
   });
 });

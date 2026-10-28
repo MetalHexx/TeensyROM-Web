@@ -37,7 +37,7 @@ If `init` shows no engine or no device online, go straight to `references/doctor
 
 ## Groundwork
 
-- Read results with `--json`. Stdout is data. Stderr may end with one JSON `{"error":…}` or `{"notice":…}` object. Exit codes: 0 success, 1 failed, 2 usage, 3 engine unavailable, 4 no device, 5 not found.
+- Read results with `--json`. Stdout is data. Stderr may end with one JSON `{"error":…}` or `{"notice":…}` object. Exit codes: 0 success, 1 failed, 2 usage, 3 engine unavailable, 4 no device, 5 not found, 6 device busy with a transfer.
 - `trom` help goes deep: `trom <noun> --help`, `trom <noun> <verb> --help`. Look a command up only when you are about to use it.
 - Pass `--device <chosen name>` on every `device`, `file` and `index` command, and on `watch-folder add`, and on `watch-folder set` when the folder has several destinations. Switch to the new name when the user asks for a different device. Pass `--storage <sd|usb>` when the user names a storage or the device has only one available, and on `watch-folder add`. `trom` parses strictly, so a flag a verb doesn't take is exit 2. The exceptions:
   - `file banned` and `file unban` take no `--device`, because bans apply to every TeensyROM.
@@ -45,6 +45,7 @@ If `init` shows no engine or no device online, go straight to `references/doctor
   - `watch-folder remove` takes an optional `--device`. `watch-folder set` needs one when the folder sends to several TeensyROMs, and takes no `--storage`.
   - `watch-folder list`, `watch-folder pause`, `watch-folder resume` and `transfer list` take no `--device`.
 - What is playing is only what you last launched, never a report from the device. The user can also launch from the web UI or the menu at any time, so it may have changed since.
+- The menu prints a line when any transfer starts or ends, so the user may mention one you did not start.
 - Offer only what `init`'s `capabilities` lists. The installed `trom` may be older or newer than this skill.
 - To open the web UI, or when `webUi.available` is false, read `references/web-ui.md`.
 

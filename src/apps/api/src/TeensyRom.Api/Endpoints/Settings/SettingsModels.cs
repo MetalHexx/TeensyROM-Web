@@ -163,7 +163,7 @@ namespace TeensyRom.Api.Endpoints.Settings
     }
 
     /// <summary>
-    /// File transfer and synchronization preferences.
+    /// File transfer preferences.
     /// </summary>
     public record FileTransferSettingsDto
     {
@@ -171,16 +171,6 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Automatically launch files after copying them.
         /// </summary>
         [Required] public bool AutoLaunchOnCopyEnabled { get; set; }
-
-        /// <summary>
-        /// Navigate to the directory after launching a file.
-        /// </summary>
-        [Required] public bool NavToDirOnLaunch { get; set; }
-
-        /// <summary>
-        /// Enable file synchronization between local and device storage.
-        /// </summary>
-        [Required] public bool SyncFilesEnabled { get; set; }
     }
 
     /// <summary>

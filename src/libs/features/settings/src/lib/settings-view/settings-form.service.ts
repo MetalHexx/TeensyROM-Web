@@ -217,11 +217,6 @@ export class SettingsFormService {
         startupLaunchEnabled: [settings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [settings.playerSettings.startupLaunchRandom],
       }),
-      fileTransferSettings: this.fb.group({
-        autoLaunchOnCopyEnabled: [settings.fileTransferSettings.autoLaunchOnCopyEnabled],
-        navToDirOnLaunch: [settings.fileTransferSettings.navToDirOnLaunch],
-        syncFilesEnabled: [settings.fileTransferSettings.syncFilesEnabled],
-      }),
       searchSettings: this.fb.group({
         weights: this.fb.group(
           {
@@ -351,11 +346,6 @@ export class SettingsFormService {
         startupLaunchEnabled: settings.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: settings.playerSettings.startupLaunchRandom,
       },
-      fileTransferSettings: {
-        autoLaunchOnCopyEnabled: settings.fileTransferSettings.autoLaunchOnCopyEnabled,
-        navToDirOnLaunch: settings.fileTransferSettings.navToDirOnLaunch,
-        syncFilesEnabled: settings.fileTransferSettings.syncFilesEnabled,
-      },
       searchSettings: {
         weights: {
           nameWeight: settings.searchSettings.weights.nameWeight,
@@ -404,10 +394,9 @@ export class SettingsFormService {
         startupLaunchEnabled: formValue.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: formValue.playerSettings.startupLaunchRandom,
       },
-      fileTransferSettings: {
-        autoLaunchOnCopyEnabled: formValue.fileTransferSettings.autoLaunchOnCopyEnabled,
-        navToDirOnLaunch: formValue.fileTransferSettings.navToDirOnLaunch,
-        syncFilesEnabled: formValue.fileTransferSettings.syncFilesEnabled,
+      // Auto-launch is edited in the transfer settings panel, so a save here carries the stored value.
+      fileTransferSettings: this.settingsStore.getSettings()()?.fileTransferSettings ?? {
+        autoLaunchOnCopyEnabled: false,
       },
       searchSettings: {
         weights: {
@@ -505,17 +494,6 @@ export class SettingsFormService {
       throw new Error('Settings form not initialized');
     }
     return form.get('playerSettings') as FormGroup;
-  }
-
-  /**
-   * Helper method to get typed FormGroup for file transfer settings section
-   */
-  getFileTransferSettings(): FormGroup {
-    const form = this.settingsForm();
-    if (!form) {
-      throw new Error('Settings form not initialized');
-    }
-    return form.get('fileTransferSettings') as FormGroup;
   }
 
   /**

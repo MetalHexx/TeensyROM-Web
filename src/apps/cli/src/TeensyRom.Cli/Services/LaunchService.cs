@@ -23,7 +23,7 @@ internal sealed class LaunchService(ITeensyRomApiClient api, IDeviceService devi
                 ? new LaunchOutcome(LaunchStatus.Launched, launched, response.Message)
                 : new LaunchOutcome(LaunchStatus.Incompatible, launched, response.Message);
         }
-        catch (TeensyApiException ex) when (ex.StatusCode is not null)
+        catch (TeensyApiException ex) when (ex.StatusCode is not null && !ex.IsDeviceBusy)
         {
             return Refused(ex);
         }
@@ -47,7 +47,7 @@ internal sealed class LaunchService(ITeensyRomApiClient api, IDeviceService devi
                 ? new LaunchOutcome(LaunchStatus.Launched, item, response.Message)
                 : new LaunchOutcome(LaunchStatus.Incompatible, item, response.Message);
         }
-        catch (TeensyApiException ex) when (ex.StatusCode is not null)
+        catch (TeensyApiException ex) when (ex.StatusCode is not null && !ex.IsDeviceBusy)
         {
             return Refused(ex);
         }

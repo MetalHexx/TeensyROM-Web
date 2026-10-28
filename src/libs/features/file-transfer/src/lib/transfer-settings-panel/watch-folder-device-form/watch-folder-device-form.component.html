@@ -1,0 +1,136 @@
+<div
+  class="form-box device-form"
+  role="group"
+  [attr.aria-label]="formLabel()"
+  [formGroup]="formGroup()"
+  data-testid="watch-folder-device-form"
+  (keydown.escape)="onEscape($event)"
+>
+  @if (mode() === 'add') {
+  <div class="field-row">
+    <mat-form-field
+      appearance="fill"
+      class="field"
+      subscriptSizing="dynamic"
+      hideRequiredMarker
+      [libTooltip]="deviceTooltip"
+    >
+      <mat-label>Device</mat-label>
+      <mat-select
+        #deviceField
+        formControlName="device"
+        [errorStateMatcher]="deviceMatcher"
+        data-testid="form-device"
+      >
+        @for (device of devices(); track device.deviceId) {
+        <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+        }
+      </mat-select>
+      @if (errors().device; as message) {
+      <mat-error data-testid="error-device">{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-button-toggle-group
+      class="storage-toggle"
+      formControlName="storage"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
+      [libTooltip]="storageTooltip"
+      data-testid="form-storage"
+    >
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage" [disabled]="!storageOptions().includes(storage)">{{
+        storage
+      }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+  @if (errors().storage; as message) {
+  <p class="form-error" role="alert" data-testid="error-storage">{{ message }}</p>
+  }
+  } @else {
+  <div class="field-row field-row--locked">
+    <mat-form-field appearance="fill" class="field" subscriptSizing="dynamic" hideRequiredMarker>
+      <mat-label>Device</mat-label>
+      <input
+        matInput
+        type="text"
+        readonly
+        [value]="deviceName()"
+        data-testid="form-device-readonly"
+      />
+    </mat-form-field>
+
+    <mat-button-toggle-group
+      class="storage-toggle"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
+      disabled
+      [value]="storageType()"
+      data-testid="form-storage-readonly"
+    >
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage">{{ storage }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+
+  <p class="note" data-testid="form-readonly-note">
+    To change the device or storage, remove this and add it again.
+  </p>
+  }
+
+  <mat-form-field
+    appearance="fill"
+    class="field"
+    subscriptSizing="dynamic"
+    hideRequiredMarker
+    [libTooltip]="devicePathTooltip"
+  >
+    <mat-label>Device folder</mat-label>
+    <input
+      #pathField
+      matInput
+      type="text"
+      formControlName="devicePath"
+      autocomplete="off"
+      [errorStateMatcher]="devicePathMatcher"
+      data-testid="form-device-path"
+      (keydown.enter)="onSubmit()"
+    />
+    @if (errors().devicePath; as message) {
+    <mat-error data-testid="error-device-path">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="launch" [libTooltip]="launchTooltip" data-testid="form-launch"
+    >Auto launch</mat-slide-toggle
+  >
+
+  @if (errors().form; as message) {
+  <p class="form-error" role="alert" data-testid="error-form">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <lib-action-button
+      icon="close"
+      label="Cancel"
+      color="normal"
+      [fullWidth]="false"
+      [tooltip]="cancelTooltip"
+      data-testid="form-cancel"
+      (buttonClick)="formCancel.emit()"
+    />
+    <lib-action-button
+      icon="check"
+      label="Save"
+      variant="flat"
+      [fullWidth]="false"
+      [disabled]="!canSubmit()"
+      [tooltip]="submitTooltip"
+      data-testid="form-submit"
+      (buttonClick)="onSubmit()"
+    />
+  </div>
+</div>

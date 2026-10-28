@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Blob as NodeBlob } from 'node:buffer';
-import { FilesApiService, TeensyStorageType } from '@teensyrom-nx/data-access/api-client';
+import {
+  FilesApiService,
+  ResponseError,
+  TeensyStorageType,
+} from '@teensyrom-nx/data-access/api-client';
 import { FileContentService } from './file-content.service';
 import { StorageType, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
 
@@ -106,5 +110,66 @@ describe('FileContentService', () => {
 
       consoleErrorSpy.mockRestore();
     });
+  });
+});
+
+const busyBody = {
+  type: 'https://tools.ietf.org/html/rfc9110#section-15.5.10',
+  title: 'Alpha is busy with a transfer.',
+  status: 409,
+  code: 'deviceBusyWithTransfer',
+  deviceId: 'device-1',
+  activeJobId: 'job-7',
+};
+
+const busyResponseError = (): ResponseError =>
+  new ResponseError(
+    new Response(JSON.stringify(busyBody), {
+      status: 409,
+      headers: { 'content-type': 'application/problem+json' },
+    }),
+    'Response returned an error code'
+  );
+
+const expectBusyRefusal = async (
+  action: () => Promise<unknown>,
+  alert: { error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn> }
+) => {
+  const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  await expect(action()).rejects.toMatchObject({
+    name: 'DeviceBusyError',
+    deviceId: 'device-1',
+    activeJobId: 'job-7',
+    message: 'Alpha is busy with a transfer.',
+  });
+  expect(alert.warning).toHaveBeenCalledTimes(1);
+  expect(alert.warning).toHaveBeenCalledWith('Alpha is busy with a transfer.');
+  expect(alert.error).not.toHaveBeenCalled();
+  logSpy.mockRestore();
+};
+
+describe('FileContentService - device busy', () => {
+  it('warns once and throws DeviceBusyError when the read is refused', async () => {
+    const api = { getFileContent: vi.fn().mockRejectedValue(busyResponseError()) };
+    const alert = { error: vi.fn(), warning: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        FileContentService,
+        { provide: FilesApiService, useValue: api },
+        { provide: ALERT_SERVICE, useValue: alert },
+      ],
+    });
+    const service = TestBed.inject(FileContentService);
+
+    await expectBusyRefusal(
+      () =>
+        new Promise((resolve, reject) => {
+          service
+            .getFileContent('device-1', StorageType.Sd, '/a.prg')
+            .subscribe({ next: resolve, error: reject });
+        }),
+      alert
+    );
   });
 });

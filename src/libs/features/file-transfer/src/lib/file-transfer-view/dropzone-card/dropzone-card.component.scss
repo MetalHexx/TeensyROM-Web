@@ -1,10 +1,18 @@
 :host {
   display: block;
   width: 100%;
+  height: 100%;
+}
+
+// Fills the stretched header row, so this card matches the transfers card beside it at any height.
+lib-sliding-container {
+  display: block;
+  height: 100%;
 }
 
 .dropzone-card {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-md);
@@ -24,6 +32,12 @@
   &.state-device-busy {
     border-color: var(--color-error);
   }
+}
+
+.no-destination-prompt {
+  margin: 0;
+  color: var(--color-dimmed-light);
+  text-align: center;
 }
 
 .picker-actions {

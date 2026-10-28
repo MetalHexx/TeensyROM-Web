@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Api.Tests.Integration.Common;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
@@ -592,6 +593,66 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         }
 
         [Fact]
+        public async Task Pump_WriteTimesOut_AbortsJobReleasesLeaseAndTheNextJobStillDrains()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+            var pump = f.Services.GetRequiredService<TransferPump>();
+
+            var stuckJob = registry.Create(device.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(device.DeviceId, stuckJob.JobId).Should().BeTrue();
+            stuckJob.TryTransitionTo(TransferJobState.Receiving);
+
+            var stuckTarget = new FilePath("/games/stuck.prg");
+
+            // A serial write the device never drains used to park this device's only pump thread for good,
+            // with the job Sealed and the lease held. Now the write times out, the handler lets it through
+            // un-retried, and the pump aborts the job like any other lost device.
+            port.FailFor = path => path == stuckTarget.Value
+                ? new TeensyWriteTimeoutException("Write to COM-TEST timed out after 10000 ms", new TimeoutException())
+                : null;
+
+            try
+            {
+                await EnqueueFileAsync(stuckJob, device.DeviceId, "stuck.prg", stuckTarget, [1, 2, 3]);
+
+                await WaitUntilAsync(() =>
+                    stuckJob.State == TransferJobState.Aborted &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0));
+
+                stuckJob.ToSnapshot().Error.Should().NotBeNullOrEmpty();
+                port.Received.Should().NotContain(r => r.Path == stuckTarget.Value);
+
+                // The worker survived: the next job to the same device is sent in full.
+                var nextJob = registry.Create(device.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+                leaseCoordinator.TryAcquire(device.DeviceId, nextJob.JobId).Should().BeTrue();
+                nextJob.TryTransitionTo(TransferJobState.Receiving);
+
+                var okTarget = new FilePath("/games/after-timeout.prg");
+                await EnqueueFileAsync(nextJob, device.DeviceId, "after-timeout.prg", okTarget, [4, 5, 6, 7]);
+
+                nextJob.TryTransitionTo(TransferJobState.Sealed);
+                pump.TryFinalize(nextJob);
+
+                await WaitUntilAsync(() =>
+                    nextJob.State == TransferJobState.Completed &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0));
+
+                nextJob.ToSnapshot().FilesSent.Should().Be(1);
+                port.Received.Should().ContainSingle(r => r.Path == okTarget.Value);
+            }
+            finally
+            {
+                port.FailFor = null;
+            }
+        }
+
+        [Fact]
         public async Task Pump_IdleDeviceWithNothingLaunched_SkipsTheResetAndSaysSo()
         {
             var device = f.DeviceManager.Devices[0];
@@ -780,11 +841,15 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 gate.Current == (0, 0));
         }
 
-        /// <summary>The pump's "not resetting" line for this job - the only Internal line it writes that names a job.</summary>
+        /// <summary>
+        /// The pump's "not resetting it before job" line for this job. Matched by its text because the
+        /// stamped reset and file-batch commands log the job id too.
+        /// </summary>
         private IEnumerable<LoggedLine> SkipLines(TransferJob job) =>
             f.Log.Lines.Where(line =>
                 line.Level == nameof(ILoggingService.Internal) &&
                 line.DeviceId == job.DeviceId &&
+                line.Message.Contains("not resetting it before job", StringComparison.Ordinal) &&
                 line.Message.Contains(job.JobId, StringComparison.Ordinal));
 
         private async Task EnqueueFileAsync(TransferJob job, string deviceId, string relativePath, FilePath targetPath, byte[] bytes)

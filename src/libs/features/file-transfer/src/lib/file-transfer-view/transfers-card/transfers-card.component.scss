@@ -1,0 +1,66 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+// Fills the stretched header row, so this card matches the drop zone beside it at any height.
+lib-sliding-container {
+  display: block;
+  height: 100%;
+}
+
+// The title comes from lib-scaling-card; the card's content area holds the list or the empty state.
+lib-scaling-card {
+  display: block;
+  height: 100%;
+}
+
+.transfers-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.transfers-count {
+  display: grid;
+  place-items: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--border-radius-lg);
+  background: color-mix(in srgb, var(--color-primary-bright) 55%, transparent);
+  font-size: 0.6875rem;
+}
+
+.transfers-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+// Fills the card's height so the empty message sits centered in the space beneath the title.
+.transfers-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-dimmed-light);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

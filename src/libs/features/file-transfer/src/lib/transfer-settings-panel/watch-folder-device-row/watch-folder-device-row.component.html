@@ -1,0 +1,47 @@
+<div class="device-row" data-testid="watch-folder-device-row">
+  <div class="device-text">
+    <span class="device-name" data-testid="watch-folder-device-name">{{ deviceLabel() }}</span>
+    <span class="device-target" data-testid="watch-folder-device-target"
+      >{{ destination().storageType }} {{ destination().path }}</span
+    >
+  </div>
+  @if (destination().launch) {
+  <span
+    class="launch-tag"
+    [libTooltip]="launchTooltip"
+    data-testid="watch-folder-device-launch"
+    >Auto launch</span
+  >
+  }
+  <lib-icon-button
+    icon="edit"
+    size="small"
+    [ariaLabel]="'Edit ' + deviceLabel()"
+    [disabled]="pending()"
+    [tooltip]="editTooltip"
+    data-testid="watch-folder-device-edit"
+    (buttonClick)="edit.emit()"
+  />
+  <lib-dropdown-dialog #confirm [centered]="true">
+    <lib-icon-button
+      icon="delete"
+      size="small"
+      color="error"
+      [ariaLabel]="'Remove ' + deviceLabel()"
+      [disabled]="pending()"
+      [tooltip]="deleteTooltip"
+      data-testid="watch-folder-device-delete"
+      (buttonClick)="confirm.open()"
+    />
+    <div dialog-content class="confirm-pop glassy-card">
+      <lib-confirmation-dialog
+        title="Remove this device?"
+        [message]="removeMessage()"
+        confirmLabel="Remove"
+        [showLabels]="true"
+        (confirmed)="confirm.close(); deleteConfirmed.emit()"
+        (cancelled)="confirm.close()"
+      />
+    </div>
+  </lib-dropdown-dialog>
+</div>

@@ -30,7 +30,7 @@ Reference for the TeensyROM .NET 9 backend: a layered Web API managing physical 
 
 **Layering**: `TeensyRom.Api` → `TeensyRom.Core.Device` → `TeensyRom.Core.Serial` / `TeensyRom.Core.Storage` → `TeensyRom.Core` (domain entities, contracts, shared utilities — referenced by all other projects).
 
-**Critical pattern**: all device operations flow through MediatR with pipeline behaviors (logging, exception handling, serial locking/state transitions) before reaching handlers that execute serial/storage operations.
+**Critical pattern**: all device operations flow through MediatR with pipeline behaviors (logging, exception handling, serial locking/state transitions) before reaching handlers that execute serial/storage operations. A device held by a transfer job is locked out of every other command: the endpoints all answer one shared `409` (`deviceBusyWithTransfer`), and full discovery skips it.
 
 ## Full Reference
 

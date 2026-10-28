@@ -30,8 +30,6 @@ describe('SettingsFormService', () => {
     },
     fileTransferSettings: {
       autoLaunchOnCopyEnabled: false,
-      navToDirOnLaunch: false,
-      syncFilesEnabled: false,
     },
     searchSettings: {
       weights: {
@@ -145,7 +143,7 @@ describe('SettingsFormService', () => {
 
       expect(form.get('knownDevices')).toBeTruthy();
       expect(form.get('playerSettings')).toBeTruthy();
-      expect(form.get('fileTransferSettings')).toBeTruthy();
+      expect(form.get('fileTransferSettings')).toBeNull();
       expect(form.get('searchSettings')).toBeTruthy();
       expect(form.get('appSettings')).toBeTruthy();
     });
@@ -283,6 +281,17 @@ describe('SettingsFormService', () => {
       expect(mockSettingsStore['saveSettings']).toHaveBeenCalled();
     });
 
+    it('keeps the stored auto-launch setting, which this screen does not edit', async () => {
+      const stored = { ...mockSettings, fileTransferSettings: { autoLaunchOnCopyEnabled: true } };
+      settingsSignal.set(stored);
+      (service.settingsForm()?.get('playerSettings.playTimerEnabled'))?.setValue(true);
+
+      await service.saveSettings();
+
+      const saved = mockSettingsStore['updateSettings'].mock.calls.at(-1)?.[0].settings;
+      expect(saved.fileTransferSettings).toEqual({ autoLaunchOnCopyEnabled: true });
+    });
+
     it('should convert form values to Settings model', async () => {
       const form = service.settingsForm();
       expect(form).toBeTruthy();
@@ -400,12 +409,6 @@ describe('SettingsFormService', () => {
       expect(formGroup.get('repeatModeOnStartup')).toBeTruthy();
     });
 
-    it('getFileTransferSettings should return typed FormGroup', () => {
-      const formGroup = service.getFileTransferSettings();
-      expect(formGroup).toBeTruthy();
-      expect(formGroup.get('autoLaunchOnCopyEnabled')).toBeTruthy();
-    });
-
     it('getSearchSettings should return typed FormGroup', () => {
       const formGroup = service.getSearchSettings();
       expect(formGroup).toBeTruthy();
@@ -454,12 +457,6 @@ describe('SettingsFormService', () => {
       service['settingsForm'].set(null);
 
       expect(() => service.getPlayerSettings()).toThrow('Settings form not initialized');
-    });
-
-    it('should throw when getFileTransferSettings called with null form', () => {
-      service['settingsForm'].set(null);
-
-      expect(() => service.getFileTransferSettings()).toThrow('Settings form not initialized');
     });
 
     it('should throw when getSearchSettings called with null form', () => {

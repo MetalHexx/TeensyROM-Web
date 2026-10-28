@@ -7,7 +7,9 @@ import {
   TransferCreateRejectedError,
   TransferJobSnapshot,
   TransferJobState,
+  TransferLaunchState,
   TransferManifestEntry,
+  TransferOriginKind,
   StorageType,
 } from '@teensyrom-nx/domain';
 import { TransferContextService } from './transfer-context.service';
@@ -45,14 +47,24 @@ function createSnapshot(overrides: Partial<TransferJobSnapshot> = {}): TransferJ
     filesReceived: 0,
     filesSent: 0,
     filesFailed: 0,
+    bytesSent: 0,
     totalFiles: null,
     currentFile: null,
+    origin: { kind: TransferOriginKind.Upload, watchFolderId: null, watchFolderPath: null },
     startedUtc: new Date('2026-01-01T00:00:00Z'),
+    lastActivityUtc: new Date('2026-01-01T00:00:00Z'),
     error: null,
     failures: [],
     recentCompletions: [],
     bytesPerSecond: 0,
     filesPerSecond: 0,
+    expandingArchive: null,
+    expansionBytesWritten: 0,
+    expansionBytesDeclared: 0,
+    expandedFileCount: null,
+    launchState: TransferLaunchState.None,
+    launchedPath: null,
+    launchError: null,
     ...overrides,
   };
 }
@@ -90,7 +102,6 @@ describe('TransferContextService', () => {
     uploadFile: ReturnType<typeof vi.fn>;
     sealJob: ReturnType<typeof vi.fn>;
     cancelJob: ReturnType<typeof vi.fn>;
-    getActiveJob: ReturnType<typeof vi.fn>;
   };
   let callOrder: string[];
   let callTimes: Record<string, number>;
@@ -150,7 +161,6 @@ describe('TransferContextService', () => {
         record('seal-job');
       }),
       cancelJob: vi.fn(async () => createSnapshot({ state: TransferJobState.Cancelled })),
-      getActiveJob: vi.fn(async () => null),
     };
 
     TestBed.configureTestingModule({
@@ -554,21 +564,323 @@ describe('TransferContextService', () => {
     });
   });
 
-  describe('refreshDeviceBusyState', () => {
-    it('reads the active job and narrows the busy window', async () => {
-      mockTransferService.getActiveJob.mockResolvedValue(createSnapshot({ jobId: 'other-job' }));
+  describe('closeTransfer for one device', () => {
+    it('releases only that device records and clears only that device', async () => {
+      mockTransferService.createJob.mockRejectedValue(
+        new TransferDeviceBusyError('foreign-job', 'device busy')
+      );
+      mockStorageStore.getSelectedDirectoryForDevice.mockImplementation(
+        (deviceId: string) => createSelectedDirectory({ deviceId })
+      );
+      await runStartTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-2', asFileList([]));
 
-      await service.refreshDeviceBusyState('device-1');
+      await service.closeTransfer('device-1');
 
-      expect(store.transfers()['device-1'].activeForeignJobId).toBe('other-job');
+      expect(mockHubListener.stop).toHaveBeenCalledTimes(1);
+      expect(mockHubListener.stop).toHaveBeenCalledWith('device-1');
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+      expect(store.transfers()['device-2'].phase).toBe('device-busy');
+
+      mockTransferService.createJob.mockClear();
+      await service.retryCreate('device-1');
+      expect(mockTransferService.createJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('releaseOwnRecords', () => {
+    it('stops the listener and forgets the retained drop but leaves the store entry and details', async () => {
+      mockTransferService.createJob.mockRejectedValueOnce(
+        new TransferDeviceBusyError('foreign-job', 'device busy')
+      );
+      await runStartTransfer('device-1', asFileList([]));
+
+      await service.releaseOwnRecords('device-1');
+
+      expect(mockHubListener.stop).toHaveBeenCalledWith('device-1');
+      expect(store.transfers()['device-1'].phase).toBe('device-busy');
+      expect(store.detailsDeviceId()).toBe('device-1');
+
+      await service.retryCreate('device-1');
+      expect(mockTransferService.createJob).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('leaving starting', () => {
+    it('applies the create response before subscribing, so the entry follows its job from then on', async () => {
+      let jobAtSubscribe: string | null | undefined;
+      mockHubListener.start.mockImplementation(async () => {
+        jobAtSubscribe = store.transfers()['device-1'].job?.jobId ?? null;
+      });
+      mockUploadPool.run.mockImplementation(async () => {
+        store.foldLiveSnapshot({
+          snapshot: createSnapshot({ filesReceived: 1, filesSent: 1, totalFiles: 1 }),
+        });
+        store.foldLiveSnapshot({
+          snapshot: createSnapshot({ state: TransferJobState.Completed, filesSent: 1 }),
+        });
+      });
+
+      await runStartTransfer('device-1', asFileList([]));
+
+      expect(jobAtSubscribe).toBe('job-1');
+      const entry = store.transfers()['device-1'];
+      expect(entry.startedHere).toBe(true);
+      expect(entry.job?.state).toBe(TransferJobState.Completed);
     });
 
-    it('clears the active job id when the device is idle', async () => {
-      mockTransferService.getActiveJob.mockResolvedValue(null);
+    it('drops pushes that arrive while the create is still in flight', async () => {
+      const createGate = deferred<TransferJobSnapshot>();
+      mockTransferService.createJob.mockImplementation(() => createGate.promise);
 
-      await service.refreshDeviceBusyState('device-1');
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
+      await flushMicrotasks();
+      expect(store.transfers()['device-1'].phase).toBe('starting');
 
-      expect(store.transfers()['device-1'].activeForeignJobId).toBeNull();
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ filesSent: 3 }) });
+      expect(store.transfers()['device-1'].job).toBeNull();
+
+      createGate.resolve(createSnapshot({ state: TransferJobState.Created }));
+      await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
+      await startPromise;
+
+      expect(store.transfers()['device-1'].job?.jobId).toBe('job-1');
+    });
+  });
+
+  describe('opening the details', () => {
+    it('a drop opens the details for its device', async () => {
+      const promise = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+
+      expect(store.detailsDeviceId()).toBe('device-1');
+
+      await advancePastStateFloors();
+      await promise;
+    });
+
+    it('shows a refusal again when the dialog was hidden before it arrived', async () => {
+      mockTransferService.createJob.mockRejectedValueOnce(
+        new TransferDeviceBusyError('foreign-job', 'device busy')
+      );
+      const promise = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+      store.hideTransferDetails();
+      expect(store.detailsDeviceId()).toBeNull();
+
+      await advancePastStateFloors();
+      await promise;
+
+      expect(store.transfers()['device-1'].phase).toBe('device-busy');
+      expect(store.detailsDeviceId()).toBe('device-1');
+    });
+
+    it('shows a create rejection and an empty scan again when the dialog was hidden', async () => {
+      mockTransferService.createJob.mockRejectedValueOnce(
+        new TransferCreateRejectedError('destination rejected')
+      );
+      const rejected = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+      store.hideTransferDetails();
+      await advancePastStateFloors();
+      await rejected;
+      expect(store.detailsDeviceId()).toBe('device-1');
+      await service.closeTransfer('device-1');
+
+      mockDropScanner.scan.mockResolvedValue(emptyScan);
+      mockStorageStore.getSelectedDirectoryForDevice.mockImplementation(
+        (deviceId: string) => createSelectedDirectory({ deviceId })
+      );
+      const empty = service.startTransfer('device-2', asFileList([]));
+      await flushMicrotasks();
+      store.hideTransferDetails();
+      await advancePastStateFloors();
+      await empty;
+
+      expect(store.transfers()['device-2'].phase).toBe('nothing-to-transfer');
+      expect(store.detailsDeviceId()).toBe('device-2');
+    });
+
+    it('leaves the details on the device being watched when another device is refused', async () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ deviceId: 'device-2', jobId: 'job-2' }) });
+      store.showTransferDetails({ deviceId: 'device-2' });
+      mockTransferService.createJob.mockRejectedValueOnce(
+        new TransferDeviceBusyError('foreign-job', 'device busy')
+      );
+      mockStorageStore.getSelectedDirectoryForDevice.mockImplementation(
+        (deviceId: string) => createSelectedDirectory({ deviceId })
+      );
+
+      const promise = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+      store.showTransferDetails({ deviceId: 'device-2' });
+      await advancePastStateFloors();
+      await promise;
+
+      expect(store.detailsDeviceId()).toBe('device-2');
+    });
+  });
+
+  describe('showDetails and hideDetails', () => {
+    const foldForeign = (deviceId: string, overrides: Partial<TransferJobSnapshot> = {}) =>
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ deviceId, jobId: `job-${deviceId}`, ...overrides }),
+      });
+
+    it('showDetails closes the previously shown entry once it has ended', async () => {
+      foldForeign('device-1', { state: TransferJobState.Completed });
+      foldForeign('device-2');
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.showDetails('device-2');
+
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+      expect(store.detailsDeviceId()).toBe('device-2');
+    });
+
+    it('showDetails keeps the previously shown entry while it is still running', async () => {
+      foldForeign('device-1');
+      foldForeign('device-2');
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.showDetails('device-2');
+
+      expect(store.transfers()['device-1'].job?.jobId).toBe('job-device-1');
+      expect(store.detailsDeviceId()).toBe('device-2');
+    });
+
+    it('showDetails on the device already shown does not drop its ended entry', async () => {
+      foldForeign('device-1', { state: TransferJobState.Completed });
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.showDetails('device-1');
+
+      expect(store.transfers()['device-1'].job?.state).toBe(TransferJobState.Completed);
+      expect(store.detailsDeviceId()).toBe('device-1');
+    });
+
+    it('hideDetails hides a running transfer without cancelling or dropping it', async () => {
+      foldForeign('device-1');
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.hideDetails();
+
+      expect(store.detailsDeviceId()).toBeNull();
+      expect(store.transfers()['device-1'].job?.state).toBe(TransferJobState.Receiving);
+      expect(mockTransferService.cancelJob).not.toHaveBeenCalled();
+    });
+
+    it('hideDetails keeps a cancel-failed entry whose job still runs', async () => {
+      foldForeign('device-1');
+      store.setCancelError({ deviceId: 'device-1', error: 'unreachable' });
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.hideDetails();
+
+      expect(store.transfers()['device-1'].phase).toBe('cancel-failed');
+    });
+
+    it('hideDetails drops an ended foreign entry', async () => {
+      foldForeign('device-1', { state: TransferJobState.Completed });
+      store.showTransferDetails({ deviceId: 'device-1' });
+
+      await service.hideDetails();
+
+      expect(store.detailsDeviceId()).toBeNull();
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+    });
+
+    it('hideDetails drops an ended own entry through closeTransfer', async () => {
+      await runStartTransfer('device-1', asFileList([]));
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Completed }),
+      });
+      mockHubListener.stop.mockClear();
+
+      await service.hideDetails();
+
+      expect(mockHubListener.stop).toHaveBeenCalledWith('device-1');
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+      expect(store.detailsDeviceId()).toBeNull();
+    });
+
+    it('hideDetails drops an own refusal, but moves to another waiting own refusal instead of closing', async () => {
+      mockTransferService.createJob.mockRejectedValue(
+        new TransferDeviceBusyError('foreign-job', 'device busy')
+      );
+      mockStorageStore.getSelectedDirectoryForDevice.mockImplementation(
+        (deviceId: string) => createSelectedDirectory({ deviceId })
+      );
+      await runStartTransfer('device-2', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
+      expect(store.detailsDeviceId()).toBe('device-1');
+
+      await service.hideDetails();
+
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+      expect(store.transfers()['device-2'].phase).toBe('device-busy');
+      expect(store.detailsDeviceId()).toBe('device-2');
+
+      await service.hideDetails();
+
+      expect(store.transfers()['device-2'].phase).toBe('idle');
+      expect(store.detailsDeviceId()).toBeNull();
+    });
+  });
+
+  describe('cancelling a transfer started elsewhere', () => {
+    it('cancels the foreign job by its id and folds the reply', async () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ jobId: 'foreign-job' }) });
+      mockTransferService.cancelJob.mockResolvedValue(
+        createSnapshot({ jobId: 'foreign-job', state: TransferJobState.Cancelled })
+      );
+
+      await service.cancelTransfer('device-1');
+
+      expect(mockTransferService.cancelJob).toHaveBeenCalledWith('foreign-job');
+      expect(store.transfers()['device-1'].job?.state).toBe(TransferJobState.Cancelled);
+      expect(store.transfers()['device-1'].startedHere).toBe(false);
+    });
+
+    it('records a failed foreign cancel as a cancel failure', async () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ jobId: 'foreign-job' }) });
+      mockTransferService.cancelJob.mockRejectedValue(new Error('engine unreachable'));
+
+      await service.cancelTransfer('device-1');
+
+      expect(store.transfers()['device-1'].phase).toBe('cancel-failed');
+      expect(store.transfers()['device-1'].error).toBe('engine unreachable');
+    });
+
+    it('never redirects the cancel to a finished own job through a stale retained record', async () => {
+      await runStartTransfer('device-1', asFileList([]));
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Completed }),
+      });
+      store.foldLiveSnapshot({
+        snapshot: createSnapshot({ jobId: 'foreign-job', startedUtc: new Date('2026-01-01T00:05:00Z') }),
+      });
+      mockTransferService.cancelJob.mockClear();
+      mockTransferService.cancelJob.mockResolvedValue(
+        createSnapshot({ jobId: 'foreign-job', state: TransferJobState.Cancelled })
+      );
+
+      await service.cancelTransfer('device-1');
+
+      expect(mockTransferService.cancelJob).toHaveBeenCalledTimes(1);
+      expect(mockTransferService.cancelJob).toHaveBeenCalledWith('foreign-job');
+    });
+
+    it('clears an ended entry instead of cancelling anything', async () => {
+      store.foldLiveSnapshot({ snapshot: createSnapshot({ state: TransferJobState.Completed }) });
+
+      await service.cancelTransfer('device-1');
+
+      expect(mockTransferService.cancelJob).not.toHaveBeenCalled();
+      expect(store.transfers()['device-1'].phase).toBe('idle');
     });
   });
 });

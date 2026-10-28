@@ -50,6 +50,32 @@ internal sealed class TestConsoles
     }
 }
 
+/// <summary>Stands in for the transfer-line hub client, so the menu never dials an engine; records how it was driven.</summary>
+internal sealed class RecordingTransferLines : ITransferLineStream
+{
+    private int _starts;
+    private int _disposals;
+
+    public int Starts => Volatile.Read(ref _starts);
+
+    public int Disposals => Volatile.Read(ref _disposals);
+
+    /// <summary>What every <see cref="StartAsync"/> call returns; set a task that never completes to model a slow start.</summary>
+    public Task StartResult { get; set; } = Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken ct)
+    {
+        Interlocked.Increment(ref _starts);
+        return StartResult;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Interlocked.Increment(ref _disposals);
+        return ValueTask.CompletedTask;
+    }
+}
+
 /// <summary>
 /// The real public tree on test consoles, with the engine and the devices replaced by substitutes. The real settings
 /// and storage services run against the test home.
@@ -67,6 +93,8 @@ internal sealed class TestHost : IDisposable
     public ServiceCollection Services { get; } = new();
 
     public CliLoggingService Logging { get; } = new();
+
+    public RecordingTransferLines TransferLines { get; } = new();
 
     public CliComposition Composition { get; }
 
@@ -92,7 +120,7 @@ internal sealed class TestHost : IDisposable
         configure?.Invoke(Services);
         CliHost.RegisterCommands(Services);
 
-        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services));
+        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services), TransferLines: TransferLines);
         Session = CliHost.CreateSession(Composition);
     }
 

@@ -808,15 +808,15 @@ public sealed class FileUploadCommandTests : IDisposable
     // ---- the run -----------------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task ABusyDevice_IsExitOne_WithTheBusySentence_AndNothingIsUploaded()
+    public async Task ABusyDevice_IsExitSix_WithTheBusySentence_AndNothingIsUploaded()
     {
-        _createError = new CliException(CliExitCode.Failed, "Alpha is busy with another transfer — try again when it finishes.");
+        _createError = new CliException(CliExitCode.DeviceBusy, "Alpha is busy with a transfer — try again when it finishes.");
         var host = NewHost();
 
         var exitCode = await host.RunAsync("file", "upload", "loose.sid", "--to", "/music");
 
-        exitCode.Should().Be((int)CliExitCode.Failed);
-        host.Consoles.StdErr.Should().Contain("Alpha is busy with another transfer — try again when it finishes.");
+        exitCode.Should().Be((int)CliExitCode.DeviceBusy);
+        host.Consoles.StdErr.Should().Contain("Alpha is busy with a transfer — try again when it finishes.");
         await _transfers.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default);
         await _transfers.DidNotReceiveWithAnyArgs().CancelAsync(default!);
     }

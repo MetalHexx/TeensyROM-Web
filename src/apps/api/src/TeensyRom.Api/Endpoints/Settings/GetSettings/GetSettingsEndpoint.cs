@@ -18,7 +18,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
                     "**Settings Categories:**\n" +
                     "- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n" +
                     "- **Player Settings**: Playback behavior and startup preferences\n" +
-                    "- **File Transfer Settings**: Auto-launch and synchronization configuration\n" +
+                    "- **File Transfer Settings**: Auto-launch configuration\n" +
                     "- **Search Settings**: Search weights, stop words, and content exclusions\n" +
                     "- **App Settings**: Application lifecycle state\n\n" +
                     "Settings are loaded from the Settings.json file and cached in memory. " +

@@ -20,6 +20,7 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     deviceName: 'Unnamed',
     destinationLabel: 'SD Card · /music/',
     droppedRootName: 'HVSC',
+    originLabel: null,
     scanFound: 12480,
     scanTotal: 12480,
     uploaded: 8412,
@@ -310,6 +311,41 @@ describe('TransferProgressComponent', () => {
       buttonByLabel('Cancel transfer')?.click();
 
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('emits hideRequested from the Hide action, which only the active shape offers', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+      const spy = vi.fn();
+      component.hideRequested.subscribe(spy);
+
+      buttonByLabel('Hide')?.click();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it.each<TransferModalState>(['scanning', 'starting', 'device-busy', 'nothing-to-transfer', 'completed'])(
+      'offers no Hide action in the %s state',
+      async (state) => {
+        await setup(baseVm({ state }));
+
+        expect(buttonByLabel('Hide')).toBeFalsy();
+      }
+    );
+
+    it('names a watched transfer’s folder in the subtitle once it is active or ended', async () => {
+      await setup(baseVm({ state: 'receiving', originLabel: 'Downloads', destinationLabel: 'SD · /auto-transfer/' }));
+
+      expect(native().querySelector('.progress-subtitle')?.textContent).toContain(
+        'Downloads → SD · /auto-transfer/'
+      );
+    });
+
+    it('keeps the destination alone as the subtitle when there is no origin label', async () => {
+      await setup(baseVm({ state: 'receiving', originLabel: null, destinationLabel: 'SD · /music/' }));
+
+      const text = native().querySelector('.progress-subtitle')?.textContent ?? '';
+      expect(text).toContain('SD · /music/');
+      expect(text).not.toContain('→');
     });
 
     it('names each write bar with a distinct accessible name', async () => {

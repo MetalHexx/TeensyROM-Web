@@ -1,0 +1,6 @@
+@use '../form-shared';
+
+// Sits between the group header and the first folder, so it keeps clear of both.
+:host {
+  margin: var(--spacing-sm) 0;
+}

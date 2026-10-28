@@ -1,0 +1,35 @@
+<lib-sliding-container animationDirection="from-top" containerHeight="100%" [animationTrigger]="true">
+  <lib-scaling-card title="Transfers" animationEntry="from-top" animationParent="auto">
+    <span class="transfers-count" slot="corner" data-testid="transfers-count" role="img" [attr.aria-label]="rows().length + (rows().length === 1 ? ' transfer under way' : ' transfers under way')">{{ rows().length }}</span>
+    <lib-icon-button
+      slot="corner"
+      icon="settings"
+      size="medium"
+      [color]="settingsOpen() ? 'highlight' : 'normal'"
+      [ariaLabel]="settingsOpen() ? 'Close transfer settings' : 'Open transfer settings'"
+      [ariaExpanded]="settingsOpen()"
+      data-testid="transfer-settings-button"
+      (buttonClick)="settingsToggle.emit()"
+    />
+    <div class="transfers-card" data-testid="transfers-card">
+      @if (rows().length > 0) {
+        <div class="transfers-list">
+          @for (row of rows(); track row.transfer.jobId) {
+            <lib-transfer-row
+              [transfer]="row.transfer"
+              [deviceName]="row.deviceName"
+              [originLabel]="row.originLabel"
+              [watched]="row.watched"
+              [elapsedLabel]="row.elapsedLabel"
+              (showRequested)="onShowRequested(row.transfer.deviceId)"
+            />
+          }
+        </div>
+      } @else {
+        <p class="transfers-empty" data-testid="transfers-empty">No active file transfers</p>
+      }
+
+      <div class="visually-hidden" aria-live="polite" data-testid="transfers-live-region">{{ announcement() }}</div>
+    </div>
+  </lib-scaling-card>
+</lib-sliding-container>

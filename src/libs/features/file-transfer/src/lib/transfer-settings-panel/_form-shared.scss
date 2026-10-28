@@ -1,0 +1,93 @@
+// Look shared by the watch-folder forms, after the Settings Panel wireframes: a tinted box of
+// labelled fields, the device beside its SD | USB switch, and compact buttons.
+
+:host {
+  display: block;
+  // The theme's compact density hides a filled field's label; these forms bring it back, with the
+  // room it needs above the value.
+  --mat-form-field-filled-label-display: block;
+  --mat-form-field-container-height: 52px;
+  --mat-form-field-filled-with-label-container-padding-top: 20px;
+  --mat-form-field-filled-with-label-container-padding-bottom: 6px;
+  --mdc-filled-text-field-container-color: rgba(255, 255, 255, 0.08);
+  --mdc-filled-text-field-disabled-container-color: rgba(255, 255, 255, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.form-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--border-radius-sm);
+  background: color-mix(in srgb, var(--color-highlight) 8%, transparent);
+}
+
+.field {
+  width: 100%;
+  // Undoes `.compact-card mat-form-field`, whose negative margin would pull each field up under the
+  // next one.
+  margin-bottom: 0;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+
+  .field {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+// The device and storage of an existing destination can't change, so they read as locked.
+.field-row--locked {
+  opacity: 0.55;
+}
+
+.storage-toggle {
+  flex: 0 0 auto;
+  --mat-standard-button-toggle-height: 28px;
+  --mat-standard-button-toggle-shape: var(--border-radius-sm);
+  --mat-standard-button-toggle-label-text-size: 0.75rem;
+  --mat-standard-button-toggle-background-color: transparent;
+  --mat-standard-button-toggle-text-color: var(--color-dimmed-light);
+  --mat-standard-button-toggle-selected-state-background-color: var(--color-primary);
+  --mat-standard-button-toggle-selected-state-text-color: #fff;
+  --mat-standard-button-toggle-disabled-state-background-color: transparent;
+  --mat-standard-button-toggle-disabled-state-text-color: var(--color-dimmed);
+  --mat-standard-button-toggle-disabled-selected-state-background-color: var(--color-primary);
+  --mat-standard-button-toggle-disabled-selected-state-text-color: #fff;
+  --mat-standard-button-toggle-divider-color: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-dimmed-light);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  // Compact buttons, matching the wireframes.
+  --mdc-outlined-button-container-height: 32px;
+  --mdc-filled-button-container-height: 32px;
+  --mdc-text-button-container-height: 32px;
+}

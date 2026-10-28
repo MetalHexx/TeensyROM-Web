@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Api.Endpoints.Common;
 using TeensyRom.Api.Endpoints.ResetDevice;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
@@ -13,13 +14,15 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
                 .Produces<PingDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .ProducesProblem(StatusCodes.Status502BadGateway)
                 .WithName("PingDevice")
                 .WithSummary("Ping Device")
                 .WithTags("Devices")
                 .WithDescription(
                     "Pings a TeensyROM device to check if it is responsive.\n\n" +
-                    "- Works the same as clicking the cartridge reset button."
+                    "- Works the same as clicking the cartridge reset button.\n" +
+                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
         public override async Task Handle(PingDeviceRequest r, CancellationToken ct)
@@ -39,6 +42,11 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
 
             if (!result.IsSuccess)
             {
+                if (result.ActiveTransferJobId is { } jobId)
+                {
+                    SendProblem(DeviceBusyProblem.Create(r.DeviceId, device.Cart.Name, jobId));
+                    return;
+                }
                 SendExternalError(string.IsNullOrWhiteSpace(result.Error?.Trim('\0')) ? "The TeensyROM did not answer the ping." : result.Error);
                 return;
             }

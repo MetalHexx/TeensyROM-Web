@@ -89,4 +89,18 @@ public class PingDeviceEndpointTests
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Handle_DeviceBusyWithTransfer_SendsTheSharedConflict()
+    {
+        GivenDevice();
+        _mediator.Send(Arg.Any<PingCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new PingResult { IsSuccess = false, Error = "busy", ActiveTransferJobId = LeaseDoubles.JobId });
+        var endpoint = EndpointFactory.CreateEndpoint<PingDeviceEndpoint>(_deviceManager, _mediator);
+
+        await endpoint.Handle(new PingDeviceRequest { DeviceId = DeviceId }, CancellationToken.None);
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.Conflict);
+        endpoint.GetProblem<ProblemHttpResult>().ShouldBeDeviceBusy(DeviceId);
+    }
 }

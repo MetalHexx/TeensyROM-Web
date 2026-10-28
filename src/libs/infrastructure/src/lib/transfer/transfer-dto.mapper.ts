@@ -3,6 +3,9 @@ import {
   TransferJobDto2,
   TransferFileCompleted,
   TransferJobState as ApiTransferJobState,
+  TransferOriginDto,
+  TransferOriginKind as ApiTransferOriginKind,
+  TransferLaunchState as ApiTransferLaunchState,
   TeensyStorageType,
 } from '@teensyrom-nx/data-access/api-client';
 import {
@@ -10,6 +13,9 @@ import {
   TransferJobSnapshot,
   TransferJobState,
   TransferFileCompletion,
+  TransferOrigin,
+  TransferOriginKind,
+  TransferLaunchState,
 } from '@teensyrom-nx/domain';
 
 /**
@@ -31,11 +37,14 @@ export class TransferDtoMapper {
       filesReceived: dto.filesReceived,
       filesSent: dto.filesSent,
       filesFailed: dto.filesFailed,
+      bytesSent: dto.bytesSent,
       totalFiles: dto.totalFiles ?? null,
       currentFile: dto.currentFile ?? null,
+      origin: this.toOrigin(dto.origin),
       // Re-wrapped in Date: SignalR-pushed dtos skip the generated fromJSON deserializer
-      // (that's REST-only), so startedUtc arrives as a raw ISO string over the hub.
+      // (that's REST-only), so the timestamps arrive as raw ISO strings over the hub.
       startedUtc: new Date(dto.startedUtc),
+      lastActivityUtc: new Date(dto.lastActivityUtc),
       error: dto.error ?? null,
       failures: dto.failures.map((failure) => this.toFileCompletion(failure)),
       recentCompletions: dto.recentCompletions.map((c) => this.toFileCompletion(c)),
@@ -45,6 +54,9 @@ export class TransferDtoMapper {
       expansionBytesWritten: dto.expansionBytesWritten,
       expansionBytesDeclared: dto.expansionBytesDeclared,
       expandedFileCount: dto.expandedFileCount ?? null,
+      launchState: this.toLaunchState(dto.launchState),
+      launchedPath: dto.launchedPath ?? null,
+      launchError: dto.launchError ?? null,
     };
   }
 
@@ -89,6 +101,42 @@ export class TransferDtoMapper {
         return TransferJobState.Aborted;
       default:
         throw new Error(`Unknown API transfer job state: ${apiState}`);
+    }
+  }
+
+  private static toOrigin(dto: TransferOriginDto): TransferOrigin {
+    return {
+      kind: this.toOriginKind(dto.kind),
+      watchFolderId: dto.watchFolderId ?? null,
+      watchFolderPath: dto.watchFolderPath ?? null,
+    };
+  }
+
+  private static toOriginKind(apiKind: ApiTransferOriginKind): TransferOriginKind {
+    switch (apiKind) {
+      case ApiTransferOriginKind.Upload:
+        return TransferOriginKind.Upload;
+      case ApiTransferOriginKind.WatchFolder:
+        return TransferOriginKind.WatchFolder;
+      default:
+        throw new Error(`Unknown API transfer origin kind: ${apiKind}`);
+    }
+  }
+
+  private static toLaunchState(apiState: ApiTransferLaunchState): TransferLaunchState {
+    switch (apiState) {
+      case ApiTransferLaunchState.None:
+        return TransferLaunchState.None;
+      case ApiTransferLaunchState.Pending:
+        return TransferLaunchState.Pending;
+      case ApiTransferLaunchState.Launched:
+        return TransferLaunchState.Launched;
+      case ApiTransferLaunchState.Incompatible:
+        return TransferLaunchState.Incompatible;
+      case ApiTransferLaunchState.Failed:
+        return TransferLaunchState.Failed;
+      default:
+        throw new Error(`Unknown API transfer launch state: ${apiState}`);
     }
   }
 }

@@ -17,6 +17,37 @@
   </section>
 
   <section class="fixture-section">
+    <h2 class="section-heading">Transfers card</h2>
+
+    <div class="fixture-block">
+      <p class="fixture-label">nothing under way</p>
+      <lib-dev-transfers-card-fixture [rowCount]="0" />
+    </div>
+
+    <div class="fixture-block">
+      <p class="fixture-label">one row — a watched folder</p>
+      <lib-dev-transfers-card-fixture [rowCount]="1" />
+    </div>
+
+    <div class="fixture-block">
+      <p class="fixture-label">two rows — a watched folder and an upload</p>
+      <lib-dev-transfers-card-fixture [rowCount]="2" />
+    </div>
+  </section>
+
+  <section class="fixture-section">
+    <h2 class="section-heading">Transfer modal — tab row</h2>
+
+    <div class="fixture-block">
+      <p class="fixture-label">active, with two transfers under way and one just ended</p>
+      <div class="glassy-card">
+        <lib-transfer-tabs [tabs]="tabRowTabs" selected="tr-1" [deviceNames]="tabRowDeviceNames" />
+        <lib-transfer-progress [vm]="tabRowVm" />
+      </div>
+    </div>
+  </section>
+
+  <section class="fixture-section">
     <h2 class="section-heading">Transfer modal — active journey</h2>
 
     @for (item of scanThroughDraining; track item.label) {

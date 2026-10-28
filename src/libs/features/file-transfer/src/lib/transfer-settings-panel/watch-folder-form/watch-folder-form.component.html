@@ -1,0 +1,126 @@
+<div
+  class="form-box watch-form"
+  role="group"
+  aria-label="Add watch folder"
+  [formGroup]="formGroup()"
+  data-testid="watch-folder-form"
+  (keydown.escape)="onEscape($event)"
+>
+  <mat-form-field
+    appearance="fill"
+    class="field"
+    subscriptSizing="dynamic"
+    hideRequiredMarker
+    [libTooltip]="folderTooltip"
+  >
+    <mat-label>Folder to watch</mat-label>
+    <input
+      #firstField
+      matInput
+      type="text"
+      formControlName="folder"
+      placeholder="Path on the engine's computer"
+      autocomplete="off"
+      [errorStateMatcher]="folderMatcher"
+      data-testid="form-folder"
+      (keydown.enter)="onSubmit()"
+    />
+    @if (errors().folder; as message) {
+    <mat-error data-testid="error-folder">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <div class="field-row">
+    <mat-form-field
+      appearance="fill"
+      class="field"
+      subscriptSizing="dynamic"
+      hideRequiredMarker
+      [libTooltip]="deviceTooltip"
+    >
+      <mat-label>Device</mat-label>
+      <mat-select
+        formControlName="device"
+        [errorStateMatcher]="deviceMatcher"
+        data-testid="form-device"
+      >
+        @for (device of devices(); track device.deviceId) {
+        <mat-option [value]="device.deviceId">{{ device.name }}</mat-option>
+        }
+      </mat-select>
+      @if (errors().device; as message) {
+      <mat-error data-testid="error-device">{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-button-toggle-group
+      class="storage-toggle"
+      formControlName="storage"
+      aria-label="Storage"
+      hideSingleSelectionIndicator
+      [libTooltip]="storageTooltip"
+      data-testid="form-storage"
+    >
+      @for (storage of storageChoices; track storage) {
+      <mat-button-toggle [value]="storage" [disabled]="!storageOptions().includes(storage)">{{
+        storage
+      }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+  @if (errors().storage; as message) {
+  <p class="form-error" role="alert" data-testid="error-storage">{{ message }}</p>
+  }
+
+  <mat-form-field
+    appearance="fill"
+    class="field"
+    subscriptSizing="dynamic"
+    hideRequiredMarker
+    [libTooltip]="devicePathTooltip"
+  >
+    <mat-label>Device folder</mat-label>
+    <input
+      matInput
+      type="text"
+      formControlName="devicePath"
+      autocomplete="off"
+      [errorStateMatcher]="devicePathMatcher"
+      data-testid="form-device-path"
+      (keydown.enter)="onSubmit()"
+    />
+    @if (errors().devicePath; as message) {
+    <mat-error data-testid="error-device-path">{{ message }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="launch" [libTooltip]="launchTooltip" data-testid="form-launch"
+    >Auto launch</mat-slide-toggle
+  >
+
+  @if (errors().form; as message) {
+  <p class="form-error" role="alert" data-testid="error-form">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <lib-action-button
+      icon="close"
+      label="Cancel"
+      color="normal"
+      [fullWidth]="false"
+      [tooltip]="cancelTooltip"
+      data-testid="form-cancel"
+      (buttonClick)="formCancel.emit()"
+    />
+    <lib-action-button
+      icon="add"
+      label="Add"
+      variant="flat"
+      [fullWidth]="false"
+      [disabled]="!canSubmit()"
+      [tooltip]="submitTooltip"
+      data-testid="form-submit"
+      (buttonClick)="onSubmit()"
+    />
+  </div>
+</div>

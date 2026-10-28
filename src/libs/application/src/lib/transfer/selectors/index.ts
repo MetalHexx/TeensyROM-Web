@@ -8,6 +8,9 @@ import { isTransferModalOpen } from './is-transfer-modal-open';
 import { getTransferMetrics } from './get-transfer-metrics';
 import { getTransferSummary } from './get-transfer-summary';
 import { isDeviceBusy } from './is-device-busy';
+import { getLiveTransfers } from './get-live-transfers';
+import { getDetailsDeviceId } from './get-details-device-id';
+import { getTransferTabs } from './get-transfer-tabs';
 
 export function withTransferSelectors() {
   return withMethods((store) => {
@@ -20,6 +23,9 @@ export function withTransferSelectors() {
       ...getTransferMetrics(writableStore),
       ...getTransferSummary(writableStore),
       ...isDeviceBusy(writableStore),
+      ...getLiveTransfers(writableStore),
+      ...getDetailsDeviceId(writableStore),
+      ...getTransferTabs(writableStore),
     };
   });
 }

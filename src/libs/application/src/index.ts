@@ -46,6 +46,9 @@ export * from './lib/player/providers';
 // Settings state management
 export * from './lib/settings/settings-store';
 
+// Watch folder state management
+export * from './lib/watch-folder/watch-folder-store';
+
 // Audio state management
 export * from './lib/audio/audio-store';
 
@@ -54,5 +57,6 @@ export * from './lib/transfer/transfer-store';
 export * from './lib/transfer/transfer-context.interface';
 export * from './lib/transfer/transfer-context.service';
 export * from './lib/transfer/transfer-playback-guard';
+export * from './lib/transfer/transfer-tracker';
 export * from './lib/transfer/providers';
 export { formatElapsedLabel } from './lib/transfer/selectors/get-transfer-summary';

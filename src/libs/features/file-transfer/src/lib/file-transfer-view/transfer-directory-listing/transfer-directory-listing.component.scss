@@ -24,21 +24,27 @@
 .header-toolbar {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm) var(--spacing-md);
   width: 100%;
 
+  // The trail keeps a floor of its own: once the pane is too narrow for the trail and the search
+  // box side by side, the search box wraps to its own row instead of squeezing the badge and the
+  // breadcrumb down to nothing.
   lib-directory-trail-container {
-    flex: 1;
+    flex: 1 1 18rem;
     min-width: 0;
   }
 
   lib-transfer-search-toolbar {
     flex: 0 0 auto;
+    margin-left: auto;
   }
 
   @include mixins.below-phone {
+    flex-wrap: nowrap;
     flex-direction: column-reverse;
     align-items: stretch;
     gap: var(--spacing-sm);
@@ -53,10 +59,11 @@
   padding-top: var(--spacing-lg);
 }
 
+// Sits in the card's content padding rather than the compact card's, so it names that inset.
 .listing-viewport {
+  --scroll-edge-inset: var(--spacing-lg);
   flex: 1;
   min-height: 0;
-  width: 100%;
   overflow-x: hidden;
 }
 

@@ -248,6 +248,7 @@
         <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>
       }
       @case ('active') {
+        <lib-action-button icon="close_fullscreen" label="Hide" color="normal" [fullWidth]="false" (buttonClick)="onHide()"></lib-action-button>
         <lib-action-button icon="close" label="Cancel transfer" color="error" [fullWidth]="false" (buttonClick)="onCancel()"></lib-action-button>
       }
       @case ('terminal') {

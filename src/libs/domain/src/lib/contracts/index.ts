@@ -33,3 +33,9 @@ export * from './audio-stream.contract';
 // Transfer contracts
 export * from './transfer.contract';
 export * from './transfer-hub.contract';
+
+// Watch folder contracts
+export * from './watch-folder.contract';
+
+// Device busy contracts
+export * from './device-busy.error';
