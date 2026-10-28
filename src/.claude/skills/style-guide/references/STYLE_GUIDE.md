@@ -1776,35 +1776,22 @@ this.dialog.open(YouTubeDialogComponent, {
 
 ## Background Patterns
 
-### Synthwave Neo-Retro Grid
+### Synthwave Background
 
-The application layout features a subtle animated synthwave-inspired background pattern that shines through glassy cards for a neo-retro aesthetic.
+The application layout features a static synthwave-inspired background image that shines through glassy cards for a neo-retro aesthetic.
 
-**Implementation**: `libs/app/shell/src/lib/layout/layout.component.scss`
+**Implementation**: `libs/app/shell/src/lib/layout/layout.component.scss` (background on the layout host)
 
-**Features**:
-- Animated radial gradients in primary purple and highlight cyan colors
-- Subtle grid pattern (50px spacing) with minimal opacity
-- Animated scanlines that drift slowly (20s cycle)
-- Gentle pulsing effect (8s cycle) for ambient depth
-- Fixed positioning with `z-index: -1` - never interferes with UI
+**Image**: `apps/teensyrom-ui/public/background-glow.svg`, served at `/background-glow.svg`
+- Magenta glows on the left and bottom, a cyan glow on the right, on a transparent canvas
+- Stretched to fill the viewport (`preserveAspectRatio="none"`), so the glows follow any aspect ratio
+- Layered over a themed base gradient (`--mat-sys-surface-container-low` mixed with `--color-primary`), so the one image serves both light and dark themes
 
 **Design Philosophy**:
-- Opacity kept very low (0.015-0.15) to avoid distraction
-- Works with both light and dark themes using CSS custom properties
+- No grid, no scanlines, no animation — the background is static
+- Glow opacity kept low (0.2-0.35) to avoid distraction
 - Enhances glassy card effects by providing visual interest through transparency
-- Performance-optimized using CSS animations only (no JavaScript)
-
-**Visual Elements**:
-1. **Grid Pattern**: Horizontal/vertical lines create retro grid aesthetic
-2. **Radial Gradients**: Purple (primary) and cyan (highlight) ellipses for depth
-3. **Scanlines**: Horizontal accent lines with subtle drift animation
-4. **Pulsing**: Gentle opacity animation for ambient movement
-
-**SVG Asset**: `apps/teensyrom-ui/public/synthwave-grid.svg`
-- Optional detailed synthwave grid with perspective
-- Animated scan line effect
-- Can be used as alternative background via CSS `background-image`
+- Needs no JavaScript and no running animation
 
 **Accessibility**: Background opacity ensures WCAG contrast ratios are maintained for all text and interactive elements.
 
