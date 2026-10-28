@@ -45,5 +45,6 @@ describe('mapping labels', () => {
   it('labels the owner of a control', () => {
     expect(ownerLabel('A')).toBe('deck A');
     expect(ownerLabel('mixer')).toBe('mixer');
+    expect(ownerLabel('set')).toBe('set');
   });
 });

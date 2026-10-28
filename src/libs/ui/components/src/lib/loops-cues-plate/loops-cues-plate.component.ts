@@ -92,4 +92,6 @@ export class LoopsCuesPlateComponent {
   readonly nudgeCommit = output<LoopBoundaryNudge>();
   /** Emits when a boundary's snap key is pressed, tagged with the boundary and direction. */
   readonly snap = output<LoopBoundarySnap>();
+  /** Emits the new name when the selected row's name is renamed in place. */
+  readonly rename = output<string>();
 }

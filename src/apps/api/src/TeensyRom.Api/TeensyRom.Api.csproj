@@ -60,6 +60,8 @@
     <None Remove="ClientApp\teensyrom-nx\dist\**" />
     <Content Remove="Endpoints\MidiSettings\deck-control-ids.json" />
     <EmbeddedResource Include="Endpoints\MidiSettings\deck-control-ids.json" LogicalName="TeensyRom.Api.DeckControlIds.json" />
+    <Content Remove="Endpoints\MidiSettings\set-control-ids.json" />
+    <EmbeddedResource Include="Endpoints\MidiSettings\set-control-ids.json" LogicalName="TeensyRom.Api.SetControlIds.json" />
   </ItemGroup>
 
   <!-- Build and copy frontend before publish -->

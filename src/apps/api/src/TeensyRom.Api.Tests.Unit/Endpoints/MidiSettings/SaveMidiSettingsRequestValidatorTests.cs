@@ -308,6 +308,8 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("a")]
     [InlineData("C")]
     [InlineData("Mixer")]
+    [InlineData("Set")]
+    [InlineData("deck")]
     [InlineData("")]
     public void Validate_UnknownOwner_IsRejected(string owner)
     {
@@ -327,8 +329,13 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("A", "voice-1-filter")]
     [InlineData("B", "filter-low-pass")]
     [InlineData("A", "filter-cutoff")]
+    [InlineData("A", "set-previous")]
+    [InlineData("B", "set-next")]
     [InlineData("A", "panic")]
     [InlineData("B", "panic")]
+    [InlineData("set", "set-select")]
+    [InlineData("set", "set-load-a")]
+    [InlineData("set", "set-load-b")]
     public void Validate_ControlOnTheOwnersAllowList_Passes(string owner, string control)
     {
         var request = ValidRequest();
@@ -353,6 +360,13 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("mixer", "speed")]
     [InlineData("mixer", "crossfader")]
     [InlineData("mixer", "")]
+    [InlineData("set", "speed")]
+    [InlineData("set", "play-pause")]
+    [InlineData("set", "set-previous")]
+    [InlineData("set", "Set-Select")]
+    [InlineData("set", "")]
+    [InlineData("A", "set-select")]
+    [InlineData("B", "set-load-a")]
     public void Validate_ControlOffTheOwnersAllowList_IsRejected(string owner, string control)
     {
         var request = ValidRequest();
@@ -363,9 +377,10 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsSeventyNineNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsEightyOneNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(79);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(81);
+        MidiSettingsAllowLists.SetControls.Should().HaveCount(3);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }
 

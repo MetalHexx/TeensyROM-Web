@@ -1,0 +1,9 @@
+// Sole content of the set card's `.compact-card--fill` flex column: `flex: 1 1 auto` claims the
+// column's full height and `min-height: 0` lets the card's own rows list, not the outer
+// `.compact-card`, be what scrolls.
+:host {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}

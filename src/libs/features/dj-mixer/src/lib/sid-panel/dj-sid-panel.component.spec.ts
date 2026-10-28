@@ -132,7 +132,7 @@ describe('DjSidPanelComponent', () => {
 
   describe('the bindings button', () => {
     function bindingsButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
-      return find(fixture, '.panel-header button');
+      return find(fixture, '.panel-header .bindings-button button');
     }
 
     it('reports whether the panel is open, and changes its name with it', () => {
@@ -166,6 +166,49 @@ describe('DjSidPanelComponent', () => {
 
       expect(document.activeElement).toBe(bindingsButton(fixture));
       fixture.nativeElement.remove();
+    });
+  });
+
+  describe('the browser button', () => {
+    function browserButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
+      return find(fixture, '.panel-header .browser-button button');
+    }
+
+    it('is lit and offers to hide while the browser is shown, and offers to show once hidden', () => {
+      const { fixture } = render();
+
+      expect(browserButton(fixture).getAttribute('aria-expanded')).toBe('true');
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Hide the browser');
+
+      fixture.componentRef.setInput('browserShown', false);
+      fixture.detectChanges();
+
+      expect(browserButton(fixture).getAttribute('aria-expanded')).toBe('false');
+      expect(browserButton(fixture).getAttribute('aria-label')).toBe('Show the browser');
+    });
+
+    it('emits browserToggle when pressed', () => {
+      const { fixture } = render();
+      const toggled = vi.fn();
+      fixture.componentInstance.browserToggle.subscribe(toggled);
+
+      browserButton(fixture).click();
+
+      expect(toggled).toHaveBeenCalledTimes(1);
+    });
+
+    it('sits beside the bindings button in the header centre cell, bindings first', () => {
+      const { fixture } = render();
+
+      const buttons = Array.from(
+        fixture.nativeElement.querySelectorAll('.panel-header > .header-actions > lib-icon-button')
+      ) as HTMLElement[];
+
+      expect(buttons.map((button) => button.classList.contains('bindings-button'))).toEqual([
+        true,
+        false,
+      ]);
+      expect(buttons[1].classList.contains('browser-button')).toBe(true);
     });
   });
 
@@ -360,6 +403,7 @@ describe('DjSidPanelComponent', () => {
   describe('the settings sign', () => {
     const marker = (id: string) => ({
       id,
+      name: null,
       start: { frame: 100, offsetFrames: 0 },
       end: null,
       voices: [0, 1, 2],

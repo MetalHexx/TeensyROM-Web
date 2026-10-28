@@ -1,11 +1,18 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { LOOP_POSITIONS_STORE, TUNE_INSERTER, TUNE_RESOLVER } from '@teensyrom-nx/application';
-import { ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import {
+  DJ_LIBRARY_STATE_REPOSITORY,
+  SET_STORE,
+  TUNE_INSERTER,
+  TUNE_MEMORY_STORE,
+  TUNE_RESOLVER,
+} from '@teensyrom-nx/application';
+import { ALERT_SERVICE, API_CONFIG, IAlertService } from '@teensyrom-nx/domain';
 import { DjDatabase, DJ_DATABASE_NAME } from './database/dj-database';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
-import { DJ_ENGINE_PROVIDERS } from './providers';
+import { ApiDjLibraryStateRepository, ApiSetStore, ApiTuneMemoryStore } from './dj-library';
+import { DJ_ENGINE_PROVIDERS, DJ_STORAGE_PROVIDERS } from './providers';
 
 const PSID_HEADER_SIZE = 0x7c;
 
@@ -106,17 +113,22 @@ describe('DJ_ENGINE_PROVIDERS composition', () => {
     expect(playable?.reference.identity).toEqual(reference.identity);
     expect(indexer.index).toHaveBeenCalledTimes(1);
   });
+});
 
-  it('provides a loop-positions store that hands back what was saved', async () => {
-    const store = TestBed.inject(LOOP_POSITIONS_STORE);
-    const identity = { sidHash: 'tune', subtune: 1 };
-    const markers = [
-      { id: 'a', start: { frame: 100, offsetFrames: -4 }, end: null, voices: [0, 1, 2] },
-    ];
+describe('DJ_STORAGE_PROVIDERS composition', () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ...DJ_STORAGE_PROVIDERS,
+        { provide: API_CONFIG, useValue: { basePath: 'http://localhost:5000' } },
+      ],
+    });
+  });
 
-    await store.save(identity, markers);
-
-    expect(await store.load(identity)).toEqual(markers);
-    expect(await store.load({ sidHash: 'tune', subtune: 2 })).toEqual([]);
+  it('binds the three library ports to their API adapters', () => {
+    expect(TestBed.inject(SET_STORE)).toBeInstanceOf(ApiSetStore);
+    expect(TestBed.inject(TUNE_MEMORY_STORE)).toBeInstanceOf(ApiTuneMemoryStore);
+    expect(TestBed.inject(DJ_LIBRARY_STATE_REPOSITORY)).toBeInstanceOf(ApiDjLibraryStateRepository);
   });
 });

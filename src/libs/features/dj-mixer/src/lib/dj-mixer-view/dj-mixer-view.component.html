@@ -1,51 +1,111 @@
 <div class="dj-mixer-view">
-  <div #mixerGrid class="mixer-grid" [class.mixer-grid--two]="decks.length === 2">
+  <div
+    #mixerGrid
+    class="mixer-grid"
+    [class.mixer-grid--two]="decks.length === 2"
+    [class.mixer-grid--no-browser]="browserCollapsed()"
+  >
     @for (deck of decks; track deck.index) {
     <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
     }
     <lib-dj-sid-panel
       [decks]="decks"
       [bindingsOpen]="panelOpen()"
+      [browserShown]="browserShown()"
       (bindingsToggle)="togglePanel()"
+      (browserToggle)="toggleBrowser()"
     ></lib-dj-sid-panel>
-    <div class="bottom-band">
-      @if (enabledDevices().length === 0) {
+    <lib-sliding-container
+      class="bottom-slot"
+      animationDirection="from-bottom"
+      containerHeight="100%"
+      [animationTrigger]="browserShown()"
+      [animationDuration]="panelAnimationDuration()"
+      (animationComplete)="onBandAnimationComplete()"
+    >
+      <div class="bottom-band" [style.--fold-duration]="panelAnimationDuration() + 'ms'">
+        <lib-scaling-compact-card
+          class="browse-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+        >
+          <lib-dj-browse-trees
+            [devices]="enabledDevices()"
+            [sets]="setsBranch()"
+            [activeStorage]="activeStorage()"
+            (storageSelect)="onStorageSelect($event)"
+            (setSelect)="onSetSelect($event)"
+          ></lib-dj-browse-trees>
+        </lib-scaling-compact-card>
+        @if (enabledDevices().length === 0) {
 
-      <lib-empty-state-message
-        icon="devices"
-        title="No Enabled Devices"
-        message="Enable a TeensyROM device to get started."
-        secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
+        <lib-empty-state-message
+          icon="devices"
+          title="No Enabled Devices"
+          message="Enable a TeensyROM device to get started."
+          secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
+        >
+        </lib-empty-state-message>
+
+        } @else {
+
+        <lib-scaling-compact-card
+          class="directory-listing-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+          [class.directory-listing-card--folded]="listingFoldedEffective()"
+          (transitionend)="onListingCardTransitionEnd($event)"
+        >
+          @if (!stacked()) {
+          <lib-fold-handle
+            label="Files"
+            foldAccessibleName="Collapse the file listing"
+            unfoldAccessibleName="Expand the file listing"
+            [folded]="listingFoldedEffective()"
+            [animationDuration]="panelAnimationDuration()"
+            (foldedChange)="foldListing($event)"
+          ></lib-fold-handle>
+          }
+          <div
+            #listingBody
+            class="listing-body"
+            [attr.inert]="listingFoldedEffective() ? '' : null"
+            [style.width.px]="listingBodyWidth()"
+            [style.min-width.px]="listingBodyWidth()"
+          >
+            <lib-dj-directory-listing
+              [activeStorage]="activeStorage()"
+              (dragStarted)="dragging.set(true)"
+              (dragEnded)="dragging.set(false)"
+            ></lib-dj-directory-listing>
+          </div>
+        </lib-scaling-compact-card>
+
+        }
+        <lib-scaling-compact-card
+          class="set-card"
+          cardClass="compact-card--fill"
+          animationEntry="from-bottom"
+        >
+          <lib-dj-set-card [listingDragActive]="dragging()"></lib-dj-set-card>
+        </lib-scaling-compact-card>
+      </div>
+    </lib-sliding-container>
+    @if (peekEverShown()) {
+    <div class="set-peek">
+      <lib-sliding-container
+        animationDirection="from-bottom"
+        containerHeight="100%"
+        [animationTrigger]="peekShown()"
+        [animationDuration]="panelAnimationDuration()"
       >
-      </lib-empty-state-message>
-
-      } @else {
-
-      <lib-scaling-compact-card
-        class="browse-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
-      >
-        <lib-dj-browse-trees
-          [devices]="enabledDevices()"
-          [activeStorage]="activeStorage()"
-          (storageSelect)="onStorageSelect($event)"
-        ></lib-dj-browse-trees>
-      </lib-scaling-compact-card>
-      <lib-scaling-compact-card
-        class="directory-listing-card"
-        cardClass="compact-card--fill"
-        animationEntry="from-bottom"
-      >
-        <lib-dj-directory-listing
-          [activeStorage]="activeStorage()"
-          (dragStarted)="dragging.set(true)"
-          (dragEnded)="dragging.set(false)"
-        ></lib-dj-directory-listing>
-      </lib-scaling-compact-card>
-
-      }
+        <div class="set-peek-card">
+          <lib-dj-set-card></lib-dj-set-card>
+        </div>
+      </lib-sliding-container>
     </div>
+    }
+    <span class="hidden-save-notice" role="status">{{ hiddenSaveNotice() }}</span>
     @if (mappingMode()) {
     <lib-mapping-overlay-layer
       [targets]="overlayTargets()"

@@ -540,6 +540,52 @@ describe('MidiMappingEngine', () => {
     });
   });
 
+  describe('the set Select', () => {
+    const SELECT = { owner: 'set', control: 'set-select' } as const satisfies ControlIdentity;
+    const selected = (): string | null => h.djStore.sets.selectedRowId();
+
+    beforeEach(() => h.seedSetRows(5, 0));
+
+    it('moves one row per relative tick, whatever the sensitivity, and clamps at the ends', () => {
+      map(ccSource(20), SELECT, style('relative-offset', 0.01));
+
+      h.engine.handle(cc(20, 65));
+      expect(selected()).toBe('row-1');
+
+      h.engine.handle(cc(20, 66));
+      expect(selected()).toBe('row-3');
+
+      h.engine.handle(cc(20, 100));
+      expect(selected()).toBe('row-4');
+
+      h.engine.handle(cc(20, 0));
+      expect(selected()).toBe('row-0');
+    });
+
+    it('moves one row per step press, down for a negative amount', () => {
+      map(noteSource(50), SELECT, style('step', 0.05));
+      map(noteSource(51), SELECT, style('step-release', -1));
+
+      h.engine.handle(note(50, 100));
+      h.engine.handle(note(50, 0));
+      h.engine.handle(note(50, 100));
+      expect(selected()).toBe('row-2');
+
+      h.engine.handle(note(51, 100));
+      h.engine.handle(note(51, 0));
+      expect(selected()).toBe('row-1');
+    });
+
+    it('does nothing in an empty set', () => {
+      h.seedSetRows(0);
+      map(ccSource(20), SELECT, style('relative-offset', 1));
+
+      h.engine.handle(cc(20, 70));
+
+      expect(selected()).toBeNull();
+    });
+  });
+
   describe('holds', () => {
     beforeEach(() => {
       map(noteSource(60), HOLD_1_A, style('hold'));

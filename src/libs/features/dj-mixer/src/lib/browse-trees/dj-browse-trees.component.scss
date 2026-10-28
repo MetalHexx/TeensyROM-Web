@@ -1,9 +1,12 @@
 // Sole content of the browse card's `.compact-card--fill` flex column: `flex: 1 1 auto` claims
 // the column's full height and `min-height: 0` lets it shrink below its trees' natural height so
-// this element — not the outer `.compact-card`'s `overflow: hidden` — is what scrolls.
+// this element — not the outer `.compact-card`'s `overflow: hidden` — is what scrolls. It never
+// scrolls sideways, and its gutter is reserved so a vertical scrollbar does not clip the widest row.
 :host {
   display: block;
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }

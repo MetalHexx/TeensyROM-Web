@@ -30,7 +30,10 @@
 }
 
 .storage-list {
+  // Block-level, as the host is: in a tree as wide as its widest row, two inline buttons would
+  // sit side by side and that one line would set the width.
   .storage-row {
+    display: block;
     background: none;
     border: none;
     padding: 0;

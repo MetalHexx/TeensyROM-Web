@@ -27,6 +27,7 @@ import type { StyledIconColor } from '../../styled-icon/styled-icon.component';
 @Component({
   selector: 'lib-directory-tree-node',
   imports: [CommonModule, IconLabelComponent],
+  host: { '[class.truncating]': 'truncate()' },
   templateUrl: './directory-tree-node.component.html',
   styleUrl: './directory-tree-node.component.scss',
 })
@@ -41,6 +42,12 @@ export class DirectoryTreeNodeComponent {
   isSelected = input<boolean>(false);
   /** The kind of node being rendered — drives the icon color (device: primary, storage: highlight, directory: directory, unset/other: highlight). See the exported `DirectoryTreeNodeType` enum (`@teensyrom-nx/domain`). */
   nodeType = input<DirectoryTreeNodeType>();
+  /**
+   * Truncates the label with an ellipsis when the row's container is narrower than the text,
+   * instead of widening the row. The node never caps its own width; the caller constrains it.
+   * Defaults to `false` (the label shows in full).
+   */
+  truncate = input<boolean>(false);
 
   /** Icon color derived from `nodeType()`: `'primary'` for a device, `'directory'` for a directory, `'highlight'` otherwise. */
   readonly iconColor = computed<StyledIconColor>(() => {

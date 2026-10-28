@@ -1,0 +1,28 @@
+:host {
+  display: block;
+}
+
+.branch-row,
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+  color: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 1px;
+    border-radius: var(--border-radius-sm);
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--color-dimmed);
+}
+
+.set-list .set-row {
+  margin-left: var(--spacing-lg);
+  min-width: 0;
+}

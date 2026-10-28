@@ -29,6 +29,7 @@ function marker(
 ): DeckLoopMarker {
   return {
     id,
+    name: null,
     start: { frame: start, offsetFrames: 0 },
     end: end === null ? null : { frame: end, offsetFrames: 0 },
     voices: [0, 1, 2],
@@ -169,6 +170,15 @@ describe('loopsSummary', () => {
         ['Item 1', 'cue', 'CUE'],
         ['Item 2', 'loop', '7.8s'],
       ]);
+    });
+
+    it('shows the name a marker was given in place of its position', () => {
+      setLoops([marker('a', 100, null, { name: 'Drop' }), marker('b', 200)], { selectedId: 'a' });
+
+      const summary = store.loopsSummary('A')();
+
+      expect(summary.items.map((item) => item.name)).toEqual(['Drop', 'Item 2']);
+      expect(summary.selected?.name).toBe('Drop');
     });
 
     it('places each item on the strip as a share of the tune, clamped, with no end for a cue', () => {

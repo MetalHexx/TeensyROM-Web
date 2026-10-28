@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import type { ControlOwner } from '../mapping/mapping.models';
 import type { Slot } from '../slot';
 
 export type MappingStyleKind =
@@ -34,7 +35,7 @@ export interface MidiSourceRecord {
 export interface ControlMappingRecord {
   readonly id: string;
   readonly source: MidiSourceRecord;
-  readonly owner: Slot | 'mixer';
+  readonly owner: ControlOwner;
   readonly control: string;
   readonly style: { readonly kind: MappingStyleKind; readonly amount: number | null };
 }

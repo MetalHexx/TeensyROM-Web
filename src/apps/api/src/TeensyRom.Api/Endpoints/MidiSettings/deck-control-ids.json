@@ -3,6 +3,8 @@
   "stop",
   "subtune-previous",
   "subtune-next",
+  "set-previous",
+  "set-next",
   "seek",
   "speed",
   "speed-jump-up",

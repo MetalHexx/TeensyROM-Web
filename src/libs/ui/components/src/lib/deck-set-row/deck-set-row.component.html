@@ -1,0 +1,23 @@
+<lib-synth-key
+  class="step-key"
+  data-control="set-previous"
+  label="Prev"
+  icon="skip_previous"
+  [accessibleName]="model().previousAccessibleName"
+  [disabled]="model().previousDisabled"
+  (press)="previous.emit()"
+/>
+<span class="readout">
+  <span class="caption">SET</span>
+  <span class="position">{{ model().positionText }}</span>
+  <span class="name">{{ model().setName }}</span>
+</span>
+<lib-synth-key
+  class="step-key"
+  data-control="set-next"
+  label="Next"
+  icon="skip_next"
+  [accessibleName]="model().nextAccessibleName"
+  [disabled]="model().nextDisabled"
+  (press)="next.emit()"
+/>

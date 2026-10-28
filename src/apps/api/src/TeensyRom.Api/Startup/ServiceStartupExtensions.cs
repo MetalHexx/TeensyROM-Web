@@ -4,6 +4,7 @@ using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Api.Transfers.Archives;
 using TeensyRom.Api.WatchFolders;
+using TeensyRom.Core.Dj;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -46,6 +47,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IMidiSettingsService, MidiSettingsService>();
+            services.AddSingleton<IDjLibraryService, DjLibraryService>();
             services.AddSingleton<IDeviceInterrogator, DeviceInterrogator>();
 			services.AddSingleton<ICartFinder, CartFinder>();
             // WindowsRegistryDescriptorReader is [SupportedOSPlatform("windows")], but registering the

@@ -48,7 +48,7 @@ import {
   type ControllerRowModel,
 } from '@teensyrom-nx/ui/components';
 
-const GROUP_OWNERS: readonly ControlOwner[] = [...DECK_SLOTS, 'mixer'];
+const GROUP_OWNERS: readonly ControlOwner[] = [...DECK_SLOTS, 'mixer', 'set'];
 
 /** Why a controller's bindings are not live, shown on each of its rows. A controller that is
  *  listening, or has not yet settled to a status, raises nothing. */
@@ -99,7 +99,7 @@ interface ControllerView {
   readonly model: ControllerRowModel;
 }
 
-/** `deck A` as `Deck A`, `mixer` as `Mixer`. */
+/** `deck A` as `Deck A`, `mixer` as `Mixer`, `set` as `Set`. */
 function ownerHeading(owner: ControlOwner): string {
   const label = ownerLabel(owner);
   return label.charAt(0).toUpperCase() + label.slice(1);
@@ -212,7 +212,7 @@ export class DjBindingsPanelComponent {
     };
   });
 
-  /** Each owner that has controls (Deck A and Deck B; the Mixer owns none today), with its
+  /** Each owner that has controls (Deck A and Deck B, the Set; the Mixer owns none today), with its
    *  mappings in control-list order, then source order. */
   readonly groups = computed<readonly BindingGroupView[]>(() => {
     const controllers = this.store.controllers();

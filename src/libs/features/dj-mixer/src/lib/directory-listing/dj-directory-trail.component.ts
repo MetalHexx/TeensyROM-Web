@@ -19,6 +19,7 @@ import type { ActiveStorage } from '../active-storage';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DirectoryTrailComponent],
   templateUrl: './dj-directory-trail.component.html',
+  styleUrl: './dj-directory-trail.component.scss',
 })
 export class DjDirectoryTrailComponent {
   readonly activeStorage = input.required<ActiveStorage>();

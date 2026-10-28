@@ -92,6 +92,12 @@ export class DeckSpeed {
     return this.tempos[slot].fader;
   }
 
+  /** The speed worth keeping for the deck: the value an open excursion remembers, else the fader's.
+   *  A nudge never counts. */
+  keptSpeed(slot: Slot): number {
+    return this.excursions[slot].remembered() ?? this.tempos[slot].fader;
+  }
+
   /** True while either nudge pad is held. */
   isNudging(slot: Slot): boolean {
     const { up, down } = this.tempos[slot].layers;

@@ -11,14 +11,24 @@
           <lib-deck-settings-sign [model]="panel.sign" />
         </span>
         @if ($first) {
-        <lib-icon-button
-          class="bindings-button"
-          icon="tune"
-          [color]="bindingsOpen() ? 'highlight' : 'normal'"
-          [ariaLabel]="bindingsOpen() ? 'Close bindings panel' : 'Open bindings panel'"
-          [ariaExpanded]="bindingsOpen()"
-          (buttonClick)="bindingsToggle.emit()"
-        ></lib-icon-button>
+        <span class="header-actions">
+          <lib-icon-button
+            class="bindings-button"
+            icon="tune"
+            [color]="bindingsOpen() ? 'highlight' : 'normal'"
+            [ariaLabel]="bindingsOpen() ? 'Close bindings panel' : 'Open bindings panel'"
+            [ariaExpanded]="bindingsOpen()"
+            (buttonClick)="bindingsToggle.emit()"
+          ></lib-icon-button>
+          <lib-icon-button
+            class="browser-button"
+            icon="dock_to_bottom"
+            [color]="browserShown() ? 'highlight' : 'normal'"
+            [ariaLabel]="browserShown() ? 'Hide the browser' : 'Show the browser'"
+            [ariaExpanded]="browserShown()"
+            (buttonClick)="browserToggle.emit()"
+          ></lib-icon-button>
+        </span>
         } }
       </div>
 

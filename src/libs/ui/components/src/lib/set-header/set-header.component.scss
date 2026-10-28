@@ -1,0 +1,116 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--synth-label);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5rem;
+}
+
+.name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex: none;
+  color: var(--synth-legend);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.lamp {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--synth-legend);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.light {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--synth-led-off);
+}
+
+.lamp[data-save='saved'] .light {
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+
+.lamp[data-save='saving'] .light {
+  background: var(--color-directory);
+  box-shadow: 0 0 6px var(--color-directory);
+  animation: lamp-pulse 1s ease-in-out infinite;
+}
+
+.lamp[data-save='failed'] {
+  color: var(--color-error);
+
+  .light {
+    background: var(--color-error);
+    box-shadow: 0 0 6px var(--color-error);
+  }
+}
+
+@keyframes lamp-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp[data-save='saving'] .light {
+    animation: none;
+  }
+}
+
+lib-synth-key {
+  flex: none;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid color-mix(in srgb, var(--color-error) 50%, transparent);
+  border-radius: var(--border-radius-sm);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
+.prompt {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--synth-label);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}

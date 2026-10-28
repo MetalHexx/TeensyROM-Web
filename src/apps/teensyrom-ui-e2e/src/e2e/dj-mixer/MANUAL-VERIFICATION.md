@@ -405,6 +405,223 @@ kB on `main`; that warning is already on `main` and `project.json`'s budgets are
 - [ ] GBL toggled mid-set on the running loop A/Bs between its own settings and the main track's.
 - [ ] Play-now and GBL are learned and played from the controller.
 
+## Sets
+
+Frame-by-frame check of the hideable browser, the set card's peek and the set card itself in the DJ
+view against the mockup, the bundle check, and the operator's bench list.
+
+**How it was driven.** Two pages, side by side, at **1920 x 1080**. The mockup
+(`ASID-DJ-ROOT-WIREFRAME-SETS.html`) was served statically and measured in Chrome with
+`getBoundingClientRect()`; its frames are drawn at 0.8 scale, so its numbers are divided by 0.8 and
+taken relative to each frame's own top-left. The view was driven with a throwaway Cypress spec in
+Electron (deleted after the run, not committed) against `pnpm nx run teensyrom-ui:serve` on port
+4210, with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }`
+injected and the library interceptors serving a saved set "Friday" (three rows) and a second set
+"Saturday", one device, and `Still_Time.sid` in the listing. Every view number is
+`getBoundingClientRect()` on the live DOM. `moveSelection` was reached through
+`ng.getComponent(document.querySelector('lib-dj-mixer-view')).djSets`. API port 10213 was not used:
+another checkout's API was listening there, so the DJ library was never written to a real host.
+
+**Frames.**
+
+| frame | what was checked                                                                                                     | how                                                                                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| A     | full view: tree, listing, set card, the browser button lit, each deck's set row, header button order                 | measured on both pages, screenshot                                                                                               |
+| B     | browser hidden: decks, speed strips and SID panel unchanged, freed height empty                                      | measured on both pages, screenshot                                                                                               |
+| C     | peek: slides up over the bottom, follows Select, leaves after the last, decks unmoved, deck controls clickable after | measured on both pages, sampled every 150 ms, screenshot; the committed case in `dj-mixer-sets.cy.ts`                            |
+| D     | set card: a drag in with a pending row then the analysed row, rename, reorder                                        | drag in measured and screenshotted; rename and reorder in `dj-mixer-sets.cy.ts`                                                  |
+| E     | load a saved set from the tree, the delete confirm                                                                   | confirm measured and screenshotted; loading in `dj-mixer-sets.cy.ts`                                                             |
+| F     | naming loops and cues in place, the name on the tile and the settings sign                                           | driven: Still Time loaded on Deck A, a cue added and renamed in place, GBL turned off and the cue played; texts read, screenshot |
+
+**Frames A, B, C: the build against the mockup** (px, 1920 x 1080 coordinates).
+
+| element                           | mockup                                                   | build                                                                                |
+| --------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| grid                              | 112 66 / 1792 x 998                                      | 112 66 / 1792 x 998 (same)                                                           |
+| deck column A / B                 | 112 and 1430, 474 wide, 614.5 high                       | transport 129 and 1447, 440 x 163.8                                                  |
+| SID panel                         | 698 66 / 620 x 614.5                                     | 698 66 / 620 x 555.8                                                                 |
+| band (tree + listing + set card)  | 112 692.5 / 1792 x 371.5, ends at 1064                   | 112 633.8 / 1792 x 430.2, ends at 1064                                               |
+| tree / listing / set card (width) | 212 / 876 / 680, 12 apart                                | 212 / 778 / 778, 12 apart (the even split; see the widths table below)               |
+| header buttons: bindings, browser | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32          | 974 and 1010, 32 x 32, 4 apart, wrapper 68 x 32 (same)                               |
+| browser button                    | `Hide the browser`, engaged (lit)                        | `Hide the browser`, lit, `aria-expanded` true; `Show the browser`, false once hidden |
+| B (hidden)                        | decks, speed strips and SID panel as in A; band absent   | same as A to the pixel; band removed, the freed height empty                         |
+| C (peek up)                       | 112 / 1792 x 316                                         | 112 748 / 1792 x 316 (bottom 1064, the grid's bottom)                                |
+| set header, left to right         | glyph, name (flex), Saved lamp, count, delete 32, new 32 | name (flex), Saved lamp, count, delete 32, New key 57.2                              |
+| deck set rows                     | in each deck stack                                       | 129 212.8 and 1447 212.8, 440 x 26                                                   |
+
+The deck, speed strip, SID panel and grid rects are identical to the pixel in A, B and C, and again
+after Show. The tree is 212 (short names) and the listing and the set card 778 each, no longer the
+mockup's 876 and 680. The freed band height stays empty.
+
+**The band's widths and the listing's fold.** Measured with `getBoundingClientRect()` in a same-origin
+frame of exactly the stated viewport, loaded in a tab against the running `pnpm start` on port 4200
+and its API, with `lib-scaling-container, lib-scaling-compact-card { transform: none !important }`
+injected. The deck, speed strip and SID panel rects were read before and after each fold and unfold
+and compared: identical in every state. The run's rendering was slow (a fold took a few seconds to
+settle), so each state was read after waiting it out, not mid-transition.
+
+| viewport    | state                              | tree         | listing | set card | tree scroller (scroll / client)     |
+| ----------- | ---------------------------------- | ------------ | ------- | -------- | ----------------------------------- |
+| 1920 x 1080 | open, short names                  | 212          | 778     | 778      | 179 / 179                           |
+| 1920 x 1080 | folded                             | 212          | 44      | 1512     | 179 / 179                           |
+| 1920 x 1080 | unfolded again                     | 212          | 778     | 778      | 179 / 179                           |
+| 1920 x 1080 | a 64-character set name (see note) | 360 (cap)    | 704     | 704      | 327 / 327                           |
+| 1366 x 768  | open, short names                  | 212          | 504.9   | 504.9    | 187 / 187                           |
+| 1366 x 768  | folded                             | 212          | 44      | 965.8    | 187 / 187                           |
+| 1366 x 768  | unfolded again                     | 212          | 504.9   | 504.9    | 187 / 187                           |
+| 1366 x 768  | a 64-character set name (see note) | 360 (cap)    | 430.9   | 430.9    | 335 / 335                           |
+| 400 x 800   | stacked, `listingFolded` true      | 358.5 (full) | 358.5   | 358.5    | no handle, not inert, listing shown |
+
+At 1920 the widths are (1792 - 212 - 24) / 2 = 778 and, folded, 1792 - 212 - 44 - 24 = 1512; at 1366
+the gap is 8 (below desktop), so 504.9 and 965.8. The handle's button is 32 x 32, 6 px from the card's
+right edge and 8 px from its top, open (1920: 1076, 640.2 in a card ending at 1114) and folded (342 in
+a card from 336 to 380). Unfolding returned the same directory and the same scroll position (200 px)
+and the same rendered rows. A folded listing is `inert` and `visibility: hidden`; the handle's button
+is the only stop. With mapping mode on (the bindings panel open, which narrows the grid) the Select
+overlay followed its key through a fold and an unfold: key at x 969, 413 wide open and overlay at
+966, 419 wide (a 3 px outset); folded, key at 421, 961 wide and overlay at 418, 967; back to the open
+numbers after the unfold. Load A and Load B did not move in that layout (the set card's right edge is
+fixed), so they were not a test of the re-measure, which the view spec pins.
+
+*Note, the long name.* The live API holds no 64-character set, so that row's text was lengthened
+in the DOM and the widths read from the live layout; the committed case in `dj-mixer-sets.cy.ts`
+serves a real 64-character set and checks the 360 width, the ellipsis (the text's `scrollWidth`
+exceeds its `clientWidth`, `title` the full name) and the tree's overflow.
+
+**Frame E.** Delete asks inline: the confirm row measures 1236 679.8 / 656 x 36, directly under the
+header, with Cancel focused. Cancel sends nothing; Delete sends the `DELETE` (`dj-mixer-sets.cy.ts`).
+
+**Frame F.** With a cue added and renamed to "Drop", the selected row shows "Drop" with its CUE tag
+and time, the tile reads "Drop CUE" (an unnamed marker keeps "Item N"), and with GBL off and the cue
+played the settings sign over Deck A reads "Drop" (`aria-label` "Settings in play deck A: Drop"),
+Deck B's "Main". The mockup's frame F is a close-up of one plate at a wider scale (592.5 wide
+against the deck column's 440), so its tile and row sizes were not compared, only what they show.
+
+**Peek timing.** In an unloaded view the peek was up 600 ms after a press (112 748 / 1792 x 316) and
+gone about 1.9 s after the last one; a second press while up restarted the wait. After it left,
+`elementFromPoint(300, 1000)`, a point it had covered, was `.mixer-grid`, and Deck A's Panic took a
+click. With a tune playing on Deck A the same press, sampled every 150 ms, showed the card held at
+its first 26 px for about 1.1 s and then at 316 px until about 3 s: the slide started late while the
+1.5 s timer ran as usual, and the page's own 150 ms timer kept its pace. That reads as frame delivery
+in this machine's software-rendered Electron with a tune playing, not the view's logic; it is on the
+bench list for real hardware. `dj-mixer-sets.cy.ts` now commits the peek case (it needs the dev
+`serve` for Angular's debug API and skips itself against a production build).
+
+**Deviations from the mockup, and why.**
+
+- **The even split.** The listing and the set card share what the tree leaves equally (778 each at
+  1920) where the mockup draws 876 and 680, and below desktop the set card no longer holds 680 as its
+  basis. The operator asked for it after bench testing.
+- **A tree as wide as its widest row.** It is 212 at the least and 360 at the most, where the mockup
+  and requirement R5 have it narrower than the old tree and fixed; a long set name is cut with an
+  ellipsis at the cap (its full name in `title`) rather than widening it further, and it never
+  scrolls sideways. The storage rows are block-level so a device's SD and USB rows do not sit side by
+  side and set the width. The operator's request after bench testing.
+- **The folding listing.** The file listing folds into a 44 px strip from a handle in its top-right
+  corner, which the mockup frames A to C show but the requirements do not ask for; the set card takes
+  the room. Choosing a storage unfolds it, choosing a set does not, and below the phone breakpoint
+  there is no handle and nothing folds. Also the operator's request after bench testing.
+- **No light on the loaded set (supersedes R5).** R5 asks for a light on the loaded set in the tree.
+  The Sets branch shows none: the loaded set is the highlighted row (`aria-selected="true"`), which
+  the dot only repeated. The operator dropped the clause after bench testing. The save lamp in the
+  set header is unchanged.
+- **A chevron and "Files" on the listing's fold (supersedes Amendment 01).** The amendment and its
+  wireframe draw an X in the open listing's corner and the words "File listing" on the folded strip.
+  The handle is a left-pointing chevron open and a right-pointing one folded, and the strip reads
+  "Files", centred on the strip both ways with the chevron kept at the top. The accessible names
+  ("Collapse the file listing", "Expand the file listing") are unchanged. The operator's request
+  after bench testing.
+- **Band height 430.2 against 371.5.** The grid's top row is sized by the decks' and the SID panel's
+  real content (555.8) and the band takes what remains; the mockup draws that row at 614.5. That row
+  is not this phase's to change; the band's width, its gaps and its bottom edge match.
+- **No glyph before the set name.** The mockup puts a queue glyph before the name; the card shows the
+  name directly, as `lib-set-header` was built and specced.
+- **The New key is labelled.** It reads "New" (57.2 wide) beside the 32 px delete key, so it reads as a
+  key like Load A and Load B; the mockup's is an icon. Its accessible name is "New set" either way.
+- **Peek surface and offset.** The peek is a card on the view's own tokens (`--synth-face`, a
+  `rgba(var(--color-highlight-rgb), 0.45)` border, a `0 -10px 24px` shadow); the mockup's is
+  `rgba(20,16,22,.96)` with a `rgba(0,247,255,.3)` ring. It sits at the grid's bottom (`bottom: 0`)
+  where the mockup's is 16 px up in its own container, and spans the grid's width (1792) as the
+  mockup's does.
+- **Browser button glyph.** `dock_to_bottom`, Material Symbols' window with a bottom panel; the
+  mockup draws its own outline glyph. The button order (Bindings, then Browser), the 4 px gap and the
+  lamp before the count were changed to match the mockup.
+- **"Most recently used" is read as most recently edited.** The tree orders the sets by their
+  `updated` stamp, which a rename, add, move, remove or row edit moves. Opening a set and playing from
+  it without an edit does not, because a set carries only `created` and `updated` and has no
+  last-used stamp.
+- **"Unavailable" shows after a load is tried.** A row is marked unavailable when loading it finds its
+  bytes uncached and its source device absent (and when its analysis fails); the load reports why.
+  A row is not checked against the connected devices when a set is opened, so one that cannot load
+  looks like any other until a Load or previous/next is attempted.
+
+**Known limitation: the peek case in CI.** The peek's end-to-end case turns the Select knob through
+Angular's dev-mode debug API, which a production build does not have. It runs against `nx run
+teensyrom-ui:serve` and skips itself against the static build the CI configuration serves; the view
+spec covers the logic there.
+
+**Known limitation: save state while the browser is hidden.** The Saved lamp and the card's live region
+live in the set card, which is not in the DOM while the browser is hidden and no peek is up. A save
+that newly fails then raises the peek (so the Not saved lamp shows for a moment) and is announced by a
+live region the view keeps ("The set was not saved"); the lamp does not stay lit afterwards, so a DJ
+who wants to see it again shows the browser. A refused or failed load still shows on the deck's own
+display.
+
+**Mapping mode.** The Set group's overlays follow the band: the view hands the overlay layer new
+targets when the band's slide finishes, so it measures again and Select, Load A and Load B regain
+their overlays after the browser is shown with mapping mode on. This is pinned in the view spec; it
+was not driven live (no MIDI is granted in this run).
+
+**Storybook.** No new component, so no new story. `pnpm nx run ui-components:build-storybook`
+passes.
+
+**Automated.** `pnpm nx test dj-mixer` (11 files, 249 specs run green; locally the `nx` process does
+not exit after reporting, so it was run under a timeout), `pnpm nx lint dj-mixer`, `tsc` on the
+library's `tsconfig.lib.json`, `eslint` on the e2e project (no errors in the new files), `pnpm nx
+build teensyrom-ui`, `pnpm nx run ui-components:build-storybook`, and the six DJ specs against a
+`serve` on port 4210 (`dj-mixer-sets.cy.ts` 10 tests, the five earlier specs 43; 53 passing).
+`dj-mixer-sets.cy.ts` covers the saved set in the card, rename (`PUT` with the new name), Alt+ArrowDown
+on a handle (`PUT` with the new order), the tree listing the sets and loading another with its
+own `GET`, delete (Cancel sends nothing, Delete sends `DELETE` then a `PUT` of a fresh "Set N"), the
+New key, hiding and showing the browser with the deck, speed strip and SID panel rects unchanged, the peek on a Select turn (dev `serve` only), and
+a SID dragged from the listing into the card (pending row, then the titled row, then the `PUT`).
+
+### Bundle check (sets)
+
+`pnpm nx build teensyrom-ui` on this branch against `main` (615a260b), the initial chunks only, as
+printed by the build:
+
+| chunk                                | main        | this branch        |
+| ------------------------------------ | ----------- | ------------------ |
+| shared ui / vendor chunk             | 1.36 MB     | 1.36 MB (same)     |
+| `main`                               | 420.34 kB   | 431.58 kB (+11.24) |
+| shared application chunk             | 195.83 kB   | 223.48 kB (+27.65) |
+| other initial chunks and `polyfills` | 133.34 kB   | 129.63 kB (-3.71)  |
+| `styles`                             | 35.13 kB    | 35.13 kB (0)       |
+| **initial total**                    | **2.14 MB** | **2.18 MB**        |
+
+The initial total is over the 2.00 MB budget by 143.08 kB on `main` and 184.77 kB on this branch
+(+41.69 kB). This branch carries the whole of ASID-DJ-12 so far (the sets model, the application's
+current set and the set components), not only this task, so the delta is the project's, not this
+task's alone. That warning is already on `main`, and `project.json`'s budgets are unchanged.
+
+### Bench checklist (operator, real hardware, sets)
+
+- [ ] A set prepared, with the speeds pre-beatmatched, loops and cues named and settings per
+      subtune, then the page refreshed and the set found as it was left.
+- [ ] The browser cache cleared: the tunes and their settings come back, re-fetched from the device.
+- [ ] Select, Load A, Load B, previous and next work from the screen and from a controller.
+- [ ] One row loaded on both decks for beat juggling.
+- [ ] The peek appears on Select while the browser is hidden, follows it, and leaves after the last.
+- [ ] Hiding and showing the browser stretches or moves nothing, and every deck control still takes
+      clicks after the peek has left.
+- [ ] Naming loops in place shows the names on the tiles and the sign on the bench.
+- [ ] The peek rises promptly with a tune playing on a deck (it started late in the software-rendered run).
+- [ ] A failed save while the browser is hidden raises the peek and is announced.
+- [ ] No audible glitch or timing slip from any load, restore or save.
+- [ ] Fold and unfold the listing on a large real directory and find the scroll position where it
+      was left, with the same rows and selection.
+
 ## Byte fidelity (P03-T02)
 
 Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM

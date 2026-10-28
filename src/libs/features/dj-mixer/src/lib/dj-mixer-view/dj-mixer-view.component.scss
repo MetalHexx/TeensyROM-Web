@@ -109,11 +109,31 @@
   }
 }
 
-.bottom-band {
+// With the browser hidden the grid drops the band's row, and the sliding container's host, which
+// outlives its exit, must leave the grid with it: left with `grid-area: bottom` it would land in an
+// implicit row and column, and the extra column gap would come out of the two deck columns.
+.mixer-grid--two.mixer-grid--no-browser {
+  grid-template-rows: auto;
+  grid-template-areas: 'd0 vs0 mx vs1 d1';
+  align-content: start;
+
+  @include styles.below-tablet {
+    grid-template-rows: repeat(3, auto);
+    grid-template-areas:
+      'd0 vs0'
+      'mx mx'
+      'd1 vs1';
+  }
+
+  .bottom-slot {
+    display: none;
+  }
+}
+
+// The band's sliding container: the host holds the grid area, and its inner box (100% of the
+// host) is what the band fills, so the listing and set rows keep their own scroll.
+.bottom-slot {
   grid-area: bottom;
-  display: flex;
-  flex-direction: row;
-  gap: var(--dj-card-gap);
   min-height: 0;
 
   // The floor belongs only to the stacked forms, whose rows are all content-sized and whose page
@@ -122,6 +142,21 @@
   @include styles.below-tablet {
     min-height: 11rem;
   }
+}
+
+.bottom-band {
+  display: flex;
+  flex-direction: row;
+  gap: var(--dj-card-gap);
+  height: 100%;
+  min-height: 0;
+
+  // The tree is as wide as its widest row, between these two; the listing and the set card share
+  // the rest evenly.
+  --browse-card-min: 212px;
+  --browse-card-max: 360px;
+  // The folded listing's strip, which the fold handle reads too.
+  --fold-strip-width: 44px;
 
   @include styles.below-phone {
     flex-direction: column;
@@ -129,27 +164,117 @@
 }
 
 .browse-card,
-.directory-listing-card {
+.directory-listing-card,
+.set-card {
   min-height: 0;
   height: 100%;
 }
 
+// `lib-scaling-compact-card`'s host is `width: 100%`; the explicit `width: auto` is what lets the
+// basis follow the widest row.
 .browse-card {
-  flex: 0 0 300px;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: var(--browse-card-min);
+  max-width: var(--browse-card-max);
 
   @include styles.below-phone {
-    // 300px is a width while the band is a row; once it stacks, that basis would become a height.
+    // Once the band stacks, the card spans it like the other two; its auto basis is a height.
     flex: 0 0 auto;
     height: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
+}
+
+.bottom-band > lib-empty-state-message {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .directory-listing-card {
   flex: 1 1 0;
   min-width: 0;
+  transition: flex-basis var(--fold-duration) cubic-bezier(0.4, 0, 0.2, 1),
+    flex-grow var(--fold-duration) cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.directory-listing-card--folded {
+    flex: 0 0 var(--fold-strip-width);
+  }
 
   @include styles.below-phone {
     flex: 1 1 auto;
   }
+}
+
+// Takes over the sole-content flex chain the listing relies on, and clips it while the card
+// narrows. It is clipped here rather than through the card's `enableOverflow`, which would stop
+// the listing scrolling.
+.listing-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: opacity var(--fold-duration) ease, visibility var(--fold-duration) linear;
+}
+
+.directory-listing-card--folded .listing-body {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.set-card {
+  flex: 1 1 0;
+  min-width: 0;
+
+  @include styles.below-phone {
+    // Once the band stacks, the zero basis would become a height.
+    flex: 0 0 auto;
+    height: auto;
+  }
+}
+
+// The set card raised over the bottom of the grid while the browser is hidden. Out of flow, so it
+// never moves a deck; above the decks' scaling containers (1000) and under the mapping overlay
+// layer (1001). The sliding container's host stays after the slide-away, so the wrapper lets clicks
+// through and only the card takes them.
+.set-peek {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 19.75rem;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.set-peek > lib-sliding-container {
+  display: block;
+  height: 100%;
+}
+
+.set-peek-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
+  background: var(--synth-face);
+  border: 1px solid rgba(var(--color-highlight-rgb), 0.45);
+  border-radius: 6px;
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.hidden-save-notice {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

@@ -239,6 +239,10 @@
       --synth-key-label-display: none;
     }
   }
+
+  .set-row {
+    --synth-key-label-display: none;
+  }
 }
 
 // Below about 336px: the same icon-only keys, with the stepper on its own row below them. The
@@ -261,6 +265,10 @@
     .subtune .step-key {
       flex: 0 0 3rem;
     }
+  }
+
+  .set-row {
+    --synth-key-label-display: none;
   }
 
   .frame {

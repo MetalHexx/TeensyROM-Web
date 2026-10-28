@@ -3,6 +3,7 @@ import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 import { multipleDevices } from '../../support/test-data/fixtures';
 import type { MockDeviceFixture } from '../../support/test-data/fixtures/fixture.types';
 import { generateDevice } from '../../support/test-data/generators/device.generators';
+import { interceptDjLibrary } from '../../support/interceptors/djLibrary.interceptors';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 
@@ -30,6 +31,7 @@ function expectNoHorizontalOverflow(): void {
 describe('DJ Mixer — responsive layout', () => {
   describe('two decks', () => {
     beforeEach(() => {
+      interceptDjLibrary();
       interceptFindDevices({ fixture: twoDevices });
       interceptConnectDevice();
       cy.visit(APP_ROUTES.djMixer);
@@ -228,6 +230,7 @@ describe('DJ Mixer — responsive layout', () => {
 
   describe('one device still renders two decks', () => {
     beforeEach(() => {
+      interceptDjLibrary();
       interceptFindDevices(); // default fixture: singleDevice
       interceptConnectDevice();
       cy.visit(APP_ROUTES.djMixer);
@@ -249,6 +252,7 @@ describe('DJ Mixer — responsive layout', () => {
 
   describe('three devices still render two decks', () => {
     beforeEach(() => {
+      interceptDjLibrary();
       interceptFindDevices({ fixture: multipleDevices });
       interceptConnectDevice();
       cy.visit(APP_ROUTES.djMixer);

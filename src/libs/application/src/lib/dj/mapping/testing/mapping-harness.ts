@@ -3,22 +3,25 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
 import type { ReplayRunner } from '@sidablist/core';
-import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
+import { InMemorySetStore, InMemoryTuneMemoryStore, createRow, createSet } from '@sidablist/tunes';
 import type { TuneReference } from '@sidablist/tunes';
-import { ALERT_SERVICE, FILE_CONTENT_SERVICE } from '@teensyrom-nx/domain';
+import { ALERT_SERVICE, FILE_CONTENT_SERVICE, type Device } from '@teensyrom-nx/domain';
+import { DeviceStore } from '../../../device/device-store';
 import { DeckBindings } from '../../deck-bindings';
 import { DeckService } from '../../deck.service';
 import { DjStore, EMPTY_DECK_LOOPS } from '../../dj-store';
 import { MidiSettingsPersistence } from '../../midi-settings-persistence';
 import { MixerService } from '../../mixer.service';
 import {
+  DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
-  LOOP_POSITIONS_STORE,
   REPLAY_RUNNER_FACTORY,
+  SET_STORE,
   TUNE_INSERTER,
+  TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from '../../ports';
 import type {
@@ -77,6 +80,9 @@ export interface MappingHarness {
    *  selected, or none when it is null. The harness loads no tune into the engine, so a marker
    *  cannot be captured through `addMarker`. */
   seedMarkers(slot: Slot, count: number, selectedIndex?: number | null): void;
+  /** Makes a current set of `count` rows (ids `row-0`…) with the one at `selectedIndex` selected, or
+   *  none when it is null. */
+  seedSetRows(count: number, selectedIndex?: number | null): void;
 }
 
 /**
@@ -125,7 +131,13 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
       { provide: FILE_CONTENT_SERVICE, useValue: { getFileContent: vi.fn() } },
       { provide: TUNE_INSERTER, useValue: { insert: vi.fn() } },
       { provide: TUNE_RESOLVER, useValue: { resolve: vi.fn() } },
-      { provide: LOOP_POSITIONS_STORE, useFactory: () => new InMemoryLoopPositionsStore() },
+      { provide: SET_STORE, useFactory: () => new InMemorySetStore() },
+      { provide: TUNE_MEMORY_STORE, useFactory: () => new InMemoryTuneMemoryStore() },
+      {
+        provide: DJ_LIBRARY_STATE_REPOSITORY,
+        useValue: { load: vi.fn().mockResolvedValue(null), save: vi.fn().mockResolvedValue(undefined) },
+      },
+      { provide: DeviceStore, useValue: { usableDevices: signal<Device[]>([]) } },
     ],
   });
 
@@ -151,9 +163,34 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
       djStore.setDeckLoaded({ slot, reference: TUNE });
       djStore.setDeckStatus({ slot, status: 'paused' });
     },
+    seedSetRows: (count, selectedIndex = 0) => {
+      const rows = Array.from({ length: count }, (_, index) =>
+        createRow({
+          id: `row-${index}`,
+          tune: {
+            sidHash: `hash-${index}`,
+            title: `Tune ${index}`,
+            author: 'Author',
+            released: '',
+            subtuneCount: 1,
+            byteLength: 1,
+          },
+          memory: null,
+          startSubtune: 1,
+        })
+      );
+      const set = {
+        ...createSet({ id: 'set-1', placeholder: 'Set 1', now: '2026-01-01T00:00:00.000Z' }),
+        rows,
+      };
+      djStore.setSetsLibrary({ summaries: [], current: set });
+      djStore.putOpenSet({ set });
+      djStore.selectSetRow({ rowId: rows[selectedIndex ?? -1]?.id ?? null, turned: false });
+    },
     seedMarkers: (slot, count, selectedIndex = 0) => {
       const markers = Array.from({ length: count }, (_, index) => ({
         id: `marker-${index}`,
+        name: null,
         start: { frame: index * 100, offsetFrames: 0 },
         end: null,
         voices: [],

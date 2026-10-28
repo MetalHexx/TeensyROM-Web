@@ -11,6 +11,8 @@
         (repeatTrackChange)="onRepeatTrackChange($event)"
         (previousSubtune)="onPreviousSubtune()"
         (nextSubtune)="onNextSubtune()"
+        (previousInSet)="onPreviousInSet()"
+        (nextInSet)="onNextInSet()"
         (scrubInput)="onScrubInput($event)"
         (scrubCommit)="onScrubCommit($event)"
       ></lib-deck-transport>
@@ -45,6 +47,7 @@
       (setEnd)="onSetEnd()"
       (clearEnd)="onClearEnd()"
       (deleteSelected)="onDeleteSelected()"
+      (rename)="onRenameSelected($event)"
       (triggerTile)="onTriggerTile($event)"
       (playNowTile)="onPlayNowTile($event)"
       (selectTile)="onSelectTile($event)"

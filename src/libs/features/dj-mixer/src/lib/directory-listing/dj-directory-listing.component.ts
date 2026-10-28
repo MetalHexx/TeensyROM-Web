@@ -119,6 +119,10 @@ export class DjDirectoryListingComponent {
       storageType: active.storageType,
       path: row.path,
       fileName: row.name,
+      title: row.title || row.name,
+      author: row.creator,
+      playLength: row.playLength,
+      subtuneLengths: row.subtuneLengths,
     });
 
     // The label must be current before the browser snapshots the drag image, which happens

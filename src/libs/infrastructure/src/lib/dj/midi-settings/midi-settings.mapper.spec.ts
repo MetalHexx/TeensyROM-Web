@@ -23,6 +23,13 @@ const RECORD: MidiSettingsRecord = {
       control: 'crossfader',
       style: { kind: 'step', amount: 0.25 },
     },
+    {
+      id: 'm3',
+      source: { controllerId: 'nano', channel: 2, kind: 'cc', number: 8 },
+      owner: 'set',
+      control: 'set-select',
+      style: { kind: 'relative-offset', amount: 1 },
+    },
   ],
   deckBindings: [
     { slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' },

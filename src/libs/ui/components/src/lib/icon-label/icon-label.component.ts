@@ -100,8 +100,15 @@ export class IconLabelComponent {
    */
   size = input<IconLabelSize>('medium');
 
-  /** Truncates the label with an ellipsis at a max width of 20ch when it overflows — defaults to `true`. Set `false` for content that must show in full, like file names in a table column. */
+  /** Truncates the label with an ellipsis at a max width of 20ch (unless `shrink` is set) when it overflows — defaults to `true`. Set `false` for content that must show in full, like file names in a table column. */
   truncate = input<boolean>(true);
+
+  /**
+   * With `truncate`, drops the 20ch cap so the label fills the room it is given and ellipsises only
+   * when its container constrains the row — defaults to `false` (the 20ch cap). Has no effect when
+   * `truncate` is `false`.
+   */
+  shrink = input<boolean>(false);
 
   /** Optional second line of text rendered below `label`, sized proportionally to `size` — defaults to `''` (not rendered). */
   secondaryLabel = input<string>('');

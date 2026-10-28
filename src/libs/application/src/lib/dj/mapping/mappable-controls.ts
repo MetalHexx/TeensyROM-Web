@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DeckService } from '../deck.service';
+import { DjSets } from '../sets/dj-sets';
 import { DjStore } from '../dj-store';
 import type { MappingStyleKind } from '../ports';
 import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
@@ -16,6 +17,7 @@ import {
   controlKey,
   type ControlIdentity,
   type DeckControlId,
+  type SetControlId,
   type VoiceStripControl,
 } from './mapping.models';
 
@@ -238,23 +240,24 @@ function wholeStepValue(
 }
 
 /**
- * Every control a MIDI source can drive, declared once: the transport, voice and SID panel
- * controls for each deck. Each entry reads from `DjStore` and commands through `DeckService` or
- * `MixerService`, so a mapped control is gated exactly like its on-screen twin. The list holds no
- * component and no mapping.
+ * Every control a MIDI source can drive, declared once: the transport, set, voice and SID panel
+ * controls for each deck, and the set's own Select and Load controls. Each entry reads from
+ * `DjStore` and commands through `DeckService`, `DjSets` or `MixerService`, so a mapped control is
+ * gated exactly like its on-screen twin. The list holds no component and no mapping.
  */
 @Injectable({ providedIn: 'root' })
 export class MappableControls {
   private readonly djStore = inject(DjStore);
   private readonly deckService = inject(DeckService);
   private readonly mixerService = inject(MixerService);
+  private readonly djSets = inject(DjSets);
 
   readonly all: readonly MappableControl[];
 
   private readonly byKey: ReadonlyMap<string, MappableControl>;
 
   constructor() {
-    this.all = DECK_SLOTS.flatMap((slot) => this.deckControls(slot));
+    this.all = [...DECK_SLOTS.flatMap((slot) => this.deckControls(slot)), ...this.setControls()];
     this.byKey = new Map(this.all.map((control) => [controlKey(control.identity), control]));
   }
 
@@ -286,6 +289,8 @@ export class MappableControls {
       trigger(id('stop'), 'Stop', () => decks.stop(slot)),
       trigger(id('subtune-previous'), 'Previous subtune', () => void decks.previousSubtune(slot)),
       trigger(id('subtune-next'), 'Next subtune', () => void decks.nextSubtune(slot)),
+      trigger(id('set-previous'), 'Previous in the set', () => void decks.previousRow(slot)),
+      trigger(id('set-next'), 'Next in the set', () => void decks.nextRow(slot)),
       value(
         id('seek'),
         'Seek',
@@ -382,6 +387,27 @@ export class MappableControls {
         VOICE_STRIP_CONTROLS.map((control) => this.voiceStripControl(slot, n, control))
       ),
       ...this.deckPanelControls(slot),
+    ];
+  }
+
+  /** The set's table: the Select knob and a Load button per deck. Select steps over real rows
+   *  only, so a row still fetching never makes the knob stick or skip. */
+  private setControls(): MappableControl[] {
+    const decks = this.deckService;
+    const sets = this.djSets;
+    const card = this.djStore.setCardSummary();
+    const id = (control: SetControlId): ControlIdentity => ({ owner: 'set', control });
+
+    return [
+      wholeStepValue(
+        id('set-select'),
+        'Select',
+        () => card().realRowCount,
+        () => card().selectedRowIndex ?? 0,
+        (index) => sets.selectRowAt(index)
+      ),
+      trigger(id('set-load-a'), 'Load A', () => void decks.loadSelected('A')),
+      trigger(id('set-load-b'), 'Load B', () => void decks.loadSelected('B')),
     ];
   }
 

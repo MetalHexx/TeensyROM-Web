@@ -7,6 +7,7 @@ import { MidiMappingStore } from './midi-mapping-store';
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const SPEED_B: ControlIdentity = { owner: 'B', control: 'speed' };
 const MIXER_OWNED: ControlIdentity = { owner: 'mixer', control: 'speed' };
+const SET_OWNED: ControlIdentity = { owner: 'set', control: 'set-select' };
 
 function mapping(
   id: string,
@@ -102,6 +103,7 @@ describe('MidiMappingStore', () => {
           mapping('m1', 7, SPEED_A),
           mapping('m2', 8, SPEED_B),
           mapping('m3', 9, MIXER_OWNED),
+          mapping('m4', 10, SET_OWNED),
         ],
       });
     });
@@ -129,6 +131,7 @@ describe('MidiMappingStore', () => {
       expect(byOwner.A.map((m) => m.id)).toEqual(['m1']);
       expect(byOwner.B.map((m) => m.id)).toEqual(['m2']);
       expect(byOwner.mixer.map((m) => m.id)).toEqual(['m3']);
+      expect(byOwner.set.map((m) => m.id)).toEqual(['m4']);
     });
   });
 

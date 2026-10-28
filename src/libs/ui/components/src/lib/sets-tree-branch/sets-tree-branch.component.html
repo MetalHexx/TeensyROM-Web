@@ -1,0 +1,44 @@
+<div
+  role="treeitem"
+  class="branch-row"
+  tabindex="0"
+  aria-selected="false"
+  [attr.aria-expanded]="expanded()"
+  (click)="onBranchActivate()"
+  (keydown.enter)="onBranchActivate($event)"
+  (keydown.space)="onBranchActivate($event)"
+>
+  <mat-icon class="chevron" aria-hidden="true">
+    {{ expanded() ? 'expand_more' : 'chevron_right' }}
+  </mat-icon>
+  <lib-directory-tree-node
+    icon="queue_music"
+    [text]="model().label"
+    [nodeType]="DirectoryTreeNodeType.Device"
+  ></lib-directory-tree-node>
+</div>
+
+@if (expanded()) {
+<div role="group" class="set-list">
+  @for (set of model().sets; track set.id) {
+  <div
+    role="treeitem"
+    class="set-row"
+    tabindex="0"
+    [attr.aria-selected]="set.loaded"
+    [attr.aria-label]="set.accessibleName"
+    (click)="onSetActivate(set.id)"
+    (keydown.enter)="onSetActivate(set.id, $event)"
+    (keydown.space)="onSetActivate(set.id, $event)"
+  >
+    <lib-directory-tree-node
+      icon="playlist_play"
+      [text]="set.name"
+      [nodeType]="DirectoryTreeNodeType.StorageType"
+      [isSelected]="set.loaded"
+      [truncate]="true"
+    ></lib-directory-tree-node>
+  </div>
+  }
+</div>
+}

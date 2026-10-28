@@ -1,14 +1,25 @@
 import { Injectable, effect, inject } from '@angular/core';
+import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { DeckLoops } from './deck-loops';
+import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
 import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
 import { SidPanelPainter } from './sid-panel-painter';
-import { TuneLoader } from './tune-loader';
-import { DjStore, type DeckDetectedKey, type DeckStatus, type DeckVoiceState } from './dj-store';
+import { RowUnavailableError, TuneLoader, type LoadPhase } from './tune-loader';
+import {
+  DjStore,
+  type DeckDetectedKey,
+  type DeckHolding,
+  type DeckStatus,
+  type DeckVoiceState,
+} from './dj-store';
+import { decodeRowSettings, type DeckRowSettings } from './loops/row-settings-codec';
+import { DjSets } from './sets/dj-sets';
+import { decodeRowHost } from './sets/row-host';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
 import type { LoopBoundaryName, LoopSnapDirection } from './selectors/loops-summary';
@@ -26,6 +37,9 @@ const RESUMABLE_STATUSES: readonly DeckStatus[] = ['playing', 'paused', 'stopped
 
 /** The SID's three voices, in engine order. */
 const VOICES: readonly number[] = [0, 1, 2];
+
+/** What a load puts on a deck: a SID dropped from the listing, or a row already in an open set. */
+type LoadTarget = { readonly drop: LoadSource } | { readonly row: DeckHolding };
 
 /** The detected key an index record carries, or `null` unless tonic, mode and camelot are all
  *  known. */
@@ -50,10 +64,15 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  * `sequence` counter extends that protection through `runtime.play` itself, a span the loader's
  * guard cannot see because it has already returned by then.
  *
+ * Every load puts a row of the current set on the deck: a listing drop joins the set (or reuses the
+ * SID's row) and loads it, and `loadRow` loads a row of any open set. Every load and subtune switch
+ * restores the row's latched state for the subtune it lands on — the SID panel, mutes, speed and
+ * Repeat as last left, with holds, nudges and any speed excursion at home, and everything at home
+ * for a subtune with nothing kept — so a new tune never inherits the last one's settings. It
+ * attaches the subtune's markers before it plays.
+ *
  * It also fronts the speed, nudge, voice and loop-marker commands and reflects the engine's tempo,
- * voice and prepared-frame state into the store. Every load and subtune switch returns the deck's
- * SID panel, speed, nudges, mutes and holds to home before anything else, so a new tune never
- * inherits the last one's settings, and attaches the incoming tune's markers before it plays.
+ * voice and prepared-frame state into the store.
  *
  * Isolation is structural: every command is addressed to one slot, and a throw caught at that
  * slot's command boundary never touches the other slot's status, `loaded` reference or runtime.
@@ -66,11 +85,13 @@ export class DeckService {
   private readonly bindings = inject(DeckBindings);
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly loops = inject(DeckLoops);
+  private readonly sets = inject(DjSets);
+  private readonly keeper = inject(DeckMemoryKeeper);
   private readonly mixerApplier = inject(MixerApplier);
   private readonly panelPainter = inject(SidPanelPainter);
 
   /** This service's own per-slot command counter — distinct from the loader's generation, which
-   *  guards only the loader's own awaits. Bumped by `load` and `selectSubtune` on entry; every
+   *  guards only the loader's own awaits. Bumped by `loadOnto` and `selectSubtune` on entry; every
    *  write either of those commands makes after an await is gated on still holding the current
    *  number. */
   private readonly sequence: Record<Slot, number> = { A: 0, B: 0 };
@@ -104,86 +125,44 @@ export class DeckService {
     }
   }
 
+  /** A SID dropped from the listing: joins the current set, or reuses its row there, and loads that
+   *  row. */
   async load(slot: Slot, source: LoadSource): Promise<void> {
-    const mySeq = ++this.sequence[slot];
-    this.store.setDeckBusy({ slot, busy: true });
-    this.store.setDeckSwitching({ slot, switching: true });
-    this.suspended[slot] = true;
+    await this.loadOnto(slot, { drop: source });
+  }
 
-    // Always, idempotent on an already-stopped player: a drop during an older load's `play` must
-    // silence that tune, and the status alone cannot say whether one is currently sounding.
-    this.runtime.stop(slot);
-    // Synchronous, before the first await: it always lands ahead of the new tune's `play`, a failed
-    // load still ends at home, and a superseded load can never reset after a newer one has started.
-    this.resetTuneShaping(slot);
-    this.loops.detach(slot);
-    this.sample(slot);
-
-    let failure: string | null = null;
-    try {
-      const playable = await this.loader.load(slot, source, (phase, reference) => {
-        if (this.sequence[slot] !== mySeq) {
-          return;
-        }
-        this.store.setDeckStatus({ slot, status: phase });
-        if (reference !== null) {
-          this.store.setDeckLoaded({ slot, reference });
-        }
-      });
-
-      if (this.sequence[slot] !== mySeq || playable === null) {
-        // Either a newer command owns the slot now, or the loader's own generation guard already
-        // discarded this load in favour of one — nothing more to write either way.
-        return;
-      }
-
-      this.runtime.load(slot, playable);
-      this.store.setDeckDetectedKey({ slot, detectedKey: detectedKeyOf(playable.index) });
-      // Lands the reference even on a cache hit, when the loader's own callback above never fired
-      // for either phase — the subtune path below always did this at its own equivalent line.
-      this.store.setDeckLoaded({ slot, reference: playable.reference });
-      this.store.setDeckStructure({
-        slot,
-        structure: {
-          loopStartFrame: playable.index.loopStartFrame,
-          loopPeriodFrames: playable.index.loopPeriodFrames,
-          endedAtFrame: playable.index.endedAtFrame,
-        },
-        lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
-      });
-      this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
-      await this.loops.attach(
-        slot,
-        playable.reference.identity,
-        playable.index.detectedMoments.map((moment) => moment.frame)
+  /** Loads a row of an open set onto the deck, replacing whatever it plays. */
+  async loadRow(slot: Slot, setId: string, rowId: string): Promise<void> {
+    const holding = this.sets.holdingFor(setId, rowId);
+    if (holding === null) {
+      logWarn(
+        `DeckService: row ${rowId} of set ${setId} is not open — loadRow refused for deck ${slot}.`
       );
-
-      if (this.sequence[slot] !== mySeq) {
-        return;
-      }
-      await this.runtime.play(slot);
-
-      if (this.sequence[slot] !== mySeq) {
-        return;
-      }
-      this.sample(slot);
-    } catch (error) {
-      failure = describeError(error);
-    } finally {
-      if (this.sequence[slot] === mySeq) {
-        this.suspended[slot] = false;
-        this.store.setDeckBusy({ slot, busy: false });
-        this.store.setDeckSwitching({ slot, switching: false });
-        // The notification that matters — `play()` announcing `playing` — arrives inside the
-        // suspended window above and is dropped there; this is what lands it, once, on the way out.
-        this.applySnapshot(slot);
-        if (failure !== null) {
-          // After the snapshot applies, so the engine's own `stopped` cannot overwrite the reason.
-          this.store.setDeckStatus({ slot, status: 'failed', error: failure });
-          logError(`DeckService: load failed for slot ${slot}: ${failure}`);
-        }
-      }
+      return;
     }
+    await this.loadOnto(slot, { row: holding });
+  }
+
+  /** Loads the current set's selected row onto the deck, replacing whatever plays. Nothing when none
+   *  is selected. */
+  async loadSelected(slot: Slot): Promise<void> {
+    const set = this.currentSet();
+    const rowId = this.store.sets.selectedRowId();
+    if (set !== null && rowId !== null && set.rows.some((row) => row.id === rowId)) {
+      await this.loadRow(slot, set.id, rowId);
+    }
+  }
+
+  /** Loads the row before the one the deck holds in the current set — skipping nothing, even a row
+   *  the other deck holds. Nothing on the first row, or when the deck holds no row of the current
+   *  set. */
+  previousRow(slot: Slot): Promise<void> {
+    return this.loadNeighbour(slot, -1);
+  }
+
+  /** Loads the row after the one the deck holds in the current set; nothing on the last row. */
+  nextRow(slot: Slot): Promise<void> {
+    return this.loadNeighbour(slot, 1);
   }
 
   async togglePlayPause(slot: Slot): Promise<void> {
@@ -239,11 +218,18 @@ export class DeckService {
     if (current.busy || !RESUMABLE_STATUSES.includes(current.status) || current.loaded === null) {
       return;
     }
+    const holding = this.store.sets.holdings()[slot];
+    if (holding === null) {
+      logWarn(`DeckService: deck ${slot} holds no row — selectSubtune refused.`);
+      return;
+    }
 
     const target = Math.min(Math.max(Math.round(subtune), 1), current.subtuneCount);
     const previousStatus = current.status;
     const sidHash = current.loaded.identity.sidHash;
 
+    // Before anything can close the set of the row the deck holds now.
+    this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
     this.store.setDeckBusy({ slot, busy: true });
     this.store.setDeckSwitching({ slot, switching: true });
@@ -255,6 +241,11 @@ export class DeckService {
 
     let failure: string | null = null;
     try {
+      // The new subtune is recorded as the row's last and taken with its kept state in one step,
+      // before the first await.
+      const moved = this.sets.selectSubtune(holding, target);
+      const restored = this.takeRow(slot, moved);
+
       const playable = await this.loader.resolveSubtune(
         slot,
         { sidHash, subtune: target },
@@ -274,6 +265,9 @@ export class DeckService {
       }
 
       this.runtime.load(slot, playable);
+      if (restored !== null) {
+        this.applyMutes(slot, restored.mixer.mutes);
+      }
       this.store.setDeckDetectedKey({ slot, detectedKey: detectedKeyOf(playable.index) });
       this.store.setDeckLoaded({ slot, reference: playable.reference });
       this.store.setDeckStructure({
@@ -288,7 +282,11 @@ export class DeckService {
       this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
       await this.loops.attach(
         slot,
-        playable.reference.identity,
+        {
+          placementKey: `${moved.setId}:${moved.rowId}`,
+          identity: playable.reference.identity,
+          positions: this.sets.positionsFor(moved),
+        },
         playable.index.detectedMoments.map((moment) => moment.frame)
       );
 
@@ -403,6 +401,13 @@ export class DeckService {
   addMarker(slot: Slot): void {
     if (this.canShape(slot, 'addMarker')) {
       this.loops.add(slot);
+    }
+  }
+
+  /** Names a marker; an empty name returns it to its place in the list. */
+  renameMarker(slot: Slot, id: string, name: string): void {
+    if (this.canShape(slot, 'renameMarker')) {
+      this.loops.rename(slot, id, name);
     }
   }
 
@@ -622,6 +627,192 @@ export class DeckService {
     ) {
       this.store.setDeckEngineControls({ slot, speed: tempo.multiplier, faderSpeed, nudging, voices });
     }
+  }
+
+  /**
+   * The one load routine: a listing drop and a set row differ only in how the row is found. A row
+   * loaded by name is taken in the synchronous prologue; a drop's row is taken as soon as it is
+   * joined, if this load is still the newest. A failed load leaves the deck at home — or, once it
+   * has taken a row, on that row's restored state — and `failed`, which is never shapeable, so the
+   * keeper writes neither into a row.
+   */
+  private async loadOnto(slot: Slot, target: LoadTarget): Promise<void> {
+    // Before anything can close the set of the row the deck holds now.
+    this.keeper.flush(slot);
+    const mySeq = ++this.sequence[slot];
+    this.store.setDeckBusy({ slot, busy: true });
+    this.store.setDeckSwitching({ slot, switching: true });
+    this.suspended[slot] = true;
+
+    // Always, idempotent on an already-stopped player: a drop during an older load's `play` must
+    // silence that tune, and the status alone cannot say whether one is currently sounding.
+    this.runtime.stop(slot);
+    // Synchronous, before the first await: it always lands ahead of the new tune's `play`, a failed
+    // load still ends at home, and a superseded load can never reset after a newer one has started.
+    this.resetTuneShaping(slot);
+    this.loops.detach(slot);
+    this.sample(slot);
+
+    let holding: DeckHolding | null = null;
+    let known: TuneReference | null = null;
+    let failure: string | null = null;
+    try {
+      const onPhase: LoadPhase = (phase, reference) => {
+        if (this.sequence[slot] !== mySeq) {
+          return;
+        }
+        this.store.setDeckStatus({ slot, status: phase });
+        const shown = reference ?? known;
+        if (shown !== null) {
+          this.store.setDeckLoaded({ slot, reference: shown });
+        }
+      };
+
+      let restored: DeckRowSettings | null;
+      if ('row' in target) {
+        holding = target.row;
+        restored = this.takeRow(slot, holding);
+      } else {
+        known = await this.loader.reference(slot, target.drop, onPhase);
+        if (known === null || this.sequence[slot] !== mySeq) {
+          // Either a newer command owns the slot now, or the loader's own generation guard already
+          // discarded this load in favour of one — nothing more to write either way.
+          return;
+        }
+        const joined = await this.sets.joinForDeck(known, target.drop);
+        if (this.sequence[slot] !== mySeq) {
+          return;
+        }
+        holding = joined;
+        restored = this.takeRow(slot, joined);
+      }
+
+      const playable = await this.loader.resolveRow(
+        slot,
+        { sidHash: holding.sidHash, subtune: holding.subtune },
+        decodeRowHost(this.sets.rowOf(holding)?.host)?.source ?? null,
+        onPhase
+      );
+      if (this.sequence[slot] !== mySeq || playable === null) {
+        return;
+      }
+      this.sets.markAvailable(holding.rowId);
+
+      this.runtime.load(slot, playable);
+      if (restored !== null) {
+        // `loadTune` cleared every latched mute.
+        this.applyMutes(slot, restored.mixer.mutes);
+      }
+      this.store.setDeckDetectedKey({ slot, detectedKey: detectedKeyOf(playable.index) });
+      // Lands the reference even on a cache hit, when the loader's own callback above never fired
+      // for either phase.
+      this.store.setDeckLoaded({ slot, reference: playable.reference });
+      this.store.setDeckStructure({
+        slot,
+        structure: {
+          loopStartFrame: playable.index.loopStartFrame,
+          loopPeriodFrames: playable.index.loopPeriodFrames,
+          endedAtFrame: playable.index.endedAtFrame,
+        },
+        lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
+      });
+      this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
+      await this.loops.attach(
+        slot,
+        {
+          placementKey: `${holding.setId}:${holding.rowId}`,
+          identity: playable.reference.identity,
+          positions: this.sets.positionsFor(holding),
+        },
+        playable.index.detectedMoments.map((moment) => moment.frame)
+      );
+
+      if (this.sequence[slot] !== mySeq) {
+        return;
+      }
+      await this.runtime.play(slot);
+
+      if (this.sequence[slot] !== mySeq) {
+        return;
+      }
+      this.sample(slot);
+    } catch (error) {
+      failure = describeError(error);
+      if (
+        error instanceof RowUnavailableError &&
+        holding !== null &&
+        this.sequence[slot] === mySeq
+      ) {
+        this.sets.markUnavailable(holding.rowId, error.message);
+      }
+    } finally {
+      if (this.sequence[slot] === mySeq) {
+        this.suspended[slot] = false;
+        this.store.setDeckBusy({ slot, busy: false });
+        this.store.setDeckSwitching({ slot, switching: false });
+        // The notification that matters — `play()` announcing `playing` — arrives inside the
+        // suspended window above and is dropped there; this is what lands it, once, on the way out.
+        this.applySnapshot(slot);
+        if (failure !== null) {
+          // After the snapshot applies, so the engine's own `stopped` cannot overwrite the reason.
+          this.store.setDeckStatus({ slot, status: 'failed', error: failure });
+          logError(`DeckService: load failed for slot ${slot}: ${failure}`);
+        }
+      }
+    }
+  }
+
+  private currentSet() {
+    const id = this.store.sets.currentSetId();
+    return id === null ? null : this.store.sets.open()[id] ?? null;
+  }
+
+  /** Loads the row `step` places from the deck's, when the deck holds a row of the current set and
+   *  the neighbour exists. Not gated on `busy`: the load supersedes an in-flight one, as a drop
+   *  does. */
+  private async loadNeighbour(slot: Slot, step: -1 | 1): Promise<void> {
+    const position = this.store.deckSetSummary(slot)();
+    const set = this.currentSet();
+    const holding = this.store.sets.holdings()[slot];
+    if (!(step < 0 ? position.canPrevious : position.canNext) || set === null || holding === null) {
+      return;
+    }
+    const neighbour = set.rows[set.rows.findIndex((row) => row.id === holding.rowId) + step];
+    if (neighbour !== undefined) {
+      await this.loadRow(slot, set.id, neighbour.id);
+    }
+  }
+
+  /** Puts the deck on a row: records the holding, then lands the kept state of its subtune. One
+   *  synchronous step, never split by an await — a holding without its restore, or the reverse,
+   *  would let a superseded or failed load write home values into a row. Returns the restored
+   *  settings, or null when the subtune keeps none and the deck stays at home. */
+  private takeRow(slot: Slot, holding: DeckHolding): DeckRowSettings | null {
+    this.sets.hold(slot, holding);
+    return this.restoreTuneShaping(slot, holding);
+  }
+
+  /** Lands the row's latched state for the holding's subtune, after `resetTuneShaping` has returned
+   *  the deck to home: the panel, mutes, speed fader and Repeat. Holds, nudges and excursions stay
+   *  at home, and so does a subtune with nothing kept. */
+  private restoreTuneShaping(slot: Slot, holding: DeckHolding): DeckRowSettings | null {
+    const settings = decodeRowSettings(this.sets.subtuneSettingsOf(holding));
+    if (settings === null) {
+      return null;
+    }
+    this.store.restoreDeckPanel({ slot, panel: settings.mixer.panel });
+    this.mixerApplier.applyDeck(slot);
+    this.applyMutes(slot, settings.mixer.mutes);
+    this.deckSpeed.setFader(slot, settings.speed);
+    this.setRepeat(slot, settings.repeat);
+    this.reflectEngineControls(slot);
+    return settings;
+  }
+
+  /** Latches each voice's mute on the engine and reflects it. */
+  private applyMutes(slot: Slot, mutes: readonly [boolean, boolean, boolean]): void {
+    mutes.forEach((muted, voice) => this.runtime.setVoiceMuted(slot, voice, muted));
+    this.reflectEngineControls(slot);
   }
 
   /** Returns the deck's tune-shaping controls to home on both the store and the engine: the SID

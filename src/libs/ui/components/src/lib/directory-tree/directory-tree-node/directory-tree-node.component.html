@@ -2,12 +2,14 @@
   class="directory-tree-node no-text-selection"
   [class]="cssClass()"
   [class.selected]="isSelected()"
+  [class.truncating]="truncate()"
 >
   <lib-icon-label
     [icon]="icon()"
     [label]="text()"
     [color]="iconColor()"
     size="medium"
-    [truncate]="false"
+    [truncate]="truncate()"
+    [shrink]="truncate()"
   ></lib-icon-label>
 </div>

@@ -1,4 +1,5 @@
 export * from './database';
+export * from './dj-library';
 export * from './midi-settings';
 export * from './midi/midi-access.service';
 export * from './midi/midi-input.service';

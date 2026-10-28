@@ -5,7 +5,7 @@ import { withDjSelectors } from './selectors';
 import type { Slot } from './slot';
 import type { DjFileKey } from './dj-file-key.util';
 import type { MidiAccessState, MidiPortOption } from './ports/midi-access';
-import type { TuneReference } from '@sidablist/tunes';
+import type { SetSummary, TuneReference, TuneSet } from '@sidablist/tunes';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -170,6 +170,8 @@ export interface DeckLoopBoundary {
 /** One saved position in the tune: a cue when it has no end, a loop when it has one. */
 export interface DeckLoopMarker {
   readonly id: string;
+  /** What the performer called it; null shows as 'Item N' by list position. */
+  readonly name: string | null;
   readonly start: DeckLoopBoundary;
   readonly end: DeckLoopBoundary | null;
   readonly voices: readonly number[];
@@ -201,6 +203,49 @@ export interface DeckLoopsState {
   mainSettings: DeckMixerSettings | null;
 }
 
+/** The row a deck holds, and the subtune its loops and settings are kept under. */
+export interface DeckHolding {
+  readonly setId: string;
+  readonly rowId: string;
+  readonly sidHash: string;
+  readonly subtune: number;
+}
+
+export type SetsSaveStatus = 'saved' | 'saving' | 'failed';
+
+/** A SID dropped into the card that is still fetching: not yet a row, since its hash is unknown.
+ *  `index` is the insertion gap among the set's real rows. */
+export interface PendingRow {
+  readonly key: string;
+  readonly setId: string;
+  readonly index: number;
+  readonly title: string;
+  readonly author: string;
+}
+
+export type RowPrep =
+  | { readonly phase: 'analyzing' }
+  | { readonly phase: 'unavailable'; readonly reason: string };
+
+export interface DjSetsState {
+  ready: boolean;
+  /** Every saved set, for the tree. */
+  summaries: readonly SetSummary[];
+  currentSetId: string | null;
+  /** Working copies: the current set and any set a deck holds a row of. */
+  open: Record<string, TuneSet>;
+  holdings: Record<Slot, DeckHolding | null>;
+  /** The set knob's selection in the current set. */
+  selectedRowId: string | null;
+  /** Bumped by every Select command, even at an end. */
+  selectTurns: number;
+  pending: readonly PendingRow[];
+  /** By row id. */
+  prep: Record<string, RowPrep>;
+  save: SetsSaveStatus;
+  announcement: { readonly seq: number; readonly text: string } | null;
+}
+
 export interface DjState {
   decks: Record<Slot, DeckState>;
   bindings: Record<Slot, DeckBindingState>;
@@ -209,6 +254,7 @@ export interface DjState {
   panel: Record<Slot, DeckPanelState>;
   loops: Record<Slot, DeckLoopsState>;
   keyDisplayFormat: KeyDisplayFormat;
+  sets: DjSetsState;
 }
 
 /** A deck holding no markers: its loop state while nothing is attached. */
@@ -262,6 +308,19 @@ const initialState: DjState = {
   panel: { A: HOME_DECK_PANEL, B: HOME_DECK_PANEL },
   loops: { A: EMPTY_DECK_LOOPS, B: EMPTY_DECK_LOOPS },
   keyDisplayFormat: 'camelot',
+  sets: {
+    ready: false,
+    summaries: [],
+    currentSetId: null,
+    open: {},
+    holdings: { A: null, B: null },
+    selectedRowId: null,
+    selectTurns: 0,
+    pending: [],
+    prep: {},
+    save: 'saved',
+    announcement: null,
+  },
 };
 
 export const DjStore = signalStore(

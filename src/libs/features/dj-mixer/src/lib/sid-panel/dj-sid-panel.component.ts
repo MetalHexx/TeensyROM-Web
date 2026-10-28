@@ -203,6 +203,12 @@ export class DjSidPanelComponent {
   /** Emits when the bindings button is pressed, to open or close the panel. */
   readonly bindingsToggle = output<void>();
 
+  /** Whether the browser (trees, listing and set card) is shown: the button's lit look and name. */
+  readonly browserShown = input<boolean>(true);
+
+  /** Emits when the browser button is pressed, to hide or show the browser. */
+  readonly browserToggle = output<void>();
+
   private readonly header = viewChild.required<ElementRef<HTMLElement>>('header');
   private readonly voiceStrips = viewChildren(SidVoiceStripComponent);
   private readonly filterSections = viewChildren(SidFilterSectionComponent);
@@ -254,7 +260,7 @@ export class DjSidPanelComponent {
 
   /** Moves keyboard focus to the bindings button. */
   focusBindingsButton(): void {
-    this.header().nativeElement.querySelector('button')?.focus();
+    this.header().nativeElement.querySelector<HTMLElement>('.bindings-button button')?.focus();
   }
 
   protected onVoiceKnob(

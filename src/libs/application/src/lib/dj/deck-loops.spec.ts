@@ -5,9 +5,9 @@ import { FakeClock, milliseconds, replayToFrame } from '@sidablist/core';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import { InMemoryLoopPositionsStore } from '@sidablist/tunes';
-import type { LoopMarker, Playable, TuneIdentity } from '@sidablist/tunes';
+import type { LoopMarker, LoopPositionsStore, Playable, TuneIdentity } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
-import { DeckLoops } from './deck-loops';
+import { DeckLoops, type DeckLoopsHolding } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import {
   DjStore,
@@ -19,10 +19,10 @@ import {
 import { MixerApplier } from './mixer-applier';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { engineSettingsOf } from './mixer/engine-settings';
+import { MARKER_NAME_MAX_LENGTH, MAX_MARKERS_PER_SUBTUNE } from './sets/set-limits';
 import { voicePitchMultiplier } from './mixer/pitch';
 import {
   FRAME_CLOCK_FACTORY,
-  LOOP_POSITIONS_STORE,
   MIDI_ACCESS,
   REPLAY_RUNNER_FACTORY,
 } from './ports';
@@ -215,7 +215,6 @@ describe('DeckLoops', () => {
           },
         },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess() },
-        { provide: LOOP_POSITIONS_STORE, useValue: positions },
       ],
     });
 
@@ -254,17 +253,28 @@ describe('DeckLoops', () => {
     }
   }
 
+  /** What `DeckService` attaches: the tune's identity in a row, read and written through `store`
+   *  (the shared `positions` unless a spec gives a row of its own). */
+  function holdingFor(
+    identity: TuneIdentity,
+    placementKey = 'set-1:row-1',
+    through: LoopPositionsStore = positions
+  ): DeckLoopsHolding {
+    return { placementKey, identity, positions: through };
+  }
+
   /** Replays what `DeckService.load` does around the markers: detach, hand the tune to the engine,
    *  attach. */
   async function loadOn(
     slot: Slot,
     identity: TuneIdentity,
-    detectedMoments: readonly number[] = []
+    detectedMoments: readonly number[] = [],
+    holding: DeckLoopsHolding = holdingFor(identity)
   ): Promise<void> {
     loops.detach(slot);
     runtime.load(slot, playableOf(identity));
     store.setDeckTiming({ slot, playCallIntervalUs: INTERVAL_US });
-    await loops.attach(slot, identity, detectedMoments);
+    await loops.attach(slot, holding, detectedMoments);
   }
 
   /** Moves the playhead to `frame` and marks it. */
@@ -382,7 +392,7 @@ describe('DeckLoops', () => {
         return markers;
       });
 
-      const attaching = loops.attach('A', TUNE_X, []);
+      const attaching = loops.attach('A', holdingFor(TUNE_X), []);
       await flush();
       loops.detach('A');
       release();
@@ -404,9 +414,9 @@ describe('DeckLoops', () => {
         return markers;
       });
 
-      const older = loops.attach('A', TUNE_X, []);
+      const older = loops.attach('A', holdingFor(TUNE_X), []);
       await flush();
-      await loops.attach('A', TUNE_Y, []);
+      await loops.attach('A', holdingFor(TUNE_Y), []);
       release();
       await older;
 
@@ -503,7 +513,7 @@ describe('DeckLoops', () => {
     });
 
     it('refuses with a warning when the engine has nothing to capture', async () => {
-      await loops.attach('A', TUNE_X, []);
+      await loops.attach('A', holdingFor(TUNE_X), []);
 
       loops.add('A');
 
@@ -515,6 +525,96 @@ describe('DeckLoops', () => {
       loops.add('A');
 
       expect(stateOf('A').markers).toEqual([]);
+      expect(refusals()).toHaveLength(1);
+    });
+
+    it('takes the marker that fills the most a subtune keeps, and refuses the next', async () => {
+      await positions.save(
+        TUNE_X,
+        Array.from({ length: MAX_MARKERS_PER_SUBTUNE - 1 }, (_, i) => cue(`m${i}`, i + 1))
+      );
+      await loadOn('A', TUNE_X);
+
+      await placeMarker('A', 500);
+      expect(stateOf('A').markers).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
+      expect(refusals()).toHaveLength(0);
+
+      await placeMarker('A', 600);
+      expect(stateOf('A').markers).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
+      expect(refusals()).toHaveLength(1);
+      expect(await positions.load(TUNE_X)).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
+    });
+  });
+
+  describe('names', () => {
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [cue('a', 10), cue('b', 20)]);
+      await loadOn('A', TUNE_X);
+    });
+
+    const namesOf = (slot: Slot) => stateOf(slot).markers.map((marker) => marker.name);
+
+    it('leaves markers unnamed until they are named', () => {
+      expect(namesOf('A')).toEqual([null, null]);
+    });
+
+    it('names a marker, saves the name with it and shows it on the other deck', async () => {
+      await loadOn('B', TUNE_X);
+
+      loops.rename('A', 'b', 'Drop');
+
+      expect(namesOf('A')).toEqual([null, 'Drop']);
+      expect(namesOf('B')).toEqual([null, 'Drop']);
+      expect(await positions.load(TUNE_X)).toEqual([cue('a', 10), { ...cue('b', 20), name: 'Drop' }]);
+    });
+
+    it('brings a stored name back when the tune is loaded again', async () => {
+      loops.rename('A', 'a', 'Intro');
+
+      await loadOn('A', TUNE_X);
+
+      expect(namesOf('A')).toEqual(['Intro', null]);
+    });
+
+    it('moves nothing in the engine: a name is not a position', () => {
+      const declare = vi.spyOn(runtime, 'setJumpTargets');
+
+      loops.rename('A', 'a', 'Intro');
+
+      expect(declare).not.toHaveBeenCalled();
+    });
+
+    it('removes control characters, trims and caps the name at the limit', () => {
+      loops.rename('A', 'a', '  Big\tDrop\u0007  ');
+      expect(namesOf('A')[0]).toBe('BigDrop');
+
+      loops.rename('A', 'b', 'x'.repeat(MARKER_NAME_MAX_LENGTH + 1));
+      expect(namesOf('A')[1]).toBe('x'.repeat(MARKER_NAME_MAX_LENGTH));
+    });
+
+    it('returns a marker to its place in the list when the name comes out empty', async () => {
+      loops.rename('A', 'a', 'Intro');
+
+      loops.rename('A', 'a', ' \t ');
+
+      expect(namesOf('A')).toEqual([null, null]);
+      expect(await positions.load(TUNE_X)).toEqual([cue('a', 10), cue('b', 20)]);
+    });
+
+    it('saves nothing for a name that did not change', () => {
+      loops.rename('A', 'a', 'Intro');
+      const save = vi.spyOn(positions, 'save');
+
+      loops.rename('A', 'a', ' Intro ');
+      loops.rename('A', 'b', '');
+
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('refuses with a warning for a marker the deck does not have', () => {
+      loops.rename('A', 'gone', 'Intro');
+
+      expect(namesOf('A')).toEqual([null, null]);
       expect(refusals()).toHaveLength(1);
     });
   });
@@ -891,6 +991,33 @@ describe('DeckLoops', () => {
       await loadOn('B', { ...TUNE_X, subtune: 2 });
       await placeMarker('A', 200);
       expect(stateOf('B').markers).toEqual([]);
+    });
+  });
+
+  describe('rows of one tune on both decks', () => {
+    it('shares nothing between two rows, each deck writing its own', async () => {
+      const first = new InMemoryLoopPositionsStore();
+      const second = new InMemoryLoopPositionsStore();
+      await loadOn('A', TUNE_X, [], holdingFor(TUNE_X, 'set-1:row-1', first));
+      await loadOn('B', TUNE_X, [], holdingFor(TUNE_X, 'set-2:row-9', second));
+
+      await placeMarker('A', 100);
+
+      expect(stateOf('B').markers).toEqual([]);
+      expect(await first.load(TUNE_X)).toHaveLength(1);
+      expect(await second.load(TUNE_X)).toEqual([]);
+    });
+
+    it('shares one row, written once by the deck that edits', async () => {
+      const row = new InMemoryLoopPositionsStore();
+      const save = vi.spyOn(row, 'save');
+      await loadOn('A', TUNE_X, [], holdingFor(TUNE_X, 'set-1:row-1', row));
+      await loadOn('B', TUNE_X, [], holdingFor(TUNE_X, 'set-1:row-1', row));
+
+      await placeMarker('A', 100);
+
+      expect(idsOf('B')).toEqual(idsOf('A'));
+      expect(save).toHaveBeenCalledTimes(1);
     });
   });
 

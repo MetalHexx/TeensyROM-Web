@@ -2,6 +2,7 @@ import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 import type { MockDeviceFixture } from '../../support/test-data/fixtures/fixture.types';
 import { generateDevice } from '../../support/test-data/generators/device.generators';
 import { generateFileItem } from '../../support/test-data/generators/storage.generators';
+import { interceptDjLibrary } from '../../support/interceptors/djLibrary.interceptors';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 import {
@@ -17,6 +18,7 @@ const twoDevices: MockDeviceFixture = { devices: [generateDevice(), generateDevi
 
 describe('DJ Mixer — Browse', () => {
   beforeEach(() => {
+    interceptDjLibrary();
     interceptFindDevices({ fixture: twoDevices });
     interceptConnectDevice();
   });

@@ -9,6 +9,7 @@ import {
   DeviceHardwareVariant,
 } from '@teensyrom-nx/domain';
 import { BrowseTreeComponent } from '@teensyrom-nx/ui/components';
+import { SetsTreeBranchComponent, type SetsTreeBranchModel } from '@teensyrom-nx/ui/components/dj';
 import { DjBrowseTreesComponent } from './dj-browse-trees.component';
 
 function device(deviceId: string, overrides: Partial<Device> = {}): Device {
@@ -31,12 +32,21 @@ function device(deviceId: string, overrides: Partial<Device> = {}): Device {
   };
 }
 
-function render(devices: readonly Device[]) {
+const SETS: SetsTreeBranchModel = {
+  label: 'Sets',
+  sets: [
+    { id: 's2', name: 'Friday', loaded: true, accessibleName: 'Set Friday, loaded' },
+    { id: 's1', name: 'Saturday', loaded: false, accessibleName: 'Set Saturday' },
+  ],
+};
+
+function render(devices: readonly Device[], sets: SetsTreeBranchModel = SETS) {
   TestBed.configureTestingModule({ imports: [DjBrowseTreesComponent] });
 
   const fixture: ComponentFixture<DjBrowseTreesComponent> =
     TestBed.createComponent(DjBrowseTreesComponent);
   fixture.componentRef.setInput('devices', devices);
+  fixture.componentRef.setInput('sets', sets);
   fixture.detectChanges();
 
   return { fixture, component: fixture.componentInstance };
@@ -157,5 +167,48 @@ describe('DjBrowseTreesComponent', () => {
     treeB.storageSelect.emit(StorageType.Sd);
 
     expect(emitted).toEqual([{ deviceId: 'b', storageType: StorageType.Sd }]);
+  });
+
+  describe('the Sets branch', () => {
+    function branch(fixture: ComponentFixture<DjBrowseTreesComponent>): SetsTreeBranchComponent {
+      return fixture.debugElement.query(By.directive(SetsTreeBranchComponent))
+        .componentInstance as SetsTreeBranchComponent;
+    }
+
+    it('renders above the device trees', () => {
+      const { fixture } = render([device('a')]);
+      const children = Array.from(fixture.nativeElement.children as HTMLCollection).map((el) =>
+        el.tagName.toLowerCase()
+      );
+
+      expect(children).toEqual(['lib-sets-tree-branch', 'lib-browse-tree']);
+      expect(branch(fixture).model()).toEqual(SETS);
+    });
+
+    it('renders with no devices', () => {
+      const { fixture } = render([]);
+
+      expect(branch(fixture).model()).toEqual(SETS);
+    });
+
+    it('starts expanded and follows the branch row', () => {
+      const { fixture } = render([]);
+      expect(branch(fixture).expanded()).toBe(true);
+
+      branch(fixture).expandedChange.emit(false);
+      fixture.detectChanges();
+
+      expect(branch(fixture).expanded()).toBe(false);
+    });
+
+    it('emits setSelect with the chosen set id', () => {
+      const { fixture, component } = render([]);
+      const emitted: string[] = [];
+      component.setSelect.subscribe((id) => emitted.push(id));
+
+      branch(fixture).setSelect.emit('s1');
+
+      expect(emitted).toEqual(['s1']);
+    });
   });
 });

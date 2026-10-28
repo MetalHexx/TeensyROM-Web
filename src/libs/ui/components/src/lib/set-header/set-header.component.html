@@ -1,0 +1,62 @@
+<div class="bar">
+  <div class="name">
+    @if (model().disabled) {
+    <span class="name-text">{{ model().name }}</span>
+    } @else {
+    <lib-inline-edit-title
+      [value]="model().name"
+      [maxLength]="model().nameMaxLength"
+      [isValid]="isValidName"
+      [editLabel]="model().renameLabel"
+      [invalidDescription]="nameRequired"
+      (commit)="rename.emit($event)"
+    />
+    }
+  </div>
+  <span class="lamp" role="status" [attr.data-save]="model().save">
+    <span class="light" aria-hidden="true"></span>
+    <span class="lamp-text">{{ model().saveText }}</span>
+  </span>
+  <span class="count">{{ model().countText }}</span>
+  <lib-synth-key
+    #deleteKey
+    data-part="delete"
+    icon="delete"
+    [accessibleName]="model().deleteAccessibleName"
+    [disabled]="model().disabled"
+    (press)="askToDelete()"
+  />
+  <lib-synth-key
+    data-part="new"
+    icon="add"
+    label="New"
+    [accessibleName]="model().newAccessibleName"
+    [disabled]="model().disabled"
+    (press)="newSet.emit()"
+  />
+</div>
+
+@if (confirming()) {
+<div
+  class="confirm"
+  role="alertdialog"
+  [attr.aria-label]="model().deletePrompt"
+  (keydown.escape)="cancelDelete()"
+>
+  <span class="prompt">{{ model().deletePrompt }}</span>
+  <lib-synth-key
+    #cancelKey
+    data-part="cancel"
+    label="Cancel"
+    accessibleName="Cancel"
+    (press)="cancelDelete()"
+  />
+  <lib-synth-key
+    data-part="confirm-delete"
+    label="Delete"
+    icon="delete"
+    accessibleName="Delete"
+    (press)="confirmDelete()"
+  />
+</div>
+}

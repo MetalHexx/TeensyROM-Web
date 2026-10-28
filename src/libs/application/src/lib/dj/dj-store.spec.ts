@@ -293,6 +293,24 @@ describe('DjStore', () => {
       expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck B panel reset (tune change)');
     });
 
+    it('restoreDeckPanel replaces one deck\'s whole panel and leaves the detected key and the other deck alone', () => {
+      store.setDeckPanel({ slot: 'B', patch: { cutoff: 300 } });
+      store.setDeckDetectedKey({
+        slot: 'A',
+        detectedKey: { tonic: 1, mode: 'minor', camelot: '8A' },
+      });
+      const kept = { ...HOME_DECK_PANEL, cutoff: 600, keySemitones: 5 };
+      vi.mocked(logInfo).mockClear();
+
+      store.restoreDeckPanel({ slot: 'A', panel: kept });
+
+      expect(store.panel().A).toBe(kept);
+      expect(store.panel().B.cutoff).toBe(300);
+      expect(store.decks().A.detectedKey).not.toBeNull();
+      expect(logInfo).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck A panel restored');
+    });
+
     it('setDeckEngineControls sets speed, fader value, nudge flag and voices only, leaving the other slot untouched', () => {
       const voices = [
         { muted: true, held: false },
@@ -366,6 +384,7 @@ describe('DjStore', () => {
     it('setLoopMarkers logs a change to the markers but not to their readiness or settings', () => {
       const marker = {
         id: 'm1',
+        name: null,
         start: { frame: 100, offsetFrames: 0 },
         end: null,
         voices: [0, 1, 2],

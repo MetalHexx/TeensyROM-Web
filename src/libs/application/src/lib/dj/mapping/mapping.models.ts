@@ -40,6 +40,8 @@ export type DeckControlId =
   | 'stop'
   | 'subtune-previous'
   | 'subtune-next'
+  | 'set-previous'
+  | 'set-next'
   | 'seek'
   | 'speed'
   | 'speed-jump-up'
@@ -78,6 +80,8 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'stop',
   'subtune-previous',
   'subtune-next',
+  'set-previous',
+  'set-next',
   'seek',
   'speed',
   'speed-jump-up',
@@ -107,11 +111,16 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   ...DECK_PANEL_CONTROLS,
 ];
 
-export type ControlId = DeckControlId;
+/** The controls the set owns, in display order. The server's allow-list for the `set` owner is
+ *  loaded from a contract file generated from this list. */
+export const SET_CONTROL_IDS = ['set-select', 'set-load-a', 'set-load-b'] as const;
 
-/** Who a control belongs to. A later surface (a playlist) adds one member here; the mixer owns
- *  nothing today. */
-export type ControlOwner = Slot | 'mixer';
+export type SetControlId = (typeof SET_CONTROL_IDS)[number];
+
+export type ControlId = DeckControlId | SetControlId;
+
+/** Who a control belongs to: a deck, the mixer (which owns none today), or the set. */
+export type ControlOwner = Slot | 'mixer' | 'set';
 
 export interface ControlIdentity {
   readonly owner: ControlOwner;
@@ -159,7 +168,7 @@ export interface SourceEvent extends MidiSource {
   readonly pressed: boolean;
 }
 
-const CONTROL_IDS: ReadonlySet<string> = new Set<string>(DECK_CONTROL_IDS);
+const CONTROL_IDS: ReadonlySet<string> = new Set<string>([...DECK_CONTROL_IDS, ...SET_CONTROL_IDS]);
 
 export function isControlId(value: string): value is ControlId {
   return CONTROL_IDS.has(value);

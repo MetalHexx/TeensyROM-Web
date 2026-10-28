@@ -13,6 +13,7 @@ export function mappingsByOwner(store: WritableStore<MidiMappingState>) {
           A: mappings.filter((mapping) => mapping.control.owner === 'A'),
           B: mappings.filter((mapping) => mapping.control.owner === 'B'),
           mixer: mappings.filter((mapping) => mapping.control.owner === 'mixer'),
+          set: mappings.filter((mapping) => mapping.control.owner === 'set'),
         };
       }),
   };

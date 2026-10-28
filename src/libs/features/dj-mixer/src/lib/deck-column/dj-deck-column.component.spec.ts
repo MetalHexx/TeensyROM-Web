@@ -8,9 +8,11 @@ import {
   DeckService,
   DeviceStore,
   DjStore,
+  MARKER_NAME_MAX_LENGTH,
   type DeckBindingState,
   type DeckBindingSummary,
   type DeckLoopsSummary,
+  type DeckSetSummary,
   type DeckTransportSummary,
   type LoopItemSummary,
   type LoopSelectionSummary,
@@ -142,6 +144,20 @@ function createDeckServiceStub() {
     deleteMarker: vi.fn(),
     nudgeMarker: vi.fn(),
     snapMarker: vi.fn(),
+    renameMarker: vi.fn(),
+    previousRow: vi.fn().mockResolvedValue(undefined),
+    nextRow: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function deckSetSummary(overrides: Partial<DeckSetSummary> = {}): DeckSetSummary {
+  return {
+    available: false,
+    positionText: '— / —',
+    setName: '',
+    canPrevious: false,
+    canNext: false,
+    ...overrides,
   };
 }
 
@@ -150,6 +166,7 @@ interface RenderOptions {
   transport?: Partial<DeckTransportSummary>;
   binding?: Partial<DeckBindingSummary>;
   loops?: Partial<DeckLoopsSummary>;
+  set?: Partial<DeckSetSummary>;
   subtune?: number;
   devices?: Device[];
   outputs?: MidiPortOption[];
@@ -166,6 +183,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   const transportSummary = signal(idleTransportSummary(options.transport));
   const bindingSummary = signal(idleBindingSummary(options.binding));
   const loopsSummary = signal(emptyLoopsSummary(options.loops));
+  const deckSet = signal(deckSetSummary(options.set));
   const loopLapPercent = signal(0);
   const settingsInPlay = signal<SettingsInPlaySummary>({ markerId: null, name: 'Main' });
   const deckState = signal({
@@ -204,6 +222,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
           transportSummary: () => transportSummary,
           bindingSummary: () => bindingSummary,
           loopsSummary: () => loopsSummary,
+          deckSetSummary: () => deckSet,
           loopLapPercent: () => loopLapPercent,
           settingsInPlay: () => settingsInPlay,
           deck: () => deckState,
@@ -227,6 +246,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     transportSummary,
     bindingSummary,
     loopsSummary,
+    deckSet,
     loopLapPercent,
     settingsInPlay,
     deckState,
@@ -453,6 +473,48 @@ describe('DjDeckColumnComponent', () => {
       expect(tiles[1].selectAccessibleName).toBe('Item 2, loop, 7.8s, own settings, deck B');
     });
 
+    it('makes the selected marker renameable, and not when nothing is selected', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
+      });
+      let row = plate(fixture).model().selected;
+
+      expect([row.renameDisabled, row.renameLabel, row.nameMaxLength]).toEqual([
+        false,
+        'Rename Item 1',
+        MARKER_NAME_MAX_LENGTH,
+      ]);
+
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, canAdd: true, items: [loopItem()] }));
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+
+      expect(row.renameDisabled).toBe(true);
+    });
+
+    it("renames the selected marker through the deck service with this deck's slot", () => {
+      const { fixture, deckService } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          canAdd: true,
+          items: [loopItem()],
+          selected: selection({ id: 'm7' }),
+        },
+      });
+
+      plate(fixture).rename.emit('Drop');
+
+      expect(deckService.renameMarker).toHaveBeenCalledWith('B', 'm7', 'Drop');
+    });
+
+    it('renames nothing when no marker is selected', () => {
+      const { fixture, deckService } = render(DECK_B);
+
+      plate(fixture).rename.emit('Drop');
+
+      expect(deckService.renameMarker).not.toHaveBeenCalled();
+    });
+
     it('fills the selected row and applies the disabled rules', () => {
       const { fixture, loopsSummary } = render(DECK_B, {
         loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
@@ -627,6 +689,64 @@ describe('DjDeckColumnComponent', () => {
       ]);
       expect(model.subtune.text).toBe('1/3');
       expect(transport(fixture).model()).toEqual(model);
+    });
+
+    it('carries the empty set row with both keys disabled when the deck holds no row of the set', () => {
+      const { fixture } = render({ slot: 'B', letter: 'B', index: 1 });
+
+      expect(fixture.componentInstance.transportModel().set).toEqual({
+        positionText: '— / —',
+        setName: '',
+        previousDisabled: true,
+        nextDisabled: true,
+        previousAccessibleName: 'Previous in the set deck B',
+        nextAccessibleName: 'Next in the set deck B',
+      });
+    });
+
+    it('shows the deck position and set name, with each key following the ends of the set', () => {
+      const { fixture, deckSet } = render(
+        { slot: 'B', letter: 'B', index: 1 },
+        {
+          set: {
+            available: true,
+            positionText: '01/03',
+            setName: 'Friday',
+            canPrevious: false,
+            canNext: true,
+          },
+        }
+      );
+      const keys = () => {
+        const { previousDisabled, nextDisabled, positionText, setName } =
+          fixture.componentInstance.transportModel().set;
+        return [positionText, setName, previousDisabled, nextDisabled];
+      };
+
+      expect(keys()).toEqual(['01/03', 'Friday', true, false]);
+
+      deckSet.set(
+        deckSetSummary({
+          available: true,
+          positionText: '03/03',
+          setName: 'Friday',
+          canPrevious: true,
+          canNext: false,
+        })
+      );
+      fixture.detectChanges();
+
+      expect(keys()).toEqual(['03/03', 'Friday', false, true]);
+    });
+
+    it("dispatches the set row's keys to previousRow and nextRow with this deck's slot", () => {
+      const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
+
+      transport(fixture).previousInSet.emit();
+      transport(fixture).nextInSet.emit();
+
+      expect(deckService.previousRow).toHaveBeenCalledWith('B');
+      expect(deckService.nextRow).toHaveBeenCalledWith('B');
     });
 
     it('reads an empty deck as the empty state, labelled Stop, with the drop hint', () => {
