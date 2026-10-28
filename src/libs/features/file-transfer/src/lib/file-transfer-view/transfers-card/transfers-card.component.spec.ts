@@ -112,16 +112,16 @@ describe('TransfersCardComponent', () => {
     vi.useRealTimers();
   });
 
-  it('shows a quiet empty state and a zero count when nothing is under way', async () => {
+  it('shows the Transfers title and a quiet empty state when nothing is under way', async () => {
     await setup();
     createFixture();
 
+    expect(native().querySelector('mat-card-title')?.textContent?.trim()).toBe('Transfers');
     expect(textOf('transfers-empty')).toContain('No active file transfers');
-    expect(textOf('transfers-count')).toBe('0');
     expect(rows().length).toBe(0);
   });
 
-  it('lists one row per live transfer, from any source, with the count', async () => {
+  it('lists one row per live transfer, from any source', async () => {
     await setup();
     transferStore.foldLiveSnapshot({ snapshot: createSnapshot() });
     transferStore.foldLiveSnapshot({
@@ -134,7 +134,6 @@ describe('TransfersCardComponent', () => {
     createFixture();
 
     expect(rows().length).toBe(2);
-    expect(textOf('transfers-count')).toBe('2');
     expect(native().querySelector('[data-testid="transfers-empty"]')).toBeNull();
     const names = Array.from(native().querySelectorAll('[data-testid="transfer-row-device"]')).map((el) =>
       el.textContent?.trim()

@@ -11,36 +11,19 @@ lib-sliding-container {
   height: 100%;
 }
 
+// The title comes from lib-scaling-card; the card's content area holds the list or the empty state.
+lib-scaling-card {
+  display: block;
+  height: 100%;
+}
+
 .transfers-card {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--spacing-md);
+  height: 100%;
   width: 100%;
-  padding: var(--spacing-lg);
   box-sizing: border-box;
-}
-
-.transfers-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: 0.75rem;
-  color: var(--color-dimmed-light);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.transfers-count {
-  display: grid;
-  place-items: center;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding: 0 var(--spacing-xs);
-  border-radius: var(--border-radius-lg);
-  background: color-mix(in srgb, var(--color-primary-bright) 55%, transparent);
-  font-size: 0.6875rem;
-  letter-spacing: 0;
 }
 
 .transfers-list {
@@ -49,7 +32,7 @@ lib-sliding-container {
   gap: var(--spacing-sm);
 }
 
-// Fills the card's stretched height so the header row doesn't jump when the card is empty.
+// Fills the card's height so the empty message sits centered in the space beneath the title.
 .transfers-empty {
   flex: 1;
   display: grid;

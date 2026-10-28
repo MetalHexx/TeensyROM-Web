@@ -1,11 +1,6 @@
 <lib-sliding-container animationDirection="from-top" containerHeight="100%" [animationTrigger]="true">
-  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card compact-card--fill">
+  <lib-scaling-card title="Transfers" animationEntry="from-top" animationParent="auto">
     <div class="transfers-card" data-testid="transfers-card">
-      <div class="transfers-header">
-        <span>Transfers</span>
-        <span class="transfers-count" data-testid="transfers-count">{{ rows().length }}</span>
-      </div>
-
       @if (rows().length > 0) {
         <div class="transfers-list">
           @for (row of rows(); track row.transfer.jobId) {
@@ -25,5 +20,5 @@
 
       <div class="visually-hidden" aria-live="polite" data-testid="transfers-live-region">{{ announcement() }}</div>
     </div>
-  </lib-scaling-compact-card>
+  </lib-scaling-card>
 </lib-sliding-container>

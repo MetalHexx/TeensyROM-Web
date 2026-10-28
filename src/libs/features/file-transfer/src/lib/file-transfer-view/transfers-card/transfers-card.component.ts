@@ -7,10 +7,7 @@ import {
   formatElapsedLabel,
 } from '@teensyrom-nx/application';
 import { TransferOriginKind } from '@teensyrom-nx/domain';
-import {
-  ScalingCompactCardComponent,
-  SlidingContainerComponent,
-} from '@teensyrom-nx/ui/components';
+import { ScalingCardComponent, SlidingContainerComponent } from '@teensyrom-nx/ui/components';
 import { watchFolderLabel } from '../../transfer-origin-label';
 import { TransferRowComponent } from './transfer-row/transfer-row.component';
 
@@ -22,7 +19,7 @@ const UPLOAD_ORIGIN_LABEL = 'Upload';
  */
 @Component({
   selector: 'lib-transfers-card',
-  imports: [SlidingContainerComponent, ScalingCompactCardComponent, TransferRowComponent],
+  imports: [SlidingContainerComponent, ScalingCardComponent, TransferRowComponent],
   templateUrl: './transfers-card.component.html',
   styleUrl: './transfers-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
