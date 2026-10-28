@@ -46,17 +46,27 @@
   .device-header {
     display: flex;
     flex-direction: row;
-    align-items: stretch; // Force all children to match the tallest component's height
+    align-items: stretch; // Force all children to match the row's height
     gap: var(--spacing-lg);
     min-width: 0; // Allow shrinking without forcing width on parent
     min-height: 0; // Allow flex shrinking
-    flex-shrink: 1; // Allow header to shrink when container is constrained
+    flex-shrink: 0;
     position: relative; // Establish positioning context for absolute overlays
+
+    // The row's height drives the picture (square) and the CRT (4:3), so they keep their
+    // shape whether the panel is full width (one device) or half width (two devices).
+    // Capped at the height one device shows, 40% of the panel's height, and 30% of its
+    // width so the info card keeps room beside the picture and CRT.
+    --header-width-share: 30cqw;
+    height: min(300px, 40cqh, var(--header-width-share));
+    overflow: clip; // Contain overflow without creating scroll context
+    overflow-clip-margin: 1.25rem; // Allow box-shadow to render beyond clip boundary
 
     @include styles.below-phone {
       flex-direction: column;
       align-items: stretch;
       flex: 0 1 calc(100vw - 2 * var(--spacing-section-gap));
+      height: auto;
       min-height: 0;
       max-height: calc(100vw - 2 * var(--spacing-section-gap));
       overflow: visible;
@@ -133,19 +143,29 @@
   }
 }
 
-// Container query: cap device-header when container height is constrained
+// Container query: guarantee storage its share when the container height is constrained
 // At 720p the container is ~638px; at 1280×800 it's ~750px.
-// Threshold of 768px covers both, preventing the header from dominating.
 @container device-panel (max-height: 768px) {
-  .device-header {
-    height: 40cqh; // 40% of container height (~300px at 750px)
-    flex-shrink: 0;
-    overflow: clip; // Contain overflow without creating scroll context
-    overflow-clip-margin: 1.25rem; // Allow box-shadow to render beyond clip boundary
-  }
-
   .storage-container {
     min-height: 25cqh; // Guarantee storage gets at least 25% of container
+  }
+}
+
+// Small panel (two devices side by side, or a small window): the info card needs about 400px
+// to fit its two-line message and a row at least ~235px tall (panel ~590px) to fit it
+// without scrolling. A full-size row (300px: 300 + 400 + gaps) leaves that width only in a
+// panel 1140px wide; a short panel has a shorter row, so 1000px is enough. Otherwise hide the
+// card and size the picture and CRT to fill the panel's width instead of leaving them to
+// overflow.
+@container device-panel
+  ((max-width: 1139px) and (min-height: 650px)) or (max-width: 999px) or (max-height: 589px) {
+  .device-container .device-header {
+    --header-width-share: calc((100cqw - var(--spacing-lg)) * 3 / 7);
+  }
+
+  .device-container lib-scaling-card:has(lib-empty-state-message),
+  .device-container lib-file-description {
+    display: none;
   }
 }
 
@@ -322,13 +342,22 @@
   }
 }
 
-// Empty-state card in canvas area — fill available space like file-description
+// Empty-state card in canvas area — takes only the space the picture and CRT leave,
+// never the width of its own text (a flex-basis of auto would let the text claim it first)
 lib-scaling-card:has(lib-empty-state-message) {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   align-items: stretch;
+}
+
+// Sit the icon and message close to the top of the card so they fit the row's height
+// without a scrollbar (phone keeps its own swipe-pane spacing)
+@media (min-width: styles.$bp-phone) {
+  lib-scaling-card lib-empty-state-message {
+    --empty-state-padding-block: var(--spacing-sm);
+  }
 }
 
 .swipe-nav-btn {

@@ -3,7 +3,12 @@
 :host {
   display: block;
   min-width: 0;
-  flex: 0 1 390px;
+  min-height: 0;
+  // Size from the row's height and let aspect-ratio compute the width, so the square
+  // never gets squeezed by its siblings
+  height: 100%;
+  width: auto;
+  flex: 0 0 auto;
   aspect-ratio: 1 / 1;
 
   // Ensure nested cycle-image stretches to fill the square
@@ -12,17 +17,7 @@
   @include styles.below-phone {
     // Host fills swipe slot; inner lib-scaling-container preserves aspect ratio
     aspect-ratio: unset;
-  }
-}
-
-// Height-constrained container: size from height, let aspect-ratio compute width
-@container device-panel (max-height: 768px) {
-  :host {
-    height: 100%;
-    width: auto;
-    flex: 0 0 auto;
-    aspect-ratio: 1 / 1;
-    min-height: 0;
+    height: auto;
   }
 }
 
