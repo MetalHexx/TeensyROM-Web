@@ -1,6 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { sharedScaleNotes } from '@sidablist/analysis';
 import { DjStore, type DeckDetectedKey } from '../dj-store';
+
+vi.mock('@sidablist/analysis', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@sidablist/analysis')>();
+  return { ...actual, sharedScaleNotes: vi.fn(actual.sharedScaleNotes) };
+});
 
 const A_MINOR: DeckDetectedKey = { tonic: 9, mode: 'minor', camelot: '8A' };
 const A_FLAT_MAJOR: DeckDetectedKey = { tonic: 8, mode: 'major', camelot: '4B' };
@@ -69,5 +75,17 @@ describe('keyMatch', () => {
 
     store.setDeckDetectedKey({ slot: 'B', detectedKey: A_MINOR });
     expect(store.keyMatch()()).toBe('full');
+  });
+
+  it('is not recomputed by a playback frame tick', () => {
+    const match = store.keyMatch();
+    expect(match()).toBe('clash');
+    vi.mocked(sharedScaleNotes).mockClear();
+
+    store.samplePosition({ slot: 'A', positionFrames: 150 });
+    store.samplePosition({ slot: 'B', positionFrames: 151 });
+
+    expect(match()).toBe('clash');
+    expect(sharedScaleNotes).not.toHaveBeenCalled();
   });
 });

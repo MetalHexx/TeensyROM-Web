@@ -222,7 +222,9 @@ describe('DJ Mixer — responsive layout', () => {
             const [keyA, keyB] = Array.from(panel.querySelectorAll('.lower-key')).map((el) =>
               el.getBoundingClientRect()
             );
-            const light = panel.querySelector('lib-key-match-light')!.getBoundingClientRect();
+            const lightEl = panel.querySelector('lib-key-match-light');
+            expect(lightEl, 'key match light').to.not.equal(null);
+            const light = (lightEl as Element).getBoundingClientRect();
 
             const gapMiddle = (keyA.right + keyB.left) / 2;
             const keysMiddle = (keyA.top + keyA.height / 2 + keyB.top + keyB.height / 2) / 2;
