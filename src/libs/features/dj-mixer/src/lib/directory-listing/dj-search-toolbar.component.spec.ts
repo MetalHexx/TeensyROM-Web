@@ -144,10 +144,12 @@ describe('DjSearchToolbarComponent', () => {
       stateOf('device-1').set(searchState());
       fixture.detectChanges();
       expect(component.searchText()).toBe('iron maiden');
+      expect(fieldOf().query(By.css('input')).nativeElement.value).toBe('iron maiden');
 
       stateOf('device-1').set(null);
       fixture.detectChanges();
       expect(component.searchText()).toBe('');
+      expect(fieldOf().query(By.css('input')).nativeElement.value).toBe('');
     });
   });
 

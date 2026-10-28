@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   computed,
   effect,
@@ -33,6 +34,8 @@ export class DjSearchToolbarComponent implements OnDestroy {
   readonly deviceId = input.required<string>();
 
   private readonly storageStore = inject(StorageStore);
+
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   private readonly searchInput = viewChild<InputFieldComponent>('searchInput');
 
@@ -132,6 +135,8 @@ export class DjSearchToolbarComponent implements OnDestroy {
   private setText(text: string): void {
     this.searchText.set(text);
     this.searchInput()?.writeValue(text);
+    // writeValue changes the field's plain `value` field, which an OnPush parent would not re-render.
+    this.changeDetector.markForCheck();
   }
 
   private cancelPendingSearch(): void {

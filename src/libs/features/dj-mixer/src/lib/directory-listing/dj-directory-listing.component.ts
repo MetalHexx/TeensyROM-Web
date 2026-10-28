@@ -130,7 +130,7 @@ export class DjDirectoryListingComponent {
     return selected?.path === result.path && selected.storageType === result.storageType;
   }
 
-  /** Only a `.sid` song is a drag source — every other file type gets nothing. */
+  /** Only a `.sid` song is a drag source â€” every other file type gets nothing. */
   isDraggableFile(file: FileItem): boolean {
     return file.type === FileItemType.Song;
   }
@@ -147,7 +147,7 @@ export class DjDirectoryListingComponent {
     this.onFileDragStart(event, row, active.storageType);
   }
 
-  /** Starts a drag of `file` loaded from `storageType` — the storage it was listed or found on. */
+  /** Starts a drag of `file` loaded from `storageType` â€” the storage it was listed or found on. */
   onFileDragStart(event: DragEvent, file: FileItem, storageType: StorageType): void {
     const active = this.activeStorage();
     if (!active || !this.isDraggableFile(file) || !event.dataTransfer) return;
@@ -164,7 +164,7 @@ export class DjDirectoryListingComponent {
     });
 
     // The label must be current before the browser snapshots the drag image, which happens
-    // synchronously when this handler returns — zoneless-coalesced change detection would
+    // synchronously when this handler returns â€” zoneless-coalesced change detection would
     // otherwise still show the previously-dragged row's name.
     this.dragChipLabel.set(file.name);
     this.changeDetectorRef.detectChanges();
