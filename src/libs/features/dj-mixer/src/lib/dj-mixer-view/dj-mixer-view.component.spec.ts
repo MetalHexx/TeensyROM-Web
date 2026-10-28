@@ -240,6 +240,7 @@ function createDjStoreStub(
     canShape: () => signal(false),
     keyReadout: () => signal('0'),
     keyDisplayFormat: signal('camelot'),
+    keyMatch: () => signal('none'),
   };
 }
 
