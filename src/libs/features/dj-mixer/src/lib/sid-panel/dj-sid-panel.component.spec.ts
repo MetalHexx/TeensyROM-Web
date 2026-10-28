@@ -400,6 +400,47 @@ describe('DjSidPanelComponent', () => {
     });
   });
 
+  describe('the Key match light', () => {
+    function light(fixture: ComponentFixture<DjSidPanelComponent>): HTMLElement {
+      return find(fixture, 'lib-key-match-light');
+    }
+
+    it('is rendered once, as a direct child of the panel, as an image', () => {
+      const { fixture } = render();
+      const host: HTMLElement = fixture.nativeElement;
+
+      expect(host.querySelectorAll('lib-key-match-light')).toHaveLength(1);
+      expect(host.querySelector('.panel > lib-key-match-light')).not.toBeNull();
+      expect(light(fixture).getAttribute('role')).toBe('img');
+    });
+
+    it("follows the store as either deck's Key knob turns, and reads no key when one is cleared", () => {
+      const { fixture, store } = render();
+      store.setDeckDetectedKey({
+        slot: 'A',
+        detectedKey: { tonic: 9, mode: 'minor', camelot: '8A' },
+      });
+      store.setDeckDetectedKey({
+        slot: 'B',
+        detectedKey: { tonic: 8, mode: 'major', camelot: '4B' },
+      });
+      store.setDeckPanel({ slot: 'B', patch: { keySemitones: 4 } });
+      fixture.detectChanges();
+
+      expect(light(fixture).getAttribute('aria-label')).toBe('Key match: full');
+
+      store.setDeckPanel({ slot: 'B', patch: { keySemitones: 2 } });
+      fixture.detectChanges();
+
+      expect(light(fixture).getAttribute('aria-label')).not.toBe('Key match: full');
+
+      store.setDeckDetectedKey({ slot: 'A', detectedKey: null });
+      fixture.detectChanges();
+
+      expect(light(fixture).getAttribute('aria-label')).toBe('Key match: no key');
+    });
+  });
+
   describe('the settings sign', () => {
     const marker = (id: string) => ({
       id,

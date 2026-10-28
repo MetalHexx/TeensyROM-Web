@@ -47,6 +47,7 @@ import {
 } from '@teensyrom-nx/ui/components';
 import {
   DeckSettingsSignComponent,
+  KeyMatchLightComponent,
   type DeckSettingsSignModel,
 } from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
@@ -180,6 +181,7 @@ function buildDeckPanel(
     DeckLabelComponent,
     DeckSettingsSignComponent,
     IconButtonComponent,
+    KeyMatchLightComponent,
     PanelSectionComponent,
     PanicButtonComponent,
     RotaryKnobComponent,
@@ -216,6 +218,7 @@ export class DjSidPanelComponent {
   protected readonly keyRange = PANEL_RANGES.key;
   protected readonly keyFormatOptions = KEY_FORMAT_OPTIONS;
   protected readonly keyDisplayFormat = this.store.keyDisplayFormat;
+  protected readonly keyMatch = this.store.keyMatch();
 
   private readonly deckSources = computed(() =>
     this.decks().map((deck) => ({

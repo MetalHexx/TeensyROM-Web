@@ -16,6 +16,14 @@ const twoDevices: MockDeviceFixture = { devices: [generateDevice(), generateDevi
 const STACKED_WIDTHS = [1279, VIEWPORT.TABLET.width] as const;
 const SID_PANEL_VIEWPORT = { width: 1920, height: 1080 } as const;
 const NO_OVERFLOW_WIDTHS = [1400, 1279, 1100, VIEWPORT.TABLET.width, 400] as const;
+// 400 is left out: the voice strips are known to be too narrow there.
+const KEY_MATCH_WIDTHS = [
+  SID_PANEL_VIEWPORT.width,
+  1400,
+  1279,
+  1100,
+  VIEWPORT.TABLET.width,
+] as const;
 
 /**
  * `.router-content` is the shell's own scroll container here (unlike the DJ Poc route, which
@@ -186,6 +194,37 @@ describe('DJ Mixer — responsive layout', () => {
       cy.get('[aria-label]')
         .filter((_, el) => /crossfader/i.test(el.getAttribute('aria-label') ?? ''))
         .should('have.length', 0);
+    });
+
+    describe('the Key match light', () => {
+      KEY_MATCH_WIDTHS.forEach((width) => {
+        const height = width === VIEWPORT.TABLET.width ? VIEWPORT.TABLET.height : 1080;
+
+        it(`sits centred between the two Key sections at ${width}px wide`, () => {
+          cy.viewport(width, height);
+
+          // Retried via `.should()`: the panel animates in, so a single read can catch it mid-scale.
+          cy.get('lib-dj-sid-panel .lower-key').should('have.length', 2);
+          cy.get('lib-dj-sid-panel lib-key-match-light').should('have.length', 1);
+          cy.get('lib-dj-sid-panel').should(([panel]) => {
+            const [keyA, keyB] = Array.from(panel.querySelectorAll('.lower-key')).map((el) =>
+              el.getBoundingClientRect()
+            );
+            const light = panel.querySelector('lib-key-match-light')!.getBoundingClientRect();
+
+            const gapMiddle = (keyA.right + keyB.left) / 2;
+            const keysMiddle = (keyA.top + keyA.height / 2 + keyB.top + keyB.height / 2) / 2;
+            expect(
+              Math.abs(light.left + light.width / 2 - gapMiddle),
+              'horizontal offset from the midpoint between the Key sections'
+            ).to.be.at.most(1);
+            expect(
+              Math.abs(light.top + light.height / 2 - keysMiddle),
+              'vertical offset from the Key sections'
+            ).to.be.at.most(1);
+          });
+        });
+      });
     });
 
     describe('transport layout by its own width', () => {

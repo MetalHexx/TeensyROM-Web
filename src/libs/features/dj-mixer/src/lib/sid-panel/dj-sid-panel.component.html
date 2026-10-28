@@ -34,6 +34,8 @@
 
       <span class="divider" aria-hidden="true"></span>
 
+      <lib-key-match-light class="key-match" [state]="keyMatch()" />
+
       @for (panel of panels(); track panel.deck.index) {
       <div
         class="deck"

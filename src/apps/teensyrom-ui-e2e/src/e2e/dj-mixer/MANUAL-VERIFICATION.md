@@ -692,3 +692,20 @@ map keys as below; expand a row to see its Action and Trigger choices, and read 
    nothing; releasing steps the value. The Amount field is shown for it.
 4. Re-learn a mapping that has Turn off and Note Off set: after the new key is chosen, the row still
    shows the same Action and Trigger.
+
+## Key match light (ASID-DJ-13)
+
+Not run. The light sits in the SID panel's lower row between the two Key sections and shows how well
+the two decks' keys, each as its Key knob has turned it, fit together. The automated checks cover
+the label and the centring; what an operator still has to see is the colour. No hardware timing is
+involved, so a cartridge is only needed to load tunes.
+
+1. Load a tune in a minor key on one deck and a tune in a major key on the other. Turn a Key knob
+   until A minor reads against C (for example `8A` against `8B` in Camelot). The light is a steady
+   full green.
+2. Keep turning the knob one step at a time and watch the light pass through green, amber and red.
+   Tell the three apart at a glance, from arm's length, without reading the label.
+3. Load a tune with no clear key on either deck. The light goes dark.
+4. Switch the notation between Camelot and Note. The light does not change.
+5. Make the window 768 px wide, the narrowest width this check covers. The light still sits
+   centred between the two Key sections.
