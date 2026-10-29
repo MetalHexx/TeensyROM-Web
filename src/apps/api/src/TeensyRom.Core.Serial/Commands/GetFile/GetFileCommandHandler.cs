@@ -3,6 +3,7 @@ using TeensyRom.Core.Common;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial.Recovery;
 
 namespace TeensyRom.Core.Commands.GetFile
@@ -17,7 +18,7 @@ namespace TeensyRom.Core.Commands.GetFile
         UnknownError = 6
     }
 
-    public class GetFileCommandHandler() : IRequestHandler<GetFileCommand, GetFileResult>
+    public class GetFileCommandHandler(ILoggingService log) : IRequestHandler<GetFileCommand, GetFileResult>
     {
         /// <summary>How long the file length may take to follow the Ack. The firmware sends it as soon as the file is open.</summary>
         public const int LengthWaitMs = 5_000;
@@ -34,11 +35,33 @@ namespace TeensyRom.Core.Commands.GetFile
 
         private const int BytesPerMegabyte = 1_048_576;
 
+        private static readonly byte[] ClosingAck = [(byte)(TeensyToken.Ack.Value & 0xFF), (byte)(TeensyToken.Ack.Value >> 8)];
+
         private ICommunicationPort _communicationPort = null!;
+
+        /// <summary>
+        /// Over USB a download now and then arrives short: the device sends the whole file and its closing Ack,
+        /// and a block of it never reaches the host. The device has finished and is answering, so the file is
+        /// asked for once more. A second short download, or a body that stops before the closing Ack, goes to
+        /// the command pipeline as a timeout, as before.
+        /// </summary>
         public async Task<GetFileResult> Handle(GetFileCommand r, CancellationToken cancellationToken)
         {
             _communicationPort = r.CommunicationPort;
 
+            try
+            {
+                return await Download(r, cancellationToken);
+            }
+            catch (TeensyShortDownloadException ex)
+            {
+                log.InternalWarning($"GetFileCommandHandler: {ex.Message}; asking for {r.FilePath} once more", r.DeviceId);
+                return await Download(r, cancellationToken);
+            }
+        }
+
+        private async Task<GetFileResult> Download(GetFileCommand r, CancellationToken cancellationToken)
+        {
             _communicationPort.ClearBuffers();
             _communicationPort.SendIntBytes(TeensyToken.GetFile, 2);
             _communicationPort.HandleAck();
@@ -78,8 +101,9 @@ namespace TeensyRom.Core.Commands.GetFile
                 };
             }
 
-            // Every read below waits for its bytes first: a serial read has no timeout of its own, and a
-            // TCP read gives up after 500 ms, well short of the time the firmware spends summing a large file.
+            // The length and the checksum are waited for before they are read: a serial read has no timeout of
+            // its own, and a TCP read gives up after 500 ms, well short of the time the firmware spends summing
+            // a large file. The device sends nothing else meanwhile, so nothing is lost while these waits poll.
             await _communicationPort.WaitForSerialDataAsync(numBytes: 4, LengthWaitMs, cancellationToken);
             var fileLength = _communicationPort.ReadIntBytes(4);
 
@@ -105,8 +129,11 @@ namespace TeensyRom.Core.Commands.GetFile
             ChecksumBaseWaitMs + (int)((long)fileLength * ChecksumWaitMsPerMegabyte / BytesPerMegabyte);
 
         /// <summary>
-        /// Reads the body as it arrives. A gap of <see cref="BodyStallMs"/> with nothing to read throws a
-        /// <see cref="TimeoutException"/>, which the command pipeline treats as a suspect link.
+        /// Hands the port the whole body in one read: over USB, a port left unread between reads while the
+        /// device streams the file loses whole packets of it, so the serial port reads back to back. A gap
+        /// of <see cref="BodyStallMs"/> with nothing arriving throws a <see cref="TimeoutException"/>, which
+        /// the command pipeline treats as a suspect link. When the bytes that did arrive end with the closing
+        /// Ack, the device sent everything and part of it was lost: that is a <see cref="TeensyShortDownloadException"/>.
         /// </summary>
         private async Task<byte[]> GetFileBytes(uint fileLength, CancellationToken ct)
         {
@@ -116,21 +143,22 @@ namespace TeensyRom.Core.Commands.GetFile
             }
 
             var buffer = new byte[fileLength];
-            int bytesRead = 0;
 
-            while (bytesRead < fileLengthInt)
+            try
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (_communicationPort.BytesToRead == 0)
-                {
-                    await _communicationPort.WaitForSerialDataAsync(numBytes: 1, BodyStallMs, ct);
-                }
-
-                bytesRead += _communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
+                await _communicationPort.ReadExactlyAsync(buffer, 0, fileLengthInt, BodyStallMs, ct);
             }
-
+            catch (TeensyReadStalledException stall) when (EndsWithTheClosingAck(buffer, stall.BytesRead))
+            {
+                var fileBytesRead = stall.BytesRead - ClosingAck.Length;
+                throw new TeensyShortDownloadException(
+                    $"The download arrived {fileLengthInt - fileBytesRead} bytes short: the closing Ack came after {fileBytesRead} of {fileLengthInt} bytes",
+                    stall);
+            }
             return buffer;
         }
+
+        private static bool EndsWithTheClosingAck(byte[] buffer, int bytesRead) =>
+            bytesRead >= ClosingAck.Length && buffer.AsSpan(bytesRead - ClosingAck.Length, ClosingAck.Length).SequenceEqual(ClosingAck);
     }
 }

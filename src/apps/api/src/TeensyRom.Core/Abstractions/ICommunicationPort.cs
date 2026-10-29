@@ -1,4 +1,5 @@
 using System.Reactive;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Settings;
 
@@ -168,6 +169,50 @@ namespace TeensyRom.Core.Abstractions
       ct.ThrowIfCancellationRequested();
       return Task.FromResult(Read(buffer, offset, count));
     }
+
+    /// <summary>
+    /// Reads exactly <paramref name="count"/> bytes, giving up once <paramref name="stallMs"/> passes
+    /// with nothing arriving. The default waits with <see cref="WaitForSerialDataAsync"/> whenever
+    /// nothing is buffered, then reads what has arrived. A transport whose wait polls instead of reading
+    /// overrides this to read back to back, so a device streaming a long reply never finds the line unread.
+    /// </summary>
+    /// <param name="buffer">Destination for the bytes read</param>
+    /// <param name="offset">Offset into <paramref name="buffer"/> to write from</param>
+    /// <param name="count">Number of bytes to read</param>
+    /// <param name="stallMs">How long the reply may go without a byte arriving</param>
+    /// <param name="ct">Observed between reads</param>
+    /// <exception cref="TeensyReadStalledException">Thrown if no byte arrives within <paramref name="stallMs"/>; it says how far the read got</exception>
+    /// <exception cref="OperationCanceledException">Thrown when <paramref name="ct"/> is cancelled between reads</exception>
+    async Task ReadExactlyAsync(byte[] buffer, int offset, int count, int stallMs, CancellationToken ct)
+    {
+      var start = offset;
+      var end = offset + count;
+
+      while (offset < end)
+      {
+        ct.ThrowIfCancellationRequested();
+
+        if (BytesToRead == 0)
+        {
+          try
+          {
+            await WaitForSerialDataAsync(numBytes: 1, stallMs, ct);
+          }
+          catch (TimeoutException ex)
+          {
+            throw Stalled(offset - start, count, stallMs, ex);
+          }
+        }
+        offset += Read(buffer, offset, end - offset);
+      }
+    }
+
+    /// <summary>
+    /// The timeout <see cref="ReadExactlyAsync"/> throws, saying how far the read got: a reply that lost
+    /// bytes on the way stalls a few bytes short of its length, one the device stopped sending stalls early.
+    /// </summary>
+    static TeensyReadStalledException Stalled(int bytesRead, int count, int stallMs, TimeoutException inner) =>
+      new($"Read {bytesRead} of {count} bytes, then nothing arrived for {stallMs} ms", bytesRead, inner);
 
     void SendSignedChar(sbyte charToSend);
     void SendSignedShort(short value);

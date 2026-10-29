@@ -16,6 +16,8 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
     {
         private static readonly byte[] Ack = [(byte)(TeensyToken.Ack.Value & 0xFF), (byte)(TeensyToken.Ack.Value >> 8)];
 
+        private readonly ILoggingService _log = Substitute.For<ILoggingService>();
+
         private static GetFileCommand BuildCommand(ScriptedCommunicationPort port) => new()
         {
             StorageType = TeensyStorageType.SD,
@@ -43,10 +45,13 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
         /// Scripts the two Acks, the length and then <paramref name="followedBy"/>, all readable at once. The
         /// handler's own <c>ClearBuffers</c> makes them current.
         /// </summary>
-        private static ScriptedCommunicationPort Script(byte[] body, params byte[][] followedBy)
+        private static ScriptedCommunicationPort Script(byte[] body, params byte[][] followedBy) =>
+            Answer(new ScriptedCommunicationPort(), body, followedBy);
+
+        /// <summary>Scripts the device's answer to one more download request, in its own segment.</summary>
+        private static ScriptedCommunicationPort Answer(ScriptedCommunicationPort port, byte[] body, params byte[][] followedBy)
         {
-            var port = new ScriptedCommunicationPort();
-            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack).Enqueue(U32((uint)body.Length));
+            port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack).Enqueue(U32((uint)body.Length));
 
             foreach (var bytes in followedBy)
             {
@@ -55,13 +60,16 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             return port;
         }
 
+        /// <summary>The body with the 1,536 bytes after its first 2,048 missing: the shape of a USB loss.</summary>
+        private static byte[] WithBlockLost(byte[] body) => [.. body[..2_048], .. body[3_584..]];
+
         [Fact]
         public async Task Handle_WholeReplyAtOnce_ReturnsTheBody()
         {
             var body = Body(5_000);
             var port = Script(body, Checksum(body), body, Ack);
 
-            var result = await new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var result = await new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
             result.IsSuccess.Should().BeTrue();
             result.FileData.SequenceEqual(body).Should().BeTrue();
@@ -79,7 +87,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             var port = Script(body);
             port.EnqueueAfterQuiet(GetFileCommandHandler.ChecksumBaseWaitMs + 1_000, [.. Checksum(body), .. body, .. Ack]);
 
-            var result = await new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var result = await new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
             result.FileData.SequenceEqual(body).Should().BeTrue();
         }
@@ -91,7 +99,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             var port = Script(body);
             port.EnqueueAfterQuiet(GetFileCommandHandler.ChecksumWaitMs((uint)body.Length) + 1, [.. Checksum(body), .. body, .. Ack]);
 
-            var act = () => new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
             await act.Should().ThrowAsync<TimeoutException>();
         }
@@ -113,7 +121,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             var port = Script(body, Checksum(body), body[..1_000]);
             port.EnqueueAfterQuiet(GetFileCommandHandler.BodyStallMs - 1_000, [.. body[1_000..], .. Ack]);
 
-            var result = await new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var result = await new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
             result.FileData.SequenceEqual(body).Should().BeTrue();
         }
@@ -129,9 +137,82 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             var port = Script(body, Checksum(body), body[..1_000]);
             port.EnqueueAfterQuiet(GetFileCommandHandler.BodyStallMs + 1, [.. body[1_000..], .. Ack]);
 
-            var act = () => new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
-            await act.Should().ThrowAsync<TimeoutException>();
+            await act.Should().ThrowAsync<TimeoutException>()
+                .WithMessage($"Read 1000 of 4000 bytes, then nothing arrived for {GetFileCommandHandler.BodyStallMs} ms");
+        }
+
+        /// <summary>
+        /// Over USB, a port left unread between reads while the device streams the body loses whole packets
+        /// of the file. The port gets the whole body in one read, which the serial port serves by reading
+        /// back to back; only the length and the checksum are waited for first.
+        /// </summary>
+        [Fact]
+        public async Task Handle_Body_IsReadInOneCallForTheWholeLength_NeverWaitedForFirst()
+        {
+            var body = Body(4_000);
+            var port = Script(body, Checksum(body), body[..1_000]);
+            port.EnqueueAfterQuiet(GetFileCommandHandler.BodyStallMs - 1_000, [.. body[1_000..], .. Ack]);
+
+            var result = await new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
+
+            const int AckWaitMs = 20_000; // HandleAck's own wait
+
+            result.FileData.SequenceEqual(body).Should().BeTrue();
+            port.ReadExactlyCalls.Should().Equal((body.Length, GetFileCommandHandler.BodyStallMs));
+            port.WaitTimeoutsMs.Should().Equal(
+                AckWaitMs, AckWaitMs, GetFileCommandHandler.LengthWaitMs, GetFileCommandHandler.ChecksumWaitMs((uint)body.Length), AckWaitMs);
+        }
+
+        /// <summary>
+        /// Over USB a block of the body can be lost on the way while the device still sends the rest and its
+        /// closing Ack. The device has finished, so the handler asks once more and returns the second answer.
+        /// </summary>
+        [Fact]
+        public async Task Handle_BodyArrivesShortButEndsWithTheClosingAck_AsksOnceMoreAndReturnsTheBody()
+        {
+            var body = Body(8_192);
+            var port = Script(body, Checksum(body), WithBlockLost(body), Ack);
+            Answer(port, body, Checksum(body), body, Ack);
+
+            var result = await new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
+
+            result.FileData.SequenceEqual(body).Should().BeTrue();
+            port.ReadExactlyCalls.Should().HaveCount(2);
+            port.Unread.Should().Be(0);
+            _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains("arrived 1536 bytes short")), Arg.Any<string?>());
+        }
+
+        [Fact]
+        public async Task Handle_BodyArrivesShortTwice_ThrowsTimeoutWithoutAskingAThirdTime()
+        {
+            var body = Body(8_192);
+            var port = Script(body, Checksum(body), WithBlockLost(body), Ack);
+            Answer(port, body, Checksum(body), WithBlockLost(body), Ack);
+            Answer(port, body, Checksum(body), body, Ack);
+
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
+
+            await act.Should().ThrowAsync<TeensyShortDownloadException>();
+            port.ReadExactlyCalls.Should().HaveCount(2);
+        }
+
+        /// <summary>
+        /// A body that stops before the closing Ack is a device that stopped sending, not bytes lost on the way:
+        /// it goes to the command pipeline as a timeout, without asking again.
+        /// </summary>
+        [Fact]
+        public async Task Handle_BodyStallsBeforeTheClosingAck_IsNotAskedAgain()
+        {
+            var body = Body(4_000);
+            var port = Script(body, Checksum(body), body[..1_000]);
+            Answer(port, body, Checksum(body), body, Ack);
+
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
+
+            (await act.Should().ThrowAsync<TeensyReadStalledException>()).Which.BytesRead.Should().Be(1_000);
+            port.ReadExactlyCalls.Should().HaveCount(1);
         }
 
         [Fact]
@@ -142,7 +223,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             using var cts = new CancellationTokenSource();
             cts.Cancel();
 
-            var act = () => new GetFileCommandHandler().Handle(BuildCommand(port), cts.Token);
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), cts.Token);
 
             await act.Should().ThrowAsync<OperationCanceledException>();
         }
@@ -153,7 +234,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.GetFile
             var body = Body(1_000);
             var port = Script(body, U32((uint)(body.CalculateChecksum() + 1) & 0xFFFF), body, Ack);
 
-            var act = () => new GetFileCommandHandler().Handle(BuildCommand(port), CancellationToken.None);
+            var act = () => new GetFileCommandHandler(_log).Handle(BuildCommand(port), CancellationToken.None);
 
             await act.Should().ThrowAsync<TeensyException>().WithMessage("Checksum Mismatch");
         }

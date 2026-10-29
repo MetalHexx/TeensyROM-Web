@@ -17,5 +17,21 @@ namespace TeensyRom.Core.Common
     /// </summary>
     public class TeensyWriteTimeoutException(string message, Exception inner) : TimeoutException(message, inner) { }
 
+    /// <summary>
+    /// A reply that stopped partway: nothing more arrived within the stall wait once <see cref="BytesRead"/> of it
+    /// had. A <see cref="TimeoutException"/>, so the command pipeline treats it as any other read timeout.
+    /// </summary>
+    public class TeensyReadStalledException(string message, int bytesRead, Exception inner) : TimeoutException(message, inner)
+    {
+        public int BytesRead { get; } = bytesRead;
+    }
+
+    /// <summary>
+    /// A download whose body stalled after the device's closing Ack had already arrived: the device sent the
+    /// whole file and finished, and part of it was lost on the way to the host. Still a <see cref="TimeoutException"/>
+    /// once the download handler stops asking again.
+    /// </summary>
+    public class TeensyShortDownloadException(string message, Exception inner) : TimeoutException(message, inner) { }
+
     public class TeensyStateException(string message) : Exception(message) { }
 }
