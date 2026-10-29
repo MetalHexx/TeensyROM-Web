@@ -97,3 +97,4 @@ export * from './lib/sid-filter-section/sid-filter-section.component';
 export * from './lib/c64-color/c64-palette';
 export * from './lib/c64-color-swatch/c64-color-swatch.component';
 export * from './lib/c64-color-picker/c64-color-picker.component';
+export * from './lib/video-capture-session/video-capture-session';

@@ -1,4 +1,4 @@
-import { Component, computed, signal, OnDestroy, inject, input, effect } from '@angular/core';
+import { Component, computed, signal, inject, input, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -14,15 +14,11 @@ import {
   CRT_PRESET_KEYS,
   AnyPresetName,
   isBuiltInPreset,
+  VideoCaptureSession,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE, validatePresetName, crtVideoStandardFor } from '@teensyrom-nx/domain';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
 import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
-
-interface VideoDevice {
-  deviceId: string;
-  label: string;
-}
 
 @Component({
   selector: 'lib-video-capture',
@@ -38,12 +34,14 @@ interface VideoDevice {
   ],
   templateUrl: './video-capture.component.html',
   styleUrl: './video-capture.component.scss',
+  providers: [VideoCaptureSession],
 })
-export class VideoCaptureComponent implements OnDestroy {
+export class VideoCaptureComponent {
   private readonly dialog = inject(MatDialog);
   private readonly settingsStore = inject(SettingsStore);
   private readonly crtStorage = inject(CRT_STORAGE);
   private readonly deviceStore = inject(DeviceStore);
+  private readonly session = inject(VideoCaptureSession);
 
   deviceId = input.required<string>();
 
@@ -79,19 +77,16 @@ export class VideoCaptureComponent implements OnDestroy {
   /** Debug mode state for black bar detection visualization */
   protected readonly debugMode = signal<boolean>(false);
 
-  private videoDevices = signal<VideoDevice[]>([]);
-  private selectedDeviceId = signal<string | null>(null);
-  protected readonly currentStream = signal<MediaStream | null>(null);
-  private permissionDenied = signal<boolean>(false);
+  protected readonly currentStream = computed(() => this.session.stream());
 
-  devices = computed(() => this.videoDevices());
-  hasDevices = computed(() => this.videoDevices().length > 0);
-  isPermissionDenied = computed(() => this.permissionDenied());
-  hasStream = computed(() => this.currentStream() !== null);
-  selectedDevice = computed(() => this.selectedDeviceId());
+  devices = computed(() => this.session.devices());
+  hasDevices = computed(() => this.session.hasDevices());
+  isPermissionDenied = computed(() => this.session.permissionDenied());
+  hasStream = computed(() => this.session.stream() !== null);
+  selectedDevice = computed(() => this.session.selectedDeviceId());
 
   constructor() {
-    this.enumerateVideoDevices();
+    void this.session.start(() => this.settingsStore.videoDeviceIdForDevice(this.deviceId())());
 
     effect(() => {
       const deviceId = this.deviceId();
@@ -114,99 +109,10 @@ export class VideoCaptureComponent implements OnDestroy {
   }
 
   /**
-   * Enumerate available video input devices
-   * POC: Requests permission first to get device labels (browser security requirement)
-   */
-  private async enumerateVideoDevices(): Promise<void> {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.error('MediaDevices API not available');
-        return;
-      }
-
-      const permissionStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices
-        .filter((device) => device.kind === 'videoinput')
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${device.deviceId.slice(0, 8)}`,
-        }));
-
-      permissionStream.getTracks().forEach((track) => track.stop());
-
-      this.videoDevices.set(videoInputs);
-
-      this.selectInitialDevice(videoInputs);
-    } catch (error) {
-      console.error('Failed to enumerate video devices:', error);
-      if ((error as Error).name === 'NotAllowedError') {
-        this.permissionDenied.set(true);
-      }
-    }
-  }
-
-  /**
-   * Select initial video device based on stored preference.
-   * Falls back to first available device if stored device not found or not available.
-   */
-  private selectInitialDevice(videoInputs: VideoDevice[]): void {
-    if (videoInputs.length === 0) {
-      return;
-    }
-
-    const teensyDeviceId = this.deviceId();
-    const storedVideoDeviceId = this.settingsStore.videoDeviceIdForDevice(teensyDeviceId)();
-
-    const storedDeviceExists = storedVideoDeviceId &&
-      videoInputs.some(d => d.deviceId === storedVideoDeviceId);
-
-    if (storedDeviceExists) {
-      this.selectedDeviceId.set(storedVideoDeviceId);
-      setTimeout(() => this.switchToDevice(storedVideoDeviceId), 100);
-    } else {
-      const firstDevice = videoInputs[0];
-      this.selectedDeviceId.set(firstDevice.deviceId);
-      setTimeout(() => this.switchToDevice(firstDevice.deviceId), 100);
-    }
-  }
-
-  /**
-   * Switch to a different video device
-   * POC: Stops current stream and starts new one
-   */
-  private async switchToDevice(deviceId: string): Promise<void> {
-    try {
-      const currentStream = this.currentStream();
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => track.stop());
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } },
-        audio: false,
-      });
-
-      this.currentStream.set(stream);
-    } catch (error) {
-      console.error('🎥 Failed to switch video device:', error);
-      console.error('🎥 Error details:', JSON.stringify(error, null, 2));
-      if ((error as Error).name === 'NotAllowedError') {
-        this.permissionDenied.set(true);
-      }
-    }
-  }
-
-  /**
    * Handle device selection from dropdown
    */
   onDeviceSelected(videoDeviceId: string): void {
-    this.selectedDeviceId.set(videoDeviceId);
-    this.switchToDevice(videoDeviceId);
+    void this.session.select(videoDeviceId);
 
     const teensyDeviceId = this.deviceId();
     this.settingsStore.updateDeviceVideoDeviceId({
@@ -219,11 +125,11 @@ export class VideoCaptureComponent implements OnDestroy {
    * Open video in fullscreen dialog
    */
   openVideoDialog(): void {
-    const stream = this.currentStream();
+    const stream = this.session.stream();
     if (!stream) return;
 
-    const deviceLabel = this.devices().find(d => d.deviceId === this.selectedDeviceId())?.label || 'Video Capture';
-    const selectedDeviceId = this.selectedDeviceId() || '';
+    const deviceLabel = this.devices().find(d => d.deviceId === this.session.selectedDeviceId())?.label || 'Video Capture';
+    const selectedDeviceId = this.session.selectedDeviceId() || '';
 
     const dialogRef = this.dialog.open(VideoDialogComponent, {
       data: {
@@ -241,7 +147,7 @@ export class VideoCaptureComponent implements OnDestroy {
     });
 
     dialogRef.afterClosed().subscribe((result: { selectedDeviceId: string } | null) => {
-      if (result?.selectedDeviceId && result.selectedDeviceId !== this.selectedDeviceId()) {
+      if (result?.selectedDeviceId && result.selectedDeviceId !== this.session.selectedDeviceId()) {
         this.onDeviceSelected(result.selectedDeviceId);
       }
     });
@@ -308,13 +214,6 @@ export class VideoCaptureComponent implements OnDestroy {
     const deviceId = this.deviceId();
     if (deviceId) {
       this.crtStorage.save(deviceId, 'video-compact', settings);
-    }
-  }
-
-  ngOnDestroy(): void {
-    const stream = this.currentStream();
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
     }
   }
 }
