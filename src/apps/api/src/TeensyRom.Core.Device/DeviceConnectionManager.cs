@@ -218,6 +218,8 @@ namespace TeensyRom.Core.Device
         /// On request, while the unit is still available on TCP: confirms the same chip on its USB serial port, adopts
         /// it under the same id and closes the TCP device's port. Nothing is ever sent over the TCP port, and the
         /// occasion sends no MediatR command, so a caller holding the device's command gate cannot deadlock on it.
+        /// A command already queued on the retired TCP port (a browse request fired just before the move, say) is not
+        /// redirected: it finds the port disposed and the network endpoint dark, and fails like any lost link.
         /// </summary>
         public Task<SerialMoveOutcome> MoveToSerialAsync(string deviceId, CancellationToken ct) =>
             RunExclusive(DiscoveryOccasion.Reconnect, token => RunMoveToSerial(deviceId, token), ct);

@@ -25,8 +25,10 @@ export class AsidPlayerLauncher {
 
   /**
    * Launches the ASID player on each bound deck's cartridge concurrently and raises an error alert
-   * naming each deck that failed, and an info alert for each cartridge moved to USB. Does nothing
-   * while a launch is already running or when no deck is bound.
+   * naming each deck that failed, and an info alert for each cartridge moved to USB (even when its
+   * launch then failed). When any cartridge moved, the device list is refreshed afterwards because the
+   * device's connection details changed. Does nothing while a launch is already running or when no
+   * deck is bound.
    */
   async launch(): Promise<void> {
     if (this.store.asidLaunching()) {
@@ -78,24 +80,28 @@ export class AsidPlayerLauncher {
     }
   }
 
-  /** Raises the alert for one deck's outcome; returns true when its cartridge moved to USB. */
+  /**
+   * Raises the alerts for one deck's outcome: an error for a failure, and the info alert whenever its
+   * cartridge moved to USB, launched or not. Returns true when the cartridge moved.
+   */
   private report(slot: Slot, outcome: AsidLaunchOutcome): boolean {
     if (!outcome.launched) {
       logError(`AsidPlayerLauncher: deck ${slot} failed (${outcome.reason})`, outcome.message);
       this.alertService.error(`Deck ${slot}: ${outcome.message}`);
-      return false;
+    } else {
+      logInfo(
+        LogType.Success,
+        `AsidPlayerLauncher: deck ${slot} ASID player started (moved to serial: ${outcome.movedToSerial})`
+      );
     }
 
-    logInfo(
-      LogType.Success,
-      `AsidPlayerLauncher: deck ${slot} ASID player started (moved to serial: ${outcome.movedToSerial})`
-    );
-    if (outcome.movedToSerial) {
+    const moved = outcome.movedToSerial === true;
+    if (moved) {
       this.alertService.info(
         `Deck ${slot}'s cartridge moved to USB for the ASID player; it returns to the network on the next reconnect.`
       );
     }
-    return outcome.movedToSerial;
+    return moved;
   }
 
   private names(bound: { slot: Slot }[]): string {

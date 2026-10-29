@@ -1068,6 +1068,19 @@ describe('DeviceService - launchAsidPlayer', () => {
     });
   });
 
+  it('carries movedToSerial on a launchFailed outcome when the 502 says the cartridge had moved', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(
+      problem(502, { title: 'It did not start.', movedToSerial: true })
+    );
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'launchFailed',
+      message: 'It did not start.',
+      movedToSerial: true,
+    });
+  });
+
   it('falls back to a generic message when the failure carries none', async () => {
     mockApi.launchAsidPlayer.mockRejectedValue(new Error('network down'));
 

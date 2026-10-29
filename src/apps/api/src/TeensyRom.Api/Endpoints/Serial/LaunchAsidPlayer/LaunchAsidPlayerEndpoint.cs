@@ -22,8 +22,7 @@ namespace TeensyRom.Api.Endpoints.LaunchAsidPlayer
                 .WithDescription(
                     "Starts the cartridge's built-in ASID player.\n\n" +
                     "- A device on the network is moved onto its USB serial port first, because the player turns the network off; it stays on serial until the next reconnect.\n" +
-                    "- Answers 502 (code usbUnreachable) when a network device cannot be reached over USB; nothing is launched then.\n" +
-                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
+                    "- Answers 502 (code usbUnreachable) when a network device cannot be reached over USB; nothing is launched then.\n" +                    "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer."
                 );
         }
 
@@ -57,6 +56,15 @@ namespace TeensyRom.Api.Endpoints.LaunchAsidPlayer
 
             if (!result.IsSuccess)
             {
+                if (result.MovedToSerial)
+                {
+                    SendProblem(TypedResults.Problem(
+                        title: result.Error,
+                        statusCode: StatusCodes.Status502BadGateway,
+                        extensions: new Dictionary<string, object?> { ["movedToSerial"] = true }));
+                    return;
+                }
+
                 SendExternalError(result.Error);
                 return;
             }

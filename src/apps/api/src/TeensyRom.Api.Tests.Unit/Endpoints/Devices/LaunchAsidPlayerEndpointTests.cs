@@ -91,5 +91,20 @@ public class LaunchAsidPlayerEndpointTests
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
         endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Title.Should().Be("did not start");
+        endpoint.GetResult<ProblemHttpResult>().ProblemDetails.Extensions.Should().NotContainKey("movedToSerial");
+    }
+
+    [Fact]
+    public async Task Handle_LaunchFailsAfterTheDeviceMoved_SendsBadGatewayFlaggedAsMoved()
+    {
+        GivenDevice();
+        GivenResult(new LaunchAsidPlayerResult { IsSuccess = false, MovedToSerial = true, Error = "did not start" });
+
+        var endpoint = await WhenLaunched();
+
+        endpoint.GetStatusCode().Should().Be(HttpStatusCode.BadGateway);
+        var problem = endpoint.GetProblem<ProblemHttpResult>().ProblemDetails;
+        problem.Title.Should().Be("did not start");
+        problem.Extensions["movedToSerial"].Should().Be(true);
     }
 }

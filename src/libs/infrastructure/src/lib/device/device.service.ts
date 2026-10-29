@@ -21,6 +21,7 @@ import {
   extractProblemMessage,
   failOnDeviceBusy,
   readDeviceBusyProblem,
+  readMovedToSerial,
   readProblemCode,
 } from '../error/api-error.utils';
 
@@ -113,7 +114,10 @@ export class DeviceService implements IDeviceService {
         return { launched: false, reason: 'usbUnreachable', message };
       }
     }
-    return { launched: false, reason: 'launchFailed', message };
+    const movedToSerial = await readMovedToSerial(error);
+    return movedToSerial
+      ? { launched: false, reason: 'launchFailed', message, movedToSerial }
+      : { launched: false, reason: 'launchFailed', message };
   }
 
   private reconnectErrorMessage(error: unknown): string {

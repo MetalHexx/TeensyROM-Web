@@ -767,3 +767,7 @@ it, and it is disabled while a launch is running.
       menu, which is accepted.
 - [ ] One deck with no cartridge bound: only the other deck's cartridge launches.
 - [ ] A cartridge running a game: the press resets it and starts the player.
+- [ ] A network cartridge whose firmware lacks the built-in player: the error alert names its deck,
+      and the info alert says it moved to USB as well.
+- [ ] Press while a directory listing is still loading from a network cartridge: the listing may
+      fail once as the cartridge moves to USB; the next request is served over USB.

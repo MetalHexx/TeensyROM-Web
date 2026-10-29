@@ -110,6 +110,18 @@ describe('AsidPlayerLauncher', () => {
     expect(alertService.info.mock.calls[0][0]).toContain('Deck B');
   });
 
+  it('tells the DJ about the move as well as the failure when a launch fails after its cartridge moved', async () => {
+    bind('A', 'dev-a');
+    answers({ 'dev-a': of({ ...failed('did not start'), movedToSerial: true }) });
+
+    await launcher.launch();
+
+    expect(alertService.error.mock.calls[0][0]).toContain('did not start');
+    expect(alertService.info).toHaveBeenCalledTimes(1);
+    expect(alertService.info.mock.calls[0][0]).toContain('Deck A');
+    expect(deviceService.findDevices).toHaveBeenCalledTimes(1);
+  });
+
   it('treats an unexpected rejection as a failure of that deck only', async () => {
     bind('A', 'dev-a');
     bind('B', 'dev-b');
