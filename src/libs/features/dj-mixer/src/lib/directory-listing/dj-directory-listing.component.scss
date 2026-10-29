@@ -1,3 +1,5 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 // Sole content of the directory-listing card's `.compact-card--fill` flex column: `flex: 1 1
 // auto` claims the column's full height and `min-height: 0` lets this element shrink below its
 // rows' natural height, so the inner viewport — not the outer `.compact-card`'s
@@ -10,8 +12,58 @@
   width: 100%;
 }
 
-lib-dj-directory-trail {
+// The trail and the search box on one row, as the file-transfer view's `.header-toolbar` has them.
+// The card's fold handle is absolutely positioned over this row's top-right corner (a medium icon
+// button, `right: 6px`), so the row holds the clearance that keeps the box off it. The row sits at
+// the card's padding like the other views' header rows; the handle is placed on this row's
+// centreline instead (`--fold-handle-top`, set on the listing card in the mixer view).
+.listing-header {
+  --listing-padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
+  --fold-handle-right: 6px;
+  --fold-handle-size: 32px;
+  --fold-handle-gap: var(--spacing-sm);
+  // The row's first line: the trail's 40px, taller than the 36px search field it is centred with.
+  --header-line-height: 40px;
+
+  display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-md);
+  min-height: var(--header-line-height);
+  padding-inline-end: calc(
+    var(--fold-handle-right) + var(--fold-handle-size) + var(--fold-handle-gap) -
+      var(--listing-padding)
+  );
+
+  lib-dj-directory-trail {
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  // `max-width` lets the box shrink in a card too narrow for its natural width instead of
+  // spilling out of it.
+  lib-dj-search-toolbar {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: auto;
+  }
+
+  // Stacked cards render no fold handle, so no clearance; the box takes its own full-width row.
+  @include styles.below-phone {
+    flex-wrap: nowrap;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    min-height: 0;
+    padding-inline-end: 0;
+
+    lib-dj-directory-trail {
+      flex: 0 0 auto;
+    }
+  }
 }
 
 // The native drag image is snapshotted from this element on `dragstart`; off-screen rather than
@@ -33,4 +85,15 @@ lib-dj-directory-trail {
   flex: 1;
   min-height: 0;
   overflow-x: hidden;
+}
+
+// A result's containing folder, dimmed and ellipsised beside its name.
+.result-path {
+  color: var(--color-dimmed-light);
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  margin-left: var(--spacing-sm);
 }

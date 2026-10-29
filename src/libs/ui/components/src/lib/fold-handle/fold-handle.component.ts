@@ -10,7 +10,8 @@ import { IconButtonComponent } from '../icon-button/icon-button.component';
  * It fills its positioned parent (the card) and does not intercept pointer events outside the
  * button, so the card must be `position: relative`; the caller sizes the folded card. The caller
  * owns the state and every word: `foldedChange` is a request, answered by flipping `folded`. The
- * button is one element in both states, so keyboard focus stays on it across a fold.
+ * button is one element in both states, so keyboard focus stays on it across a fold. The button sits
+ * 8px below the card's top edge unless the card sets `--fold-handle-top`.
  *
  * @example
  * ```html

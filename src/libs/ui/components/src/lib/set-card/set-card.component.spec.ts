@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SetCardComponent, type SetCardModel } from './set-card.component';
 import { SET_ROW_DRAG_TYPE, type SetRowModel } from '../set-row/set-row.component';
 
@@ -82,6 +82,8 @@ describe('SetCardComponent', () => {
     c.rowRemove.subscribe(valued('rowRemove'));
     c.rowMove.subscribe(valued('rowMove'));
     c.listingDrop.subscribe((drop) => emitted.push(['listingDrop', drop.index]));
+    c.rowDragStart.subscribe(plain('rowDragStart'));
+    c.rowDragEnd.subscribe(plain('rowDragEnd'));
   });
 
   const el = (): HTMLElement => fixture.nativeElement;
@@ -304,6 +306,66 @@ describe('SetCardComponent', () => {
       drag('drop', list(), listingDrag(5));
 
       expect(line()).toBeNull();
+    });
+  });
+
+  describe('dragging a row by its handle', () => {
+    const ghostEl = (): HTMLElement | null => el().querySelector('lib-set-row-ghost');
+
+    function startDrag(rowIndex: number, setDragImage = vi.fn()): ReturnType<typeof vi.fn> {
+      const event = new Event('dragstart', { bubbles: true });
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { setData: vi.fn(), setDragImage, effectAllowed: 'uninitialized' },
+      });
+      rowEls()[rowIndex].querySelector('.handle')?.dispatchEvent(event);
+      fixture.detectChanges();
+      return setDragImage;
+    }
+
+    beforeEach(() => render(card(FOUR())));
+
+    it('has no ghost until a row is dragged', () => {
+      expect(ghostEl()).toBeNull();
+    });
+
+    it('shows the dragged row in the ghost, sets it as the drag image, then announces the start', () => {
+      let imageSetFor: string | undefined;
+      const setDragImage = vi.fn((image: Element) => {
+        imageSetFor = `${image.tagName}|${image.textContent}|${emitted.length}`;
+      });
+      startDrag(2, setDragImage);
+
+      const ghost = ghostEl() as HTMLElement;
+      expect(ghost.textContent).toContain('R2');
+      expect(ghost.textContent).toContain('Tune r2');
+      expect(ghost.textContent).toContain('Author');
+      expect(setDragImage).toHaveBeenCalledTimes(1);
+      expect(setDragImage.mock.calls[0][0]).toBe(ghost);
+      expect(imageSetFor).toContain('Tune r2');
+      expect(imageSetFor?.endsWith('|0')).toBe(true);
+      expect(emitted).toEqual(['rowDragStart']);
+    });
+
+    it('shows the row dragged next, not the one before', () => {
+      startDrag(0);
+      drag('dragend', list(), rowDrag('r0', 5));
+      startDrag(3);
+
+      expect(ghostEl()?.textContent).toContain('Tune r3');
+      expect(ghostEl()?.textContent).not.toContain('Tune r0');
+    });
+
+    it('announces the end, clears the insertion line and removes the ghost', () => {
+      startDrag(1);
+      drag('dragover', list(), rowDrag('r1', 5));
+      expect(el().querySelector('.insertion-line')).not.toBeNull();
+      emitted.length = 0;
+
+      drag('dragend', list(), rowDrag('r1', 5));
+
+      expect(emitted).toEqual(['rowDragEnd']);
+      expect(el().querySelector('.insertion-line')).toBeNull();
+      expect(ghostEl()).toBeNull();
     });
   });
 

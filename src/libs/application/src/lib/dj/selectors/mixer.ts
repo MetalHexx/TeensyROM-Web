@@ -1,7 +1,9 @@
 import { computed } from '@angular/core';
+import { sharedScaleNotes } from '@sidablist/analysis';
 import { DeckPanelState, DeckState, DeckStatus, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
-import { keyDisplayFor } from '../mixer/key-display';
+import { keyDisplayFor, shiftedKeyFor } from '../mixer/key-display';
+import { keyMatchStateFor, type KeyMatchState } from '../mixer/key-match';
 
 const SHAPEABLE_STATUSES: readonly DeckStatus[] = ['playing', 'paused', 'stopped'];
 
@@ -48,6 +50,22 @@ export function keyReadout(store: WritableStore<DjState>) {
           keySemitones
         );
         return key ?? signedOffset(keySemitones);
+      }),
+  };
+}
+
+/** How well the two decks' keys, each shifted by its own Key knob, fit together: `'none'` while
+ *  either deck has no detected key, otherwise the state for the notes their scales share. Reads
+ *  the four fields it needs one signal at a time, so neither the readout format, a speed field nor
+ *  a playback frame tick re-runs it. */
+export function keyMatch(store: WritableStore<DjState>) {
+  return {
+    keyMatch: () =>
+      computed<KeyMatchState>(() => {
+        const a = shiftedKeyFor(store.decks.A.detectedKey(), store.panel.A.keySemitones());
+        const b = shiftedKeyFor(store.decks.B.detectedKey(), store.panel.B.keySemitones());
+        if (a === null || b === null) return 'none';
+        return keyMatchStateFor(sharedScaleNotes(a, b));
       }),
   };
 }

@@ -6,7 +6,7 @@
     [class.mixer-grid--no-browser]="browserCollapsed()"
   >
     @for (deck of decks; track deck.index) {
-    <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
+    <lib-dj-deck-column [deck]="deck" [dropActive]="dragging() || rowDragging()"></lib-dj-deck-column>
     }
     <lib-dj-sid-panel
       [decks]="decks"
@@ -88,7 +88,11 @@
           cardClass="compact-card--fill"
           animationEntry="from-bottom"
         >
-          <lib-dj-set-card [listingDragActive]="dragging()"></lib-dj-set-card>
+          <lib-dj-set-card
+            [listingDragActive]="dragging()"
+            (rowDragStart)="onRowDragStart()"
+            (rowDragEnd)="onRowDragEnd()"
+          ></lib-dj-set-card>
         </lib-scaling-compact-card>
       </div>
     </lib-sliding-container>
@@ -101,7 +105,10 @@
         [animationDuration]="panelAnimationDuration()"
       >
         <div class="set-peek-card">
-          <lib-dj-set-card></lib-dj-set-card>
+          <lib-dj-set-card
+            (rowDragStart)="onRowDragStart()"
+            (rowDragEnd)="onRowDragEnd()"
+          ></lib-dj-set-card>
         </div>
       </lib-sliding-container>
     </div>

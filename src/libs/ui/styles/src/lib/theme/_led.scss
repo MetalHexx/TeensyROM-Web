@@ -1,0 +1,50 @@
+@use 'sass:list';
+@use 'sass:map';
+
+// The status-LED dot recipe, shared so every LED in the app is built from one copy. `box-sizing`
+// lives in the dot so the 1px border sits inside the 8px and the light is never 10px.
+
+// name: (fill, border, glow). `dark` has no glow; it is dark like real hardware, not a tinted
+// variant of the unlit body.
+$-tones: (
+  'green': (var(--color-success), var(--color-success), 0 0 8px rgba(111, 220, 140, 0.95)),
+  'green-soft': (
+    color-mix(in srgb, var(--color-success) 77%, #000),
+    color-mix(in srgb, var(--color-success) 77%, #000),
+    0 0 4px rgba(111, 220, 140, 0.4)
+  ),
+  'amber': (var(--color-warning), var(--color-warning), 0 0 8px rgba(245, 185, 66, 0.85)),
+  'yellow': (var(--color-directory), var(--color-directory), 0 0 8px rgba(245, 226, 158, 0.9)),
+  'cyan': (var(--color-highlight), var(--color-highlight), 0 0 8px rgba(0, 247, 255, 0.95)),
+  'magenta': (
+    var(--color-primary-bright),
+    var(--color-primary-bright),
+    0 0 9px rgba(179, 51, 179, 1)
+  ),
+  'red': (var(--color-error), var(--color-error), 0 0 8px rgba(255, 111, 111, 0.95)),
+  'dark': (var(--chrome-dark, #33334a), var(--chrome-dark-border, #44445c), none),
+);
+
+/// The unlit 8px dot.
+@mixin dot {
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chrome-inset, #2e2e3e);
+  border: 1px solid var(--chrome-inset-border, #3d3d52);
+}
+
+/// Lights the dot in the named tone: fill, border and glow.
+@mixin tone($name) {
+  $parts: map.get($-tones, $name);
+  @if $parts == null {
+    @error 'Unknown LED tone `#{$name}`.';
+  }
+  background: list.nth($parts, 1);
+  border-color: list.nth($parts, 2);
+  @if list.nth($parts, 3) != none {
+    box-shadow: list.nth($parts, 3);
+  }
+}

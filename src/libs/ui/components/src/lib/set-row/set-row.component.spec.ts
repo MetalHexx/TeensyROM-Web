@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SET_ROW_DRAG_TYPE, SetRowComponent, type SetRowModel } from './set-row.component';
 
 const row: SetRowModel = {
@@ -72,15 +72,46 @@ describe('SetRowComponent', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
-  it('puts its id on the drag under the set row type', () => {
-    const data = new Map<string, string>();
-    const dragstart = new Event('dragstart', { bubbles: true });
-    Object.defineProperty(dragstart, 'dataTransfer', {
-      value: { setData: (type: string, value: string) => data.set(type, value) },
-    });
-    handle().dispatchEvent(dragstart);
+  describe('dragging the handle', () => {
+    function startDrag(): { dataTransfer: Record<string, unknown>; data: Map<string, string> } {
+      const data = new Map<string, string>();
+      const dataTransfer = {
+        effectAllowed: 'uninitialized',
+        setData: (type: string, value: string) => data.set(type, value),
+        setDragImage: vi.fn(),
+      };
+      const dragstart = new Event('dragstart', { bubbles: true });
+      Object.defineProperty(dragstart, 'dataTransfer', { value: dataTransfer });
+      handle().dispatchEvent(dragstart);
+      fixture.detectChanges();
+      return { dataTransfer, data };
+    }
 
-    expect(data.get(SET_ROW_DRAG_TYPE)).toBe('r3');
+    it('puts its id on the drag under the set row type, allowing copy and move', () => {
+      const { dataTransfer, data } = startDrag();
+
+      expect(data.get(SET_ROW_DRAG_TYPE)).toBe('r3');
+      expect(dataTransfer['effectAllowed']).toBe('copyMove');
+    });
+
+    it('dims the row until the drag ends', () => {
+      startDrag();
+      expect(el().hasAttribute('data-dragging')).toBe(true);
+
+      handle().dispatchEvent(new Event('dragend', { bubbles: true }));
+      fixture.detectChanges();
+      expect(el().hasAttribute('data-dragging')).toBe(false);
+    });
+
+    it('announces the drag start with the event and leaves the drag image to the host', () => {
+      const started: DragEvent[] = [];
+      fixture.componentInstance.dragStarted.subscribe((event) => started.push(event));
+      const { dataTransfer } = startDrag();
+
+      expect(started).toHaveLength(1);
+      expect(started[0].type).toBe('dragstart');
+      expect(dataTransfer['setDragImage']).not.toHaveBeenCalled();
+    });
   });
 
   it('names the controls and marks the selected row current', () => {

@@ -1,9 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
   computed,
-  inject,
   input,
   output,
   signal,
@@ -92,6 +90,8 @@ export class SetRowComponent {
   readonly remove = output<void>();
   /** Emits -1 or 1 when Alt+ArrowUp or Alt+ArrowDown is pressed on the handle. */
   readonly moveBy = output<-1 | 1>();
+  /** Emits when the handle's drag starts, with the event so the host can set the drag image. */
+  readonly dragStarted = output<DragEvent>();
 
   protected readonly dragging = signal(false);
   protected readonly detailWords = DETAIL_WORDS;
@@ -102,16 +102,18 @@ export class SetRowComponent {
     return detail.kind === 'counts' || detail.kind === 'unavailable' ? detail.text : '';
   });
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-
-  /** Starts a row drag: the payload carries only the row's id, under the card's own type. */
+  /**
+   * Starts a row drag: the payload carries only the row's id, under the card's own type. `copyMove`
+   * lets both the card (a move) and a deck (a copy) accept it. The drag image is left to the host,
+   * which sets it from the emitted event.
+   */
   protected onDragStart(event: DragEvent): void {
     const { dataTransfer } = event;
     if (!dataTransfer) return;
     dataTransfer.setData(SET_ROW_DRAG_TYPE, this.model().id);
-    dataTransfer.effectAllowed = 'move';
-    dataTransfer.setDragImage?.(this.host.nativeElement, 16, 16);
+    dataTransfer.effectAllowed = 'copyMove';
     this.dragging.set(true);
+    this.dragStarted.emit(event);
   }
 
   protected onDragEnd(): void {

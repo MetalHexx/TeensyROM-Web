@@ -194,6 +194,11 @@
 }
 
 .directory-listing-card {
+  // Puts the fold handle's centre on the listing header row's: the row starts at the card's padding
+  // and is 40px tall (`--header-line-height` in the listing), the handle 32px, so the handle sits
+  // (40 - 32) / 2 = 4px below the row's top.
+  --fold-handle-top: calc(var(--compact-card-padding, var(--spacing-card-padding-compact)) + 4px);
+
   flex: 1 1 0;
   min-width: 0;
   transition: flex-basis var(--fold-duration) cubic-bezier(0.4, 0, 0.2, 1),
@@ -210,14 +215,16 @@
 
 // Takes over the sole-content flex chain the listing relies on, and clips it while the card
 // narrows. It is clipped here rather than through the card's `enableOverflow`, which would stop
-// the listing scrolling.
+// the listing scrolling. Only the inline axis is clipped, so a vertical clip never cuts the header
+// chips' borders.
 .listing-body {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   transition: opacity var(--fold-duration) ease, visibility var(--fold-duration) linear;
 }
 

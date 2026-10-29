@@ -1,0 +1,44 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 14rem;
+  max-width: 24rem;
+  padding: 6px var(--spacing-md);
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--border-radius-sm);
+  background: var(--synth-face);
+  color: var(--synth-label);
+  box-sizing: border-box;
+}
+
+.number {
+  flex: none;
+  width: 1.6rem;
+  color: var(--synth-legend);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.7rem;
+}
+
+.tune {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.title,
+.author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  font-size: 0.8rem;
+}
+
+.author {
+  color: var(--synth-legend);
+  font-size: 0.65rem;
+}

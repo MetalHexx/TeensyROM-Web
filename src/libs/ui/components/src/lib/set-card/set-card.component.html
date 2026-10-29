@@ -40,6 +40,7 @@
         (selectRow)="rowSelect.emit(drawn.row.id)"
         (remove)="rowRemove.emit(drawn.row.id)"
         (moveBy)="onMoveBy(drawn.row.id, $event)"
+        (dragStarted)="onRowDragStart($event, drawn.row)"
       />
       }
       @if (insertionGap() === realRowCount()) {
@@ -48,6 +49,10 @@
     </div>
     }
   </div>
+
+  @if (ghostRow(); as dragged) {
+  <lib-set-row-ghost #ghost class="ghost" [row]="dragged" aria-hidden="true" />
+  }
 
   <div class="announcer" aria-live="polite" aria-atomic="true">
     @for (announcement of announcements(); track announcement.seq) {

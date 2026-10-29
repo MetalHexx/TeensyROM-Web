@@ -692,3 +692,63 @@ map keys as below; expand a row to see its Action and Trigger choices, and read 
    nothing; releasing steps the value. The Amount field is shown for it.
 4. Re-learn a mapping that has Turn off and Note Off set: after the new key is chosen, the row still
    shows the same Action and Trigger.
+
+## Key match light (ASID-DJ-13)
+
+Not run. The light sits in the SID panel's lower row between the two Key sections and shows how well
+the two decks' keys, each as its Key knob has turned it, fit together. The automated checks cover
+the label and the centring; what an operator still has to see is the colour. No hardware timing is
+involved, so a cartridge is only needed to load tunes.
+
+1. Load a tune in a minor key on one deck and a tune in a major key on the other. Turn a Key knob
+   until A minor reads against C (for example `8A` against `8B` in Camelot). The light is a steady
+   full green.
+2. Keep turning the knob one step at a time and watch the light pass through green, amber and red.
+   Tell the three apart at a glance, from arm's length, without reading the label.
+3. Load a tune with no clear key on either deck. The light goes dark.
+4. Switch the notation between Camelot and Note. The light does not change.
+5. Make the window 768 px wide, the narrowest width this check covers. The light still sits
+   centred between the two Key sections.
+
+## File search (ASID-DJ-13)
+
+Not run. The search box in the listing's header searches the active device across SD and USB and
+shows the matches in place of the directory. The automated checks cover the states, the drag
+payload and a result dropped into the set list; what needs a bench is a device with a tune on each
+storage. Loading from the cartridge is the only hardware step.
+
+1. Search a name that exists on both SD and USB. Results from both storages appear, and each row
+   shows which storage it is on, so the two same-named matches can be told apart.
+2. Drag an SD result onto a deck and a USB result onto the other deck. Each loads and plays from
+   its own storage.
+3. Drag a result into the set list. It is added as a row, and the deck drop targets light up while
+   the drag is in flight and clear when it ends. The drag image is the small name chip.
+4. With the listing showing SD, use the jump button on a USB result. The listing moves to that
+   storage's folder, showing the result's containing folder, and the search box is cleared.
+5. Search again, then clear the search. The directory comes back.
+6. Fold and unfold the listing. The search box and its chevron are spaced and aligned as before.
+7. Make the window 768 px wide. The search box and the chevron still sit spaced and aligned.
+
+## Set list drag (ASID-DJ-13)
+
+Not run. A row of the set list can be dragged by its handle onto either deck, and the same handle
+still reorders the set. The automated checks cover the wiring with synthetic events, which skip the
+browser's own drop rules; whether a real browser accepts the drop, and how the drag ghost looks,
+needs a bench. Loading from the cartridge is the only hardware step, and it is the cartridge the
+decks already use.
+
+1. With a device, a storage and a set of at least two rows, drag the first row by its handle onto
+   Deck A. The deck loads that row and plays, the row's deck lamp lights, and the set, its order
+   and its selection do not change. Drag the second row onto Deck B. It loads the same way.
+2. While a row is dragged, both decks show the drop overlay. Release over the deck and the overlays
+   go. Press Esc during a drag and release off the window: the overlays go as well.
+3. Look at the drag ghost over a bright row and a dark row. It reads clearly on both.
+4. Reorder with the same handle, dropping inside the set list. The row moves and nothing loads.
+5. Drag a file from the listing into the set list, then onto a deck. Both still work, and the set
+   card does not show its listing drop state while a row is dragged.
+6. Hide the browser with the mixer toggle and wait for the peek to come up. Start a drag from a row
+   in the peek and keep it going longer than the peek's usual interval (about 1.5 s). The peek
+   stays up for the whole drag. Drop on a deck: it loads, and the peek goes away about 1.5 s later.
+7. Start a drag, and with a mapped control or the mixer toggle show or hide the browser mid-drag.
+   The deck overlays go.
+8. Press Load A and Load B on the set card. Each still loads the selected row onto its deck.

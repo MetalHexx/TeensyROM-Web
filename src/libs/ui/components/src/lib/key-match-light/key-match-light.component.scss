@@ -1,0 +1,26 @@
+@use '../../../../styles/src/lib/theme/led' as led;
+
+:host {
+  display: inline-flex;
+}
+
+// No modifier for `none`: the unlit dot is that state.
+.led {
+  @include led.dot;
+
+  &--full {
+    @include led.tone('green');
+  }
+
+  &--close {
+    @include led.tone('green-soft');
+  }
+
+  &--possible {
+    @include led.tone('amber');
+  }
+
+  &--clash {
+    @include led.tone('red');
+  }
+}

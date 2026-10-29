@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   Injector,
@@ -15,6 +16,7 @@ import {
 } from '@angular/core';
 import { SetControlPlateComponent, type SetControlPlateModel } from '../set-control-plate/set-control-plate.component';
 import { SetHeaderComponent, type SetHeaderModel } from '../set-header/set-header.component';
+import { SetRowGhostComponent, type SetRowGhostRow } from '../set-row-ghost/set-row-ghost.component';
 import { SET_ROW_DRAG_TYPE, SetRowComponent, type SetRowModel } from '../set-row/set-row.component';
 
 /** Everything the set card draws, caller-composed. */
@@ -75,7 +77,7 @@ type DragKind = 'row' | 'listing';
  */
 @Component({
   selector: 'lib-set-card',
-  imports: [SetHeaderComponent, SetControlPlateComponent, SetRowComponent],
+  imports: [SetHeaderComponent, SetControlPlateComponent, SetRowComponent, SetRowGhostComponent],
   templateUrl: './set-card.component.html',
   styleUrl: './set-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -107,12 +109,22 @@ export class SetCardComponent {
   readonly rowMove = output<SetRowMove>();
   /** Emits when a SID from the file listing is dropped, with the insertion gap among real rows. */
   readonly listingDrop = output<SetListingDrop>();
+  /** Emits when a row's drag starts, once the drag image is set. */
+  readonly rowDragStart = output<void>();
+  /** Emits when a row's drag ends, wherever it ends. */
+  readonly rowDragEnd = output<void>();
 
   /** The gap, among real rows, where the insertion line is drawn; `null` when no drag is over the list. */
   protected readonly insertionGap = signal<number | null>(null);
 
+  /** The row the off-screen ghost shows; set only while a row is being dragged. */
+  protected readonly ghostRow = signal<SetRowGhostRow | null>(null);
+
   private readonly rowsList = viewChild.required<ElementRef<HTMLElement>>('rowsList');
+  /** The off-screen ghost's element, snapshotted synchronously by the browser on `dragstart`. */
+  private readonly ghostEl = viewChild<ElementRef<HTMLElement>, ElementRef<HTMLElement>>('ghost', { read: ElementRef });
   private readonly injector = inject(Injector);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   /** Rows with their place among real rows, so pending entries are drawn but never counted. */
   protected readonly drawnRows = computed<readonly DrawnRow[]>(() => {
@@ -151,6 +163,17 @@ export class SetCardComponent {
     this.rowMove.emit({ rowId, toIndex });
   }
 
+  /** Sets the dragged row's ghost as the drag image, then announces the drag. */
+  protected onRowDragStart(event: DragEvent, row: SetRowModel): void {
+    // The ghost must show this row before the browser snapshots it, which happens synchronously
+    // when this handler returns — zoneless-coalesced change detection would be too late.
+    this.ghostRow.set({ numberText: row.numberText, title: row.title, author: row.author });
+    this.changeDetectorRef.detectChanges();
+    const ghost = this.ghostEl()?.nativeElement;
+    if (ghost) event.dataTransfer?.setDragImage(ghost, 16, ghost.offsetHeight / 2);
+    this.rowDragStart.emit();
+  }
+
   protected onDragOver(event: DragEvent): void {
     if (this.dragKind(event) === null) return;
     event.preventDefault();
@@ -169,6 +192,8 @@ export class SetCardComponent {
 
   protected onDragEnd(): void {
     this.insertionGap.set(null);
+    this.ghostRow.set(null);
+    this.rowDragEnd.emit();
   }
 
   protected onDrop(event: DragEvent): void {

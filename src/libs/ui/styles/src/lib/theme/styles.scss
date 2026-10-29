@@ -40,6 +40,7 @@ html {
   --color-dimmed: #656363;
   --color-dimmed-light: rgba(255, 255, 255, 0.6); // Light grey - subtle disabled state
   --color-directory: #f5d76e;
+  --color-warning: #e8a838;
   --glassy-color: 255, 255, 255;
 
   // Synth panel tokens (SID panel and its parts)
@@ -136,6 +137,7 @@ html.dark-mode {
   --color-dimmed: #656363;
   --color-dimmed-light: rgba(255, 255, 255, 0.6); // Light grey - subtle disabled state
   --color-directory: #f5e29e;
+  --color-warning: #f5b942;
   --glassy-color: 255, 255, 255;
 
   // Synth panel tokens (SID panel and its parts)
@@ -631,11 +633,15 @@ lib-compact-card-layout:has(.compact-card--fill) {
   background-color: transparent;
 }
 
+// The box fits the glyph: `.mat-icon` clips its overflow and the icon font's content area is taller
+// than its 16px em, and the button keeps Material's 8px padding, which leaves a content box too
+// small for the icon, so it must not flex-shrink into it.
 .icon-button-small .mat-icon {
   font-size: 16px;
   line-height: 1;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 20px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;

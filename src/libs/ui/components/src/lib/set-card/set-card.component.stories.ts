@@ -38,6 +38,8 @@ const meta: Meta<SetCardComponent> = {
     rowRemove: { description: 'A row’s remove key was pressed; carries its id.' },
     rowMove: { description: 'A row moved; carries its id and final index among real rows.' },
     listingDrop: { description: 'A SID from the listing dropped; carries the gap among real rows.' },
+    rowDragStart: { description: 'A row’s drag started and its ghost is set as the drag image.' },
+    rowDragEnd: { description: 'A row’s drag ended, wherever it ended.' },
   },
   render: (args) => ({
     props: args,

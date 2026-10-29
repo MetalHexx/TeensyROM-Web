@@ -11,6 +11,7 @@ import { interceptFindDevices } from '../../support/interceptors/findDevices.int
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 import { setupGetDirectoryWithFiles } from '../../support/interceptors/getDirectory.interceptors';
 import { interceptGetFileContent } from '../../support/interceptors/getFileContent.interceptors';
+import { interceptSearch } from '../../support/interceptors/search.interceptors';
 import { generateFileItem } from '../../support/test-data/generators/storage.generators';
 import { stillTimeSidBytes } from '../../support/test-data/fixtures/still-time.fixture';
 
@@ -400,6 +401,120 @@ describe('DJ Mixer — sets', () => {
       cy.window().then((win) => {
         const dataTransfer = new win.DataTransfer();
         cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragstart', { dataTransfer });
+        cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer });
+        cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer });
+      });
+
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('exist');
+      cy.get(`${CARD} button[aria-label*="Still Time"]`, { timeout: 60000 }).should('exist');
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('not.exist');
+
+      waitForSaveWhere((set) => set.rows.length === 1, 60000).then((set) => {
+        expect(set.rows[0].tune.title).to.match(/Still Time/);
+        expect(set.rows[0].tune.sidHash).to.match(/^[0-9a-f]{32}$/);
+      });
+    });
+  });
+
+  describe('dragging a set row onto a deck', () => {
+    beforeEach(() => {
+      cy.viewport(VIEWPORT.width, VIEWPORT.height);
+      clearDjBindingsDatabase();
+      interceptDjLibrary();
+      interceptFindDevices();
+      interceptConnectDevice();
+      setupGetDirectoryWithFiles([
+        generateFileItem({
+          name: 'Still_Time.sid',
+          path: '/Still_Time.sid',
+          type: FileItemType.Song,
+          title: 'Still Time',
+        }),
+      ]);
+      interceptGetFileContent({ bytes: stillTimeSidBytes() });
+      cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
+    });
+
+    it('loads that row onto the deck, setting the effects on a stand-in transfer, and clears the overlays at the end', () => {
+      cy.window().then((win) => {
+        const listingTransfer = new win.DataTransfer();
+        cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragstart', {
+          dataTransfer: listingTransfer,
+        });
+        cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer: listingTransfer });
+        cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer: listingTransfer });
+        cy.get('[data-item-path="/Still_Time.sid"]').trigger('dragend', {
+          dataTransfer: listingTransfer,
+        });
+      });
+      cy.get(`${CARD} button[aria-label*="Still Time"]`, { timeout: 60000 }).should('exist');
+      cy.get(`${CARD} lib-set-row[data-pending]`).should('not.exist');
+      cy.get(`${CARD} lib-set-row .deck`).should('not.exist');
+
+      // A constructed DataTransfer ignores effectAllowed and dropEffect (only a browser-made drag
+      // honours them), so the row drag shares a recording stand-in that keeps what both sides set.
+      const data = new Map<string, string>();
+      const dataTransfer = {
+        effectAllowed: 'uninitialized',
+        dropEffect: 'none',
+        get types() {
+          return [...data.keys()];
+        },
+        setData: (type: string, value: string) => void data.set(type, value),
+        getData: (type: string) => data.get(type) ?? '',
+        setDragImage: () => undefined,
+      };
+      cy.then(() => {
+        cy.get(`${CARD} lib-set-row .handle`).trigger('dragstart', { dataTransfer });
+        cy.wrap(dataTransfer).its('effectAllowed').should('eq', 'copyMove');
+
+        cy.get('[data-deck="B"] .drop-overlay').should('be.visible');
+        cy.get('[data-deck="A"] .drop-overlay').should('be.visible');
+        cy.get('[data-deck="B"] .drop-overlay').trigger('dragenter', { dataTransfer });
+        cy.get('[data-deck="B"] .drop-overlay').trigger('dragover', { dataTransfer });
+        cy.wrap(dataTransfer).its('dropEffect').should('eq', 'copy');
+        cy.get('[data-deck="B"] .drop-overlay').trigger('drop', { dataTransfer });
+        cy.get(`${CARD} lib-set-row .handle`).trigger('dragend', { dataTransfer });
+      });
+
+      cy.contains(`${CARD} lib-set-row .deck`, 'B', { timeout: 60000 })
+        .should('have.attr', 'data-light')
+        .and('not.eq', 'off');
+      cy.get('.drop-overlay').should('not.exist');
+    });
+  });
+
+  describe('dragging a search result into the card', () => {
+    beforeEach(() => {
+      cy.viewport(VIEWPORT.width, VIEWPORT.height);
+      clearDjBindingsDatabase();
+      interceptDjLibrary();
+      interceptFindDevices();
+      interceptConnectDevice();
+      setupGetDirectoryWithFiles([]);
+      interceptSearch({
+        files: [
+          generateFileItem({
+            name: 'Still_Time.sid',
+            parentPath: '/hvsc',
+            path: '/hvsc/Still_Time.sid',
+            type: FileItemType.Song,
+            title: 'Still Time',
+          }),
+        ],
+      });
+      interceptGetFileContent({ bytes: stillTimeSidBytes() });
+      cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
+    });
+
+    it('shows a pending row, then the tune with its title, and saves it', () => {
+      cy.get('lib-dj-search-toolbar input').type('still{enter}');
+      cy.get('[data-item-path="/hvsc/Still_Time.sid"]').should('exist');
+
+      cy.get(`${CARD} [role="list"]`).should('not.exist');
+      cy.window().then((win) => {
+        const dataTransfer = new win.DataTransfer();
+        cy.get('[data-item-path="/hvsc/Still_Time.sid"]').trigger('dragstart', { dataTransfer });
         cy.get(`${CARD} .rows`).trigger('dragover', { dataTransfer });
         cy.get(`${CARD} .rows`).trigger('drop', { dataTransfer });
       });

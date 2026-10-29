@@ -23,6 +23,8 @@ export * from './lib/set-card/set-card.component';
 export * from './lib/set-header/set-header.component';
 export * from './lib/set-control-plate/set-control-plate.component';
 export * from './lib/set-row/set-row.component';
+export * from './lib/set-row-ghost/set-row-ghost.component';
 export * from './lib/sets-tree-branch/sets-tree-branch.component';
 export * from './lib/deck-set-row/deck-set-row.component';
 export * from './lib/fold-handle/fold-handle.component';
+export * from './lib/key-match-light/key-match-light.component';

@@ -6,7 +6,7 @@
 
 .fold-button {
   position: absolute;
-  top: 8px;
+  top: var(--fold-handle-top, 8px);
   right: 6px;
   pointer-events: auto;
 }

@@ -103,6 +103,15 @@ lib-scaling-container {
   min-width: 0;
 }
 
+// The Key sections sit at each side's inner edge and the middle track is equidistant from them; the
+// light takes the lower row's centre, and paints above the divider by coming later in the DOM.
+.key-match {
+  grid-area: lower;
+  grid-column: 2;
+  justify-self: center;
+  align-self: center;
+}
+
 .lower-filter {
   flex: 1 1 auto;
   min-width: 0;

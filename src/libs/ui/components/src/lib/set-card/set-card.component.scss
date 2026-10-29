@@ -71,6 +71,14 @@
   }
 }
 
+// The native drag image is snapshotted from this element on `dragstart`; off-screen rather than
+// `opacity: 0`/`display: none` because Chrome ignores those as drag images.
+.ghost {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+}
+
 .announcer {
   position: absolute;
   width: 1px;

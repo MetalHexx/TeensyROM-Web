@@ -123,6 +123,10 @@ export class DjMixerViewComponent {
   /** Whether a SID drag from the listing is currently in flight — lights every deck's overlay. */
   readonly dragging = signal(false);
 
+  /** Whether a set row drag is in flight — lights every deck's overlay, but not the set card's
+   *  listing drop state. */
+  readonly rowDragging = signal(false);
+
   /** Whether the bindings panel is open. */
   readonly panelOpen = signal(false);
 
@@ -330,8 +334,10 @@ export class DjMixerViewComponent {
   }
 
   /** Hides the browser, or shows it. Showing restores the grid's row first, so the entry
-   *  animation plays into it, and puts the peek away at once. */
+   *  animation plays into it, and puts the peek away at once. Either way the source card of a row
+   *  drag leaves the DOM, so its `dragend` may never come: the drag is taken as over. */
   toggleBrowser(): void {
+    this.rowDragging.set(false);
     if (this.browserShown()) {
       this.browserShown.set(false);
       return;
@@ -373,10 +379,27 @@ export class DjMixerViewComponent {
     }
   }
 
+  /** A row drag began: the peek, if up, holds until it ends, so a drag begun in it keeps its source. */
+  onRowDragStart(): void {
+    this.rowDragging.set(true);
+    this.clearPeekTimer();
+  }
+
+  /** A row drag ended: the peek, if up, goes away its usual interval after the drop. */
+  onRowDragEnd(): void {
+    this.rowDragging.set(false);
+    if (this.peekShown()) {
+      this.showPeek();
+    }
+  }
+
   private showPeek(): void {
     this.peekEverShown.set(true);
     this.peekShown.set(true);
     this.clearPeekTimer();
+    if (this.rowDragging()) {
+      return;
+    }
     this.peekTimer = setTimeout(() => {
       this.peekTimer = null;
       this.peekShown.set(false);
