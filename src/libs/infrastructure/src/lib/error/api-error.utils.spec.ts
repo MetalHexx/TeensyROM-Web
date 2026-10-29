@@ -4,6 +4,7 @@ import {
   extractErrorMessage,
   extractProblemMessage,
   readDeviceBusyProblem,
+  readProblemCode,
 } from './api-error.utils';
 
 function responseErrorWithBody(body: unknown, contentType = 'application/json'): ResponseError {
@@ -177,5 +178,32 @@ describe('readDeviceBusyProblem', () => {
 
   it('is null for a non-ResponseError', async () => {
     await expect(readDeviceBusyProblem(new Error('boom'))).resolves.toBeNull();
+  });
+});
+
+describe('readProblemCode', () => {
+  it('returns the code from a problem+json body and leaves the body readable', async () => {
+    const error = responseErrorWithBody(
+      { title: 'USB unreachable', code: 'usbUnreachable' },
+      'application/problem+json'
+    );
+
+    await expect(readProblemCode(error)).resolves.toBe('usbUnreachable');
+    await expect(error.response.json()).resolves.toMatchObject({ code: 'usbUnreachable' });
+  });
+
+  it('is undefined for a body without a string code', async () => {
+    await expect(readProblemCode(responseErrorWithBody({ code: 7 }))).resolves.toBeUndefined();
+    await expect(readProblemCode(responseErrorWithBody('bare string'))).resolves.toBeUndefined();
+  });
+
+  it('is undefined for a body that is not JSON', async () => {
+    const error = new ResponseError(new Response('not json', { status: 502 }));
+
+    await expect(readProblemCode(error)).resolves.toBeUndefined();
+  });
+
+  it('is undefined for an error that is not a ResponseError', async () => {
+    await expect(readProblemCode(new Error('boom'))).resolves.toBeUndefined();
   });
 });

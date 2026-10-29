@@ -13,7 +13,9 @@
       [bindingsOpen]="panelOpen()"
       [browserShown]="browserShown()"
       (bindingsToggle)="togglePanel()"
+      [asidLaunching]="asidLaunching()"
       (browserToggle)="toggleBrowser()"
+      (asidLaunch)="launchAsidPlayer()"
     ></lib-dj-sid-panel>
     <lib-sliding-container
       class="bottom-slot"

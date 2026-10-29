@@ -207,8 +207,46 @@ describe('DjSidPanelComponent', () => {
       expect(buttons.map((button) => button.classList.contains('bindings-button'))).toEqual([
         true,
         false,
+        false,
       ]);
       expect(buttons[1].classList.contains('browser-button')).toBe(true);
+      expect(buttons[2].classList.contains('asid-button')).toBe(true);
+    });
+  });
+
+  describe('the ASID button', () => {
+    function asidButton(fixture: ComponentFixture<DjSidPanelComponent>): HTMLButtonElement {
+      return find(fixture, '.panel-header .asid-button button');
+    }
+
+    it('is enabled until a launch is running, and disabled exactly while it is', () => {
+      const { fixture } = render();
+      expect(asidButton(fixture).disabled).toBe(false);
+
+      fixture.componentRef.setInput('asidLaunching', true);
+      fixture.detectChanges();
+      expect(asidButton(fixture).disabled).toBe(true);
+
+      fixture.componentRef.setInput('asidLaunching', false);
+      fixture.detectChanges();
+      expect(asidButton(fixture).disabled).toBe(false);
+    });
+
+    it('emits asidLaunch when pressed', () => {
+      const { fixture } = render();
+      const launched = vi.fn();
+      fixture.componentInstance.asidLaunch.subscribe(launched);
+
+      asidButton(fixture).click();
+
+      expect(launched).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not a mappable control', () => {
+      const { fixture } = render();
+
+      expect(fixture.nativeElement.querySelector('.asid-button[data-control]')).toBeNull();
+      expect(asidButton(fixture).closest('[data-control]')).toBeNull();
     });
   });
 

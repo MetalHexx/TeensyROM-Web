@@ -1082,6 +1082,175 @@ public class DeviceConnectionManagerTests
         await _finder.DidNotReceive().FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task FallBackToSerialAsync_UnitStillAvailableOnTcp_ReturnsNullWithoutCreatingASerialPortOrSaving()
+    {
+        var (manager, _, tcpPort) = await AvailableTcpUnit("avail001", knownSerialPort: "COM5");
+        AllowSerialLookup("avail001", "COM5");
+        _cache.ClearReceivedCalls();
+
+        var fallback = await manager.FallBackToSerialAsync("avail001", CancellationToken.None);
+
+        fallback.Should().BeNull();
+        _transports.DidNotReceiveWithAnyArgs().CreateSerial(default!, default);
+        _cache.ReceivedCalls().Should().BeEmpty();
+        tcpPort.DidNotReceive().Dispose();
+    }
+
+    // --- MoveToSerial ---
+
+    /// <summary>A TCP unit the manager knows and still has available.</summary>
+    private async Task<(DeviceConnectionManager Manager, TeensyRomDevice Device, ICommunicationPort TcpPort)> AvailableTcpUnit(string chipId, string? knownSerialPort)
+    {
+        var tcpPort = CreatePort(ConnectionType.Tcp);
+        var device = CreateDevice(chipId, ConnectionType.Tcp, "10.0.0.9:80", tcpPort);
+
+        if (knownSerialPort is not null)
+        {
+            device.Connection.RememberEndpoint(ConnectionType.Serial, knownSerialPort);
+        }
+
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        _finder.ClearReceivedCalls();
+        return (manager, device, tcpPort);
+    }
+
+    private (ICommunicationPort Port, TeensyRomDevice Device) ConfirmingSerialDevice(string chipId, string portName)
+    {
+        var serialPort = CreatePort(ConnectionType.Serial);
+        var serialDevice = CreateDevice(chipId, ConnectionType.Serial, portName, serialPort);
+        AllowSerialLookup(chipId, portName);
+        _transports.CreateSerial(portName, true).Returns(serialPort);
+        _interrogator.ReadVersion(serialPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = chipId });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(serialDevice);
+        return (serialPort, serialDevice);
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_PortOnRecordConfirms_AdoptsSerialKeepsTcpEndpointAndClosesTheTcpPort()
+    {
+        var (manager, _, tcpPort) = await AvailableTcpUnit("moverec1", knownSerialPort: "COM5");
+        var lastSave = CaptureLastSave();
+        var (serialPort, serialDevice) = ConfirmingSerialDevice("moverec1", "COM5");
+
+        var outcome = await manager.MoveToSerialAsync("moverec1", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.Moved);
+        outcome.Device.Should().BeSameAs(serialDevice);
+        manager.GetAvailableDevice("moverec1").Should().BeSameAs(serialDevice);
+        serialDevice.Connection.TcpEndpoint.Should().Be("10.0.0.9:80");
+        lastSave().Should().ContainSingle(r => r.ChipId == "moverec1" && r.SerialPortName == "COM5" && r.TcpEndpoint == "10.0.0.9:80");
+        tcpPort.Received(1).Dispose();
+        serialPort.DidNotReceive().Dispose();
+        await _finder.DidNotReceive().FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_NoPortOnRecordButADescriptorCandidate_ConfirmsOnTheCandidate()
+    {
+        var (manager, _, _) = await AvailableTcpUnit("movedsc1", knownSerialPort: null);
+        var (_, serialDevice) = ConfirmingSerialDevice("movedsc1", "COM9");
+
+        var outcome = await manager.MoveToSerialAsync("movedsc1", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.Moved);
+        outcome.Device.Should().BeSameAs(serialDevice);
+        serialDevice.Connection.TcpEndpoint.Should().Be("10.0.0.9:80");
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_SerialConfirmMisses_LeavesTheSameTcpDeviceAvailableAndItsPortOpen()
+    {
+        var (manager, tcpDevice, tcpPort) = await AvailableTcpUnit("movemis1", knownSerialPort: "COM5");
+        var serialPort = CreatePort(ConnectionType.Serial);
+        AllowSerialLookup("movemis1", "COM5");
+        _transports.CreateSerial("COM5", true).Returns(serialPort);
+        _interrogator.ReadVersion(serialPort).Returns(VersionReply.Empty);
+
+        var outcome = await manager.MoveToSerialAsync("movemis1", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.SerialUnreachable);
+        outcome.Device.Should().BeNull();
+        manager.GetAvailableDevice("movemis1").Should().BeSameAs(tcpDevice);
+        tcpPort.DidNotReceive().Dispose();
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_NoSerialKnown_IsSerialUnreachableWithoutCreatingASerialPort()
+    {
+        var (manager, tcpDevice, tcpPort) = await AvailableTcpUnit("movenone", knownSerialPort: null);
+        _locator.FindByChipId("movenone").Returns(new PortLookup([], true, null));
+
+        var outcome = await manager.MoveToSerialAsync("movenone", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.SerialUnreachable);
+        _transports.DidNotReceiveWithAnyArgs().CreateSerial(default!, default);
+        manager.GetAvailableDevice("movenone").Should().BeSameAs(tcpDevice);
+        tcpPort.DidNotReceive().Dispose();
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_AlreadyOnSerial_ReturnsTheSameDeviceWithNoContact()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("moveser1", ConnectionType.Serial, "COM5", port);
+        _finder.FindDevices(Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { device });
+        var manager = CreateManager();
+        await manager.FindDevices(autoConnect: false, CancellationToken.None, fullScan: true);
+        _transports.ClearReceivedCalls();
+        _interrogator.ClearReceivedCalls();
+
+        var outcome = await manager.MoveToSerialAsync("moveser1", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.AlreadyOnSerial);
+        outcome.Device.Should().BeSameAs(device);
+        _transports.DidNotReceiveWithAnyArgs().CreateSerial(default!, default);
+        _interrogator.DidNotReceiveWithAnyArgs().ReadVersion(default!);
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_UnitLeasedBeforeTheMove_IsTransferActiveWithoutCreatingASerialPort()
+    {
+        var (manager, tcpDevice, tcpPort) = await AvailableTcpUnit("movelsd1", knownSerialPort: "COM5");
+        AllowSerialLookup("movelsd1", "COM5");
+        _lease.GetActiveJobId("movelsd1").Returns("job-7");
+
+        var outcome = await manager.MoveToSerialAsync("movelsd1", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.TransferActive);
+        outcome.ActiveJobId.Should().Be("job-7");
+        _transports.DidNotReceiveWithAnyArgs().CreateSerial(default!, default);
+        manager.GetAvailableDevice("movelsd1").Should().BeSameAs(tcpDevice);
+        tcpPort.DidNotReceive().Dispose();
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_LeaseTakenDuringTheConfirm_ClosesTheConfirmedSerialPortAndLeavesTheTcpDevice()
+    {
+        var (manager, tcpDevice, tcpPort) = await AvailableTcpUnit("movelate", knownSerialPort: "COM5");
+        var (serialPort, _) = ConfirmingSerialDevice("movelate", "COM5");
+        _lease.GetActiveJobId("movelate").Returns((string?)null, "job-9");
+
+        var outcome = await manager.MoveToSerialAsync("movelate", CancellationToken.None);
+
+        outcome.Result.Should().Be(SerialMoveResult.TransferActive);
+        outcome.ActiveJobId.Should().Be("job-9");
+        serialPort.Received(1).Dispose();
+        tcpPort.DidNotReceive().Dispose();
+        manager.GetAvailableDevice("movelate").Should().BeSameAs(tcpDevice);
+    }
+
+    [Fact]
+    public async Task MoveToSerialAsync_UnknownOrUnreachableUnit_IsUnknownDevice()
+    {
+        var (manager, _) = await StuckTcpUnit("moveunr1", knownSerialPort: "COM5");
+
+        (await manager.MoveToSerialAsync("moveunr1", CancellationToken.None)).Result.Should().Be(SerialMoveResult.UnknownDevice);
+        (await manager.MoveToSerialAsync("neverseen", CancellationToken.None)).Result.Should().Be(SerialMoveResult.UnknownDevice);
+    }
+
     // --- GetOfflineDevices ---
 
     [Fact]

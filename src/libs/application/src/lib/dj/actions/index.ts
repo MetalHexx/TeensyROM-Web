@@ -36,6 +36,7 @@ import { setPendingRows } from './set-pending-rows';
 import { setRowPrep } from './set-row-prep';
 import { setSetsSaveStatus } from './set-sets-save-status';
 import { announceSets } from './announce-sets';
+import { setAsidLaunching } from './set-asid-launching';
 
 export function withDjActions() {
   return withMethods((store) => {
@@ -77,6 +78,7 @@ export function withDjActions() {
       ...setRowPrep(writableStore),
       ...setSetsSaveStatus(writableStore),
       ...announceSets(writableStore),
+      ...setAsidLaunching(writableStore),
     };
   });
 }

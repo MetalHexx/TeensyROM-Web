@@ -106,6 +106,45 @@ export async function extractProblemMessage(error: unknown): Promise<string | un
 }
 
 /**
+ * The problem `code` from a ResponseError's JSON / problem+json body, read from a clone so the body stays
+ * readable. Undefined when the error is not a ResponseError, the body is not JSON, or it has no string code.
+ *
+ * @param error - The error thrown by the API client
+ * @returns The problem code, or undefined when there is none
+ */
+export async function readProblemCode(error: unknown): Promise<string | undefined> {
+  if (!(error instanceof ResponseError) || !error.response) {
+    return undefined;
+  }
+
+  try {
+    const body = (await error.response.clone().json()) as { code?: unknown } | null;
+    return typeof body?.code === 'string' ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether a ResponseError's JSON body carries `movedToSerial: true`, the API's note that a failed ASID launch
+ * had already moved the cartridge onto USB. False when the error is not a ResponseError or the body has no flag.
+ *
+ * @param error - The error thrown by the API client
+ */
+export async function readMovedToSerial(error: unknown): Promise<boolean> {
+  if (!(error instanceof ResponseError) || !error.response) {
+    return false;
+  }
+
+  try {
+    const body = (await error.response.clone().json()) as { movedToSerial?: unknown } | null;
+    return body?.movedToSerial === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Extracts a user-friendly error message from an API response.
  *
  * Uses the API's ProblemDetails message when present, then the error's own message for a standard Error,

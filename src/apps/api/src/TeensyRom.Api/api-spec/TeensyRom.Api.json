@@ -999,6 +999,78 @@
         }
       }
     },
+    "/api/devices/{deviceId}/asid-player/launch": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Launch ASID Player",
+        "description": "Starts the cartridge's built-in ASID player.\n\n- A device on the network is moved onto its USB serial port first, because the player turns the network off; it stays on serial until the next reconnect.\n- Answers 502 (code usbUnreachable) when a network device cannot be reached over USB; nothing is launched then.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.",
+        "operationId": "LaunchAsidPlayer",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchAsidPlayerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{deviceId}/ping": {
       "get": {
         "tags": [
@@ -3952,6 +4024,21 @@
             "nullable": true
           },
           "listening": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LaunchAsidPlayerResponse": {
+        "required": [
+          "message",
+          "movedToSerial"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "movedToSerial": {
             "type": "boolean"
           }
         }

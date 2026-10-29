@@ -23,6 +23,7 @@ import {
   SearchWeightsDto,
   AppSettingsDto,
   DeviceSettingsDto,
+  LaunchAsidPlayerResponse,
 } from '@teensyrom-nx/data-access/api-client';
 import {
   Device,
@@ -52,6 +53,7 @@ import {
   SearchWeights,
   AppSettings,
   DeviceSettings,
+  AsidLaunchOutcome,
 } from '@teensyrom-nx/domain';
 
 /**
@@ -100,6 +102,10 @@ export class DomainMapper {
 
   static toDeviceList(cartDtos: CartDto[]): Device[] {
     return cartDtos.map((cart) => this.toDevice(cart));
+  }
+
+  static toAsidLaunchOutcome(response: LaunchAsidPlayerResponse): AsidLaunchOutcome {
+    return { launched: true, movedToSerial: response.movedToSerial };
   }
 
   // ===== STORAGE MAPPING =====

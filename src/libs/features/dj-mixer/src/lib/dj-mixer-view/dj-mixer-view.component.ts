@@ -17,6 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import {
+  AsidPlayerLauncher,
   DECK_SLOTS,
   DeviceStore,
   DjSets,
@@ -79,6 +80,7 @@ export class DjMixerViewComponent {
   private readonly storageStore = inject(StorageStore);
   private readonly djStore = inject(DjStore);
   private readonly djSets = inject(DjSets);
+  private readonly asidLauncher = inject(AsidPlayerLauncher);
   private readonly destroyRef = inject(DestroyRef);
   private readonly midiStore = inject(MidiMappingStore);
   private readonly controls = inject(MappableControls);
@@ -168,6 +170,9 @@ export class DjMixerViewComponent {
   );
 
   private readonly listingBody = viewChild<ElementRef<HTMLElement>>('listingBody');
+
+  /** Whether the ASID player is being started on the decks' cartridges. */
+  readonly asidLaunching = this.djStore.asidLaunching;
 
   /** Whether the browser (trees, listing and set card) is shown; session only. */
   readonly browserShown = signal(true);
@@ -331,6 +336,11 @@ export class DjMixerViewComponent {
     if (focusWasInPanel) {
       this.sidPanel()?.focusBindingsButton();
     }
+  }
+
+  /** Starts the ASID player on every bound deck's cartridge. */
+  launchAsidPlayer(): void {
+    void this.asidLauncher.launch();
   }
 
   /** Hides the browser, or shows it. Showing restores the grid's row first, so the entry

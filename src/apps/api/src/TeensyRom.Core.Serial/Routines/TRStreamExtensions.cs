@@ -118,6 +118,29 @@ namespace TeensyRom.Core.Serial.Routines
 			}
 		}
 
+		/// <summary>
+		/// ClearBuffers; LaunchFile token (2 bytes); ack; drive byte (1 byte); "{path}\0"; ack. Returns the second ack's
+		/// token - Ack, or RetryLaunch from minimal; HandleAck throws for anything else. The first ack's result is ignored.
+		/// </summary>
+		public static TeensyToken SendLaunch(this ICommunicationPort port, uint driveToken, string path, ILoggingService log)
+		{
+			log.Internal($"{_logClass} Clearing serial buffers");
+			port.ClearBuffers();
+
+			log.Internal($"{_logClass} Sending {TeensyToken.LaunchFile} token.");
+			port.SendIntBytes(TeensyToken.LaunchFile, 2);
+
+			_ = port.HandleAck();
+
+			log.Internal($"{_logClass} Sending storage token to TeensyROM");
+			port.SendIntBytes(driveToken, 1);
+
+			log.Internal($"{_logClass} Sending {path} to TeensyROM");
+			port.Write($"{path}\0");
+
+			return port.HandleAck();
+		}
+
 		public static void PlaySubtune(this ICommunicationPort communicationPort, uint subtuneIndex)
 		{
 			subtuneIndex = subtuneIndex > 0

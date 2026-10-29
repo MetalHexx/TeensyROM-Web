@@ -6,6 +6,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 import {
+  AsidPlayerLauncher,
   DECK_CONTROL_IDS,
   DECK_SLOTS,
   SET_CONTROL_IDS,
@@ -214,7 +215,8 @@ const SAVED_SETS: SetTreeSummary = {
 function createDjStoreStub(
   loops: DeckLoopsSummary = NO_LOOPS,
   selectTurns = signal(0),
-  save = signal<'saved' | 'saving' | 'failed'>('saved')
+  save = signal<'saved' | 'saving' | 'failed'>('saved'),
+  asidLaunching = signal(false)
 ) {
   return {
     sets: computed(() => ({ selectTurns: selectTurns(), save: save() })),
@@ -226,6 +228,7 @@ function createDjStoreStub(
     loopsSummary: () => signal(loops),
     loopLapPercent: () => signal(0),
     settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
+    asidLaunching,
     bindings: signal({
       A: { device: null, portId: null, present: false, error: null },
       B: { device: null, portId: null, present: false, error: null },
@@ -334,6 +337,8 @@ function render(
   const selectTurns = signal(0);
   const save = signal<'saved' | 'saving' | 'failed'>('saved');
   const djSets = { openSet: vi.fn().mockResolvedValue(undefined) };
+  const launcher = { launch: vi.fn().mockResolvedValue(undefined) };
+  const asidLaunching = signal(false);
   const midi = createMidiStubs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const usableDevices = signal(devices.filter((d: any) => d.isEnabled));
@@ -344,9 +349,10 @@ function render(
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices), usableDevices } },
       { provide: StorageStore, useValue: storageStore },
-      { provide: DjStore, useValue: createDjStoreStub(loops, selectTurns, save) },
+      { provide: DjStore, useValue: createDjStoreStub(loops, selectTurns, save, asidLaunching) },
       { provide: DeckService, useValue: createDeckServiceStub() },
       { provide: DjSets, useValue: djSets },
+      { provide: AsidPlayerLauncher, useValue: launcher },
       { provide: MixerService, useValue: createMixerServiceStub() },
       { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
@@ -377,6 +383,8 @@ function render(
     component: fixture.componentInstance,
     storageStore,
     djSets,
+    launcher,
+    asidLaunching,
     selectTurns,
     save,
     midi,
@@ -716,6 +724,29 @@ describe('DjMixerViewComponent', () => {
       component.toggleBrowser();
       fixture.detectChanges();
       expect(component.rowDragging()).toBe(false);
+    });
+  });
+
+  describe('the ASID launch button', () => {
+    const asidButton = (fixture: ComponentFixture<DjMixerViewComponent>): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('lib-dj-sid-panel .asid-button button');
+
+    it('calls the launcher when pressed', () => {
+      const { fixture, launcher } = render([]);
+
+      asidButton(fixture).click();
+
+      expect(launcher.launch).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables the button while the store's launching flag is set", () => {
+      const { fixture, asidLaunching } = render([]);
+      expect(asidButton(fixture).disabled).toBe(false);
+
+      asidLaunching.set(true);
+      fixture.detectChanges();
+
+      expect(asidButton(fixture).disabled).toBe(true);
     });
   });
 
