@@ -9,6 +9,7 @@ using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Settings;
+using TeensyRom.Core.Themes;
 
 namespace TeensyRom.Core.Serial.Routines
 {
@@ -150,6 +151,29 @@ namespace TeensyRom.Core.Serial.Routines
 			communicationPort.ClearBuffers();
 			communicationPort.SendIntBytes(TeensyToken.PlaySubtune, 2);
 			communicationPort.SendIntBytes(subtuneIndex, 1);
+			communicationPort.HandleAck();
+		}
+
+		/// <summary>
+		/// Sets one color of the C64 menu in the firmware's palette. The device holds it until the next
+		/// reset, which is when the menu shows it. Throws <see cref="ArgumentOutOfRangeException"/>, before
+		/// anything is written, for a slot outside 0..6 or a color above 15.
+		/// </summary>
+		public static void SetColor(this ICommunicationPort communicationPort, ColorSlot slot, uint color)
+		{
+			if (!Enum.IsDefined(slot))
+			{
+				throw new ArgumentOutOfRangeException(nameof(slot), slot, "The slot must be 0..6.");
+			}
+			if (color >= DeviceThemePart.ColorCount)
+			{
+				throw new ArgumentOutOfRangeException(nameof(color), color, "The color must be 0..15.");
+			}
+
+			communicationPort.ClearBuffers();
+			communicationPort.SendIntBytes(TeensyToken.SetColor, 2);
+			communicationPort.SendIntBytes((uint)slot, 1);
+			communicationPort.SendIntBytes(color, 1);
 			communicationPort.HandleAck();
 		}
 
