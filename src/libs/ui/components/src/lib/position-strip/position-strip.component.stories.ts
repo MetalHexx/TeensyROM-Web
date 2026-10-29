@@ -130,22 +130,25 @@ export const MarksIdle: Story = {
   render: wrapped,
 };
 
+/** One mark in each state: idle, selected, running, queued, and selected with running. */
+const everyMarkState: PositionMark[] = [
+  mark('idle', { startPercent: 2, endPercent: 10 }),
+  mark('idle-cue', { kind: 'cue', startPercent: 14, endPercent: null }),
+  mark('selected', { startPercent: 18, endPercent: 28, selected: true }),
+  mark('selected-cue', { kind: 'cue', startPercent: 32, endPercent: null, selected: true }),
+  mark('running', { startPercent: 36, endPercent: 46, activity: 'running' }),
+  mark('queued', { startPercent: 50, endPercent: 60, activity: 'queued' }),
+  mark('queued-cue', { kind: 'cue', startPercent: 64, endPercent: null, activity: 'queued' }),
+  mark('both', { startPercent: 70, endPercent: 82, activity: 'running', selected: true }),
+];
+
 /** Every state at once: idle, selected, running, queued, and selected with running. */
 export const MarksEveryState: Story = {
   args: {
     ...base,
     barState: { kind: 'loop', introPercent: 25 },
     positionPercent: 40,
-    marks: [
-      mark('idle', { startPercent: 2, endPercent: 10 }),
-      mark('idle-cue', { kind: 'cue', startPercent: 14, endPercent: null }),
-      mark('selected', { startPercent: 18, endPercent: 28, selected: true }),
-      mark('selected-cue', { kind: 'cue', startPercent: 32, endPercent: null, selected: true }),
-      mark('running', { startPercent: 36, endPercent: 46, activity: 'running' }),
-      mark('queued', { startPercent: 50, endPercent: 60, activity: 'queued' }),
-      mark('queued-cue', { kind: 'cue', startPercent: 64, endPercent: null, activity: 'queued' }),
-      mark('both', { startPercent: 70, endPercent: 82, activity: 'running', selected: true }),
-    ],
+    marks: everyMarkState,
   },
   render: wrapped,
 };
@@ -157,12 +160,7 @@ export const Held: Story = {
     barState: { kind: 'loop', introPercent: 25 },
     positionPercent: 40,
     held: true,
-    marks: [
-      mark('idle', { startPercent: 4, endPercent: 14 }),
-      mark('queued', { startPercent: 18, endPercent: 28, activity: 'queued' }),
-      mark('running', { startPercent: 52, endPercent: 64, activity: 'running' }),
-      mark('selected', { kind: 'cue', startPercent: 72, endPercent: null, selected: true }),
-    ],
+    marks: everyMarkState,
   },
   render: wrapped,
 };

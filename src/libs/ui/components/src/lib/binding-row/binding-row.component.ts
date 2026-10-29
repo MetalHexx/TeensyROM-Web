@@ -73,7 +73,8 @@ let nextRowId = 0;
  * One MIDI binding in a list: what it drives, where it listens and how it behaves. Collapsed, it
  * is two lines — the control's name, a style chip and the edit and delete buttons, then the source.
  * Expanded in place, it frames itself and offers the style (or Action), the trigger where the
- * style has one, the amount (and a second amount) where the style takes them, and Re-learn source and Delete.
+ * style has one, the amount (and a second amount) where the style takes them, and Re-learn source
+ * and Delete.
  *
  * Purely presentational — the caller owns the model and the `expanded` flag, and updates them from
  * the outputs. Each amount is a native number input that emits on `change`, and only for a finite

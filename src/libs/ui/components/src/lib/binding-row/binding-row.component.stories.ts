@@ -232,14 +232,12 @@ export const ExpandedHand: Story = {
 };
 
 /** Interactive: the story owns the model, as a caller would. Expand the row, change the style,
- *  and type an amount (or, where the row has one, a second amount) — a value outside its range, or no value, shows an inline error and is not
+ *  and type an amount — a value outside its range, or no value, shows an inline error and is not
  *  applied. */
 export const Interactive: Story = {
   render: () => ({
     props: {
-      model: baseModel({
-        styleOptions: [...ccStyleOptions, { id: 'hand', label: 'Hand' }],
-      }),
+      model: baseModel(),
       toggleExpanded(this: { model: BindingRowModel }) {
         this.model = { ...this.model, expanded: !this.model.expanded };
       },
@@ -247,25 +245,12 @@ export const Interactive: Story = {
         this.model = {
           ...this.model,
           selectedStyleId: id,
-          amount:
-            id === 'absolute'
-              ? null
-              : id === 'hand'
-              ? handReach
-              : id === 'step'
-              ? stepAmount
-              : relativeAmount,
-          secondAmount: id === 'hand' ? handGrip : null,
+          amount: id === 'absolute' ? null : id === 'step' ? stepAmount : relativeAmount,
         };
       },
       applyAmount(this: { model: BindingRowModel }, value: number) {
         if (this.model.amount) {
           this.model = { ...this.model, amount: { ...this.model.amount, value } };
-        }
-      },
-      applySecondAmount(this: { model: BindingRowModel }, value: number) {
-        if (this.model.secondAmount) {
-          this.model = { ...this.model, secondAmount: { ...this.model.secondAmount, value } };
         }
       },
     },
@@ -275,7 +260,6 @@ export const Interactive: Story = {
         (editToggle)="toggleExpanded()"
         (styleSelect)="chooseStyle($event)"
         (amountChange)="applyAmount($event)"
-        (secondAmountChange)="applySecondAmount($event)"
       />
     `,
   }),
