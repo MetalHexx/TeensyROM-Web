@@ -10,7 +10,8 @@ The raw probes show what the **device** does; the API runner shows what the **AP
 the two disagree, the bug is in the API. Built during CONNECTION-2 (2026-09-23), where TCP passed
 15/15 swaps and Serial failed 10/10 on the same device, and only the raw probe explained why.
 
-Pairs with `api-live-debug` (debugger + log tap on the running API).
+Pairs with `api-live-debug` (debugger + log tap on the running API). For uploads and downloads, use
+`file-transfer-diagnostics`, which builds on this skill's wire library.
 
 ## When to Use This Skill
 
