@@ -202,6 +202,70 @@ namespace TeensyRom.Core.Device
                 return null;
             }
 
+            var device = await ConfirmOnSerial(existing, "serial fall-back", ct);
+
+            if (device is null)
+            {
+                return null;
+            }
+
+            AdoptOnSerial(device, existing);
+            _log.InternalSuccess($"DeviceConnectionManager: fell back to serial on {device.Connection.SerialPortName} after a stuck TCP session");
+            return device;
+        }
+
+        /// <summary>
+        /// On request, while the unit is still available on TCP: confirms the same chip on its USB serial port, adopts
+        /// it under the same id and closes the TCP device's port. Nothing is ever sent over the TCP port, and the
+        /// occasion sends no MediatR command, so a caller holding the device's command gate cannot deadlock on it.
+        /// </summary>
+        public Task<SerialMoveOutcome> MoveToSerialAsync(string deviceId, CancellationToken ct) =>
+            RunExclusive(DiscoveryOccasion.Reconnect, token => RunMoveToSerial(deviceId, token), ct);
+
+        private async Task<SerialMoveOutcome> RunMoveToSerial(string deviceId, CancellationToken ct)
+        {
+            if (!_byChip.TryGetValue(deviceId, out var existing) || existing.Connection.Mode == DeviceMode.Unreachable)
+            {
+                return new SerialMoveOutcome(SerialMoveResult.UnknownDevice, null);
+            }
+
+            if (existing.ConnectionType == ConnectionType.Serial)
+            {
+                return new SerialMoveOutcome(SerialMoveResult.AlreadyOnSerial, existing);
+            }
+
+            if (_lease.GetActiveJobId(deviceId) is { } activeJobId)
+            {
+                return new SerialMoveOutcome(SerialMoveResult.TransferActive, null, activeJobId);
+            }
+
+            var device = await ConfirmOnSerial(existing, "serial move", ct);
+
+            if (device is null)
+            {
+                return new SerialMoveOutcome(SerialMoveResult.SerialUnreachable, null);
+            }
+
+            if (_lease.GetActiveJobId(deviceId) is { } leasedDuringConfirm)
+            {
+                device.CommunicationPort.Dispose();
+                return new SerialMoveOutcome(SerialMoveResult.TransferActive, null, leasedDuringConfirm);
+            }
+
+            AdoptOnSerial(device, existing);
+            existing.CommunicationPort.Dispose();
+            _log.InternalSuccess($"DeviceConnectionManager: moved to serial on {device.Connection.SerialPortName} on request");
+            return new SerialMoveOutcome(SerialMoveResult.Moved, device);
+        }
+
+        /// <summary>
+        /// Decides whether serial is known (the port on record, else a descriptor match for the chip) before any COM
+        /// port is touched, then confirms the chip on it. Returns the confirmed device without adopting it; any miss
+        /// other than cancellation is null. <paramref name="label"/> names the caller in the log lines.
+        /// </summary>
+        private async Task<TeensyRomDevice?> ConfirmOnSerial(TeensyRomDevice existing, string label, CancellationToken ct)
+        {
+            var deviceId = existing.DeviceId;
             var stopwatch = Stopwatch.StartNew();
             var knownPort = existing.Connection.SerialPortName;
             IReadOnlyList<TeensyRomPort> candidates = [];
@@ -217,7 +281,7 @@ namespace TeensyRom.Core.Device
 
                 if (candidates.Count == 0)
                 {
-                    _log.Internal($"DeviceConnectionManager: no serial connection known for {deviceId}; not falling back");
+                    _log.Internal($"DeviceConnectionManager: no serial connection known for {deviceId}; {label} not attempted");
                     return null;
                 }
             }
@@ -247,22 +311,26 @@ namespace TeensyRom.Core.Device
             }
             catch (Exception ex)
             {
-                _log.Internal($"DeviceConnectionManager: serial fall-back miss for {deviceId}: {ex.Message}");
+                _log.Internal($"DeviceConnectionManager: {label} miss for {deviceId}: {ex.Message}");
                 return null;
             }
 
             if (device is null)
             {
-                _log.Internal($"DeviceConnectionManager: serial fall-back for {deviceId} found no answering port in {stopwatch.ElapsedMilliseconds} ms");
+                _log.Internal($"DeviceConnectionManager: {label} for {deviceId} found no answering port in {stopwatch.ElapsedMilliseconds} ms");
                 return null;
             }
 
-            CarryForwardEndpoint(device.Connection, ConnectionType.Serial, row.SerialPortName);
-            CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, row.TcpEndpoint);
+            return device;
+        }
+
+        /// <summary>Carries both of the unit's endpoints onto the confirmed device, publishes it under the unit's id and saves the records.</summary>
+        private void AdoptOnSerial(TeensyRomDevice device, TeensyRomDevice existing)
+        {
+            CarryForwardEndpoint(device.Connection, ConnectionType.Serial, existing.Connection.SerialPortName);
+            CarryForwardEndpoint(device.Connection, ConnectionType.Tcp, existing.Connection.TcpEndpoint);
             AdoptConfirmedDevice(device);
             SaveRecords();
-            _log.InternalSuccess($"DeviceConnectionManager: fell back to serial on {device.Connection.SerialPortName} after a stuck TCP session");
-            return device;
         }
 
         /// <summary>Opens each descriptor candidate in order and adopts the first that answers as this chip - the candidate loop of <see cref="TryConfirmCachedSerialRow"/> for a unit with no port on record.</summary>

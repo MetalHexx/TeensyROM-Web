@@ -28,6 +28,19 @@ public enum ReconnectResult
 /// <summary><see cref="Device"/> is set only when <see cref="Result"/> is <see cref="ReconnectResult.Reconnected"/> or <see cref="ReconnectResult.AlreadyAvailable"/>.</summary>
 public sealed record ReconnectOutcome(ReconnectResult Result, TeensyRomDevice? Device);
 
+/// <summary>The outcome of a <see cref="TeensyRom.Core.Abstractions.IDeviceConnectionManager.MoveToSerialAsync"/> attempt.</summary>
+public enum SerialMoveResult
+{
+    Moved,
+    AlreadyOnSerial,
+    UnknownDevice,
+    TransferActive,
+    SerialUnreachable
+}
+
+/// <summary><see cref="Device"/> is set only when <see cref="Result"/> is <see cref="SerialMoveResult.Moved"/> or <see cref="SerialMoveResult.AlreadyOnSerial"/>; <see cref="ActiveJobId"/> only for <see cref="SerialMoveResult.TransferActive"/>.</summary>
+public sealed record SerialMoveOutcome(SerialMoveResult Result, TeensyRomDevice? Device, string? ActiveJobId = null);
+
 /// <summary>The outcome of a <see cref="TeensyRom.Core.Abstractions.IDeviceConnectionManager.ForgetAsync"/> attempt.</summary>
 public enum ForgetResult
 {

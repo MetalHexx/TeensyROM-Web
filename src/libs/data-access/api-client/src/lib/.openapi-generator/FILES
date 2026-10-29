@@ -68,6 +68,7 @@ models/IndexAllResponse.ts
 models/IndexResponse.ts
 models/IndexingStatusDto.ts
 models/KnownMidiControllerDto.ts
+models/LaunchAsidPlayerResponse.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
 models/LiftBanResponse.ts

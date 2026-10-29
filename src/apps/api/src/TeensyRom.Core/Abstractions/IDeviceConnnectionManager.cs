@@ -71,6 +71,18 @@ namespace TeensyRom.Core.Abstractions
         Task<TeensyRomDevice?> FallBackToSerialAsync(string deviceId, CancellationToken ct);
 
         /// <summary>
+        /// On request, while the unit is still available on TCP: confirms the same chip on its USB serial port through the
+        /// confirm-and-adopt path <see cref="FallBackToSerialAsync"/> uses (the port on record, else a descriptor match for its
+        /// chip), adopts the serial device under the same id and closes the TCP device's port. The record keeps its TCP
+        /// endpoint and the preferred transport is untouched. Already on serial -&gt; <see cref="SerialMoveResult.AlreadyOnSerial"/>
+        /// with the device, no contact. A unit a transfer holds is left exactly as it is
+        /// (<see cref="SerialMoveResult.TransferActive"/>, with the job id). Unknown or unreachable -&gt;
+        /// <see cref="SerialMoveResult.UnknownDevice"/>. Serial unknown or not answering -&gt;
+        /// <see cref="SerialMoveResult.SerialUnreachable"/>, nothing changed.
+        /// </summary>
+        Task<SerialMoveOutcome> MoveToSerialAsync(string deviceId, CancellationToken ct);
+
+        /// <summary>
         /// Removes a known, unreachable unit from memory and the saved file - <see cref="ForgetResult.Forgotten"/>.
         /// An available unit is left untouched (<see cref="ForgetResult.StillAvailable"/>); an unknown
         /// chip is <see cref="ForgetResult.UnknownDevice"/>. Runs exclusively of every other occasion, so
