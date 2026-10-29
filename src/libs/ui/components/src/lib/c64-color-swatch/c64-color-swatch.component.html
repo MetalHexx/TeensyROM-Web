@@ -1,0 +1,4 @@
+<span class="swatch" [class.swatch--unknown]="!color()" [style.background-color]="color()?.hex"></span>
+@if (showName()) {
+<span class="name">{{ name() }}</span>
+}
