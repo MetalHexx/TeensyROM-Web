@@ -47,12 +47,12 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         [Required] public int Channel { get; set; }
 
         /// <summary>
-        /// Message kind: "note" or "cc".
+        /// Message kind: "note", "cc" or "pitch-bend".
         /// </summary>
         [Required] public string Kind { get; set; } = string.Empty;
 
         /// <summary>
-        /// Note or controller number, 0-127.
+        /// Note or controller number, 0-127. Must be 0 for a pitch bend, which has none.
         /// </summary>
         [Required] public int Number { get; set; }
     }
@@ -64,15 +64,21 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
     {
         /// <summary>
         /// Style kind: press, release, latch, on, off, hold, absolute, relative-offset, relative-signed, step,
-        /// latch-release, on-release, off-release or step-release.
+        /// latch-release, on-release, off-release, step-release or hand.
         /// </summary>
         [Required] public string Kind { get; set; } = string.Empty;
 
         /// <summary>
         /// Step size. Required for relative-offset and relative-signed (greater than 0, up to 1) and for step and
-        /// step-release (-1 to 1, not 0). Optional for hold (greater than 0, up to 1; null holds the voice). Must be null for every other kind.
+        /// step-release (-1 to 1, not 0). Optional for hold (greater than 0, up to 1; null holds the voice). For hand, the
+        /// reach in seconds (0.02 to 2). Must be null for every other kind.
         /// </summary>
         public double? Amount { get; set; }
+
+        /// <summary>
+        /// The hand's grip in seconds from a standstill to normal speed (0.05 to 3). Required for hand; must be null for every other kind.
+        /// </summary>
+        public double? Grip { get; set; }
     }
 
     /// <summary>
@@ -140,10 +146,15 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         public const string SetOwner = "set";
         public const string StepStyleKind = "step";
         public const string HoldStyleKind = "hold";
+        public const string PitchBendSourceKind = "pitch-bend";
+        public const string HandStyleKind = "hand";
+        public const string SeekControl = "seek";
+        public const double HandReachMinSeconds = 0.02, HandReachMaxSeconds = 2.0;
+        public const double HandGripMinSeconds = 0.05, HandGripMaxSeconds = 3.0;
 
         public static readonly Regex IdPattern = new(@"^[A-Za-z0-9_-]{1,64}\z", RegexOptions.CultureInvariant);
 
-        public static readonly IReadOnlySet<string> SourceKinds = new HashSet<string>(StringComparer.Ordinal) { "note", "cc" };
+        public static readonly IReadOnlySet<string> SourceKinds = new HashSet<string>(StringComparer.Ordinal) { "note", "cc", PitchBendSourceKind };
 
         public static readonly IReadOnlySet<string> Slots = new HashSet<string>(StringComparer.Ordinal) { "A", "B" };
 
@@ -169,7 +180,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         public static readonly IReadOnlySet<string> StyleKinds = new HashSet<string>(StringComparer.Ordinal)
         {
             "press", "release", "latch", "on", "off", "hold", "absolute", "relative-offset", "relative-signed", StepStyleKind,
-            "latch-release", "on-release", "off-release", "step-release"
+            "latch-release", "on-release", "off-release", "step-release", HandStyleKind
         };
 
         public static readonly IReadOnlySet<string> PositiveAmountStyleKinds = new HashSet<string>(StringComparer.Ordinal)
@@ -219,10 +230,14 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
 
             RuleFor(x => x.Kind)
                 .Must(kind => kind is not null && MidiSettingsAllowLists.SourceKinds.Contains(kind))
-                .WithMessage("Source kind must be 'note' or 'cc'.");
+                .WithMessage("Source kind must be 'note', 'cc' or 'pitch-bend'.");
 
             RuleFor(x => x.Number)
                 .InclusiveBetween(0, 127).WithMessage("Source number must be between 0 and 127.");
+
+            RuleFor(x => x.Number)
+                .Equal(0).When(x => x.Kind == MidiSettingsAllowLists.PitchBendSourceKind)
+                .WithMessage("A pitch bend source has no number; it must be 0.");
         }
     }
 
@@ -254,6 +269,14 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
                             context.AddFailure($"Amount is required for style '{kind}' and must be between -1 and 1, and not 0.");
                         }
                     }
+                    else if (kind == MidiSettingsAllowLists.HandStyleKind)
+                    {
+                        if (amount is not { } a || !double.IsFinite(a)
+                            || a < MidiSettingsAllowLists.HandReachMinSeconds || a > MidiSettingsAllowLists.HandReachMaxSeconds)
+                        {
+                            context.AddFailure($"Amount is required for style 'hand' and must be between {MidiSettingsAllowLists.HandReachMinSeconds} and {MidiSettingsAllowLists.HandReachMaxSeconds} seconds.");
+                        }
+                    }
                     else if (kind == MidiSettingsAllowLists.HoldStyleKind)
                     {
                         if (amount is { } a && (!double.IsFinite(a) || a <= 0 || a > 1))
@@ -264,6 +287,26 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
                     else if (amount is not null)
                     {
                         context.AddFailure($"Amount must be null for style '{kind}'.");
+                    }
+                });
+
+            RuleFor(x => x.Grip)
+                .Custom((grip, context) =>
+                {
+                    var kind = context.InstanceToValidate.Kind;
+                    if (kind is null || !MidiSettingsAllowLists.StyleKinds.Contains(kind)) return;
+
+                    if (kind == MidiSettingsAllowLists.HandStyleKind)
+                    {
+                        if (grip is not { } g || !double.IsFinite(g)
+                            || g < MidiSettingsAllowLists.HandGripMinSeconds || g > MidiSettingsAllowLists.HandGripMaxSeconds)
+                        {
+                            context.AddFailure($"Grip is required for style 'hand' and must be between {MidiSettingsAllowLists.HandGripMinSeconds} and {MidiSettingsAllowLists.HandGripMaxSeconds} seconds.");
+                        }
+                    }
+                    else if (grip is not null)
+                    {
+                        context.AddFailure($"Grip must be null for style '{kind}'.");
                     }
                 });
         }
@@ -306,6 +349,24 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
             RuleFor(x => x.Style)
                 .NotNull().WithMessage("Mapping style is required.")
                 .SetValidator(new MidiMappingStyleValidator());
+
+            RuleFor(x => x)
+                .Custom((mapping, context) =>
+                {
+                    var isPitchBend = mapping.Source?.Kind == MidiSettingsAllowLists.PitchBendSourceKind;
+                    var isHand = mapping.Style?.Kind == MidiSettingsAllowLists.HandStyleKind;
+
+                    if (isPitchBend != isHand)
+                    {
+                        context.AddFailure("Style", "A pitch bend source pairs only with the 'hand' style, and the 'hand' style only with a pitch bend source.");
+                    }
+
+                    if (isPitchBend
+                        && (mapping.Owner is not ("A" or "B") || mapping.Control != MidiSettingsAllowLists.SeekControl))
+                    {
+                        context.AddFailure("Control", "A pitch bend source can drive only a deck's seek control.");
+                    }
+                });
         }
     }
 

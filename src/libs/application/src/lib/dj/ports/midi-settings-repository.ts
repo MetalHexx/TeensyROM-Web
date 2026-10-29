@@ -16,7 +16,8 @@ export type MappingStyleKind =
   | 'latch-release'
   | 'on-release'
   | 'off-release'
-  | 'step-release';
+  | 'step-release'
+  | 'hand';
 
 export interface KnownControllerRecord {
   readonly id: string;
@@ -28,7 +29,7 @@ export interface KnownControllerRecord {
 export interface MidiSourceRecord {
   readonly controllerId: string;
   readonly channel: number;
-  readonly kind: 'note' | 'cc';
+  readonly kind: 'note' | 'cc' | 'pitch-bend';
   readonly number: number;
 }
 
@@ -37,7 +38,11 @@ export interface ControlMappingRecord {
   readonly source: MidiSourceRecord;
   readonly owner: ControlOwner;
   readonly control: string;
-  readonly style: { readonly kind: MappingStyleKind; readonly amount: number | null };
+  readonly style: {
+    readonly kind: MappingStyleKind;
+    readonly amount: number | null;
+    readonly grip?: number;
+  };
 }
 
 /** Which TeensyROM device a deck slot is bound to, and the name it last went by. */

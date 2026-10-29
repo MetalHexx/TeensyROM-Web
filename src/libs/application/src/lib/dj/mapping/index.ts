@@ -1,5 +1,6 @@
 export * from './mapping.models';
 export * from './mappable-controls';
+export * from './hand-settings';
 export * from './mapping-styles';
 export * from './mapping-labels';
 export * from './midi-mapping-store';

@@ -24,14 +24,23 @@ public class SaveMidiSettingsRequestValidatorTests
         string owner = "A",
         string control = "speed",
         string styleKind = "relative-offset",
-        double? amount = 0.01) => new()
+        double? amount = 0.01,
+        double? grip = null) => new()
     {
         Id = id,
         Source = new MidiSourceDto { ControllerId = controllerId, Channel = channel, Kind = sourceKind, Number = number },
         Owner = owner,
         Control = control,
-        Style = new MidiMappingStyleDto { Kind = styleKind, Amount = amount }
+        Style = new MidiMappingStyleDto { Kind = styleKind, Amount = amount, Grip = grip }
     };
+
+    private static MidiControlMappingDto HandMapping(
+        string owner = "A",
+        string control = "seek",
+        int number = 0,
+        double? reach = 0.13,
+        double? grip = 0.25) =>
+        Mapping(sourceKind: "pitch-bend", number: number, owner: owner, control: control, styleKind: "hand", amount: reach, grip: grip);
 
     private static DeckDeviceBindingDto Binding(string slot = "A", string deviceId = "19277260", string lastSeenName = "TR-2") => new()
     {
@@ -280,6 +289,7 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("")]
     [InlineData("pitch")]
     [InlineData("CC")]
+    [InlineData("Pitch-Bend")]
     public void Validate_SourceKindUnknown_IsRejected(string kind)
     {
         var request = ValidRequest();
@@ -490,6 +500,99 @@ public class SaveMidiSettingsRequestValidatorTests
         request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "hold", Amount = amount };
 
         AssertRejectedAt(request, "Mappings[0].Style.Amount");
+    }
+
+    #endregion
+
+    #region Hand
+
+    [Theory]
+    [InlineData("A", 0.13, 0.25)]
+    [InlineData("B", 0.02, 0.05)]
+    [InlineData("A", 2.0, 3.0)]
+    public void Validate_HandMappingOnADecksSeek_Passes(string owner, double reach, double grip)
+    {
+        var request = ValidRequest();
+        request.Mappings = [HandMapping(owner: owner, reach: reach, grip: grip)];
+
+        _validator.Validate(request).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("A", "speed")]
+    [InlineData("mixer", "seek")]
+    [InlineData("set", "seek")]
+    [InlineData("set", "set-select")]
+    public void Validate_PitchBendOnAnotherControlOrOwner_IsRejected(string owner, string control)
+    {
+        var request = ValidRequest();
+        request.Mappings = [HandMapping(owner: owner, control: control)];
+
+        AssertRejectedAt(request, "Mappings[0].Control");
+    }
+
+    [Fact]
+    public void Validate_PitchBendWithAnotherStyle_IsRejected()
+    {
+        var request = ValidRequest();
+        request.Mappings = [Mapping(sourceKind: "pitch-bend", number: 0, control: "seek", styleKind: "press", amount: null)];
+
+        AssertRejectedAt(request, "Mappings[0].Style");
+    }
+
+    [Theory]
+    [InlineData("cc")]
+    [InlineData("note")]
+    public void Validate_HandOnAnotherSourceKind_IsRejected(string sourceKind)
+    {
+        var request = ValidRequest();
+        request.Mappings = [Mapping(sourceKind: sourceKind, control: "seek", styleKind: "hand", amount: 0.13, grip: 0.25)];
+
+        AssertRejectedAt(request, "Mappings[0].Style");
+    }
+
+    [Fact]
+    public void Validate_PitchBendWithANumber_IsRejected()
+    {
+        var request = ValidRequest();
+        request.Mappings = [HandMapping(number: 5)];
+
+        AssertRejectedAt(request, "Mappings[0].Source.Number");
+    }
+
+    [Theory]
+    [InlineData(0.01)]
+    [InlineData(2.5)]
+    [InlineData(null)]
+    [InlineData(double.NaN)]
+    public void Validate_HandReachOutOfRange_IsRejected(double? reach)
+    {
+        var request = ValidRequest();
+        request.Mappings = [HandMapping(reach: reach)];
+
+        AssertRejectedAt(request, "Mappings[0].Style.Amount");
+    }
+
+    [Theory]
+    [InlineData(0.01)]
+    [InlineData(4.0)]
+    [InlineData(null)]
+    [InlineData(double.PositiveInfinity)]
+    public void Validate_HandGripOutOfRange_IsRejected(double? grip)
+    {
+        var request = ValidRequest();
+        request.Mappings = [HandMapping(grip: grip)];
+
+        AssertRejectedAt(request, "Mappings[0].Style.Grip");
+    }
+
+    [Fact]
+    public void Validate_GripOnAnotherStyle_IsRejected()
+    {
+        var request = ValidRequest();
+        request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "relative-offset", Amount = 0.01, Grip = 0.25 };
+
+        AssertRejectedAt(request, "Mappings[0].Style.Grip");
     }
 
     #endregion

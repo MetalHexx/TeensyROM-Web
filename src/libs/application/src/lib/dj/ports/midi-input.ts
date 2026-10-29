@@ -7,22 +7,30 @@ export interface MidiInputPort {
   readonly connected: boolean;
 }
 
+/** A pitch bend's centre — exactly here means no finger on a strip that springs back. */
+export const PITCH_BEND_CENTRE = 8192;
+export const PITCH_BEND_MAX = 16383;
+
 /**
- * A decoded note or control change; no raw bytes ever cross this port.
+ * A decoded note, control change or pitch bend; no raw bytes ever cross this port.
  *
  * A note: `value` is the velocity (0 on release) and `pressed` is note-on with velocity > 0.
  * A CC: `value` is 0–127 and `pressed` is `value >= 64`, so a CC button acts as a key.
+ * A pitch bend: `value` is 0–16383, `number` is always 0 and `pressed` is
+ * `value !== PITCH_BEND_CENTRE`.
  */
 export interface MidiInputMessage {
   readonly portId: string;
-  readonly kind: 'note' | 'cc';
+  readonly kind: 'note' | 'cc' | 'pitch-bend';
   /** 1–16. */
   readonly channel: number;
-  /** 0–127: the note number or the controller number. */
+  /** 0–127: the note number or the controller number; always 0 for pitch bend, which has none. */
   readonly number: number;
-  /** 0–127. */
+  /** 0–127; 0–16383 for pitch bend. */
   readonly value: number;
   readonly pressed: boolean;
+  /** When the message arrived, from the MIDI event's own timestamp (ms, performance clock). */
+  readonly timeStampMs: number;
 }
 
 /**

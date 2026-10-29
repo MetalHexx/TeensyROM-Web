@@ -55,7 +55,8 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                 Style = new MidiMappingStyle
                 {
                     Kind = dto.Style.Kind,
-                    Amount = dto.Style.Amount
+                    Amount = dto.Style.Amount,
+                    Grip = dto.Style.Grip
                 }
             };
         }

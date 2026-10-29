@@ -113,11 +113,15 @@ export class MidiLearn {
   }
 
   /** Takes a message for learn when one is in progress. Returns true when it was consumed, so it
-   *  must not reach the engine. A note release is never consumed: it may end a hold. */
+   *  must not reach the engine. A note release is never consumed: it may end a hold. A pitch bend
+   *  is not consumed yet. */
   offer(message: MidiInputMessage, portName: string): boolean {
     const learn = this.store.learn();
     if (learn === null) {
       this.clearSampling();
+      return false;
+    }
+    if (message.kind === 'pitch-bend') {
       return false;
     }
     if (learn.phase === 'sampling') {

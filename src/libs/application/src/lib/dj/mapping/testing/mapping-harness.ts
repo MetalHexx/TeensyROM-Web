@@ -225,9 +225,10 @@ export function cc(
   number: number,
   value: number,
   channel = 1,
-  controllerId = LAUNCH_CONTROL
+  controllerId = LAUNCH_CONTROL,
+  timeStampMs = 0
 ): SourceEvent {
-  return { ...ccSource(number, channel, controllerId), value, pressed: value >= 64 };
+  return { ...ccSource(number, channel, controllerId), value, pressed: value >= 64, timeStampMs };
 }
 
 /** A note message; velocity 0 is the release. */
@@ -235,7 +236,13 @@ export function note(
   number: number,
   velocity: number,
   channel = 1,
-  controllerId = LAUNCH_CONTROL
+  controllerId = LAUNCH_CONTROL,
+  timeStampMs = 0
 ): SourceEvent {
-  return { ...noteSource(number, channel, controllerId), value: velocity, pressed: velocity > 0 };
+  return {
+    ...noteSource(number, channel, controllerId),
+    value: velocity,
+    pressed: velocity > 0,
+    timeStampMs,
+  };
 }

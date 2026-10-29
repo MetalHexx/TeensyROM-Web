@@ -1,5 +1,6 @@
 import { clamp } from '@sidablist/core';
 import type { MappingStyleKind } from '../ports';
+import { HAND_GRIP_SECONDS, HAND_REACH_SECONDS } from './hand-settings';
 import type { MappableControl } from './mappable-controls';
 import type { ControlNature, MappingStyle, MidiSourceKind } from './mapping.models';
 
@@ -18,7 +19,8 @@ export type StyleAction =
   | 'hold'
   | 'absolute'
   | 'relative-offset'
-  | 'relative-signed';
+  | 'relative-signed'
+  | 'hand';
 
 /** The key edge a style acts on. */
 export type StyleTrigger = 'press' | 'release';
@@ -62,6 +64,7 @@ export function actionOf(kind: MappingStyleKind): StyleAction {
     case 'absolute':
     case 'relative-offset':
     case 'relative-signed':
+    case 'hand':
       return kind;
   }
 }
@@ -85,6 +88,7 @@ export function triggerOf(kind: MappingStyleKind): StyleTrigger | null {
     case 'absolute':
     case 'relative-offset':
     case 'relative-signed':
+    case 'hand':
       return null;
   }
 }
@@ -100,6 +104,9 @@ export function kindFor(action: StyleAction, trigger: StyleTrigger): MappingStyl
 
 /** The styles a control of this nature offers for a source of this kind, in menu order. */
 export function stylesFor(nature: ControlNature, sourceKind: MidiSourceKind): MappingStyleKind[] {
+  if (sourceKind === 'pitch-bend') {
+    return [];
+  }
   switch (nature) {
     case 'trigger':
       return ['press', 'release'];
@@ -159,6 +166,9 @@ export function defaultAmountFor(control: MappableControl, kind: MappingStyleKin
 
 /** The style a source gets when first mapped onto a control, from the styles it allows. */
 export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKind): MappingStyle {
+  if (sourceKind === 'pitch-bend') {
+    return { kind: 'hand', amount: HAND_REACH_SECONDS.home, grip: HAND_GRIP_SECONDS.home };
+  }
   switch (control.nature) {
     case 'trigger':
       return { kind: 'press', amount: null };
@@ -178,13 +188,16 @@ export function defaultStyle(control: MappableControl, sourceKind: MidiSourceKin
 
 /** Keeps an amount in what the server accepts for the kind: a relative amount in (0, 1], a hold's
  *  amount in (0, 1] (`null` for a hold that takes none), a step amount (either edge) in [−1, 1] and never zero,
- *  and `null` for every other kind. A missing or non-finite amount falls back to the control's
- *  default. */
+ *  a hand's reach in seconds within its range, and `null` for every other kind. A missing or
+ *  non-finite amount falls back to the control's default. */
 export function clampAmount(
   control: MappableControl,
   kind: MappingStyleKind,
   amount: number | null
 ): number | null {
+  if (kind === 'hand') {
+    return clampSeconds(amount, HAND_REACH_SECONDS);
+  }
   if (kind === 'hold') {
     if (control.nature !== 'hold' || control.amountDefault === null) {
       return null;
@@ -201,6 +214,26 @@ export function clampAmount(
   const raw = amount !== null && Number.isFinite(amount) ? amount : defaultAmountFor(control, kind);
   const bounded = clamp(raw ?? MIN_AMOUNT, isStepKind(kind) ? -1 : MIN_AMOUNT, 1);
   return Math.abs(bounded) < MIN_AMOUNT ? Math.sign(bounded || 1) * MIN_AMOUNT : bounded;
+}
+
+/** Keeps a hand's grip within its range, the home value for a missing or non-finite one;
+ *  `undefined` for every other kind, which has none. */
+export function clampGrip(
+  kind: MappingStyleKind,
+  grip: number | null | undefined
+): number | undefined {
+  return kind === 'hand' ? clampSeconds(grip, HAND_GRIP_SECONDS) : undefined;
+}
+
+function clampSeconds(
+  seconds: number | null | undefined,
+  range: { readonly min: number; readonly max: number; readonly home: number }
+): number {
+  return clamp(
+    seconds !== null && seconds !== undefined && Number.isFinite(seconds) ? seconds : range.home,
+    range.min,
+    range.max
+  );
 }
 
 /** How many ticks a relative encoder's raw CC value says it turned, signed.

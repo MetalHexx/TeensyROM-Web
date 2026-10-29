@@ -4,7 +4,7 @@ import { MidiSettingsPersistence } from '../midi-settings-persistence';
 import type { ControlMappingRecord } from '../ports';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { ownerLabel } from './mapping-labels';
-import { clampAmount, defaultStyle, isStyleAvailableFor } from './mapping-styles';
+import { clampAmount, clampGrip, defaultStyle, isStyleAvailableFor } from './mapping-styles';
 import {
   controlKey,
   isControlId,
@@ -123,10 +123,7 @@ export class MidiMappings {
     }
 
     this.store.upsertMapping({
-      mapping: {
-        ...mapping,
-        style: { kind: style.kind, amount: clampAmount(control, style.kind, style.amount) },
-      },
+      mapping: { ...mapping, style: this.clampedStyle(control, style) },
     });
     this.persistence.scheduleSave();
   }
@@ -184,7 +181,16 @@ export class MidiMappings {
       );
       return defaultStyle(control, sourceKind);
     }
-    return { kind: style.kind, amount: clampAmount(control, style.kind, style.amount) };
+    return this.clampedStyle(control, style);
+  }
+
+  private clampedStyle(control: MappableControl, style: MappingStyle): MappingStyle {
+    const grip = clampGrip(style.kind, style.grip);
+    return {
+      kind: style.kind,
+      amount: clampAmount(control, style.kind, style.amount),
+      ...(grip !== undefined ? { grip } : {}),
+    };
   }
 
   private toMapping(record: ControlMappingRecord): ControlMapping | null {

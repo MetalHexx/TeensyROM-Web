@@ -14,7 +14,7 @@ interface FakeInput {
   connection: 'open' | 'closed' | 'pending';
   open: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
-  onmidimessage: ((event: { data: Uint8Array | null }) => void) | null;
+  onmidimessage: ((event: { data: Uint8Array | null; timeStamp?: number }) => void) | null;
 }
 
 function makeInput(
@@ -59,8 +59,10 @@ function stubRequestMidiAccess(inputs: FakeInput[]): void {
   });
 }
 
+const EVENT_TIME = 1234.5;
+
 function send(input: FakeInput, ...bytes: number[]): void {
-  input.onmidimessage?.({ data: Uint8Array.from(bytes) });
+  input.onmidimessage?.({ data: Uint8Array.from(bytes), timeStamp: EVENT_TIME });
 }
 
 describe('MidiInputService', () => {
@@ -340,10 +342,43 @@ describe('MidiInputService', () => {
         bytes: [0xb2, 7, 100, 0],
         expected: { kind: 'cc', channel: 3, number: 7, value: 100, pressed: true },
       },
+      {
+        label: 'pitch bend at centre as not pressed',
+        bytes: [0xe0, 0, 64],
+        expected: { kind: 'pitch-bend', channel: 1, number: 0, value: 8192, pressed: false },
+      },
+      {
+        label: 'pitch bend at its lowest',
+        bytes: [0xe0, 0, 0],
+        expected: { kind: 'pitch-bend', channel: 1, number: 0, value: 0, pressed: true },
+      },
+      {
+        label: 'pitch bend at its highest',
+        bytes: [0xe0, 127, 127],
+        expected: { kind: 'pitch-bend', channel: 1, number: 0, value: 16383, pressed: true },
+      },
+      {
+        label: 'pitch bend with the low byte first',
+        bytes: [0xe0, 1, 64],
+        expected: { kind: 'pitch-bend', channel: 1, number: 0, value: 8193, pressed: true },
+      },
+      {
+        label: 'pitch bend on channel 5',
+        bytes: [0xe4, 0, 100],
+        expected: { kind: 'pitch-bend', channel: 5, number: 0, value: 12800, pressed: true },
+      },
     ])('decodes $label', ({ bytes, expected }) => {
       send(pad, ...bytes);
 
-      expect(received).toEqual([{ portId: 'pad', ...expected }]);
+      expect(received).toEqual([{ portId: 'pad', timeStampMs: EVENT_TIME, ...expected }]);
+    });
+
+    it('falls back to the performance clock when the event has no timestamp', () => {
+      vi.spyOn(performance, 'now').mockReturnValue(777);
+
+      pad.onmidimessage?.({ data: Uint8Array.from([0x90, 60, 100]) });
+
+      expect(received.map((message) => message.timeStampMs)).toEqual([777]);
     });
 
     it.each([
@@ -351,7 +386,6 @@ describe('MidiInputService', () => {
       { label: 'timing clock', bytes: [0xf8, 0, 0] },
       { label: 'active sensing', bytes: [0xfe, 0, 0] },
       { label: 'program change', bytes: [0xc0, 5, 0] },
-      { label: 'pitch bend', bytes: [0xe0, 0, 64] },
       { label: 'polyphonic aftertouch', bytes: [0xa0, 60, 50] },
       { label: 'channel pressure', bytes: [0xd0, 50, 0] },
       { label: 'a message shorter than 3 bytes', bytes: [0x90, 60] },
@@ -359,6 +393,7 @@ describe('MidiInputService', () => {
       { label: 'running-status data with no status byte', bytes: [0x3c, 0x64, 0x00] },
       { label: 'a first data byte with the high bit set', bytes: [0x90, 0x80, 100] },
       { label: 'a second data byte with the high bit set', bytes: [0xb0, 20, 0x90] },
+      { label: 'a pitch bend data byte with the high bit set', bytes: [0xe0, 0, 0x90] },
     ])('drops $label', ({ bytes }) => {
       send(pad, ...bytes);
 

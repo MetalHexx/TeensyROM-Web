@@ -437,6 +437,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Each mapping source names a controller in the same request, and no two mappings share a source
         /// <br/>- Mapping owner is A, B, mixer or set; the control must be a known deck control (A, B) or a set control (set: set-select, set-load-a, set-load-b); the mixer owns none
         /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed, step and step-release, optional (range-checked) for hold, and null otherwise
+        /// <br/>- A pitch-bend source (number 0) pairs only with the hand style, and a hand style only with a pitch-bend source; it drives only a deck's seek control
+        /// <br/>- A hand style needs a reach (amount, 0.02-2 seconds) and a grip (0.05-3 seconds); grip must be null for every other style
         /// <br/>- Deck slots are A or B, each bound at most once, to different devices
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -3616,6 +3618,8 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Each mapping source names a controller in the same request, and no two mappings share a source
         /// <br/>- Mapping owner is A, B, mixer or set; the control must be a known deck control (A, B) or a set control (set: set-select, set-load-a, set-load-b); the mixer owns none
         /// <br/>- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed, step and step-release, optional (range-checked) for hold, and null otherwise
+        /// <br/>- A pitch-bend source (number 0) pairs only with the hand style, and a hand style only with a pitch-bend source; it drives only a deck's seek control
+        /// <br/>- A hand style needs a reach (amount, 0.02-2 seconds) and a grip (0.05-3 seconds); grip must be null for every other style
         /// <br/>- Deck slots are A or B, each bound at most once, to different devices
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -7869,6 +7873,9 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("amount")]
         public double? Amount { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("grip")]
+        public double? Grip { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

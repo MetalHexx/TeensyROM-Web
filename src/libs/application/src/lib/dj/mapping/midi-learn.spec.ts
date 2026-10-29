@@ -92,6 +92,16 @@ describe('MidiLearn', () => {
       expect(h.mappingStore.learn()).toBeNull();
     });
 
+    it('never consumes a pitch bend, leaving the selection waiting', async () => {
+      await start();
+      h.learn.select({ owner: 'A', control: 'seek' });
+
+      h.midiInput.emitPitchBend(PORT, 0);
+
+      expect(h.mappingStore.mappings()).toEqual([]);
+      expect(h.mappingStore.learn()?.phase).toBe('waiting');
+    });
+
     it('moves to another control when a different one is selected', async () => {
       await start();
       h.learn.select(PLAY_A);
@@ -288,6 +298,7 @@ describe('MidiLearn', () => {
         number,
         value: 20,
         pressed: false,
+        timeStampMs: 0,
       });
 
       expect(h.learn.offer(message(7), NAME)).toBe(true);

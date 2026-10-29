@@ -85,6 +85,28 @@ describe('MidiMappings', () => {
       ]);
     });
 
+    it('loads a hand mapping with its reach and grip unchanged', async () => {
+      const hand: ControlMappingRecord = {
+        id: 'hand',
+        source: { controllerId: LAUNCH_CONTROL, channel: 1, kind: 'pitch-bend', number: 0 },
+        owner: 'A',
+        control: 'seek',
+        style: { kind: 'hand', amount: 0.13, grip: 0.25 },
+      };
+      setUp({ ...SAVED, mappings: [hand] });
+
+      await h.mappings.hydrate();
+
+      expect(h.mappingStore.mappings()).toEqual([
+        {
+          id: 'hand',
+          source: hand.source,
+          control: { owner: 'A', control: 'seek' },
+          style: { kind: 'hand', amount: 0.13, grip: 0.25 },
+        },
+      ]);
+    });
+
     it('drops, with a warning, a mapping whose control is not on the list', async () => {
       setUp({
         ...SAVED,
@@ -281,7 +303,7 @@ describe('MidiMappings', () => {
     it("lets go of the mapping's hold before it goes", async () => {
       await h.mappings.hydrate();
       const { mapping } = h.mappings.bind(noteSource(60), HOLD_1_A, style('hold'));
-      h.engine.handle({ ...noteSource(60), value: 100, pressed: true });
+      h.engine.handle({ ...noteSource(60), value: 100, pressed: true, timeStampMs: 0 });
       expect(h.djStore.deck('A')().voices[0].held).toBe(true);
 
       h.mappings.remove(mapping.id);
