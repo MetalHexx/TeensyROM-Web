@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { ColorThemeStore } from '@teensyrom-nx/application';
+import { ColorThemeStore, deviceLabel } from '@teensyrom-nx/application';
 import { APPLY_TO_ALL_DEVICES, ColorThemeKind } from '@teensyrom-nx/domain';
 import {
   ActionButtonComponent,
@@ -63,7 +63,7 @@ export class ThemeActionsComponent {
   });
   protected readonly targetOptions = computed<SegmentedControlOption[]>(() => [
     { id: APPLY_TO_ALL_DEVICES, label: 'All connected devices' },
-    ...this.store.connectedDevices().map((d) => ({ id: d.deviceId, label: d.name })),
+    ...this.store.connectedDevices().map((d) => ({ id: d.deviceId, label: deviceLabel(d) })),
   ]);
   protected readonly themeNames = computed(() => this.store.themes().map((t) => t.name));
 
@@ -72,7 +72,7 @@ export class ThemeActionsComponent {
     const themeName = themeId ? (this.store.themes().find((t) => t.id === themeId)?.name ?? null) : null;
     const message = applyConfirmText(
       themeName,
-      this.store.targetDevices().map((d) => d.name)
+      this.store.targetDevices().map(deviceLabel)
     );
     const confirmRef = this.dialog.open(ConfirmationDialogComponent, {
       disableClose: true,

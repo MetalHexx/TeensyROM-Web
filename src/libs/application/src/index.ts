@@ -67,3 +67,4 @@ export { formatElapsedLabel } from './lib/transfer/selectors/get-transfer-summar
 
 // Color theme state management
 export * from './lib/color-theme/color-theme-store';
+export { deviceLabel } from './lib/color-theme/actions/action-store';

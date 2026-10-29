@@ -8,6 +8,7 @@ import { ColorThemeState } from '../color-theme-state.interface';
 export type ColorThemeActionStore = StateSignals<ColorThemeState> &
   WritableStateSource<ColorThemeState> & {
     connectedDevices: Signal<Device[]>;
+    devicesDiscovered: Signal<boolean>;
     targetDevices: Signal<Device[]>;
     selectedTheme: Signal<ColorTheme | null>;
     unchangedThemeId: Signal<string | null>;
@@ -21,6 +22,14 @@ export function fetchRecord(
   return firstValueFrom(service.getDeviceColors(deviceId)).catch(() => null);
 }
 
+/** Resolves once device discovery has finished, so the connected devices are known. */
+export async function waitForDeviceDiscovery(store: ColorThemeActionStore): Promise<void> {
+  while (!store.devicesDiscovered()) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** How a device is named in labels, confirmations and alerts. */
 export function deviceLabel(device: Device): string {
   return device.name || device.deviceId;
 }

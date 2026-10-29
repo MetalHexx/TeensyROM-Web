@@ -7,19 +7,21 @@ import {
   IColorThemeService,
 } from '@teensyrom-nx/domain';
 import { createAction, logError, logInfo, LogType } from '@teensyrom-nx/utils';
-import { ColorThemeActionStore, fetchRecord } from './action-store';
+import { ColorThemeActionStore, fetchRecord, waitForDeviceDiscovery } from './action-store';
 
 export function initialize(store: ColorThemeActionStore, service: IColorThemeService) {
   return {
     /**
-     * Loads the themes and the records of all connected devices. The draft and selection follow the first
-     * connected device's record, or the factory theme when no device is connected.
+     * Waits for device discovery, then loads the themes and the records of all connected devices. The draft
+     * and selection follow the first connected device's record, or the factory theme when none is connected.
      */
     initialize: async (): Promise<void> => {
       const actionMessage = createAction('initialize-color-theme');
       logInfo(LogType.Start, 'ColorTheme: Initializing', { actionMessage });
 
       updateState(store, actionMessage, (state) => ({ ...state, isLoading: true, error: null }));
+
+      await waitForDeviceDiscovery(store);
 
       const devices = store.connectedDevices();
       let themes: ColorTheme[];

@@ -55,6 +55,7 @@ export class ThemeViewComponent implements OnInit {
   constructor() {
     effect(() => {
       this.connectedDeviceIds();
+      this.store.hasInitialised();
       untracked(() => void this.store.loadMissingRecords());
     });
   }

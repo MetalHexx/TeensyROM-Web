@@ -16,6 +16,6 @@ export function withColorThemeSelectors() {
     const permissions = permissionSelectors(state, devices.targetDevices, themes.selectedTheme);
     const record = recordStateSelector(state, devices.connectedDevices);
 
-    return { ...devices, ...themes, ...permissions, ...record };
+    return { devicesDiscovered: deviceStore.hasInitialised, ...devices, ...themes, ...permissions, ...record };
   });
 }

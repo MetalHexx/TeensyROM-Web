@@ -5,8 +5,15 @@ import { ColorThemeActionStore, fetchRecord } from './action-store';
 
 export function loadMissingRecords(store: ColorThemeActionStore, service: IColorThemeService) {
   return {
-    /** Fetches records for connected devices that have none yet, leaving the draft alone. */
+    /**
+     * Fetches records for connected devices that have none yet, leaving the draft alone. Does nothing until
+     * initialization has run, which loads the records of the devices connected at that point.
+     */
     loadMissingRecords: async (): Promise<void> => {
+      if (!store.hasInitialised()) {
+        return;
+      }
+
       const missing = store.connectedDevices().filter((d) => !store.records()[d.deviceId]);
       if (missing.length === 0) {
         return;

@@ -56,6 +56,7 @@ const device = (deviceId: string, name = deviceId, isConnected = true): Device =
 
 describe('ColorThemeStore', () => {
   let devices: ReturnType<typeof signal<Device[]>>;
+  let discovered: ReturnType<typeof signal<boolean>>;
   let service: {
     listThemes: ReturnType<typeof vi.fn>;
     createTheme: ReturnType<typeof vi.fn>;
@@ -75,6 +76,7 @@ describe('ColorThemeStore', () => {
 
   beforeEach(() => {
     devices = signal<Device[]>([]);
+    discovered = signal(true);
     service = {
       listThemes: vi.fn().mockReturnValue(of([factory, custom])),
       createTheme: vi.fn(),
@@ -90,7 +92,8 @@ describe('ColorThemeStore', () => {
       providers: [
         { provide: COLOR_THEME_SERVICE, useValue: service },
         { provide: ALERT_SERVICE, useValue: alerts },
-        { provide: DeviceStore, useValue: { usableDevices: computed(() => devices()) } },
+        { provide: DeviceStore, useValue: { usableDevices: computed(() => devices()), hasInitialised: discovered },
+        },
       ],
     });
     store = TestBed.inject(ColorThemeStore);
@@ -153,6 +156,32 @@ describe('ColorThemeStore', () => {
       });
     });
 
+    it('waits for device discovery and then follows the record of the device that arrived', async () => {
+      vi.useFakeTimers();
+      try {
+        discovered.set(false);
+        records({ d1: record('d1', 2, 'custom-1') });
+
+        const initialized = store.initialize();
+        await vi.advanceTimersByTimeAsync(200);
+
+        expect(store.hasInitialised()).toBe(false);
+        expect(service.listThemes).not.toHaveBeenCalled();
+
+        devices.set([device('d1')]);
+        discovered.set(true);
+        await vi.advanceTimersByTimeAsync(100);
+        await initialized;
+
+        expect(store.draft()).toEqual(colors(2));
+        expect(store.selectedThemeId()).toBe('custom-1');
+        expect(store.recordState()).toEqual({ kind: 'recorded' });
+        expect(service.getDeviceColors).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('counts a failed record load as no record', async () => {
       devices.set([device('d1'), device('d2')]);
       records({ d1: new Error('offline'), d2: record('d2', 3, null) });
@@ -165,6 +194,27 @@ describe('ColorThemeStore', () => {
   });
 
   describe('loadMissingRecords', () => {
+    it('does nothing before initialization, leaving the records to initialize', async () => {
+      devices.set([device('d1')]);
+      records({ d1: record('d1', 2, null) });
+
+      await store.loadMissingRecords();
+
+      expect(service.getDeviceColors).not.toHaveBeenCalled();
+    });
+
+    it('does not fetch again what initialize already loaded', async () => {
+      devices.set([device('d1')]);
+      records({ d1: record('d1', 2, null) });
+
+      const initialized = store.initialize();
+      await store.loadMissingRecords();
+      await initialized;
+      await store.loadMissingRecords();
+
+      expect(service.getDeviceColors).toHaveBeenCalledTimes(1);
+    });
+
     it('fetches only missing records and leaves the draft alone', async () => {
       devices.set([device('d1')]);
       records({ d1: record('d1', 2, null), d2: record('d2', 3, null) });

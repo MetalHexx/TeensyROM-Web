@@ -34,6 +34,7 @@ describe('ThemeViewComponent', () => {
   let fixture: ComponentFixture<ThemeViewComponent>;
   let selectedTheme: WritableSignal<ColorTheme | null>;
   let isEdited: WritableSignal<boolean>;
+  let hasInitialised: WritableSignal<boolean>;
   let recordState: WritableSignal<unknown>;
   let targetDevices: WritableSignal<Device[]>;
   let videoEnabled: Record<string, WritableSignal<boolean>>;
@@ -47,6 +48,7 @@ describe('ThemeViewComponent', () => {
   beforeEach(() => {
     selectedTheme = signal<ColorTheme | null>(shipped);
     isEdited = signal(false);
+    hasInitialised = signal(true);
     recordState = signal({ kind: 'none' });
     targetDevices = signal<Device[]>([]);
     videoEnabled = { d1: signal(false), d2: signal(false) };
@@ -69,6 +71,7 @@ describe('ThemeViewComponent', () => {
       canSave: signal(false),
       canDelete: signal(false),
       initialize: vi.fn(),
+      hasInitialised,
       selectTheme: vi.fn(),
       setSlotColor: vi.fn(),
       saveSelected: vi.fn(),
@@ -131,6 +134,17 @@ describe('ThemeViewComponent', () => {
     const calls = store.loadMissingRecords.mock.calls.length;
 
     targetDevices.set([{ deviceId: 'd1', name: 'd1' } as Device]);
+    fixture.detectChanges();
+
+    expect(store.loadMissingRecords.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it('loads missing records again once the store has initialized', () => {
+    const calls = store.loadMissingRecords.mock.calls.length;
+
+    hasInitialised.set(false);
+    fixture.detectChanges();
+    hasInitialised.set(true);
     fixture.detectChanges();
 
     expect(store.loadMissingRecords.mock.calls.length).toBeGreaterThan(calls);

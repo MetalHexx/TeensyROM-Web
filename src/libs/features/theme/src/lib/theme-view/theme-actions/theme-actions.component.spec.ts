@@ -167,6 +167,22 @@ describe('ThemeActionsComponent', () => {
       expect(store.apply).not.toHaveBeenCalled();
     });
 
+    it('names a device without a name by its id in the chooser and the confirmation', () => {
+      connected.set([makeDevice('d1', ''), makeDevice('d2', 'Desk')]);
+      store.showApplyTarget.set(true);
+      fixture.detectChanges();
+
+      const chooser = fixture.debugElement.query(By.directive(SegmentedControlComponent))
+        .componentInstance as SegmentedControlComponent;
+      expect(chooser.options().map((o) => o.label)).toEqual(['All connected devices', 'd1', 'Desk']);
+
+      const { setInput } = openApply();
+      expect(setInput).toHaveBeenCalledWith(
+        'message',
+        expect.stringContaining('This will apply the theme to d1 and Desk.')
+      );
+    });
+
     it('words edited colors for all target devices', () => {
       unchangedThemeId.set(null);
       connected.set([
