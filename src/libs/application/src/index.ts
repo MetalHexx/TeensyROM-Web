@@ -64,3 +64,6 @@ export * from './lib/transfer/transfer-playback-guard';
 export * from './lib/transfer/transfer-tracker';
 export * from './lib/transfer/providers';
 export { formatElapsedLabel } from './lib/transfer/selectors/get-transfer-summary';
+
+// Color theme state management
+export * from './lib/color-theme/color-theme-store';
