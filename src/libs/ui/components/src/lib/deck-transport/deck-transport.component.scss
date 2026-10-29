@@ -93,6 +93,11 @@
   animation: state-blink 1s steps(1, end) infinite;
 }
 
+.state[data-state='held'] .state-light {
+  background: var(--color-warning);
+  box-shadow: 0 0 6px var(--color-warning);
+}
+
 @keyframes state-blink {
   50% {
     opacity: 0.2;

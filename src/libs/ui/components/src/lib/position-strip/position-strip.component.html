@@ -31,7 +31,11 @@
     } @if (loopMarkPercent() !== null) {
     <span class="loop-mark" [style.left.%]="loopMarkPercent()"></span>
     } @if (barState().kind !== 'analyzing') {
-    <span class="playhead" [style.left.%]="clampedPercent()"></span>
+    <span
+      class="playhead"
+      [attr.data-held]="held() ? '' : null"
+      [style.left.%]="clampedPercent()"
+    ></span>
     }
   </div>
 </div>

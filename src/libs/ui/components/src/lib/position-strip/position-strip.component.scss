@@ -157,6 +157,11 @@ input[type='range'] {
   box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
 }
 
+.playhead[data-held] {
+  background: var(--color-warning);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-warning) 85%, transparent);
+}
+
 // The marks lane shares the track's 0–100 scale (the same 2px inset), sits above the strip and
 // takes no pointer input.
 .lane {

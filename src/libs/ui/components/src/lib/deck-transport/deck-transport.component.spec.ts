@@ -7,6 +7,7 @@ function testModel(): DeckTransportModel {
     accessibleName: 'Transport deck A',
     state: 'stopped',
     stateLabel: 'Stop',
+    held: false,
     title: 'Commando',
     author: 'Rob Hubbard',
     emptyText: 'No tune — drop a SID here',
@@ -215,6 +216,36 @@ describe('DeckTransportComponent', () => {
     });
   });
 
+  describe('held', () => {
+    const stateAttr = (): string | null =>
+      root().querySelector('.state')?.getAttribute('data-state') ?? null;
+    const playheadHeld = (): boolean =>
+      root().querySelector('.playhead')?.hasAttribute('data-held') ?? false;
+
+    it('shows the held state and passes held to the strip while a finger is down', () => {
+      setModel({ state: 'paused', stateLabel: 'Held', held: true });
+
+      expect(stateAttr()).toBe('held');
+      expect(root().querySelector('.state-word')?.textContent).toBe('Held');
+      expect(playheadHeld()).toBe(true);
+    });
+
+    it('keeps the Play key on the deck’s own state while held', () => {
+      setModel({ state: 'playing', held: true, playPause: { showing: 'pause', disabled: false } });
+
+      expect(keyButton('[data-control="play-pause"]').getAttribute('data-state-light')).toBe(
+        'playing'
+      );
+    });
+
+    it('shows the deck’s own state and a plain playhead otherwise', () => {
+      setModel({ state: 'paused' });
+
+      expect(stateAttr()).toBe('paused');
+      expect(playheadHeld()).toBe(false);
+    });
+  });
+
   describe('seek strip', () => {
     it('says the position as time', () => {
       const range = root().querySelector('input[type="range"]') as HTMLInputElement;
@@ -240,7 +271,14 @@ describe('DeckTransportComponent', () => {
             activity: 'running',
             selected: true,
           },
-          { id: 'cue-1', kind: 'cue', startPercent: 60, endPercent: null, activity: 'idle', selected: false },
+          {
+            id: 'cue-1',
+            kind: 'cue',
+            startPercent: 60,
+            endPercent: null,
+            activity: 'idle',
+            selected: false,
+          },
         ],
       });
 

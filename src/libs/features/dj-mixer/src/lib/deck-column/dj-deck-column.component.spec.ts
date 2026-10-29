@@ -786,6 +786,32 @@ describe('DjDeckColumnComponent', () => {
       expect([model.state, model.stateLabel]).toEqual([state, label]);
     });
 
+    it.each([
+      ['playing', 'playing'],
+      ['paused', 'paused'],
+    ] as const)('reads a held %s deck as held, labelled Held, over its own state', (led, state) => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { status: led, led, held: true } }
+      );
+      const model = fixture.componentInstance.transportModel();
+
+      expect([model.held, model.state, model.stateLabel]).toEqual([true, state, 'Held']);
+      expect(fixture.nativeElement.querySelector('.state')?.getAttribute('data-state')).toBe(
+        'held'
+      );
+    });
+
+    it('keeps the deck’s own label and is not held while no finger is down', () => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { status: 'paused', led: 'paused', held: false } }
+      );
+      const model = fixture.componentInstance.transportModel();
+
+      expect([model.held, model.state, model.stateLabel]).toEqual([false, 'paused', 'Pause']);
+    });
+
     it("carries a failed load's reason in errors so the display announces it", () => {
       const { fixture } = render(
         { slot: 'A', letter: 'A', index: 0 },

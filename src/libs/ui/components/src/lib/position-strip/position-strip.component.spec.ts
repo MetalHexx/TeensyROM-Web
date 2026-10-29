@@ -300,5 +300,15 @@ describe('PositionStripComponent', () => {
       set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
       expect(playhead()).toBeNull();
     });
+
+    it('carries data-held only while held', () => {
+      expect(playhead()?.hasAttribute('data-held')).toBe(false);
+
+      set('held', true);
+      expect(playhead()?.hasAttribute('data-held')).toBe(true);
+
+      set('held', false);
+      expect(playhead()?.hasAttribute('data-held')).toBe(false);
+    });
   });
 });

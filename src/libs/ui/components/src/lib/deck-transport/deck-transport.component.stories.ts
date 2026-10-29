@@ -46,6 +46,7 @@ function baseModel(): DeckTransportModel {
     accessibleName: 'Transport deck A',
     state: 'stopped',
     stateLabel: 'Stop',
+    held: false,
     title: 'Last Ninja 2 - The Wilderness',
     author: 'Ben Daglish',
     emptyText: 'No tune — drop a SID here',
@@ -129,6 +130,18 @@ export const Paused: Story = {
   render: atEveryWidth,
 };
 
+/** A finger is on the strip: the state word reads Held and its light is steady amber, over a
+ *  paused deck — the Play key keeps its own blinking amber light. */
+export const Held: Story = {
+  args: {
+    model: { ...baseModel(), state: 'paused', stateLabel: 'Held', held: true },
+    positionPercent: 42,
+    elapsedText: '01:20.7',
+    frameLabel: 'frame 4035',
+  },
+  render: atEveryWidth,
+};
+
 export const Stopped: Story = {
   args: { model: baseModel(), positionPercent: 0, elapsedText: '00:00.0', frameLabel: 'frame 0' },
   render: atEveryWidth,
@@ -140,9 +153,30 @@ export const WithMarks: Story = {
     model: {
       ...playingModel(),
       marks: [
-        { id: 'a', kind: 'loop', startPercent: 18, endPercent: 34, activity: 'running', selected: true },
-        { id: 'b', kind: 'loop', startPercent: 48, endPercent: 60, activity: 'queued', selected: false },
-        { id: 'c', kind: 'cue', startPercent: 78, endPercent: null, activity: 'idle', selected: false },
+        {
+          id: 'a',
+          kind: 'loop',
+          startPercent: 18,
+          endPercent: 34,
+          activity: 'running',
+          selected: true,
+        },
+        {
+          id: 'b',
+          kind: 'loop',
+          startPercent: 48,
+          endPercent: 60,
+          activity: 'queued',
+          selected: false,
+        },
+        {
+          id: 'c',
+          kind: 'cue',
+          startPercent: 78,
+          endPercent: null,
+          activity: 'idle',
+          selected: false,
+        },
       ],
     },
     positionPercent: 26,

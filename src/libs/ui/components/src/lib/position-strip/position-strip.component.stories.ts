@@ -25,6 +25,7 @@ const meta: Meta<PositionStripComponent> = {
     barState: { description: 'How the bar is coloured and whether a loop mark appears.' },
     positionPercent: { description: '0–100: the live playhead, or the caller’s drag pin.' },
     accessibleName: { description: "The range's accessible name, e.g. 'Position deck A'." },
+    held: { description: 'A finger is on this deck’s record: the playhead turns warning amber.' },
     valueText: { description: "The range's aria-valuetext, e.g. '01:23.4 of 03:12'." },
     marks: {
       description:
@@ -43,6 +44,7 @@ const base = {
   accessibleName: 'Position deck A',
   valueText: '01:23.4 of 03:12',
   marks: null as readonly PositionMark[] | null,
+  held: false,
 };
 
 const wrapped: Story['render'] = (args) => ({
@@ -55,6 +57,7 @@ const wrapped: Story['render'] = (args) => ({
         [accessibleName]="accessibleName"
         [valueText]="valueText"
         [marks]="marks"
+        [held]="held"
       />
     </div>
   `,
@@ -142,6 +145,23 @@ export const MarksEveryState: Story = {
       mark('queued', { startPercent: 50, endPercent: 60, activity: 'queued' }),
       mark('queued-cue', { kind: 'cue', startPercent: 64, endPercent: null, activity: 'queued' }),
       mark('both', { startPercent: 70, endPercent: 82, activity: 'running', selected: true }),
+    ],
+  },
+  render: wrapped,
+};
+
+/** A finger on the strip: the playhead is amber, beside marks in every state. */
+export const Held: Story = {
+  args: {
+    ...base,
+    barState: { kind: 'loop', introPercent: 25 },
+    positionPercent: 40,
+    held: true,
+    marks: [
+      mark('idle', { startPercent: 4, endPercent: 14 }),
+      mark('queued', { startPercent: 18, endPercent: 28, activity: 'queued' }),
+      mark('running', { startPercent: 52, endPercent: 64, activity: 'running' }),
+      mark('selected', { kind: 'cue', startPercent: 72, endPercent: null, selected: true }),
     ],
   },
   render: wrapped,

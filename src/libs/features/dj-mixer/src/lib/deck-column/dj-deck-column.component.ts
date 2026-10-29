@@ -244,7 +244,8 @@ export class DjDeckColumnComponent {
     return {
       accessibleName: `Transport deck ${letter}`,
       state,
-      stateLabel: STATE_LABELS[state],
+      stateLabel: summary.held ? 'Held' : STATE_LABELS[state],
+      held: summary.held,
       title: summary.title,
       author: summary.author,
       emptyText: 'No tune — drop a SID here',

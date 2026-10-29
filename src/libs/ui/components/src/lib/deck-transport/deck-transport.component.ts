@@ -1,6 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DeckSetRowComponent, type DeckSetRowModel } from '../deck-set-row/deck-set-row.component';
-import { PositionStripComponent, type PositionMark } from '../position-strip/position-strip.component';
+import {
+  PositionStripComponent,
+  type PositionMark,
+} from '../position-strip/position-strip.component';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
@@ -17,6 +20,9 @@ export interface DeckTransportModel {
   /** The state word on the display, caller-composed: 'Play' | 'Pause' | 'Stop' | 'Analyzing…';
    *  'Error' for `error`, 'Stop' for `empty`. */
   readonly stateLabel: string;
+  /** A finger is on the deck's record: the state word shows the caller's `stateLabel` ('Held') and
+   *  the state light is the warning amber, steady. The Play key's light keeps the deck's own state. */
+  readonly held: boolean;
   /** The loaded tune's title. `null`: nothing is loaded and `emptyText` shows instead. */
   readonly title: string | null;
   readonly author: string | null;

@@ -71,6 +71,8 @@ export class PositionStripComponent {
   /** Loop brackets and cue ticks for the marks lane. `null` reserves no lane; an array, even an
    *  empty one, does. Changes rarely — the playhead is `positionPercent`, not this. */
   readonly marks = input<readonly PositionMark[] | null>(null);
+  /** A finger is on this deck's record: the playhead turns the warning amber. */
+  readonly held = input<boolean>(false);
   /** Fires on every drag tick — a live preview, never a seek. */
   readonly scrubInput = output<number>();
   /** Fires on release only. This is the one that should seek. */
