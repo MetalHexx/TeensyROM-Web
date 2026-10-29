@@ -8,7 +8,6 @@
         PathParamError = 4,
         DirectoryNotFoundError = 5,
         NotADirectoryError = 6,
-        UnknownError = 7,
-        EmptyDirectory = 8
+        UnknownError = 7
     }
 }

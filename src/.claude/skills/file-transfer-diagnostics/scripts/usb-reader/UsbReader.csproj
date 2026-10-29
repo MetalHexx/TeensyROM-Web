@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The engine's own version, so this reader opens the port exactly as the engine does. -->
+    <PackageReference Include="System.IO.Ports" Version="9.0.6" />
+  </ItemGroup>
+</Project>

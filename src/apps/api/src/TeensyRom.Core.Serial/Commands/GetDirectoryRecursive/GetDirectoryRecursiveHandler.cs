@@ -81,20 +81,8 @@ namespace TeensyRom.Core.Commands
                     };
                 }
 
-                var count = 0;
-
-                foreach (var directory in result.DirectoryContent)
-                {
-                    count += directory?.Files.Count ?? 0;
-                    count += directory?.Directories.Count ?? 0;
-                }
-
-                if (count == 0)
-                {
-                    result.IsSuccess = false;
-                    result.Error = "No data was returned from the TR.";
-                    result.ErrorCode = GetDirectoryErrorCode.EmptyDirectory;
-                }
+                // A listing that reached its end token is complete, even with nothing in it: the firmware
+                // answers a missing folder, or a file, with a fail token instead.
                 return result;
             }, ct);
         }

@@ -30,6 +30,12 @@ namespace TeensyRom.Core.Serial
     };
 
     /// <summary>
+    /// The most one read in <see cref="ReadExactlyAsync"/> asks the driver for. Asked for a whole
+    /// multi-megabyte file in one read, the USB serial driver loses packets of it.
+    /// </summary>
+    public const int MaxReadBytes = 65_536;
+
+    /// <summary>
     /// How long a write may wait for the device to drain the USB buffer. The default is infinite, so a device
     /// that stops reading parked its transfer thread in <see cref="SerialPort.Write(byte[], int, int)"/> for
     /// good. A normal chunk drains in milliseconds; reads are left unbounded on purpose.
@@ -49,6 +55,39 @@ namespace TeensyRom.Core.Serial
     public byte[] ReadSerialBytes() => _serialPort.ReadSerialBytes();
     public byte[] ReadSerialBytes(int msToWait = 0) => _serialPort.ReadSerialBytes(msToWait);
     public void WaitForSerialData(int numBytes, int timeoutMs) => _serialPort.WaitForSerialData(numBytes, timeoutMs);
+
+    /// <summary>
+    /// Reads back to back, with the read timeout set to <paramref name="stallMs"/> once for the whole
+    /// reply and restored once at the end. <see cref="WaitForSerialData"/> polls and sleeps 10 ms between
+    /// checks, and over USB a port left unread while the device streams a file loses whole packets of it,
+    /// so nothing runs between one read and the next but the cancellation check. A read already waiting
+    /// cannot be cancelled; <paramref name="stallMs"/> bounds it.
+    /// </summary>
+    /// <exception cref="TeensyReadStalledException">Thrown if no byte arrives within <paramref name="stallMs"/></exception>
+    public Task ReadExactlyAsync(byte[] buffer, int offset, int count, int stallMs, CancellationToken ct)
+    {
+      var start = offset;
+      var end = offset + count;
+
+      _serialPort.ReadTimeout = stallMs;
+      try
+      {
+        while (offset < end)
+        {
+          ct.ThrowIfCancellationRequested();
+          offset += _serialPort.Read(buffer, offset, Math.Min(end - offset, MaxReadBytes));
+        }
+      }
+      catch (TimeoutException ex)
+      {
+        throw ICommunicationPort.Stalled(offset - start, count, stallMs, ex);
+      }
+      finally
+      {
+        _serialPort.ReadTimeout = SerialPort.InfiniteTimeout;
+      }
+      return Task.CompletedTask;
+    }
 
     public long? BytesWritten => _bytesWritten;
 

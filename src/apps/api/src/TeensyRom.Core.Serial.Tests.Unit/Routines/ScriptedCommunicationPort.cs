@@ -23,6 +23,12 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         /// <summary>Every byte the code under test wrote, in order.</summary>
         public IReadOnlyList<byte> Written => _written;
 
+        /// <summary>The <c>timeoutMs</c> of every <see cref="WaitForSerialData"/> call, in order.</summary>
+        public List<int> WaitTimeoutsMs { get; } = [];
+
+        /// <summary>The <c>count</c> and <c>stallMs</c> of every <see cref="ReadExactlyAsync"/> call, in order.</summary>
+        public List<(int Count, int StallMs)> ReadExactlyCalls { get; } = [];
+
         /// <summary>Starts the next command's reply. A single-command test can skip this and call <see cref="Enqueue"/> directly.</summary>
         public ScriptedCommunicationPort NewSegment()
         {
@@ -116,7 +122,21 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             }
         }
 
-        public uint ReadIntBytes(short byteLength) => 0;
+        /// <summary>Mirrors the real ports: reads the current segment low byte first, and a short read is a timeout.</summary>
+        public uint ReadIntBytes(short byteLength)
+        {
+            if (BytesToRead < byteLength)
+            {
+                throw new TimeoutException();
+            }
+
+            uint result = 0;
+            for (var byteNum = 0; byteNum < byteLength; byteNum++)
+            {
+                result |= (uint)_currentSegment!.Dequeue() << (8 * byteNum);
+            }
+            return result;
+        }
 
         public int Read(byte[] buffer, int offset, int count)
         {
@@ -131,6 +151,36 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
                 buffer[offset + i] = _currentSegment.Dequeue();
             }
             return toRead;
+        }
+
+        /// <summary>
+        /// Behaves as the interface's default - wait for a byte whenever none is buffered, then read - but
+        /// records each call, and its waits are not counted in <see cref="WaitTimeoutsMs"/>.
+        /// </summary>
+        public Task ReadExactlyAsync(byte[] buffer, int offset, int count, int stallMs, CancellationToken ct)
+        {
+            ReadExactlyCalls.Add((count, stallMs));
+            var start = offset;
+            var end = offset + count;
+
+            while (offset < end)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (BytesToRead == 0)
+                {
+                    try
+                    {
+                        WaitUntilReadable(numBytes: 1, stallMs);
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        throw ICommunicationPort.Stalled(offset - start, count, stallMs, ex);
+                    }
+                }
+                offset += Read(buffer, offset, end - offset);
+            }
+            return Task.CompletedTask;
         }
 
         public int ReadByte() => -1;
@@ -172,6 +222,12 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         /// so no test spends real seconds waiting.
         /// </summary>
         public void WaitForSerialData(int numBytes, int timeoutMs)
+        {
+            WaitTimeoutsMs.Add(timeoutMs);
+            WaitUntilReadable(numBytes, timeoutMs);
+        }
+
+        private void WaitUntilReadable(int numBytes, int timeoutMs)
         {
             if (BytesToRead >= numBytes)
             {

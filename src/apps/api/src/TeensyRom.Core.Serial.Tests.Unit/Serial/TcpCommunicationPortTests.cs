@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
@@ -641,6 +642,36 @@ public class TcpCommunicationPortTests : IDisposable
 
         var thrown = (await act.Should().ThrowAsync<TeensyException>()).Which;
         TransportDrop.IsDrop(thrown, link.Port).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadExactlyAsync_ShouldFillTheBuffer_FromBytesThatArriveInParts()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        var sent = new byte[] { 0x41, 0x42, 0x43, 0x44 };
+        var buffer = new byte[sent.Length];
+
+        // The read starts with nothing buffered, and the second part arrives only after the first was read.
+        var read = ((ICommunicationPort)link.Port).ReadExactlyAsync(buffer, 0, buffer.Length, 5000, CancellationToken.None);
+        await Task.Delay(200);
+        await link.Server.GetStream().WriteAsync(sent.AsMemory(0, 2));
+        await Task.Delay(200);
+        await link.Server.GetStream().WriteAsync(sent.AsMemory(2));
+        await read;
+
+        buffer.Should().Equal(sent);
+    }
+
+    [Fact]
+    public async Task ReadExactlyAsync_ShouldThrowTimeout_WhenALiveSilentPeerStopsPartway()
+    {
+        using var link = await LoopbackLink.Open(_mockLogger);
+        await link.Server.GetStream().WriteAsync(new byte[] { 0x41, 0x42 });
+
+        var act = () => ((ICommunicationPort)link.Port).ReadExactlyAsync(new byte[4], 0, 4, 100, CancellationToken.None);
+
+        var thrown = (await act.Should().ThrowAsync<TeensyReadStalledException>().WithMessage("Read 2 of 4 bytes, then nothing arrived for 100 ms")).Which;
+        thrown.BytesRead.Should().Be(2);
     }
 
     [Fact]

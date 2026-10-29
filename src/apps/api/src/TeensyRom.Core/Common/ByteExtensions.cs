@@ -19,7 +19,7 @@ namespace TeensyRom.Core.Common
 
             int length = bytes.Length;
 
-            if (trimEndBytes > 0 && trimEndBytes < length)
+            if (trimEndBytes > 0 && trimEndBytes <= length)
             {
                 length -= trimEndBytes;
             }
