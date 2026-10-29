@@ -57,6 +57,7 @@ const bindingRow = (name: string, source: string) => ({
   triggerOptions: null,
   selectedTriggerId: null,
   amount: null,
+  secondAmount: null,
   statusText: null,
   editAccessibleName: `Edit ${name} binding`,
   deleteAccessibleName: `Delete ${name} binding`,

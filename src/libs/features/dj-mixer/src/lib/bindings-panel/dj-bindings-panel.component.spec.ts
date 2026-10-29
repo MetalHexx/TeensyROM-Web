@@ -20,6 +20,7 @@ import {
 import { BindingRowComponent, ControllerRowComponent } from '@teensyrom-nx/ui/components';
 import { DjBindingsPanelComponent } from './dj-bindings-panel.component';
 
+const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const STOP_A: ControlIdentity = { owner: 'A', control: 'stop' };
 const STOP_B: ControlIdentity = { owner: 'B', control: 'stop' };
@@ -29,6 +30,8 @@ const MUTE_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const VOICE_HOLD_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const MIXER_KEY: ControlIdentity = { owner: 'mixer', control: 'key' };
 const SET_LOAD_A: ControlIdentity = { owner: 'set', control: 'set-load-a' };
+
+const PITCH_BEND = { kind: 'pitch-bend', number: 0 } as const;
 
 const DEFAULTS = { ccStyle: 'relative-offset', sensitivity: 0.01, stepAmount: 0.05 } as const;
 
@@ -48,6 +51,19 @@ const CONTROLS: readonly MappableControl[] = [
   },
   { identity: STOP_B, name: 'Stop', nature: 'trigger', fire: () => undefined },
   keyControl(KEY_B),
+  {
+    identity: SEEK_A,
+    name: 'Seek',
+    nature: 'value',
+    min: 0,
+    max: 100,
+    home: 0,
+    step: null,
+    defaults: DEFAULTS,
+    hand: { strip: () => undefined, lose: () => undefined },
+    read: () => 0,
+    set: () => undefined,
+  },
   {
     identity: MUTE_A,
     name: 'Voice 1 mute',
@@ -456,6 +472,36 @@ describe('DjBindingsPanelComponent', () => {
       expect(voice?.styleText).toBe('Hold');
     });
 
+    it('shows a hand mapping Reach and Grip in milliseconds, with Hand as its one style', () => {
+      const { fixture, seed } = render();
+      seed([XL], [mapping('hand', SEEK_A, { kind: 'hand', amount: 0.13, grip: 0.25 }, PITCH_BEND)]);
+
+      expect(modelOf(fixture)).toMatchObject({
+        styleOptions: [{ id: 'hand', label: 'Hand' }],
+        selectedStyleId: 'hand',
+        amount: { label: 'Reach', value: 130, min: 20, max: 2000, step: 10, suffix: 'ms' },
+        secondAmount: { label: 'Grip', value: 250, min: 50, max: 3000, step: 10, suffix: 'ms' },
+      });
+    });
+
+    it('shows the home Grip for a hand saved without one, and no second field on other rows', () => {
+      const { fixture, seed } = render();
+      seed(
+        [XL],
+        [
+          mapping('hand', SEEK_A, { kind: 'hand', amount: 0.13 }, PITCH_BEND),
+          mapping('speed', SPEED_A, { kind: 'relative-offset', amount: 0.01 }),
+        ]
+      );
+
+      const modelNamed = (name: string) =>
+        rows(fixture)
+          .map((row) => row.model())
+          .find((model) => model.name === name);
+      expect(modelNamed('Seek')?.secondAmount?.value).toBe(250);
+      expect(modelNamed('Speed')?.secondAmount).toBeNull();
+    });
+
     it('names the edit and delete controls after the control and its owner', () => {
       const { fixture, seed } = render();
       seed([XL], [mapping('m1', SPEED_A, { kind: 'absolute', amount: null })]);
@@ -564,6 +610,25 @@ describe('DjBindingsPanelComponent', () => {
         kind: 'relative-offset',
         amount: 0.025,
       });
+    });
+
+    it('saves a hand Reach and Grip in seconds, each keeping the other', () => {
+      const { fixture, seed, mappings } = render();
+      seed([XL], [mapping('hand', SEEK_A, { kind: 'hand', amount: 0.13, grip: 0.25 }, PITCH_BEND)]);
+      clickButton(fixture, 'Edit Seek binding, deck A');
+
+      const [reach, grip] = Array.from(
+        fixture.nativeElement.querySelectorAll('input[type="number"]')
+      ) as HTMLInputElement[];
+      reach.value = '200';
+      reach.dispatchEvent(new Event('change'));
+      grip.value = '400';
+      grip.dispatchEvent(new Event('change'));
+
+      expect(mappings.setStyle.mock.calls).toEqual([
+        ['hand', { kind: 'hand', amount: 0.2, grip: 0.25 }],
+        ['hand', { kind: 'hand', amount: 0.13, grip: 0.4 }],
+      ]);
     });
 
     it('starts re-learning the source, and deletes the binding', () => {

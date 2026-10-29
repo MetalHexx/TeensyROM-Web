@@ -7,6 +7,7 @@ import {
   output,
   signal,
   untracked,
+  type WritableSignal,
 } from '@angular/core';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 import {
@@ -53,6 +54,9 @@ export interface BindingRowModel {
   readonly selectedTriggerId: string | null;
   /** The style's amount, or `null` when the style takes none — the amount field is not shown. */
   readonly amount: BindingRowAmount | null;
+  /** The style's second setting — the hand's grip — shown as its own labelled field after the
+   *  amount, or null for every style with one setting or none. */
+  readonly secondAmount: BindingRowAmount | null;
   /** Why the binding is not live, e.g. 'Controller not connected'. Rendered as text under the
    *  source, with the row dimmed; `null` for a live binding. */
   readonly statusText: string | null;
@@ -69,11 +73,11 @@ let nextRowId = 0;
  * One MIDI binding in a list: what it drives, where it listens and how it behaves. Collapsed, it
  * is two lines — the control's name, a style chip and the edit and delete buttons, then the source.
  * Expanded in place, it frames itself and offers the style (or Action), the trigger where the
- * style has one, the amount where the style takes one, and Re-learn source and Delete.
+ * style has one, the amount (and a second amount) where the style takes them, and Re-learn source and Delete.
  *
  * Purely presentational — the caller owns the model and the `expanded` flag, and updates them from
- * the outputs. The amount is a native number input that emits on `change`, and only for a finite
- * value within `min` and `max`; anything else shows an inline error and emits nothing.
+ * the outputs. Each amount is a native number input that emits on `change`, and only for a finite
+ * value within its `min` and `max`; anything else shows an inline error and emits nothing.
  *
  * @example
  * ```html
@@ -83,6 +87,7 @@ let nextRowId = 0;
  *   (styleSelect)="onStyleSelect($event)"
  *   (triggerSelect)="onTriggerSelect($event)"
  *   (amountChange)="onAmountChange($event)"
+ *   (secondAmountChange)="onSecondAmountChange($event)"
  *   (relearn)="onRelearn()"
  *   (deleteBinding)="onDelete()"
  * />
@@ -106,6 +111,8 @@ export class BindingRowComponent {
   readonly triggerSelect = output<string>();
   /** Emits a new amount, only for a finite value within the amount's `min` and `max`. */
   readonly amountChange = output<number>();
+  /** Emits a new second amount, only for a finite value within its `min` and `max`. */
+  readonly secondAmountChange = output<number>();
   /** Emits when Re-learn source is pressed. */
   readonly relearn = output<void>();
   /** Emits when either delete control is pressed. */
@@ -115,31 +122,58 @@ export class BindingRowComponent {
   protected readonly amountInputId = `binding-row-amount-${nextRowId++}`;
   /** The inline error for the last rejected amount entry, or `null`. */
   protected readonly amountError = signal<string | null>(null);
+  /** Unique id tying the second amount input to its label and error. */
+  protected readonly secondAmountInputId = `binding-row-second-amount-${nextRowId++}`;
+  /** The inline error for the last rejected second amount entry, or `null`. */
+  protected readonly secondAmountError = signal<string | null>(null);
 
   /** Whether the row is expanded, as a value the error reset can depend on alone. */
   private readonly expanded = computed(() => this.model().expanded);
   /** The current amount's value, or `null` for a style without one. */
   private readonly amountValue = computed(() => this.model().amount?.value ?? null);
+  /** The current second amount's value, or `null` for a style without one. */
+  private readonly secondAmountValue = computed(() => this.model().secondAmount?.value ?? null);
 
-  /** Drops a rejected amount entry — which only means something while the row stays as it was —
-   *  when the row collapses or the caller accepts a new amount. */
+  /** Drops a rejected entry — which only means something while the row stays as it was — when the
+   *  row collapses or the caller accepts a new value for that field. */
   constructor() {
     effect(() => {
       this.expanded();
       this.amountValue();
       untracked(() => this.amountError.set(null));
     });
+    effect(() => {
+      this.expanded();
+      this.secondAmountValue();
+      untracked(() => this.secondAmountError.set(null));
+    });
   }
 
   /** Emits the entered amount when it is valid; otherwise shows the inline error. */
   protected onAmountChange(event: Event, amount: BindingRowAmount): void {
+    this.commit(event, amount, this.amountError, (value) => this.amountChange.emit(value));
+  }
+
+  /** Emits the entered second amount when it is valid; otherwise shows the inline error. */
+  protected onSecondAmountChange(event: Event, amount: BindingRowAmount): void {
+    this.commit(event, amount, this.secondAmountError, (value) =>
+      this.secondAmountChange.emit(value)
+    );
+  }
+
+  private commit(
+    event: Event,
+    amount: BindingRowAmount,
+    error: WritableSignal<string | null>,
+    emit: (value: number) => void
+  ): void {
     const raw = (event.target as HTMLInputElement).value.trim();
     const value = raw === '' ? NaN : Number(raw);
     if (!Number.isFinite(value) || value < amount.min || value > amount.max) {
-      this.amountError.set(`Enter a number from ${amount.min} to ${amount.max}.`);
+      error.set(`Enter a number from ${amount.min} to ${amount.max}.`);
       return;
     }
-    this.amountError.set(null);
-    this.amountChange.emit(value);
+    error.set(null);
+    emit(value);
   }
 }
