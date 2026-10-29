@@ -1,0 +1,8 @@
+{
+  "id": "tr-default",
+  "name": "TR Default",
+  "sortOrder": 1,
+  "parts": {
+    "device": { "background": 0, "border": 4, "banner": 4, "time": 10, "option": 7, "sources": 14, "name": 13 }
+  }
+}
