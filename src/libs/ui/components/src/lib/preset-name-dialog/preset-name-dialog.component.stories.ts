@@ -45,3 +45,17 @@ export const Default: Story = {
     validationFn: validateName,
   },
 };
+
+/** Custom wording and a 24-character limit, as used for naming a theme. */
+export const CustomLimitAndWording: Story = {
+  args: {
+    ...Default.args,
+    title: 'Save Theme',
+    initialValue: 'My Theme',
+    maxLength: 24,
+    fieldLabel: 'Theme Name',
+    placeholder: 'Enter theme name',
+    inputAriaLabel: 'Theme name',
+    saveLabel: 'Save theme',
+  },
+};

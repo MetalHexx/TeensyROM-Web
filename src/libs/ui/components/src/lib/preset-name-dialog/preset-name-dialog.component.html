@@ -6,20 +6,20 @@
 
 <!-- Form Field -->
 <mat-form-field appearance="outline" class="preset-name-field">
-  <mat-label>Preset Name</mat-label>
+  <mat-label>{{ fieldLabel() }}</mat-label>
   <input 
     matInput
     [value]="currentName()"
     (input)="currentName.set($any($event.target).value)"
-    maxlength="50"
+    [attr.maxlength]="maxLength()"
     (keydown)="onKeyDown($event)"
-    placeholder="Enter preset name"
-    aria-label="Preset name"
+    [placeholder]="placeholder()"
+    [attr.aria-label]="inputAriaLabel()"
   />
   
   <!-- Character Counter -->
   <mat-hint align="end">
-    <span [class.error-text]="currentName().length > 50">
+    <span [class.error-text]="currentName().length > maxLength()">
       {{ remainingChars() }}
     </span>
   </mat-hint>
@@ -34,8 +34,8 @@
 <div class="button-row">
   <lib-icon-button
     [icon]="'check'"
-    [ariaLabel]="'Save CRT preset'"
-    [tooltip]="saveTooltip"
+    [ariaLabel]="saveLabel()"
+    [tooltip]="saveTooltip()"
     [disabled]="!canSave()"
     (buttonClick)="onSaveClick()"
   />

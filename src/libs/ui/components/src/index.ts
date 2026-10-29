@@ -29,6 +29,7 @@ export * from './lib/loading-text/loading-text.component';
 export * from './lib/scrolling-marquee/scrolling-marquee.component';
 export * from './lib/storage-item/storage-item.component';
 export * from './lib/storage-item/storage-item-actions.component';
+export * from './lib/selectable-row/selectable-row.component';
 export * from './lib/empty-state-message';
 export * from './lib/video-stream/video-stream.component';
 export * from './lib/crt-effect-wrapper/crt-effect-wrapper.component';

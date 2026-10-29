@@ -1,0 +1,7 @@
+<div class="selectable-row">
+  <ng-content select="[rowLeading]"></ng-content>
+  <span class="selectable-row__label">{{ label() }}</span>
+  <ng-content select="[rowAfterLabel]"></ng-content>
+  <span class="selectable-row__spacer"></span>
+  <ng-content select="[rowTrailing]"></ng-content>
+</div>
