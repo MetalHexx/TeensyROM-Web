@@ -15,6 +15,7 @@ describe('createMockDeviceService', () => {
     expect(service.reconnectDevice).toBeDefined();
     expect(service.forgetDevice).toBeDefined();
     expect(service.renameDevice).toBeDefined();
+    expect(service.launchAsidPlayer).toBeDefined();
   });
 
   it('lets an override replace one method while the rest keep their defaults', async () => {

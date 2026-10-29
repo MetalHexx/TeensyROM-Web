@@ -87,6 +87,7 @@ describe('DeviceStore - indexStorage state updates', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -421,6 +422,7 @@ describe('DeviceStore - indexStorageAllStorage', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -614,6 +616,7 @@ describe('DeviceStore - resetAllDevices and pingAllDevices', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
     mockPlayerContext = createMockPlayerContext();
 
@@ -750,6 +753,7 @@ describe('DeviceStore - usableDevices and hasEnabledDevices', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -835,6 +839,7 @@ describe('DeviceStore - reconnectDevice', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -973,6 +978,7 @@ describe('DeviceStore - forgetDevice', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     mockCrtStorage = createMockCrtStorage();
@@ -1079,6 +1085,7 @@ describe('DeviceStore - renameDevice', () => {
       reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
       forgetDevice: vi.fn().mockReturnValue(of(void 0)),
       renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+      launchAsidPlayer: vi.fn(),
     };
 
     TestBed.configureTestingModule({

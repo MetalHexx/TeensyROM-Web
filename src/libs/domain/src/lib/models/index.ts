@@ -3,6 +3,7 @@ export * from './device.model';
 export * from './device-storage.model';
 export * from './device-state.enum';
 export * from './device-facts.enum';
+export * from './asid-launch-outcome.model';
 
 // Storage models
 export * from './directory-item.model';

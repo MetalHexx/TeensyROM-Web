@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   FindDevicesResponse,
   ForgetDeviceResponse,
+  LaunchAsidPlayerResponse,
   PingDeviceResponse,
   ProblemDetails,
   ReconnectDeviceResponse,
@@ -29,6 +30,8 @@ import {
     FindDevicesResponseToJSON,
     ForgetDeviceResponseFromJSON,
     ForgetDeviceResponseToJSON,
+    LaunchAsidPlayerResponseFromJSON,
+    LaunchAsidPlayerResponseToJSON,
     PingDeviceResponseFromJSON,
     PingDeviceResponseToJSON,
     ProblemDetailsFromJSON,
@@ -48,6 +51,10 @@ export interface FindDevicesRequest {
 }
 
 export interface ForgetDeviceRequest {
+    deviceId: string;
+}
+
+export interface LaunchAsidPlayerRequest {
     deviceId: string;
 }
 
@@ -144,6 +151,41 @@ export class DevicesApiService extends runtime.BaseAPI {
      */
     async forgetDevice(requestParameters: ForgetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ForgetDeviceResponse> {
         const response = await this.forgetDeviceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Starts the cartridge\'s built-in ASID player.  - A device on the network is moved onto its USB serial port first, because the player turns the network off; it stays on serial until the next reconnect. - Answers 502 (code usbUnreachable) when a network device cannot be reached over USB; nothing is launched then. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
+     * Launch ASID Player
+     */
+    async launchAsidPlayerRaw(requestParameters: LaunchAsidPlayerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchAsidPlayerResponse>> {
+        if (requestParameters['deviceId'] == null) {
+            throw new runtime.RequiredError(
+                'deviceId',
+                'Required parameter "deviceId" was null or undefined when calling launchAsidPlayer().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/asid-player/launch`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => LaunchAsidPlayerResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Starts the cartridge\'s built-in ASID player.  - A device on the network is moved onto its USB serial port first, because the player turns the network off; it stays on serial until the next reconnect. - Answers 502 (code usbUnreachable) when a network device cannot be reached over USB; nothing is launched then. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
+     * Launch ASID Player
+     */
+    async launchAsidPlayer(requestParameters: LaunchAsidPlayerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LaunchAsidPlayerResponse> {
+        const response = await this.launchAsidPlayerRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

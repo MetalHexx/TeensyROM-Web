@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DevicesApiService, ResponseError } from '@teensyrom-nx/data-access/api-client';
 import { DeviceService } from './device.service';
@@ -964,5 +964,130 @@ describe('DeviceService - device busy', () => {
     const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await expect(new Promise((resolve, reject) => service.pingDevice('device-1').subscribe({ next: resolve, error: reject }))).rejects.toBeInstanceOf(DeviceBusyError);
     logSpy.mockRestore();
+  });
+});
+
+describe('DeviceService - launchAsidPlayer', () => {
+  let service: DeviceService;
+  let mockApi: { launchAsidPlayer: ReturnType<typeof vi.fn> };
+  let alert: {
+    error: ReturnType<typeof vi.fn>;
+    warning: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+  };
+
+  const problem = (status: number, body: unknown, contentType = 'application/problem+json') =>
+    new ResponseError(
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': contentType } })
+    );
+
+  const launch = () =>
+    new Promise((resolve, reject) =>
+      service.launchAsidPlayer('device-1').subscribe({ next: resolve, error: reject })
+    );
+
+  beforeEach(() => {
+    mockApi = { launchAsidPlayer: vi.fn() };
+    alert = { error: vi.fn(), warning: vi.fn(), info: vi.fn() };
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        DeviceService,
+        { provide: DevicesApiService, useValue: mockApi },
+        { provide: ALERT_SERVICE, useValue: alert },
+      ],
+    });
+    service = TestBed.inject(DeviceService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    expect(alert.error).not.toHaveBeenCalled();
+    expect(alert.warning).not.toHaveBeenCalled();
+    expect(alert.info).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('maps a success (movedToSerial %s)', async (movedToSerial) => {
+    mockApi.launchAsidPlayer.mockResolvedValue({ message: 'ok', movedToSerial });
+
+    await expect(launch()).resolves.toEqual({ launched: true, movedToSerial });
+    expect(mockApi.launchAsidPlayer).toHaveBeenCalledWith({ deviceId: 'device-1' });
+  });
+
+  it('maps a 404 to notFound with the API message', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(
+      problem(404, 'Device device-1 not found.', 'application/json')
+    );
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'notFound',
+      message: 'Device device-1 not found.',
+    });
+  });
+
+  it('maps the busy 409 to busy with the problem title', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(
+      problem(409, {
+        title: 'Alpha is busy with a transfer.',
+        code: 'deviceBusyWithTransfer',
+        deviceId: 'device-1',
+      })
+    );
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'busy',
+      message: 'Alpha is busy with a transfer.',
+    });
+  });
+
+  it('maps a 502 with the usbUnreachable code to usbUnreachable', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(
+      problem(502, { title: 'The USB port is held by another program.', code: 'usbUnreachable' })
+    );
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'usbUnreachable',
+      message: 'The USB port is held by another program.',
+    });
+  });
+
+  it('maps a plain 502 to launchFailed with its title', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(problem(502, { title: 'The cartridge went away.' }));
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'launchFailed',
+      message: 'The cartridge went away.',
+    });
+  });
+
+  it('carries movedToSerial on a launchFailed outcome when the 502 says the cartridge had moved', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(
+      problem(502, { title: 'It did not start.', movedToSerial: true })
+    );
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'launchFailed',
+      message: 'It did not start.',
+      movedToSerial: true,
+    });
+  });
+
+  it('falls back to a generic message when the failure carries none', async () => {
+    mockApi.launchAsidPlayer.mockRejectedValue(new Error('network down'));
+
+    await expect(launch()).resolves.toEqual({
+      launched: false,
+      reason: 'launchFailed',
+      message: 'The ASID player could not be started.',
+    });
   });
 });

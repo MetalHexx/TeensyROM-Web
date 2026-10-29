@@ -12,6 +12,7 @@ export function createMockDeviceService(
     reconnectDevice: vi.fn().mockReturnValue(of({} as Device)),
     forgetDevice: vi.fn().mockReturnValue(of(undefined)),
     renameDevice: vi.fn().mockReturnValue(of({} as Device)),
+    launchAsidPlayer: vi.fn().mockReturnValue(of({ launched: true, movedToSerial: false })),
     ...overrides,
   };
 }

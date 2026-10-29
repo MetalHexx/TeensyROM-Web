@@ -6,6 +6,7 @@ using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial.Recovery;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
@@ -424,26 +425,8 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			return (null, false);
 		}
 
-		private TeensyToken TryLaunchCommand(LaunchFileCommand command)
-		{
-			log.Internal($"LaunchFileHandler: Clearing serial buffers");
-			command.CommunicationPort.ClearBuffers();
-
-			log.Internal($"LaunchFileHandler: Sending {TeensyToken.LaunchFile} token.");
-			command.CommunicationPort.SendIntBytes(TeensyToken.LaunchFile, 2);
-
-			_ = command.CommunicationPort.HandleAck();
-
-			log.Internal($"LaunchFileHandler: Sending storage token to TeensyROM");
-			command.CommunicationPort.SendIntBytes(command.StorageType.GetStorageToken(), 1);
-
-			log.Internal($"LaunchFileHandler: Sending {command.LaunchItem.Path} to TeensyROM");
-
-			command.CommunicationPort.Write($"{command.LaunchItem.Path}\0");
-			var result = command.CommunicationPort.HandleAck();
-
-			return result;
-		}
+		private TeensyToken TryLaunchCommand(LaunchFileCommand command) =>
+			command.CommunicationPort.SendLaunch(command.StorageType.GetStorageToken(), command.LaunchItem.Path.ToString(), log);
 
 		private LaunchFileResultType ParseResponse(byte[] responseBytes)
 		{

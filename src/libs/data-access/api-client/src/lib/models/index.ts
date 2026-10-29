@@ -56,6 +56,7 @@ export * from './IndexAllResponse';
 export * from './IndexResponse';
 export * from './IndexingStatusDto';
 export * from './KnownMidiControllerDto';
+export * from './LaunchAsidPlayerResponse';
 export * from './LaunchFileResponse';
 export * from './LaunchRandomResponse';
 export * from './LiftBanResponse';

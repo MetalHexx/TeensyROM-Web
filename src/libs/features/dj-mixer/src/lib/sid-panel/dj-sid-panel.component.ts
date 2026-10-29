@@ -168,7 +168,8 @@ function buildDeckPanel(
 
 /**
  * The SID panel: both decks' voice strips, filter and Key sections, Panic buttons and deck labels,
- * with the bindings button and the Camelot / Note switch at the faceplate's centre. It builds each
+ * with the bindings, browser and ASID launch buttons and the Camelot / Note switch at the
+ * faceplate's centre. It builds each
  * control's model from `DjStore`, sends what the hand did to `MixerService`, and hands every
  * control's live indicators to `SidPanelPainter`.
  */
@@ -210,6 +211,12 @@ export class DjSidPanelComponent {
 
   /** Emits when the browser button is pressed, to hide or show the browser. */
   readonly browserToggle = output<void>();
+
+  /** Whether the ASID player is being started on the decks' cartridges: disables the ASID button. */
+  readonly asidLaunching = input<boolean>(false);
+
+  /** Emits when the ASID button is pressed, to start the ASID player on the bound cartridges. */
+  readonly asidLaunch = output<void>();
 
   private readonly header = viewChild.required<ElementRef<HTMLElement>>('header');
   private readonly voiceStrips = viewChildren(SidVoiceStripComponent);

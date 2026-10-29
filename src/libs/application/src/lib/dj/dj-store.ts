@@ -255,6 +255,8 @@ export interface DjState {
   loops: Record<Slot, DeckLoopsState>;
   keyDisplayFormat: KeyDisplayFormat;
   sets: DjSetsState;
+  /** True only while `AsidPlayerLauncher` is starting the ASID player on the bound cartridges. */
+  asidLaunching: boolean;
 }
 
 /** A deck holding no markers: its loop state while nothing is attached. */
@@ -321,6 +323,7 @@ const initialState: DjState = {
     save: 'saved',
     announcement: null,
   },
+  asidLaunching: false,
 };
 
 export const DjStore = signalStore(
