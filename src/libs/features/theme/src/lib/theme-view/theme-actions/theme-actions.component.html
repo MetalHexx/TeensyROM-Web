@@ -1,0 +1,54 @@
+<lib-scaling-compact-card>
+  <div class="actions">
+    <span class="save-wrapper" [libTooltip]="saveTooltip()">
+      <lib-action-button
+        icon="save"
+        label="Save"
+        variant="stroked"
+        color="normal"
+        [fullWidth]="false"
+        [disabled]="!store.canSave()"
+        [ariaLabel]="saveAriaLabel()"
+        (buttonClick)="onSave()"
+      />
+    </span>
+
+    <lib-dropdown-dialog #saveAs (opened)="saveAsOpen.set(true)" (closed)="saveAsOpen.set(false)">
+      <lib-action-button
+        icon="save_as"
+        label="Save as"
+        variant="stroked"
+        color="normal"
+        [fullWidth]="false"
+        (buttonClick)="saveAs.open()"
+      />
+      <div dialog-content class="glassy-card">
+        @if (saveAsOpen()) {
+          <lib-preset-name-dialog
+            title="Save Theme As"
+            fieldLabel="Theme name"
+            placeholder="Enter theme name"
+            inputAriaLabel="Theme name"
+            saveLabel="Save theme"
+            [maxLength]="maxNameLength"
+            [initialValue]="suggestedName()"
+            [reservedNames]="themeNames()"
+            [validationFn]="validateName"
+            (confirmed)="onSaveAs($event, saveAs)"
+            (cancelled)="saveAs.close()"
+          />
+        }
+      </div>
+    </lib-dropdown-dialog>
+
+    <lib-action-button
+      icon="delete"
+      label="Delete"
+      variant="stroked"
+      color="error"
+      [fullWidth]="false"
+      [disabled]="!store.canDelete()"
+      (buttonClick)="onDelete()"
+    />
+  </div>
+</lib-scaling-compact-card>

@@ -1,0 +1,51 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as breakpoints;
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+.theme-view {
+  display: grid;
+  gap: var(--spacing-section-gap);
+  padding: var(--spacing-page-gutter);
+  align-items: start;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
+  grid-template-areas:
+    'list colors'
+    'list actions';
+
+  @include breakpoints.screen-tablet {
+    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+    grid-template-areas:
+      'list colors'
+      'list actions';
+  }
+
+  @include breakpoints.below-phone {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'list'
+      'colors'
+      'actions';
+  }
+}
+
+.area-list {
+  grid-area: list;
+}
+
+.area-colors {
+  grid-area: colors;
+}
+
+.area-actions {
+  grid-area: actions;
+}
+
+.area-list,
+.area-colors,
+.area-actions {
+  display: block;
+  min-width: 0;
+}

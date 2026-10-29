@@ -1,0 +1,46 @@
+<lib-scaling-card title="Themes">
+  <h3 class="group-heading">Shipped</h3>
+  <div class="theme-group" role="listbox" aria-label="Shipped themes">
+    @for (theme of shipped(); track theme.id) {
+      <lib-selectable-row
+        [label]="theme.name"
+        [selected]="theme.id === selectedId()"
+        (selectedChange)="themeSelected.emit(theme.id)"
+      >
+        <span
+          rowAfterLabel
+          class="lock"
+          role="img"
+          [attr.aria-label]="READ_ONLY_TEXT"
+          [libTooltip]="lockTooltip"
+        >
+          <lib-styled-icon icon="lock" size="small" color="dimmed" />
+        </span>
+        <span rowTrailing class="swatches" role="img" [attr.aria-label]="'Colors: ' + colorNames(theme)">
+          @for (index of colorIndexes(theme); track $index) {
+            <lib-c64-color-swatch [colorIndex]="index" size="small" [decorative]="true" />
+          }
+        </span>
+      </lib-selectable-row>
+    }
+  </div>
+
+  @if (custom().length > 0) {
+    <h3 class="group-heading">Custom</h3>
+    <div class="theme-group" role="listbox" aria-label="Custom themes">
+      @for (theme of custom(); track theme.id) {
+        <lib-selectable-row
+          [label]="theme.name"
+          [selected]="theme.id === selectedId()"
+          (selectedChange)="themeSelected.emit(theme.id)"
+        >
+          <span rowTrailing class="swatches" role="img" [attr.aria-label]="'Colors: ' + colorNames(theme)">
+            @for (index of colorIndexes(theme); track $index) {
+              <lib-c64-color-swatch [colorIndex]="index" size="small" [decorative]="true" />
+            }
+          </span>
+        </lib-selectable-row>
+      }
+    </div>
+  }
+</lib-scaling-card>
