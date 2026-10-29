@@ -28,6 +28,14 @@
             [ariaExpanded]="browserShown()"
             (buttonClick)="browserToggle.emit()"
           ></lib-icon-button>
+          <lib-icon-button
+            class="asid-button"
+            icon="rocket_launch"
+            color="normal"
+            ariaLabel="Start the ASID player on both decks' cartridges"
+            [disabled]="asidLaunching()"
+            (buttonClick)="asidLaunch.emit()"
+          ></lib-icon-button>
         </span>
         } }
       </div>

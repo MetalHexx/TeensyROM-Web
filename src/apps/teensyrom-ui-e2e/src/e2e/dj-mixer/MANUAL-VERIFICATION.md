@@ -752,3 +752,18 @@ decks already use.
 7. Start a drag, and with a mapped control or the mixer toggle show or hide the browser mid-drag.
    The deck overlays go.
 8. Press Load A and Load B on the set card. Each still loads the selected row onto its deck.
+
+## Launching the ASID player from the mixer (ASID-DJ-14)
+
+Needs real TeensyROM cartridges bound to the decks. The rocket button is the third in the SID panel
+header, after the bindings and browser buttons. It is not mappable, so there is no MIDI control for
+it, and it is disabled while a launch is running.
+
+- [ ] A cartridge on the network: one press starts its ASID player, the info alert names its deck,
+      and a SID dropped from that cartridge's own storage then plays.
+- [ ] A cartridge already on USB: one press starts its player, with no alert.
+- [ ] A cartridge whose serial port another program holds: the launch is refused with the USB
+      error and the cartridge stays on the network. If a game was running, the C64 is back at its
+      menu, which is accepted.
+- [ ] One deck with no cartridge bound: only the other deck's cartridge launches.
+- [ ] A cartridge running a game: the press resets it and starts the player.

@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import {
   DevicesApiService,
   FindDevicesResponse,
+  LaunchAsidPlayerResponse,
   ReconnectDeviceResponse,
   RenameDeviceResponse,
   ResponseError,
@@ -11,11 +12,20 @@ import {
   IDeviceService,
   ALERT_SERVICE,
   IAlertService,
+  AsidLaunchOutcome,
 } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
 import { Observable, map, from, catchError, switchMap, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
-import { extractProblemMessage, failOnDeviceBusy } from '../error/api-error.utils';
+import {
+  extractProblemMessage,
+  failOnDeviceBusy,
+  readDeviceBusyProblem,
+  readProblemCode,
+} from '../error/api-error.utils';
+
+const USB_UNREACHABLE_PROBLEM_CODE = 'usbUnreachable';
+const LAUNCH_ASID_FALLBACK_MESSAGE = 'The ASID player could not be started.';
 
 @Injectable()
 export class DeviceService implements IDeviceService {
@@ -73,6 +83,37 @@ export class DeviceService implements IDeviceService {
       map((response: RenameDeviceResponse) => DomainMapper.toDevice(response.device)),
       catchError((error) => this.handleError(error, 'renameDevice', 'Failed to rename device'))
     );
+  }
+
+  launchAsidPlayer(deviceId: string): Observable<AsidLaunchOutcome> {
+    return from(this.apiService.launchAsidPlayer({ deviceId })).pipe(
+      map((response: LaunchAsidPlayerResponse) => DomainMapper.toAsidLaunchOutcome(response)),
+      catchError((error) => {
+        logError('DeviceService.launchAsidPlayer error:', error);
+        return from(this.toFailedLaunchOutcome(error));
+      })
+    );
+  }
+
+  private async toFailedLaunchOutcome(error: unknown): Promise<AsidLaunchOutcome> {
+    const busy = await readDeviceBusyProblem(error);
+    if (busy) {
+      return { launched: false, reason: 'busy', message: busy.title };
+    }
+
+    const message = (await extractProblemMessage(error)) ?? LAUNCH_ASID_FALLBACK_MESSAGE;
+    if (error instanceof ResponseError) {
+      if (error.response.status === 404) {
+        return { launched: false, reason: 'notFound', message };
+      }
+      if (
+        error.response.status === 502 &&
+        (await readProblemCode(error)) === USB_UNREACHABLE_PROBLEM_CODE
+      ) {
+        return { launched: false, reason: 'usbUnreachable', message };
+      }
+    }
+    return { launched: false, reason: 'launchFailed', message };
   }
 
   private reconnectErrorMessage(error: unknown): string {

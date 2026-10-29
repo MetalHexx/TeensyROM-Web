@@ -38,6 +38,15 @@ import {
   AudioSettings,
 } from '@teensyrom-nx/domain';
 
+describe('DomainMapper.toAsidLaunchOutcome', () => {
+  it.each([true, false])('maps a success carrying movedToSerial %s', (movedToSerial) => {
+    expect(DomainMapper.toAsidLaunchOutcome({ message: 'ok', movedToSerial })).toEqual({
+      launched: true,
+      movedToSerial,
+    });
+  });
+});
+
 describe('DomainMapper (Storage)', () => {
   const baseApiUrl = 'http://localhost:5168';
 
