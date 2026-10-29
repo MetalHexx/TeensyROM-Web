@@ -141,6 +141,11 @@ export interface DeckState {
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
    *  also spans the `await` in a play toggle. */
   switching: boolean;
+  /** True while a finger is on the deck's pitch bend strip — from the touch to the lift. */
+  handHeld: boolean;
+  /** The engine's varispeed: the record is being played at the hand's rate, from the touch until
+   *  the throw has settled. Mirrors the engine's snapshot. */
+  varispeed: boolean;
 }
 
 /** One deck slot's cartridge binding. The binding is to the device; the MIDI output is only where
@@ -291,6 +296,8 @@ const initialDeckState: DeckState = {
   ],
   detectedKey: null,
   switching: false,
+  handHeld: false,
+  varispeed: false,
 };
 
 const initialBindingState: DeckBindingState = {

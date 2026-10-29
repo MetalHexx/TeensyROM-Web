@@ -117,6 +117,7 @@ function idleTransportSummary(): DeckTransportSummary {
     subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
+    held: false,
     errors: [],
   };
 }

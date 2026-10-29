@@ -8,6 +8,7 @@ import {
   LAUNCH_CONTROL,
   ccSource,
   noteSource,
+  pitchBendSource,
   setUpMappingHarness,
   type MappingHarness,
 } from './testing/mapping-harness';
@@ -22,6 +23,7 @@ const SPEED_B: ControlIdentity = { owner: 'B', control: 'speed' };
 const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
 const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
+const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
 const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 
@@ -368,6 +370,55 @@ describe('MidiMappings', () => {
       h.mappings.setStyle(mapping.id, style('step-release', 0.1));
 
       expect(h.mappingStore.mappings()[0].style).toEqual(style('press'));
+    });
+
+    describe('a hand on a pitch bend strip', () => {
+      const hand = (amount: number | null, grip?: number): MappingStyle => ({
+        kind: 'hand',
+        amount,
+        ...(grip === undefined ? {} : { grip }),
+      });
+
+      it('keeps its reach and grip, saves them, and takes a new pair', async () => {
+        await h.mappings.hydrate();
+        const { mapping } = h.mappings.bind(pitchBendSource(), SEEK_A, hand(0.5, 1));
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.5, 1));
+
+        h.mappings.setStyle(mapping.id, hand(0.3, 0.75));
+
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.3, 0.75));
+        expect((await saved()).mappings[0].style).toEqual(hand(0.3, 0.75));
+      });
+
+      it('clamps the reach and the grip into their ranges', async () => {
+        await h.mappings.hydrate();
+        const { mapping } = h.mappings.bind(pitchBendSource(), SEEK_A, hand(0.5, 1));
+
+        h.mappings.setStyle(mapping.id, hand(9, 9));
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(2, 3));
+
+        h.mappings.setStyle(mapping.id, hand(0, 0));
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.02, 0.05));
+      });
+
+      it('falls back to the home grip when a style carries none', async () => {
+        await h.mappings.hydrate();
+        const { mapping } = h.mappings.bind(pitchBendSource(), SEEK_A, hand(0.5, 1));
+
+        h.mappings.setStyle(mapping.id, hand(0.5));
+
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.5, 0.25));
+      });
+
+      it('is refused on a control that takes no hand, which gets the default instead on a bind', async () => {
+        await h.mappings.hydrate();
+        const { mapping } = h.mappings.bind(pitchBendSource(), SPEED_A, hand(0.5, 1));
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.13, 0.25));
+
+        h.mappings.setStyle(mapping.id, hand(0.5, 1));
+
+        expect(h.mappingStore.mappings()[0].style).toEqual(hand(0.13, 0.25));
+      });
     });
 
     it('drops the amount of a style that takes none', async () => {

@@ -5,7 +5,12 @@ import { FakeClock } from '@sidablist/core';
 import type { FrameClock, ReplayRunner } from '@sidablist/core';
 import { DeckSpeed } from './deck-speed';
 import { DeckRuntime } from './deck-runtime';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  REGISTER_RECORDER_FACTORY,
+  MIDI_ACCESS,
+} from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { Slot } from './slot';
 
@@ -39,6 +44,10 @@ describe('DeckSpeed', () => {
         DeckRuntime,
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FrameClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => fakeReplayRunner },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess },
       ],
     });

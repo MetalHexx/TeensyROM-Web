@@ -53,6 +53,7 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
     subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
+    held: false,
     errors: [],
     ...overrides,
   };
@@ -940,6 +941,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.75,
         faderSpeed: 0.75,
         nudging: false,
+        varispeed: false,
         voices: store.decks().B.voices,
       });
       fixture.detectChanges();
@@ -979,6 +981,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.7,
         faderSpeed: 1.7,
         nudging: false,
+        varispeed: false,
         voices,
       });
       fixture.detectChanges();
@@ -990,6 +993,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.3,
         faderSpeed: 0.3,
         nudging: false,
+        varispeed: false,
         voices,
       });
       fixture.detectChanges();
@@ -1006,6 +1010,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.05,
         faderSpeed: 1,
         nudging: true,
+        varispeed: false,
         voices: store.decks().B.voices,
       });
       fixture.detectChanges();
@@ -1080,6 +1085,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1,
         faderSpeed: 1,
         nudging: false,
+        varispeed: false,
         voices: [
           { muted: true, held: false },
           { muted: false, held: false },
@@ -1131,6 +1137,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.2,
         faderSpeed: 1.2,
         nudging: false,
+        varispeed: false,
         voices: [
           { muted: true, held: false },
           { muted: true, held: false },

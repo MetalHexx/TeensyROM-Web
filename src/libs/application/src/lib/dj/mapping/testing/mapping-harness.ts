@@ -1,8 +1,8 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { FakeClock } from '@sidablist/core';
-import type { ReplayRunner } from '@sidablist/core';
+import { FakeClock, SID_REGISTER_COUNT } from '@sidablist/core';
+import type { RegisterRecord, ReplayRunner } from '@sidablist/core';
 import { InMemorySetStore, InMemoryTuneMemoryStore, createRow, createSet } from '@sidablist/tunes';
 import type { TuneReference } from '@sidablist/tunes';
 import { ALERT_SERVICE, FILE_CONTENT_SERVICE, type Device } from '@teensyrom-nx/domain';
@@ -18,6 +18,8 @@ import {
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
+  PITCH_BEND_CENTRE,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
@@ -30,6 +32,7 @@ import type {
   MidiPermission,
   MidiPortOption,
   MidiSettingsRecord,
+  RegisterRecorder,
 } from '../../ports';
 import type { Slot } from '../../slot';
 import { MappableControls } from '../mappable-controls';
@@ -57,6 +60,44 @@ const TUNE: TuneReference = {
   byteLength: 1234,
 };
 
+/** The play calls the harness's register record covers unless a spec says otherwise. */
+export const RECORD_FRAMES = 6000;
+
+/**
+ * A register record of `frames` entries that names its own entry. Registers 5 and 6 (voice 1's
+ * attack/decay and sustain/release) carry the entry index in two bytes: the output stage scales
+ * only frequency bytes, so the index survives a held or stroked record, which a frequency would
+ * not.
+ */
+export function indexedRecord(frames: number): RegisterRecord {
+  const values = new Uint8Array(frames * SID_REGISTER_COUNT);
+  for (let entry = 0; entry < frames; entry++) {
+    values[entry * SID_REGISTER_COUNT + 5] = entry & 0xff;
+    values[entry * SID_REGISTER_COUNT + 6] = (entry >> 8) & 0xff;
+  }
+  return {
+    frames,
+    values,
+    retriggerEntries: new Uint32Array(0),
+    retriggerRegisters: new Uint8Array(0),
+    retriggerValues: new Uint8Array(0),
+  };
+}
+
+/** The entry index an `indexedRecord` frame names, from the registers as written. */
+export function entryIndexOf(written: Uint8Array): number {
+  return written[5] | (written[6] << 8);
+}
+
+/** The recorder the harness hands every deck slot: it answers `answer` to every request, and
+ *  remembers what it was asked. */
+export interface FakeRegisterRecorder {
+  /** What each request asked for, in order. */
+  readonly requests: { readonly subtune: number; readonly frames: number }[];
+  /** What `record` answers; null answers a failed scan. */
+  answer: RegisterRecord | null;
+}
+
 export interface MappingHarness {
   readonly djStore: InstanceType<typeof DjStore>;
   readonly mappingStore: InstanceType<typeof MidiMappingStore>;
@@ -72,6 +113,11 @@ export interface MappingHarness {
   readonly midiInput: FakeMidiInput;
   readonly accessState: WritableSignal<MidiAccessState>;
   readonly requestAccess: ReturnType<typeof vi.fn>;
+  /** The frame clock each deck slot built, in build order: A then B. */
+  readonly clocks: FakeClock[];
+  readonly recorder: FakeRegisterRecorder;
+  /** What `TUNE_RESOLVER.resolve` answers; unset it answers nothing. */
+  readonly resolve: ReturnType<typeof vi.fn>;
   readonly alerts: { warning: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
   readonly repository: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   /** Puts a tune on the slot at a settled status, which is what makes its controls live. */
@@ -87,11 +133,18 @@ export interface MappingHarness {
 
 /**
  * The mapping TestBed: the real stores, services, engine and mappable controls over the real deck
- * runtime, with fakes only at the ports — the settings repository, MIDI access, the frame clock and
- * replay factories, the alert service and the tune sources. `DeckBindings` is the one non-port
- * fake: nothing here binds a cartridge.
+ * runtime, with fakes only at the ports — the settings repository, MIDI access, the frame clock,
+ * replay and register recorder factories, the alert service and the tune sources. `DeckBindings` is
+ * the one non-port fake: nothing here binds a cartridge. Replays are refused unless a spec brings
+ * a runner that answers them.
  */
-export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTINGS): MappingHarness {
+export function setUpMappingHarness(
+  settings: MidiSettingsRecord = EMPTY_SETTINGS,
+  replay: ReplayRunner = {
+    run: () => Promise.reject(new Error('no replay in this spec')),
+    dispose: () => undefined,
+  }
+): MappingHarness {
   const repository = {
     load: vi.fn().mockResolvedValue(settings),
     save: vi.fn().mockResolvedValue(undefined),
@@ -111,10 +164,9 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     release: (): void => undefined,
     outputPortFor: () => null,
   };
-  const idleReplay: ReplayRunner = {
-    run: () => Promise.reject(new Error('no replay in this spec')),
-    dispose: () => undefined,
-  };
+  const clocks: FakeClock[] = [];
+  const resolve = vi.fn();
+  const recorder: FakeRegisterRecorder = { requests: [], answer: indexedRecord(RECORD_FRAMES) };
 
   TestBed.configureTestingModule({
     providers: [
@@ -124,13 +176,30 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
         provide: DeckBindings,
         useValue: { hydrate: vi.fn(), bindDevice: vi.fn(), enableMidi: vi.fn(), identify: vi.fn() },
       },
-      { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
-      { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => idleReplay },
+      {
+        provide: FRAME_CLOCK_FACTORY,
+        useValue: (): FakeClock => {
+          const clock = new FakeClock();
+          clocks.push(clock);
+          return clock;
+        },
+      },
+      { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => replay },
+      {
+        provide: REGISTER_RECORDER_FACTORY,
+        useValue: (): RegisterRecorder => ({
+          record: async (_bytes, subtune, frames) => {
+            recorder.requests.push({ subtune, frames });
+            return recorder.answer;
+          },
+          dispose: () => undefined,
+        }),
+      },
       { provide: MIDI_ACCESS, useValue: midiAccess },
       { provide: MIDI_INPUT, useValue: midiInput },
       { provide: FILE_CONTENT_SERVICE, useValue: { getFileContent: vi.fn() } },
       { provide: TUNE_INSERTER, useValue: { insert: vi.fn() } },
-      { provide: TUNE_RESOLVER, useValue: { resolve: vi.fn() } },
+      { provide: TUNE_RESOLVER, useValue: { resolve } },
       { provide: SET_STORE, useFactory: () => new InMemorySetStore() },
       { provide: TUNE_MEMORY_STORE, useFactory: () => new InMemoryTuneMemoryStore() },
       {
@@ -157,6 +226,9 @@ export function setUpMappingHarness(settings: MidiSettingsRecord = EMPTY_SETTING
     midiInput,
     accessState,
     requestAccess,
+    clocks,
+    recorder,
+    resolve,
     alerts,
     repository,
     makeShapeable: (slot) => {
@@ -243,6 +315,25 @@ export function note(
     ...noteSource(number, channel, controllerId),
     value: velocity,
     pressed: velocity > 0,
+    timeStampMs,
+  };
+}
+
+export function pitchBendSource(channel = 1, controllerId = LAUNCH_CONTROL): MidiSource {
+  return { controllerId, channel, kind: 'pitch-bend', number: 0 };
+}
+
+/** A pitch bend message (0–16383); it reads as a finger down anywhere but centre. */
+export function pitchBend(
+  value: number,
+  timeStampMs = 0,
+  channel = 1,
+  controllerId = LAUNCH_CONTROL
+): SourceEvent {
+  return {
+    ...pitchBendSource(channel, controllerId),
+    value,
+    pressed: value !== PITCH_BEND_CENTRE,
     timeStampMs,
   };
 }

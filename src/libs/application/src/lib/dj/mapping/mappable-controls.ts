@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
+import { DeckHand, type HandTarget } from '../deck-hand';
 import { DeckService } from '../deck.service';
 import { DjSets } from '../sets/dj-sets';
 import { DjStore } from '../dj-store';
@@ -61,6 +62,9 @@ export type MappableControl =
       /** A selection that moves one place per tick or press: the engine ignores sensitivity, reads
        *  a step amount only for its sign (the direction), and never applies `absolute`. */
       readonly wholeSteps?: boolean;
+      /** What a pitch bend strip mapped here drives as a hand; a control without one takes no
+       *  pitch bend. */
+      readonly hand?: HandTarget;
       read(): number;
       set(value: number): void;
     });
@@ -207,9 +211,19 @@ function value(
   range: ValueRange,
   defaults: ValueDefaults,
   read: () => number,
-  set: (value: number) => void
+  set: (value: number) => void,
+  hand?: HandTarget
 ): MappableControl {
-  return { identity, name, nature: 'value', ...range, defaults, read, set };
+  return {
+    identity,
+    name,
+    nature: 'value',
+    ...range,
+    defaults,
+    read,
+    set,
+    ...(hand === undefined ? {} : { hand }),
+  };
 }
 
 /** A selection over `count()` places, from 0 to `count() − 1` (0 when there are none). It moves
@@ -251,6 +265,7 @@ export class MappableControls {
   private readonly deckService = inject(DeckService);
   private readonly mixerService = inject(MixerService);
   private readonly djSets = inject(DjSets);
+  private readonly deckHand = inject(DeckHand);
 
   readonly all: readonly MappableControl[];
 
@@ -297,7 +312,8 @@ export class MappableControls {
         { min: 0, max: 100, home: 0, step: null },
         SEEK_DEFAULTS,
         () => seek.pending() ?? transport().scrubPercent,
-        seek.request
+        seek.request,
+        this.deckHand.handFor(slot)
       ),
       value(
         id('speed'),

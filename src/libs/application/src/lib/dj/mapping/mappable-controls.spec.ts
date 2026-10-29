@@ -141,6 +141,15 @@ describe('MappableControls', () => {
       expect(pick('A', 'seek', 'value').read()).toBe(25);
     });
 
+    it("seek carries its deck's hand, and no other control carries one", () => {
+      const withHand = h.controls.all
+        .filter((control) => control.nature === 'value' && control.hand !== undefined)
+        .map((control) => controlKey(control.identity));
+
+      expect(withHand).toEqual(['A:seek', 'B:seek']);
+      expect(pick('A', 'seek', 'value').hand).not.toBe(pick('B', 'seek', 'value').hand);
+    });
+
     it('declares each value control with its range, home, step and CC defaults', () => {
       const key = pick('A', 'key', 'value');
       expect([key.min, key.max, key.home, key.step]).toEqual([-12, 12, 0, 1]);

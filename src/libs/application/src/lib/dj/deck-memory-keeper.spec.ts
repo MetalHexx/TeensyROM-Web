@@ -23,6 +23,7 @@ import {
   DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
@@ -113,6 +114,7 @@ describe('DeckMemoryKeeper', () => {
       speed: speed.faderValue(slot),
       faderSpeed: speed.faderValue(slot),
       nudging: speed.isNudging(slot),
+      varispeed: false,
       voices,
     });
   }
@@ -152,6 +154,10 @@ describe('DeckMemoryKeeper', () => {
         { provide: DeviceStore, useValue: { usableDevices: signal<Device[]>([]) } },
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FrameClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => idleReplay },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess },
       ],
     });

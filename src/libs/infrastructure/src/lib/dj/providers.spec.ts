@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import {
   DJ_LIBRARY_STATE_REPOSITORY,
+  REGISTER_RECORDER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
   TUNE_MEMORY_STORE,
@@ -10,6 +11,7 @@ import {
 } from '@teensyrom-nx/application';
 import { ALERT_SERVICE, API_CONFIG, IAlertService } from '@teensyrom-nx/domain';
 import { DjDatabase, DJ_DATABASE_NAME } from './database/dj-database';
+import { WorkerRegisterRecorder } from './analysis/worker-register-recorder';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
 import { ApiDjLibraryStateRepository, ApiSetStore, ApiTuneMemoryStore } from './dj-library';
 import { DJ_ENGINE_PROVIDERS, DJ_STORAGE_PROVIDERS } from './providers';
@@ -95,6 +97,16 @@ describe('DJ_ENGINE_PROVIDERS composition', () => {
       request.onerror = () => resolve();
       request.onblocked = () => resolve();
     });
+  });
+
+  it('builds a recorder of its own for every call of the register recorder factory', () => {
+    const factory = TestBed.inject(REGISTER_RECORDER_FACTORY);
+
+    const first = factory();
+    const second = factory();
+
+    expect(first).toBeInstanceOf(WorkerRegisterRecorder);
+    expect(second).not.toBe(first);
   });
 
   it('resolves bytes inserted through TUNE_INSERTER to a playable through TUNE_RESOLVER', async () => {

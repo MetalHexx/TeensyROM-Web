@@ -261,6 +261,7 @@ describe('DjStore', () => {
         speed: 1.2,
         faderSpeed: 1.2,
         nudging: false,
+        varispeed: false,
         voices: store.decks().A.voices,
       });
       store.setKeyDisplayFormat({ format: 'note' });
@@ -311,7 +312,7 @@ describe('DjStore', () => {
       expect(vi.mocked(logInfo).mock.calls[0][1]).toBe('Deck A panel restored');
     });
 
-    it('setDeckEngineControls sets speed, fader value, nudge flag and voices only, leaving the other slot untouched', () => {
+    it('setDeckEngineControls sets speed, fader value, nudge flag, varispeed and voices only, leaving the other slot untouched', () => {
       const voices = [
         { muted: true, held: false },
         { muted: false, held: true },
@@ -319,16 +320,34 @@ describe('DjStore', () => {
       ];
       store.setDeckStatus({ slot: 'A', status: 'playing' });
 
-      store.setDeckEngineControls({ slot: 'A', speed: 1.37, faderSpeed: 1.32, nudging: true, voices });
+      store.setDeckEngineControls({
+        slot: 'A',
+        speed: 1.37,
+        faderSpeed: 1.32,
+        nudging: true,
+        varispeed: true,
+        voices,
+      });
 
       expect(store.decks().A.speed).toBe(1.37);
       expect(store.decks().A.faderSpeed).toBe(1.32);
       expect(store.decks().A.nudging).toBe(true);
+      expect(store.decks().A.varispeed).toBe(true);
+      expect(store.decks().B.varispeed).toBe(false);
       expect(store.decks().A.voices).toEqual(voices);
       expect(store.decks().A.status).toBe('playing');
       expect(store.decks().B.speed).toBe(1);
       expect(store.decks().B.faderSpeed).toBe(1);
       expect(store.decks().B.nudging).toBe(false);
+    });
+
+    it('setDeckHand sets handHeld only, leaving the other slot untouched', () => {
+      store.setDeckHand({ slot: 'A', held: true });
+      expect(store.decks().A.handHeld).toBe(true);
+      expect(store.decks().B.handHeld).toBe(false);
+
+      store.setDeckHand({ slot: 'A', held: false });
+      expect(store.decks().A.handHeld).toBe(false);
     });
 
     it('setDeckTiming sets the play-call interval only, leaving the other slot untouched', () => {

@@ -32,6 +32,7 @@ import { DeviceStore } from '../device/device-store';
 import { DeckService } from './deck.service';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
+import { DeckHand } from './deck-hand';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
@@ -46,6 +47,7 @@ import { decodeRowHost } from './sets/row-host';
 import {
   DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
   MIDI_ACCESS,
   SET_STORE,
@@ -297,6 +299,10 @@ describe('DeckService', () => {
           },
         },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess((id) => outputPortForMock(id) as MidiOutputPort | null) },
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService },
         { provide: TUNE_INSERTER, useValue: { insert: insertMock } },
@@ -1603,6 +1609,34 @@ describe('DeckService', () => {
       runFrame();
 
       expect(paintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+    });
+
+    it('polls a paused deck while the engine is in varispeed, and stops when it leaves', async () => {
+      await service.togglePlayPause('A');
+      TestBed.flushEffects();
+      runFrame();
+      expect(pending.size).toBe(0);
+      const controls = (varispeed: boolean) =>
+        store.setDeckEngineControls({
+          slot: 'A',
+          speed: 1,
+          faderSpeed: 1,
+          nudging: false,
+          varispeed,
+          voices: store.decks().A.voices,
+        });
+
+      controls(true);
+      TestBed.flushEffects();
+      paintSpy.mockClear();
+      setPosition(9);
+      runFrame();
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+
+      controls(false);
+      TestBed.flushEffects();
       expect(pending.size).toBe(0);
     });
 
@@ -3251,6 +3285,40 @@ describe('DeckService', () => {
         expect(currentSet().rows[0].lastSubtune).toBe(3);
         expect((await memoryStore.load(held.sidHash))?.lastSubtune).toBe(3);
       });
+    });
+  });
+
+  describe('letting go of the hand', () => {
+    let drop: MockInstance<DeckHand['drop']>;
+
+    beforeEach(() => {
+      drop = vi.spyOn(TestBed.inject(DeckHand), 'drop');
+    });
+
+    it("drops the deck's hand on a load, a subtune switch and a stop, once each", async () => {
+      await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+      expect(drop.mock.calls).toEqual([['A']]);
+
+      await service.selectSubtune('A', 2);
+      expect(drop.mock.calls).toEqual([['A'], ['A']]);
+
+      service.stop('A');
+      expect(drop.mock.calls).toEqual([['A'], ['A'], ['A']]);
+    });
+
+    it('leaves the hand alone when a stop or a subtune switch is refused by its guards', async () => {
+      await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+      service.stop('A');
+      drop.mockClear();
+
+      service.stop('A');
+      service.stop('B');
+      await service.selectSubtune('B', 2);
+      store.setDeckBusy({ slot: 'A', busy: true });
+      service.stop('A');
+      await service.selectSubtune('A', 2);
+
+      expect(drop).not.toHaveBeenCalled();
     });
   });
 

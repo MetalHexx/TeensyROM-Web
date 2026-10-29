@@ -2,12 +2,18 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FakeClock } from '@sidablist/core';
-import type { FrameClock, ReplayRunner, SidPlayer } from '@sidablist/core';
+import type { FrameClock, RegisterRecord, ReplayRunner, SidPlayer } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  REGISTER_RECORDER_FACTORY,
+  MIDI_ACCESS,
+} from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
+import type { RegisterRecorder } from './ports';
 
 const createdPlayers = vi.hoisted((): unknown[] => []);
 
@@ -32,6 +38,48 @@ class FakeReplayRunner implements ReplayRunner {
   dispose(): void {
     this.disposed = true;
   }
+}
+
+/** A recorder whose scans the spec settles by hand. */
+class FakeRegisterRecorder implements RegisterRecorder {
+  disposed = false;
+  readonly requests: {
+    readonly bytes: Uint8Array;
+    readonly subtune: number;
+    readonly frames: number;
+  }[] = [];
+  private readonly settlers: {
+    resolve: (record: RegisterRecord | null) => void;
+    reject: (error: unknown) => void;
+  }[] = [];
+
+  record(bytes: Uint8Array, subtune: number, frames: number): Promise<RegisterRecord | null> {
+    this.requests.push({ bytes, subtune, frames });
+    return new Promise((resolve, reject) => this.settlers.push({ resolve, reject }));
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+
+  /** Answers the `index`th request. */
+  answer(index: number, record: RegisterRecord | null): void {
+    this.settlers[index].resolve(record);
+  }
+
+  fail(index: number, error: unknown): void {
+    this.settlers[index].reject(error);
+  }
+}
+
+function recordOf(frames: number): RegisterRecord {
+  return {
+    frames,
+    values: new Uint8Array(frames * 25),
+    retriggerEntries: new Uint32Array(0),
+    retriggerRegisters: new Uint8Array(0),
+    retriggerValues: new Uint8Array(0),
+  };
 }
 
 function recordingPort(portId: string): MidiOutputPort & { readonly sent: readonly Uint8Array[] } {
@@ -96,11 +144,13 @@ describe('DeckRuntime', () => {
   let clockFactory: ReturnType<typeof vi.fn>;
   let replayFactory: ReturnType<typeof vi.fn>;
   let replayRunners: FakeReplayRunner[];
+  let recorders: FakeRegisterRecorder[];
   let outputPortFor: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     createdPlayers.length = 0;
     replayRunners = [];
+    recorders = [];
     clockFactory = vi.fn((): FrameClock => new FakeClock());
     replayFactory = vi.fn((): ReplayRunner => {
       const runner = new FakeReplayRunner();
@@ -114,6 +164,14 @@ describe('DeckRuntime', () => {
         DeckRuntime,
         { provide: FRAME_CLOCK_FACTORY, useValue: clockFactory },
         { provide: REPLAY_RUNNER_FACTORY, useValue: replayFactory },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: (): RegisterRecorder => {
+            const recorder = new FakeRegisterRecorder();
+            recorders.push(recorder);
+            return recorder;
+          },
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess((id) => outputPortFor(id) as MidiOutputPort | null) },
       ],
     });
@@ -243,6 +301,105 @@ describe('DeckRuntime', () => {
     runtime.dispose('A');
 
     expect(replayRunners.map((runner) => runner.disposed)).toEqual([true, true, false, false]);
+  });
+
+  it("disposes the recorder with the player, and only that slot's", () => {
+    runtime.build('A');
+    runtime.build('B');
+
+    runtime.dispose('A');
+
+    expect(recorders.map((recorder) => recorder.disposed)).toEqual([true, false]);
+  });
+
+  describe('the register record', () => {
+    const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve));
+    let setRecord: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      runtime.build('A');
+      setRecord = vi
+        .spyOn(createdPlayers[0] as SidPlayer, 'setRegisterRecord')
+        .mockImplementation(() => undefined);
+    });
+
+    it('is requested for the loaded subtune, covering the position basis, the ceiling and five seconds more', () => {
+      const playable = playableOf(SID_MODEL_6581);
+
+      runtime.load('A', playable);
+
+      const { basis } = runtime.snapshot('A');
+      const margin = Math.round(5e6 / runtime.playCallIntervalUs('A'));
+      expect(recorders[0].requests).toHaveLength(1);
+      expect(recorders[0].requests[0].bytes).toBe(playable.bytes);
+      expect(recorders[0].requests[0].subtune).toBe(1);
+      expect(recorders[0].requests[0].frames).toBe(
+        Math.max(basis.positionBasisFrames, basis.ceilingFrames) + margin
+      );
+    });
+
+    it('is requested again for a reload, since a subtune switch loads through the same call', () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      runtime.load('A', playableOf(SID_MODEL_8580));
+
+      expect(recorders[0].requests).toHaveLength(2);
+    });
+
+    it('goes to the player when it arrives', async () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      const record = recordOf(10);
+
+      recorders[0].answer(0, record);
+      await settle();
+
+      expect(setRecord).toHaveBeenCalledExactlyOnceWith(record);
+    });
+
+    it('is not set once a newer load has been made, whichever answer comes first', async () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      runtime.load('A', playableOf(SID_MODEL_8580));
+      const stale = recordOf(10);
+      const current = recordOf(20);
+
+      recorders[0].answer(1, current);
+      recorders[0].answer(0, stale);
+      await settle();
+
+      expect(setRecord).toHaveBeenCalledExactlyOnceWith(current);
+    });
+
+    it('is simply not set when the scan fails, with a null answer or a rejection', async () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      runtime.load('A', playableOf(SID_MODEL_6581));
+
+      recorders[0].answer(0, null);
+      recorders[0].fail(1, new Error('worker gone'));
+      await settle();
+
+      expect(setRecord).not.toHaveBeenCalled();
+    });
+
+    it("asks the slot's own recorder", () => {
+      runtime.build('B');
+
+      runtime.load('B', playableOf(SID_MODEL_6581));
+
+      expect(recorders[0].requests).toHaveLength(0);
+      expect(recorders[1].requests).toHaveLength(1);
+    });
+
+    it("hands varispeed to the slot's player and takes it back", () => {
+      const player = createdPlayers[0] as SidPlayer;
+      const enter = vi.spyOn(player, 'enterVarispeed').mockReturnValue(true);
+      const leave = vi.spyOn(player, 'leaveVarispeed').mockImplementation(() => undefined);
+      const source = (): number => 0;
+
+      expect(runtime.enterVarispeed('A', source)).toBe(true);
+      runtime.leaveVarispeed('A');
+
+      expect(enter).toHaveBeenCalledExactlyOnceWith(source);
+      expect(leave).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('engine controls', () => {
@@ -419,6 +576,10 @@ describe('DeckRuntime', () => {
           DeckRuntime,
           { provide: FRAME_CLOCK_FACTORY, useValue: clockFactory },
           { provide: REPLAY_RUNNER_FACTORY, useValue: replayFactory },
+          {
+            provide: REGISTER_RECORDER_FACTORY,
+            useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+          },
           { provide: MIDI_ACCESS, useValue: fakeMidiAccess(() => null) },
         ],
       });

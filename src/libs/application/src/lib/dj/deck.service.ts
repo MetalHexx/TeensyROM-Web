@@ -3,6 +3,7 @@ import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { DeckHand } from './deck-hand';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
@@ -84,6 +85,7 @@ export class DeckService {
   private readonly store = inject(DjStore);
   private readonly bindings = inject(DeckBindings);
   private readonly deckSpeed = inject(DeckSpeed);
+  private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
   private readonly sets = inject(DjSets);
   private readonly keeper = inject(DeckMemoryKeeper);
@@ -204,6 +206,7 @@ export class DeckService {
     if (deck.busy || (deck.status !== 'playing' && deck.status !== 'paused')) {
       return;
     }
+    this.deckHand.drop(slot);
     // The engine disarms its loop on a stop, but not a marker still waiting for readiness.
     this.releaseMarkers(slot);
     this.runtime.stop(slot);
@@ -236,6 +239,7 @@ export class DeckService {
     const previousStatus = current.status;
     const sidHash = current.loaded.identity.sidHash;
 
+    this.deckHand.drop(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -619,9 +623,10 @@ export class DeckService {
     );
   }
 
-  /** Mirrors the engine's tempo and voice state, and the speed controls' fader value and nudge
-   *  state, onto the store, writing only on a difference — every notification calls this,
-   *  including those during a load's suspended window. */
+  /** Mirrors the engine's tempo, varispeed and voice state, and the speed controls' fader value
+   *  and nudge state, onto the store, writing only on a difference — every notification calls
+   *  this, including those during a load's suspended window. Samples the playhead when varispeed
+   *  ends, since the position poll stops with it. */
   private reflectEngineControls(slot: Slot): void {
     const { tempo, voices } = this.runtime.snapshot(slot);
     const faderSpeed = this.deckSpeed.faderValue(slot);
@@ -631,9 +636,20 @@ export class DeckService {
       deck.speed !== tempo.multiplier ||
       deck.faderSpeed !== faderSpeed ||
       deck.nudging !== nudging ||
+      deck.varispeed !== tempo.varispeed ||
       !sameVoices(deck.voices, voices)
     ) {
-      this.store.setDeckEngineControls({ slot, speed: tempo.multiplier, faderSpeed, nudging, voices });
+      this.store.setDeckEngineControls({
+        slot,
+        speed: tempo.multiplier,
+        faderSpeed,
+        nudging,
+        varispeed: tempo.varispeed,
+        voices,
+      });
+      if (deck.varispeed && !tempo.varispeed) {
+        this.sample(slot);
+      }
     }
   }
 
@@ -645,6 +661,7 @@ export class DeckService {
    * keeper writes neither into a row.
    */
   private async loadOnto(slot: Slot, target: LoadTarget): Promise<void> {
+    this.deckHand.drop(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -877,9 +894,10 @@ export class DeckService {
     return false;
   }
 
-  /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` and paused
-   *  while the document is hidden — the POC's `animationFrameSignal` bridge rule, generalised per
-   *  slot. Samples and paints the SID panel only when the polled frame actually moved; every other
+  /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` or the
+   *  engine is in varispeed (a hand moves the playhead of a paused deck), and paused while the
+   *  document is hidden — the POC's `animationFrameSignal` bridge rule, generalised per slot.
+   *  Samples and paints the SID panel only when the polled frame actually moved; every other
    *  reason to sample runs through the explicit calls each command already makes. Reschedules
    *  first, so a fault in either cannot end the loop. */
   private watchPosition(slot: Slot): void {
@@ -909,8 +927,13 @@ export class DeckService {
       }
     };
 
+    const moving = (): boolean => {
+      const deck = this.store.deck(slot)();
+      return deck.status === 'playing' || deck.varispeed;
+    };
+
     effect(() => {
-      if (this.store.deck(slot)().status === 'playing') {
+      if (moving()) {
         start();
       } else {
         stop();
@@ -920,7 +943,7 @@ export class DeckService {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stop();
-      } else if (this.store.deck(slot)().status === 'playing') {
+      } else if (moving()) {
         start();
       }
     });

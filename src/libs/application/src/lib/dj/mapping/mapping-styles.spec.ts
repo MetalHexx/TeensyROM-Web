@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { HandTarget } from '../deck-hand';
 import type { MappableControl, ValueDefaults } from './mappable-controls';
 import type { MappingStyleKind } from '../ports';
 import {
@@ -41,7 +42,7 @@ const nudge: MappableControl = {
   set: () => undefined,
 };
 
-function value(defaults: ValueDefaults): MappableControl {
+function value(defaults: ValueDefaults, hand?: HandTarget): MappableControl {
   return {
     identity,
     name: 'V',
@@ -53,6 +54,7 @@ function value(defaults: ValueDefaults): MappableControl {
     defaults,
     read: () => 0,
     set: () => undefined,
+    ...(hand === undefined ? {} : { hand }),
   };
 }
 
@@ -300,12 +302,27 @@ describe('clampGrip', () => {
 });
 
 describe('pitch bend', () => {
-  it('offers no styles on any control yet and defaults to the hand', () => {
+  const withHand = value(
+    { ccStyle: 'absolute', sensitivity: 0.01, stepAmount: 0.1 },
+    { strip: () => undefined, lose: () => undefined }
+  );
+
+  it('offers no style on a control without a hand, and always defaults to the hand', () => {
     for (const nature of ['trigger', 'state', 'hold', 'value'] as const) {
       expect(stylesFor(nature, 'pitch-bend')).toEqual([]);
     }
+    for (const control of [trigger, toggle, held, fader]) {
+      expect(stylesForControl(control, 'pitch-bend')).toEqual([]);
+    }
     expect(defaultStyle(fader, 'pitch-bend')).toEqual({ kind: 'hand', amount: 0.13, grip: 0.25 });
     expect(isStyleAvailableFor(fader, 'pitch-bend', 'hand')).toBe(false);
+  });
+
+  it('offers the hand, and only the hand, on a control that has one', () => {
+    expect(stylesForControl(withHand, 'pitch-bend')).toEqual(['hand']);
+    expect(actionsForControl(withHand, 'pitch-bend')).toEqual(['hand']);
+    expect(isStyleAvailableFor(withHand, 'pitch-bend', 'hand')).toBe(true);
+    expect(stylesForControl(withHand, 'cc')).toEqual(stylesForControl(fader, 'cc'));
   });
 
   it('reads the hand as its own action with no trigger', () => {

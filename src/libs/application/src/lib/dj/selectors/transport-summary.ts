@@ -38,6 +38,8 @@ export interface DeckTransportSummary {
   subtuneCompact: string;
   subtuneDisabled: boolean;
   repeat: boolean;
+  /** A finger is on the deck's pitch bend strip. The word shown for it is the view's to compose. */
+  held: boolean;
   errors: readonly string[];
 }
 
@@ -111,6 +113,7 @@ export function transportSummary(store: WritableStore<DjState>) {
           subtuneCompact: deck.subtuneCount === 0 ? '–/–' : `${deck.subtune}/${deck.subtuneCount}`,
           subtuneDisabled: controlsDisabled || deck.subtuneCount <= 1,
           repeat: deck.repeat,
+          held: deck.handHeld,
           errors: [],
         };
       }),

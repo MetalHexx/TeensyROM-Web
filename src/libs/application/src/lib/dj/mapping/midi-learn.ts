@@ -3,7 +3,7 @@ import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import type { MappingStyleKind, MidiInputMessage } from '../ports';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { describeSource, ownerLabel } from './mapping-labels';
-import { defaultAmountFor, defaultStyle } from './mapping-styles';
+import { defaultAmountFor, defaultStyle, stylesForControl } from './mapping-styles';
 import {
   controlKey,
   sourceKey,
@@ -67,8 +67,9 @@ interface Sampling {
 
 /**
  * Captures a mapping: the first message after a control is selected binds. A CC on a value control
- * is sampled for 1.5 s (or 24 messages) first, so a relative encoder can be told from a fader.
- * Binding a source that drives another control moves it, and the move is announced.
+ * is sampled for 1.5 s (or 24 messages) first, so a relative encoder can be told from a fader. A
+ * pitch bend binds only to a control that takes a hand, and only when it is off centre. Binding a
+ * source that drives another control moves it, and the move is announced.
  */
 @Injectable({ providedIn: 'root' })
 export class MidiLearn {
@@ -113,15 +114,16 @@ export class MidiLearn {
   }
 
   /** Takes a message for learn when one is in progress. Returns true when it was consumed, so it
-   *  must not reach the engine. A note release is never consumed: it may end a hold. A pitch bend
-   *  is not consumed yet. */
+   *  must not reach the engine. A note release is never consumed: it may end a hold. Neither is a
+   *  pitch bend at centre, which may end a hand, nor one offered to a control that takes no hand:
+   *  learn keeps waiting. */
   offer(message: MidiInputMessage, portName: string): boolean {
     const learn = this.store.learn();
     if (learn === null) {
       this.clearSampling();
       return false;
     }
-    if (message.kind === 'pitch-bend') {
+    if (message.kind === 'pitch-bend' && !message.pressed) {
       return false;
     }
     if (learn.phase === 'sampling') {
@@ -135,6 +137,10 @@ export class MidiLearn {
     if (control === null) {
       logWarn(`MidiLearn: ${controlKey(learn.control)} is not a mappable control.`);
       this.cancel();
+      return false;
+    }
+
+    if (message.kind === 'pitch-bend' && stylesForControl(control, 'pitch-bend').length === 0) {
       return false;
     }
 

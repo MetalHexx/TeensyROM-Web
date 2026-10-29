@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MidiInputMessage, MidiSettingsRecord } from '../ports';
+import { PITCH_BEND_CENTRE, type MidiInputMessage, type MidiSettingsRecord } from '../ports';
 import type { ControlIdentity } from './mapping.models';
 import { guessValueStyle } from './midi-learn';
 import {
@@ -92,16 +92,6 @@ describe('MidiLearn', () => {
       expect(h.mappingStore.learn()).toBeNull();
     });
 
-    it('never consumes a pitch bend, leaving the selection waiting', async () => {
-      await start();
-      h.learn.select({ owner: 'A', control: 'seek' });
-
-      h.midiInput.emitPitchBend(PORT, 0);
-
-      expect(h.mappingStore.mappings()).toEqual([]);
-      expect(h.mappingStore.learn()?.phase).toBe('waiting');
-    });
-
     it('moves to another control when a different one is selected', async () => {
       await start();
       h.learn.select(PLAY_A);
@@ -122,6 +112,73 @@ describe('MidiLearn', () => {
 
       expect(h.mappingStore.learn()).toBeNull();
       expect(learned()).toHaveLength(0);
+    });
+  });
+
+  describe('a pitch bend strip', () => {
+    const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
+    const SEEK_B: ControlIdentity = { owner: 'B', control: 'seek' };
+    const bend = (value: number) => h.midiInput.emitPitchBend(PORT, value);
+
+    it('binds off centre onto a control that takes a hand, as the hand', async () => {
+      await start();
+      h.learn.select(SEEK_A);
+
+      bend(12000);
+
+      expect(learned()).toHaveLength(1);
+      expect(learned()[0]).toMatchObject({
+        source: { channel: 1, kind: 'pitch-bend', number: 0 },
+        control: SEEK_A,
+        style: { kind: 'hand', amount: 0.13, grip: 0.25 },
+      });
+      expect(h.mappingStore.learn()).toBeNull();
+    });
+
+    it('never consumes a strip at centre, leaving the selection waiting', async () => {
+      await start();
+      h.learn.select(SEEK_A);
+
+      bend(PITCH_BEND_CENTRE);
+
+      expect(learned()).toEqual([]);
+      expect(h.mappingStore.learn()?.phase).toBe('waiting');
+    });
+
+    it('does not consume a strip offered to a control that takes no hand, and keeps waiting', async () => {
+      await start();
+      h.learn.select(PLAY_A);
+
+      bend(12000);
+      bend(4000);
+
+      expect(learned()).toEqual([]);
+      expect(h.mappingStore.learn()).toMatchObject({ control: PLAY_A, phase: 'waiting' });
+      expect(h.mappingStore.controllers()).toEqual([]);
+    });
+
+    it("moves a strip learned onto the other deck's seek", async () => {
+      await start({
+        controllers: [SAVED_CONTROLLER],
+        mappings: [
+          {
+            id: 'hand-a',
+            source: { controllerId: LAUNCH_CONTROL, channel: 1, kind: 'pitch-bend', number: 0 },
+            owner: 'A',
+            control: 'seek',
+            style: { kind: 'hand', amount: 0.13, grip: 0.25 },
+          },
+        ],
+      });
+      h.learn.select(SEEK_B);
+
+      bend(12000);
+
+      expect(learned()).toHaveLength(1);
+      expect(learned()[0].control).toEqual(SEEK_B);
+      expect(h.mappingStore.announcement()).toBe(
+        `Seek, deck B, bound to ${NAME} · ch 1 · Pitch bend, moved from Seek, deck A`
+      );
     });
   });
 

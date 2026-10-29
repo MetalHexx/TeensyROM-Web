@@ -2,6 +2,7 @@ import { withMethods } from '@ngrx/signals';
 import { DjState, WritableStore } from '../dj-store';
 import { setDeckStatus } from './set-deck-status';
 import { setDeckBusy } from './set-deck-busy';
+import { setDeckHand } from './set-deck-hand';
 import { setDeckLoaded } from './set-deck-loaded';
 import { setDeckStructure } from './set-deck-structure';
 import { samplePosition } from './sample-position';
@@ -42,6 +43,7 @@ export function withDjActions() {
     return {
       ...setDeckStatus(writableStore),
       ...setDeckBusy(writableStore),
+      ...setDeckHand(writableStore),
       ...setDeckLoaded(writableStore),
       ...setDeckStructure(writableStore),
       ...samplePosition(writableStore),

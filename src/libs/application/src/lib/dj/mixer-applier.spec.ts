@@ -11,7 +11,12 @@ import { engineSettingsOf } from './mixer/engine-settings';
 import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, type DeckDetectedKey } from './dj-store';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  REGISTER_RECORDER_FACTORY,
+  MIDI_ACCESS,
+} from './ports';
 import type {
   IMidiAccess,
   MidiAccessState,
@@ -81,6 +86,10 @@ describe('MixerApplier', () => {
       providers: [
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess() },
         { provide: DeckLoops, useValue: { saveSettingsInPlay: vi.fn() } },
       ],
