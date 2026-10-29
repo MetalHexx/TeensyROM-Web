@@ -70,6 +70,12 @@ export const Open: Story = {
   }),
 };
 
+/** The open popover must fit a 390px viewport: columns shrink and long names truncate rather than overflow. */
+export const OpenPhone: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  render: Open.render,
+};
+
 export const AllValues: Story = {
   render: () => ({
     props: { palette: C64_PALETTE },

@@ -8,8 +8,8 @@ describe('C64ColorPickerComponent', () => {
   let emitted: number[];
 
   beforeEach(async () => {
-  // jsdom has no layout, so CDK's focus trap sees every element as hidden and skips it.
-  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    // jsdom has no layout, so CDK's focus trap sees every element as hidden and skips it.
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
     await TestBed.configureTestingModule({
       imports: [C64ColorPickerComponent],
       providers: [provideNoopAnimations()],
@@ -63,6 +63,9 @@ describe('C64ColorPickerComponent', () => {
     await open();
 
     expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe(
+      'Choose a color for Background'
+    );
     expect(document.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe(
       'Choose a color for Background'
     );

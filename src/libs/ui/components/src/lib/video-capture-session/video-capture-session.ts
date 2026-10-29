@@ -28,6 +28,8 @@ export class VideoCaptureSession implements OnDestroy {
   private readonly hasEnumeratedSignal = signal<boolean>(false);
   private openTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  /** Bumped by stop() and every open(); an async step that sees a newer value is stale and discards its result. */
+  private generation = 0;
 
   readonly devices: Signal<VideoDevice[]> = this.devicesSignal.asReadonly();
   readonly selectedDeviceId: Signal<string | null> = this.selectedDeviceIdSignal.asReadonly();
@@ -45,6 +47,7 @@ export class VideoCaptureSession implements OnDestroy {
    */
   async start(preferredDeviceId: () => string): Promise<void> {
     this.stop();
+    const generation = this.generation;
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -67,7 +70,7 @@ export class VideoCaptureSession implements OnDestroy {
 
       stopVideoStream(permissionStream);
 
-      if (this.destroyed) return;
+      if (this.destroyed || generation !== this.generation) return;
 
       this.devicesSignal.set(videoInputs);
       this.hasEnumeratedSignal.set(true);
@@ -99,13 +102,18 @@ export class VideoCaptureSession implements OnDestroy {
     await this.open(deviceId);
   }
 
-  /** Stops the held stream and cancels a pending open. */
+  /**
+   * Stops the held stream and clears it, cancels a pending open, and discards the
+   * result of any start or select still awaiting the browser.
+   */
   stop(): void {
+    this.generation++;
     if (this.openTimer !== null) {
       clearTimeout(this.openTimer);
       this.openTimer = null;
     }
     stopVideoStream(this.streamSignal());
+    this.streamSignal.set(null);
   }
 
   ngOnDestroy(): void {
@@ -114,11 +122,12 @@ export class VideoCaptureSession implements OnDestroy {
   }
 
   private async open(deviceId: string): Promise<void> {
+    const generation = ++this.generation;
     try {
       stopVideoStream(this.streamSignal());
 
       const stream = await openVideoStream(deviceId);
-      if (this.destroyed) {
+      if (this.destroyed || generation !== this.generation) {
         stopVideoStream(stream);
         return;
       }

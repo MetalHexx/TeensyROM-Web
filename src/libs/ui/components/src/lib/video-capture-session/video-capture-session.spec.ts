@@ -163,4 +163,50 @@ describe('VideoCaptureSession', () => {
     // the select and start's permission probe; the pending open never fires
     expect(getUserMedia).toHaveBeenCalledTimes(2);
   });
+
+  it('stop stops the stream and clears it', async () => {
+    const { streams } = mockMediaDevices([{ deviceId: 'cam-a', label: 'A' }]);
+    await session.select('cam-a');
+
+    session.stop();
+
+    expect(streams[0].stop).toHaveBeenCalled();
+    expect(session.stream()).toBeNull();
+  });
+
+  it('stop during a pending select discards the late stream and stops its tracks', async () => {
+    const { getUserMedia, streams } = mockMediaDevices([{ deviceId: 'cam-a', label: 'A' }]);
+    const pending = session.select('cam-a');
+
+    session.stop();
+    await pending;
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(streams[0].stop).toHaveBeenCalled();
+    expect(session.stream()).toBeNull();
+  });
+
+  it('stop during start enumeration keeps the session stopped', async () => {
+    const { getUserMedia, streams } = mockMediaDevices([{ deviceId: 'cam-a', label: 'A' }]);
+    const pending = session.start(() => '');
+
+    session.stop();
+    await pending;
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(streams[0].stop).toHaveBeenCalled();
+    expect(session.stream()).toBeNull();
+    expect(session.hasEnumerated()).toBe(false);
+  });
+
+  it('a newer select supersedes one still pending', async () => {
+    const { streams } = mockMediaDevices([]);
+    const first = session.select('cam-a');
+    const second = session.select('cam-b');
+    await Promise.all([first, second]);
+
+    expect(streams[0].stop).toHaveBeenCalled();
+    expect(session.stream()).toBe(streams[1].stream);
+  });
 });

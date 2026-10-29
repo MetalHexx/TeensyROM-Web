@@ -13,7 +13,7 @@
     <mat-icon class="trigger-arrow" aria-hidden="true">arrow_drop_down</mat-icon>
   </button>
 
-  <div dialog-content class="popover">
+  <div dialog-content class="popover" role="dialog" [attr.aria-label]="'Choose a color for ' + label()">
     <lib-compact-card-layout cardClass="glassy-card">
       <div class="grid" role="radiogroup" [attr.aria-label]="'Choose a color for ' + label()">
         @for (color of palette; track color.index) {

@@ -190,8 +190,8 @@ describe('DropdownDialogComponent', () => {
     let trigger: HTMLButtonElement;
 
     beforeEach(async () => {
-    // jsdom has no layout, so CDK's focus trap sees every element as hidden and skips it.
-    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+      // jsdom has no layout, so CDK's focus trap sees every element as hidden and skips it.
+      vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
       await TestBed.resetTestingModule();
       await TestBed.configureTestingModule({
         imports: [FocusHostComponent],
@@ -228,6 +228,19 @@ describe('DropdownDialogComponent', () => {
       expect(host.componentInstance.closedCount).toBe(1);
       expect(document.querySelector('.first-inside')).toBeNull();
       expect(document.activeElement).toBe(trigger);
+    });
+
+    it('wraps focus from the trap end anchor back to the first tabbable inside the popup', async () => {
+      trigger.click();
+      await vi.waitFor(() => {
+        expect(document.activeElement?.classList.contains('first-inside')).toBe(true);
+      });
+
+      const anchors = document.querySelectorAll<HTMLElement>('.cdk-focus-trap-anchor');
+      (document.querySelector('.second-inside') as HTMLElement).focus();
+      anchors[anchors.length - 1].focus();
+
+      expect(document.activeElement?.classList.contains('first-inside')).toBe(true);
     });
 
     it('does not emit closed again when close() is called after it already closed', () => {
