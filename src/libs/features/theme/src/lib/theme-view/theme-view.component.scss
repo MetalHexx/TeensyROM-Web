@@ -22,12 +22,34 @@
       'list actions';
   }
 
+  &.with-preview {
+    grid-template-areas:
+      'list colors'
+      'list preview'
+      'list actions';
+
+    @include breakpoints.screen-tablet {
+      grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr) minmax(16rem, 24rem);
+      grid-template-areas:
+        'list colors preview'
+        'list colors actions';
+    }
+  }
+
   @include breakpoints.below-phone {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'list'
       'colors'
       'actions';
+
+    &.with-preview {
+      grid-template-areas:
+        'list'
+        'colors'
+        'preview'
+        'actions';
+    }
   }
 }
 
@@ -39,12 +61,17 @@
   grid-area: colors;
 }
 
+.area-preview {
+  grid-area: preview;
+}
+
 .area-actions {
   grid-area: actions;
 }
 
 .area-list,
 .area-colors,
+.area-preview,
 .area-actions {
   display: block;
   min-width: 0;

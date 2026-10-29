@@ -1,0 +1,42 @@
+<lib-scaling-compact-card [enableOverflow]="true">
+  <div class="preview">
+    <lib-content-overlay-container [showOverlaysOnHover]="!selectorOpen()">
+      <lib-video-stream content [stream]="session.stream()" objectFit="contain" />
+
+      <lib-video-device-selector
+        topRightCorner
+        [visible]="showSelector()"
+        [devices]="session.devices()"
+        [selectedDeviceId]="session.selectedDeviceId() ?? ''"
+        (deviceSelected)="onCameraSelected($event)"
+        (openedChange)="selectorOpen.set($event)"
+      />
+
+      <lib-video-controls-toolbar
+        rightControls
+        [showCrtToggle]="false"
+        [showCrtSettings]="false"
+        [showFullscreen]="false"
+        [showClose]="false"
+        [isDeviceSelectorActive]="showSelector()"
+        (deviceSelectorClick)="toggleSelector()"
+      />
+    </lib-content-overlay-container>
+
+    @if (session.permissionDenied()) {
+      <lib-empty-state-message
+        class="preview-message"
+        icon="videocam_off"
+        title="Camera permission denied"
+        message="Allow camera access in your browser settings."
+      />
+    } @else if (session.hasEnumerated() && !session.hasDevices()) {
+      <lib-empty-state-message
+        class="preview-message"
+        icon="videocam_off"
+        title="No video capture device"
+        message="Connect a USB video capture device to see the C64’s screen here."
+      />
+    }
+  </div>
+</lib-scaling-compact-card>

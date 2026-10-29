@@ -1,5 +1,36 @@
 <lib-scaling-compact-card>
+  @if (store.showApplyTarget()) {
+    <div class="apply-target">
+      <span class="control-label" id="apply-to">Apply to</span>
+      <lib-segmented-control
+        [options]="targetOptions()"
+        [selectedId]="store.effectiveApplyTarget()"
+        accessibleName="Apply to"
+        (optionSelect)="store.setApplyTarget($event)"
+      />
+    </div>
+  }
+  @if (store.connectedDevices().length === 0) {
+    <lib-icon-label
+      class="no-device"
+      icon="usb_off"
+      color="dimmed"
+      label="Connect a TeensyROM to apply a theme."
+      [truncate]="false"
+      role="status"
+    />
+  }
   <div class="actions">
+    <lib-action-button
+      icon="check"
+      label="Apply"
+      variant="flat"
+      color="primary"
+      [fullWidth]="false"
+      [disabled]="!store.canApply()"
+      (buttonClick)="onApply()"
+    />
+
     <span class="save-wrapper" [libTooltip]="saveTooltip()">
       <lib-action-button
         icon="save"

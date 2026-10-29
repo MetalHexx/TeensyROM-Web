@@ -66,3 +66,19 @@ export function validateThemeName(name: string, existingNames: string[]): string
   }
   return '';
 }
+
+/** Joins names as `A`, `A and B` or `A, B and C`. */
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) {
+    return names.join('');
+  }
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** The Apply confirmation paragraph, naming the theme when the colors are an unchanged theme. */
+export function applyConfirmText(themeName: string | null, deviceNames: string[]): string {
+  const devices = joinNames(deviceNames);
+  return themeName
+    ? `Applying “${themeName}” resets the C64 and ends whatever it is running. This will apply the theme to ${devices}.`
+    : `Applying these colors resets the C64 and ends whatever it is running. This will apply them to ${devices}.`;
+}

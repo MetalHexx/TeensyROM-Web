@@ -3,10 +3,11 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, WritableSignal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
-import { ColorThemeStore } from '@teensyrom-nx/application';
-import { ColorTheme, ColorThemeKind, DeviceColors } from '@teensyrom-nx/domain';
+import { ColorThemeStore, SettingsStore } from '@teensyrom-nx/application';
+import { ColorTheme, ColorThemeKind, Device, DeviceColors } from '@teensyrom-nx/domain';
 import { ThemeViewComponent } from './theme-view.component';
 import { ThemeColorsCardComponent } from './theme-colors-card/theme-colors-card.component';
+import { ThemePreviewComponent } from './theme-preview/theme-preview.component';
 import { ThemeListComponent } from './theme-list/theme-list.component';
 import { By } from '@angular/platform-browser';
 import { recordInfoText, themeSubtitle, validateThemeName } from './theme-texts';
@@ -34,7 +35,10 @@ describe('ThemeViewComponent', () => {
   let selectedTheme: WritableSignal<ColorTheme | null>;
   let isEdited: WritableSignal<boolean>;
   let recordState: WritableSignal<unknown>;
+  let targetDevices: WritableSignal<Device[]>;
+  let videoEnabled: Record<string, WritableSignal<boolean>>;
   let store: Record<string, unknown> & {
+    loadMissingRecords: ReturnType<typeof vi.fn>;
     initialize: ReturnType<typeof vi.fn>;
     selectTheme: ReturnType<typeof vi.fn>;
     setSlotColor: ReturnType<typeof vi.fn>;
@@ -44,7 +48,16 @@ describe('ThemeViewComponent', () => {
     selectedTheme = signal<ColorTheme | null>(shipped);
     isEdited = signal(false);
     recordState = signal({ kind: 'none' });
+    targetDevices = signal<Device[]>([]);
+    videoEnabled = { d1: signal(false), d2: signal(false) };
     store = {
+      loadMissingRecords: vi.fn(),
+      connectedDevices: targetDevices,
+      targetDevices,
+      showApplyTarget: signal(false),
+      effectiveApplyTarget: signal('all'),
+      canApply: signal(false),
+      unchangedThemeId: signal<string | null>(null),
       themes: signal([shipped, custom]),
       shippedThemes: signal([shipped]),
       customThemes: signal([custom]),
@@ -67,6 +80,14 @@ describe('ThemeViewComponent', () => {
       imports: [ThemeViewComponent],
       providers: [
         { provide: ColorThemeStore, useValue: store },
+        {
+          provide: SettingsStore,
+          useValue: {
+            enableVideoForDevice: (id: string) => videoEnabled[id],
+            videoDeviceIdForDevice: () => signal(''),
+            updateDeviceVideoDeviceId: vi.fn(),
+          },
+        },
         { provide: MatDialog, useValue: { open: vi.fn() } },
         provideNoopAnimations(),
       ],
@@ -77,6 +98,42 @@ describe('ThemeViewComponent', () => {
 
   it('initializes the store on init', () => {
     expect(store.initialize).toHaveBeenCalledTimes(1);
+  });
+
+  describe('preview', () => {
+    const preview = () => fixture.debugElement.query(By.directive(ThemePreviewComponent));
+    const setDevices = (...ids: string[]) => {
+      targetDevices.set(ids.map((id) => ({ deviceId: id, name: id }) as Device));
+      fixture.detectChanges();
+    };
+
+    it('is absent without a target device that has video enabled', () => {
+      setDevices('d1', 'd2');
+
+      expect(preview()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.theme-view.with-preview')).toBeNull();
+    });
+
+    it('previews the first target device with video enabled', () => {
+      videoEnabled['d2'].set(true);
+      setDevices('d1', 'd2');
+
+      expect(preview().componentInstance.deviceId()).toBe('d2');
+
+      videoEnabled['d1'].set(true);
+      fixture.detectChanges();
+
+      expect(preview().componentInstance.deviceId()).toBe('d1');
+    });
+  });
+
+  it('loads missing records when the connected devices change', () => {
+    const calls = store.loadMissingRecords.mock.calls.length;
+
+    targetDevices.set([{ deviceId: 'd1', name: 'd1' } as Device]);
+    fixture.detectChanges();
+
+    expect(store.loadMissingRecords.mock.calls.length).toBeGreaterThan(calls);
   });
 
   it('selects a theme through the store when the list emits', () => {

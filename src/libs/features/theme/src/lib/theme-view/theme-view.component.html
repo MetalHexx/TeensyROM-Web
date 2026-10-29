@@ -1,4 +1,4 @@
-<div class="theme-view">
+<div class="theme-view" [class.with-preview]="previewDeviceId() !== null">
   <lib-theme-list
     class="area-list"
     [shipped]="store.shippedThemes()"
@@ -13,5 +13,8 @@
     [infoText]="infoText()"
     (colorChange)="onColorChange($event)"
   />
+  @if (previewDeviceId(); as deviceId) {
+    <lib-theme-preview class="area-preview" [deviceId]="deviceId" />
+  }
   <lib-theme-actions class="area-actions" />
 </div>

@@ -1,20 +1,28 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ColorThemeStore } from '@teensyrom-nx/application';
-import { ColorThemeKind } from '@teensyrom-nx/domain';
+import { APPLY_TO_ALL_DEVICES, ColorThemeKind } from '@teensyrom-nx/domain';
 import {
   ActionButtonComponent,
   ConfirmationDialogComponent,
   DropdownDialogComponent,
+  IconLabelComponent,
   PresetNameDialogComponent,
   ScalingCompactCardComponent,
+  SegmentedControlComponent,
+  SegmentedControlOption,
   TooltipConfig,
   TooltipDirective,
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
-import { MAX_THEME_NAME_LENGTH, READ_ONLY_TEXT, validateThemeName } from '../theme-texts';
+import {
+  applyConfirmText,
+  MAX_THEME_NAME_LENGTH,
+  READ_ONLY_TEXT,
+  validateThemeName,
+} from '../theme-texts';
 
-/** The editing buttons of the Theme view: Save, Save as and Delete. */
+/** The Theme view's actions card: the Apply target chooser, Apply, Save, Save as and Delete. */
 @Component({
   selector: 'lib-theme-actions',
   imports: [
@@ -23,6 +31,8 @@ import { MAX_THEME_NAME_LENGTH, READ_ONLY_TEXT, validateThemeName } from '../the
     DropdownDialogComponent,
     PresetNameDialogComponent,
     TooltipDirective,
+    SegmentedControlComponent,
+    IconLabelComponent,
   ],
   templateUrl: './theme-actions.component.html',
   styleUrl: './theme-actions.component.scss',
@@ -51,7 +61,41 @@ export class ThemeActionsComponent {
     const theme = this.store.selectedTheme();
     return theme ? `${theme.name} copy`.slice(0, MAX_THEME_NAME_LENGTH) : '';
   });
+  protected readonly targetOptions = computed<SegmentedControlOption[]>(() => [
+    { id: APPLY_TO_ALL_DEVICES, label: 'All connected devices' },
+    ...this.store.connectedDevices().map((d) => ({ id: d.deviceId, label: d.name })),
+  ]);
   protected readonly themeNames = computed(() => this.store.themes().map((t) => t.name));
+
+  protected onApply(): void {
+    const themeId = this.store.unchangedThemeId();
+    const themeName = themeId ? (this.store.themes().find((t) => t.id === themeId)?.name ?? null) : null;
+    const message = applyConfirmText(
+      themeName,
+      this.store.targetDevices().map((d) => d.name)
+    );
+    const confirmRef = this.dialog.open(ConfirmationDialogComponent, {
+      disableClose: true,
+      panelClass: 'glassy-dialog',
+      backdropClass: 'busy-dialog-backdrop',
+    });
+
+    confirmRef.componentRef?.setInput('title', 'Apply theme?');
+    confirmRef.componentRef?.setInput('message', message);
+    confirmRef.componentRef?.setInput('confirmLabel', 'Apply');
+    confirmRef.componentRef?.setInput('confirmIcon', 'check');
+    confirmRef.componentRef?.setInput('cancelLabel', 'Cancel');
+    confirmRef.componentRef?.setInput('showLabels', true);
+    confirmRef.componentRef?.setInput('confirmColor', 'primary');
+
+    confirmRef.componentInstance.confirmed.subscribe(() => {
+      confirmRef.close();
+      void this.store.apply();
+    });
+    confirmRef.componentInstance.cancelled.subscribe(() => {
+      confirmRef.close();
+    });
+  }
 
   protected onSave(): void {
     void this.store.saveSelected();
