@@ -210,6 +210,20 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchAsidPlayer
         }
 
         [Fact]
+        public async Task Handle_SerialDeviceWhoseLivePortIsNotTheCommandsPort_LaunchesOnTheLivePortAndContainsFailures()
+        {
+            var retiredTcpPort = BuildTcpDevice();
+            var silentSerialPort = new ScriptedCommunicationPort();
+            BuildDevice(silentSerialPort);
+
+            var result = await BuildHandler().Handle(BuildCommand(retiredTcpPort), CancellationToken.None);
+
+            result.IsSuccess.Should().BeFalse();
+            ShouldHaveSentNothing(retiredTcpPort);
+            silentSerialPort.Written.Should().NotBeEmpty();
+        }
+
+        [Fact]
         public async Task Handle_ExchangeThrowsOnTheCommandsOwnPort_Propagates()
         {
             var silentPort = new ScriptedCommunicationPort();

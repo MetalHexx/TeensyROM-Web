@@ -32,7 +32,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchAsidPlayer
             }
 
             var launchDevice = device;
-            var launchPort = r.CommunicationPort;
+            var launchPort = device.CommunicationPort;
             var movedToSerial = false;
 
             if (device.ConnectionType == ConnectionType.Tcp)
