@@ -7,6 +7,7 @@ apis/FilesApi.ts
 apis/MidiSettingsApi.ts
 apis/PlayerApi.ts
 apis/SettingsApi.ts
+apis/ThemesApi.ts
 apis/TransfersApi.ts
 apis/VersionApi.ts
 apis/WatchFoldersApi.ts
@@ -15,6 +16,8 @@ index.ts
 models/AddWatchFolderBody.ts
 models/AddWatchFolderResponse.ts
 models/AppSettingsDto.ts
+models/ApplyDeviceThemeBody.ts
+models/ApplyDeviceThemeResponse.ts
 models/AudioDeviceDto.ts
 models/AudioSettingsDto.ts
 models/BanFileResponse.ts
@@ -29,8 +32,11 @@ models/CreateJobBody.ts
 models/CreateJobResponse.ts
 models/DeckDeviceBindingDto.ts
 models/DeleteDjSetResponse.ts
+models/DeleteThemeResponse.ts
 models/DeviceSettingsDto.ts
 models/DeviceState.ts
+models/DeviceThemePartDto.ts
+models/DeviceThemeRecordDto.ts
 models/DirectoryItemDto.ts
 models/DjLibraryStateDto.ts
 models/DjLoopBoundaryDto.ts
@@ -53,12 +59,14 @@ models/FileTransferSettingsDto.ts
 models/FindDevicesResponse.ts
 models/ForgetDeviceResponse.ts
 models/GetActiveJobResponse.ts
+models/GetDeviceThemeResponse.ts
 models/GetDirectoryResponse.ts
 models/GetDjLibraryStateResponse.ts
 models/GetDjSetResponse.ts
 models/GetJobResponse.ts
 models/GetMidiSettingsResponse.ts
 models/GetSettingsResponse.ts
+models/GetThemeResponse.ts
 models/GetTuneMemoryResponse.ts
 models/GetVersionResponse.ts
 models/GetWatchFoldersResponse.ts
@@ -75,6 +83,7 @@ models/LiftBanResponse.ts
 models/ListDevicesResponse.ts
 models/ListDjSetsResponse.ts
 models/ListJobsResponse.ts
+models/ListThemesResponse.ts
 models/MachineType.ts
 models/MidiControlMappingDto.ts
 models/MidiMappingStyleDto.ts
@@ -97,6 +106,8 @@ models/SaveMidiSettingsRequest.ts
 models/SaveMidiSettingsResponse.ts
 models/SaveSettingsRequest.ts
 models/SaveSettingsResponse.ts
+models/SaveThemeBody.ts
+models/SaveThemeResponse.ts
 models/SaveTuneMemoryResponse.ts
 models/SealJobResponse.ts
 models/SearchResponse.ts
@@ -110,6 +121,9 @@ models/StopEngineResponse.ts
 models/StorageCacheDto.ts
 models/TeensyFilterType.ts
 models/TeensyStorageType.ts
+models/ThemeDto.ts
+models/ThemeKind.ts
+models/ThemePartsDto.ts
 models/ToggleMusicResponse.ts
 models/TransferFileCompleted.ts
 models/TransferJobDto.ts

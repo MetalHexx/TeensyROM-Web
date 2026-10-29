@@ -721,6 +721,392 @@
         }
       }
     },
+    "/api/themes/{themeId}": {
+      "put": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Update Theme",
+        "description": "Replaces the name and colors of a custom theme. The id does not change.\n\nShipped themes can't be changed; save a copy with a new name instead.\n\n**Validation:**\n- The theme id is lowercase letters, digits and single hyphens\n- Name is 1-24 characters after trimming, with no control characters\n- Each device color is 0-15\n- The name is not used by another theme",
+        "operationId": "UpdateTheme",
+        "parameters": [
+          {
+            "name": "themeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveThemeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Get Theme",
+        "description": "Reads one shipped or custom theme.\n\n**Validation:**\n- The theme id is lowercase letters, digits and single hyphens",
+        "operationId": "GetTheme",
+        "parameters": [
+          {
+            "name": "themeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Delete Theme",
+        "description": "Deletes a custom theme file. Shipped themes can't be deleted.\n\nDevice records that name the theme are kept.\n\n**Validation:**\n- The theme id is lowercase letters, digits and single hyphens",
+        "operationId": "DeleteTheme",
+        "parameters": [
+          {
+            "name": "themeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes": {
+      "get": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "List Themes",
+        "description": "Lists every theme: the shipped themes by sort order, then the custom themes by name.\n\nA custom theme whose file is corrupt is skipped and left on disk.",
+        "operationId": "ListThemes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListThemesResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Create Theme",
+        "description": "Saves a new custom theme. The id is generated from the name.\n\n**Validation:**\n- Name is 1-24 characters after trimming, with no control characters\n- Each device color is 0-15\n- The name is not used by another theme",
+        "operationId": "CreateTheme",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveThemeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{deviceId}/theme": {
+      "get": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Get Device Theme",
+        "description": "Reads the colors last applied to a device. The device does not need to be connected.\n\nA device with no record reports the factory colors with isRecorded false.\n\n**Validation:**\n- The device id is 1-32 letters, digits, hyphens or underscores",
+        "operationId": "GetDeviceTheme",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDeviceThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Themes"
+        ],
+        "summary": "Apply Device Theme",
+        "description": "Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.\n\n- Resets the C64 and ends whatever is running.\n- The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors.\n- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.\n\n**Validation:**\n- The device id is 1-32 letters, digits, hyphens or underscores\n- Each color is 0-15\n- The theme id, when given, is lowercase letters, digits and single hyphens",
+        "operationId": "ApplyDeviceTheme",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyDeviceThemeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyDeviceThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "post": {
         "tags": [
@@ -2856,6 +3242,32 @@
           }
         }
       },
+      "ApplyDeviceThemeBody": {
+        "required": [
+          "colors"
+        ],
+        "type": "object",
+        "properties": {
+          "colors": {
+            "$ref": "#/components/schemas/DeviceThemePartDto"
+          },
+          "themeId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApplyDeviceThemeResponse": {
+        "required": [
+          "record"
+        ],
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/DeviceThemeRecordDto"
+          }
+        }
+      },
       "AppSettingsDto": {
         "required": [
           "firstTimeSetup"
@@ -3186,6 +3598,17 @@
           }
         }
       },
+      "DeleteThemeResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "DeviceSettingsDto": {
         "required": [
           "deviceId",
@@ -3217,6 +3640,76 @@
           "Busy",
           "Unknown"
         ]
+      },
+      "DeviceThemePartDto": {
+        "required": [
+          "background",
+          "border",
+          "banner",
+          "time",
+          "option",
+          "sources",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "background": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "border": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "banner": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "time": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "option": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sources": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DeviceThemeRecordDto": {
+        "required": [
+          "deviceId",
+          "colors",
+          "isRecorded"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "colors": {
+            "$ref": "#/components/schemas/DeviceThemePartDto"
+          },
+          "themeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isRecorded": {
+            "type": "boolean"
+          }
+        }
       },
       "DirectoryItemDto": {
         "required": [
@@ -3792,6 +4285,17 @@
           }
         }
       },
+      "GetDeviceThemeResponse": {
+        "required": [
+          "record"
+        ],
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/DeviceThemeRecordDto"
+          }
+        }
+      },
       "GetDirectoryResponse": {
         "required": [
           "storageItem",
@@ -3890,6 +4394,17 @@
           },
           "appSettings": {
             "$ref": "#/components/schemas/AppSettingsDto"
+          }
+        }
+      },
+      "GetThemeResponse": {
+        "required": [
+          "theme"
+        ],
+        "type": "object",
+        "properties": {
+          "theme": {
+            "$ref": "#/components/schemas/ThemeDto"
           }
         }
       },
@@ -4142,6 +4657,20 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TransferJobDto"
+            }
+          }
+        }
+      },
+      "ListThemesResponse": {
+        "required": [
+          "themes"
+        ],
+        "type": "object",
+        "properties": {
+          "themes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThemeDto"
             }
           }
         }
@@ -4520,6 +5049,32 @@
           }
         }
       },
+      "SaveThemeBody": {
+        "required": [
+          "name",
+          "device"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceThemePartDto"
+          }
+        }
+      },
+      "SaveThemeResponse": {
+        "required": [
+          "theme"
+        ],
+        "type": "object",
+        "properties": {
+          "theme": {
+            "$ref": "#/components/schemas/ThemeDto"
+          }
+        }
+      },
       "SaveTuneMemoryResponse": {
         "required": [
           "message"
@@ -4749,6 +5304,46 @@
           "SD",
           "USB"
         ]
+      },
+      "ThemeDto": {
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "parts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ThemeKind"
+          },
+          "parts": {
+            "$ref": "#/components/schemas/ThemePartsDto"
+          }
+        }
+      },
+      "ThemeKind": {
+        "enum": [
+          "Shipped",
+          "Custom"
+        ]
+      },
+      "ThemePartsDto": {
+        "required": [
+          "device"
+        ],
+        "type": "object",
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/DeviceThemePartDto"
+          }
+        }
       },
       "ToggleMusicResponse": {
         "required": [
@@ -5297,6 +5892,9 @@
     },
     {
       "name": "Transfers"
+    },
+    {
+      "name": "Themes"
     },
     {
       "name": "Settings"
