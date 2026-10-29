@@ -24,6 +24,7 @@ namespace TeensyRom.Api.Endpoints.Themes.ApplyDeviceTheme
                     "Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.\n\n" +
                     "- Resets the C64 and ends whatever is running.\n" +
                     "- The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors.\n" +
+                    "- Still answers 200 when the record cannot be written. The colors reached the device and `isRecorded` is false.\n" +
                     "- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.\n\n" +
                     "**Validation:**\n" +
                     "- The device id is 1-32 letters, digits, hyphens or underscores\n" +
@@ -64,9 +65,9 @@ namespace TeensyRom.Api.Endpoints.Themes.ApplyDeviceTheme
             var themeId = r.Body.ThemeId is { } id && store.GetTheme(id)?.Parts.Device == colors ? id : null;
             var record = new DeviceThemeRecord(device.Cart.DeviceId, colors, themeId, DateTimeOffset.UtcNow);
 
-            store.SaveDeviceRecord(record);
+            var saved = store.SaveDeviceRecord(record);
 
-            Response = new() { Record = ThemeMapping.ToDto(record) };
+            Response = new() { Record = ThemeMapping.ToDto(record) with { IsRecorded = saved } };
             Send();
         }
     }

@@ -1,3 +1,4 @@
+using System.Text;
 using TeensyRom.Api.Endpoints.Themes;
 using TeensyRom.Api.Endpoints.Themes.ApplyDeviceTheme;
 using TeensyRom.Api.Endpoints.Themes.CreateTheme;
@@ -91,6 +92,31 @@ namespace TeensyRom.Api.Tests.Integration.Themes
             var read = await f.Client.GetAsync<GetDeviceThemeEndpoint, GetDeviceThemeRequest, GetDeviceThemeResponse>(new() { DeviceId = id });
             read.Content.Record.IsRecorded.Should().BeTrue();
             read.Content.Record.Colors.Should().Be(Colors(5));
+        }
+
+        [Theory]
+        [InlineData("{}")]
+        [InlineData("{\"colors\":{\"background\":1,\"border\":1,\"banner\":1,\"time\":1,\"option\":1,\"sources\":1}}")]
+        public async Task ApplyToADevice_WithColorsMissing_AnswersBadRequestAndResetsNothing(string json)
+        {
+            var id = f.DeviceManager.Devices[0].DeviceId;
+            var port = f.DeviceManager.PortFor(id);
+            var resetsBefore = port.ResetCount;
+
+            var response = await f.RawClient.PutAsync($"/api/devices/{id}/theme", new StringContent(json, Encoding.UTF8, "application/json"));
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            port.ResetCount.Should().Be(resetsBefore);
+        }
+
+        [Theory]
+        [InlineData("{\"name\":\"Mine\"}")]
+        [InlineData("{\"device\":{\"background\":1,\"border\":1,\"banner\":1,\"time\":1,\"option\":1,\"sources\":1,\"name\":1}}")]
+        public async Task CreateTheme_WithMembersMissing_AnswersBadRequest(string json)
+        {
+            var response = await f.RawClient.PostAsync("/api/themes", new StringContent(json, Encoding.UTF8, "application/json"));
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
     }
 }

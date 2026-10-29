@@ -10,6 +10,7 @@ namespace TeensyRom.Api.Middleware
     /// <summary>
     /// Middleware to catch and log unhandled exceptions during HTTP request processing.
     /// Logs to disk with rolling date-based files.
+    /// A request the framework rejects as malformed (an unreadable body, a missing required member) keeps its own 4xx status instead of becoming a 500.
     /// </summary>
     public class ExceptionMiddleware
     {
@@ -73,14 +74,16 @@ namespace TeensyRom.Api.Middleware
 
         private static async Task HandleExceptionResponseAsync(HttpContext context, Exception ex)
         {
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            var status = ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError;
+
+            context.Response.StatusCode = status;
             context.Response.ContentType = "application/problem+json";
 
             var problemDetails = new ProblemDetails
             {
                 Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
                 Title = "An error occurred while processing your request.",
-                Status = StatusCodes.Status500InternalServerError,
+                Status = status,
                 Detail = ex.Message,
                 Instance = context.Request.Path
             };

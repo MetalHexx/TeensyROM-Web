@@ -20,7 +20,7 @@ public class ThemeWriteEndpointTests
         await endpoint.Handle(new CreateThemeRequest { Body = ThemeTestData.Body() }, CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Theme.Id.Should().Be("mine");
+        endpoint.Response!.Theme.Id.Should().Be("mine");
         _store.Received().CreateCustom("Mine", ThemeTestData.Colors());
     }
 
@@ -46,7 +46,7 @@ public class ThemeWriteEndpointTests
         await endpoint.Handle(new UpdateThemeRequest { ThemeId = "mine", Body = ThemeTestData.Body() }, CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Theme.Name.Should().Be("Mine");
+        endpoint.Response!.Theme.Name.Should().Be("Mine");
     }
 
     [Theory]

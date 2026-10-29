@@ -20,9 +20,9 @@ public class ThemeReadEndpointTests
         await endpoint.Handle(CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Themes.Select(t => t.Id).Should().Equal("a", "b");
-        endpoint.Response.Themes[0].Kind.Should().Be(ThemeKind.Custom);
-        endpoint.Response.Themes[0].Parts.Device.Border.Should().Be(3);
+        endpoint.Response!.Themes.Select(t => t.Id).Should().Equal("a", "b");
+        endpoint.Response!.Themes[0].Kind.Should().Be(ThemeKind.Custom);
+        endpoint.Response!.Themes[0].Parts.Device.Border.Should().Be(3);
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class ThemeReadEndpointTests
         await endpoint.Handle(new GetThemeRequest { ThemeId = "mine" }, CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Theme.Name.Should().Be("Mine");
+        endpoint.Response!.Theme.Name.Should().Be("Mine");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class ThemeReadEndpointTests
         await endpoint.Handle(new GetDeviceThemeRequest { DeviceId = "ABCD2345" }, CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        var record = endpoint.Response.Record;
+        var record = endpoint.Response!.Record;
         record.IsRecorded.Should().BeTrue();
         record.ThemeId.Should().Be("mine");
         record.AppliedAt.Should().Be(appliedAt);
@@ -72,7 +72,7 @@ public class ThemeReadEndpointTests
         await endpoint.Handle(new GetDeviceThemeRequest { DeviceId = "ABCD2345" }, CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        var record = endpoint.Response.Record;
+        var record = endpoint.Response!.Record;
         record.IsRecorded.Should().BeFalse();
         record.AppliedAt.Should().BeNull();
         record.DeviceId.Should().Be("ABCD2345");

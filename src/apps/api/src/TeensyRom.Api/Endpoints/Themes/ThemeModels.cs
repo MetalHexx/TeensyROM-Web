@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Themes;
 
@@ -47,25 +48,25 @@ namespace TeensyRom.Api.Endpoints.Themes
     public record DeviceThemePartDto
     {
         /// <summary>Menu background color, 0-15.</summary>
-        [Required] public int Background { get; init; }
+        [Required, JsonRequired] public int Background { get; init; }
 
         /// <summary>Menu border color, 0-15.</summary>
-        [Required] public int Border { get; init; }
+        [Required, JsonRequired] public int Border { get; init; }
 
         /// <summary>Banner color, 0-15.</summary>
-        [Required] public int Banner { get; init; }
+        [Required, JsonRequired] public int Banner { get; init; }
 
         /// <summary>Clock color, 0-15.</summary>
-        [Required] public int Time { get; init; }
+        [Required, JsonRequired] public int Time { get; init; }
 
         /// <summary>Menu option color, 0-15.</summary>
-        [Required] public int Option { get; init; }
+        [Required, JsonRequired] public int Option { get; init; }
 
         /// <summary>Sources line color, 0-15.</summary>
-        [Required] public int Sources { get; init; }
+        [Required, JsonRequired] public int Sources { get; init; }
 
         /// <summary>Device name color, 0-15.</summary>
-        [Required] public int Name { get; init; }
+        [Required, JsonRequired] public int Name { get; init; }
     }
 
     /// <summary>
@@ -76,12 +77,12 @@ namespace TeensyRom.Api.Endpoints.Themes
         /// <summary>
         /// The theme name: 1 to 24 characters after trimming, with no control characters. Names are unique among themes.
         /// </summary>
-        [Required] public string Name { get; init; } = string.Empty;
+        [Required, JsonRequired] public string Name { get; init; } = string.Empty;
 
         /// <summary>
         /// The device menu colors.
         /// </summary>
-        [Required] public DeviceThemePartDto Device { get; init; } = new();
+        [Required, JsonRequired] public DeviceThemePartDto Device { get; init; } = new();
     }
 
     /// <summary>
@@ -92,7 +93,7 @@ namespace TeensyRom.Api.Endpoints.Themes
         /// <summary>
         /// The colors to send to the device.
         /// </summary>
-        [Required] public DeviceThemePartDto Colors { get; init; } = new();
+        [Required, JsonRequired] public DeviceThemePartDto Colors { get; init; } = new();
 
         /// <summary>
         /// The theme the colors came from. It is recorded only when the theme exists and holds exactly these colors.

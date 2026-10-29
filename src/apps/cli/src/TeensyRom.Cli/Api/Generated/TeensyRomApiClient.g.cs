@@ -337,6 +337,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>
         /// <br/>- Resets the C64 and ends whatever is running.
         /// <br/>- The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors.
+        /// <br/>- Still answers 200 when the record cannot be written. The colors reached the device and `isRecorded` is false.
         /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// <br/>
         /// <br/>**Validation:**
@@ -3044,6 +3045,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>
         /// <br/>- Resets the C64 and ends whatever is running.
         /// <br/>- The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors.
+        /// <br/>- Still answers 200 when the record cannot be written. The colors reached the device and `isRecorded` is false.
         /// <br/>- Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.
         /// <br/>
         /// <br/>**Validation:**

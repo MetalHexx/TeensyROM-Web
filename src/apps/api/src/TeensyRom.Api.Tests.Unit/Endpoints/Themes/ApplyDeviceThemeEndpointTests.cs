@@ -17,6 +17,8 @@ public class ApplyDeviceThemeEndpointTests
     private readonly IMediator _mediator = Substitute.For<IMediator>();
     private readonly IThemeStore _store = Substitute.For<IThemeStore>();
 
+    public ApplyDeviceThemeEndpointTests() => _store.SaveDeviceRecord(Arg.Any<DeviceThemeRecord>()).Returns(true);
+
     private void GivenDevice()
     {
         var device = new TeensyRomDevice(
@@ -49,8 +51,8 @@ public class ApplyDeviceThemeEndpointTests
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Record.IsRecorded.Should().BeTrue();
-        endpoint.Response.Record.Colors.Should().Be(ThemeTestData.ColorsDto());
+        endpoint.Response!.Record.IsRecorded.Should().BeTrue();
+        endpoint.Response!.Record.Colors.Should().Be(ThemeTestData.ColorsDto());
         await _mediator.Received().Send(
             Arg.Is<ApplyThemeColorsCommand>(c => c.DeviceId == DeviceId && c.Colors == ThemeTestData.Colors(3)),
             Arg.Any<CancellationToken>());
@@ -67,7 +69,7 @@ public class ApplyDeviceThemeEndpointTests
 
         await endpoint.Handle(Request("mine", color: 3), CancellationToken.None);
 
-        endpoint.Response.Record.ThemeId.Should().Be("mine");
+        endpoint.Response!.Record.ThemeId.Should().Be("mine");
         _store.Received().SaveDeviceRecord(Arg.Is<DeviceThemeRecord>(r => r.ThemeId == "mine"));
     }
 
@@ -81,7 +83,7 @@ public class ApplyDeviceThemeEndpointTests
 
         await endpoint.Handle(Request("mine", color: 9), CancellationToken.None);
 
-        endpoint.Response.Record.ThemeId.Should().BeNull();
+        endpoint.Response!.Record.ThemeId.Should().BeNull();
         _store.Received().SaveDeviceRecord(Arg.Is<DeviceThemeRecord>(r => r.ThemeId == null));
     }
 
@@ -94,11 +96,11 @@ public class ApplyDeviceThemeEndpointTests
 
         await endpoint.Handle(Request("ghost"), CancellationToken.None);
 
-        endpoint.Response.Record.ThemeId.Should().BeNull();
+        endpoint.Response!.Record.ThemeId.Should().BeNull();
     }
 
     [Fact]
-    public async Task Handle_RecordWriteFails_StillAnswersOk()
+    public async Task Handle_RecordWriteFails_StillAnswersOkAndReportsNotRecorded()
     {
         GivenDevice();
         GivenResult(new ApplyThemeColorsResult());
@@ -108,7 +110,8 @@ public class ApplyDeviceThemeEndpointTests
         await endpoint.Handle(Request(), CancellationToken.None);
 
         endpoint.GetStatusCode().Should().Be(HttpStatusCode.OK);
-        endpoint.Response.Record.IsRecorded.Should().BeTrue();
+        endpoint.Response!.Record.IsRecorded.Should().BeFalse();
+        endpoint.Response!.Record.Colors.Should().Be(ThemeTestData.ColorsDto());
     }
 
     [Fact]

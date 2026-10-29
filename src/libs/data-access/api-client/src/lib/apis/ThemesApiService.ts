@@ -81,7 +81,7 @@ export interface UpdateThemeRequest {
 export class ThemesApiService extends runtime.BaseAPI {
 
     /**
-     * Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.  - Resets the C64 and ends whatever is running. - The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.  **Validation:** - The device id is 1-32 letters, digits, hyphens or underscores - Each color is 0-15 - The theme id, when given, is lowercase letters, digits and single hyphens
+     * Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.  - Resets the C64 and ends whatever is running. - The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors. - Still answers 200 when the record cannot be written. The colors reached the device and `isRecorded` is false. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.  **Validation:** - The device id is 1-32 letters, digits, hyphens or underscores - Each color is 0-15 - The theme id, when given, is lowercase letters, digits and single hyphens
      * Apply Device Theme
      */
     async applyDeviceThemeRaw(requestParameters: ApplyDeviceThemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApplyDeviceThemeResponse>> {
@@ -117,7 +117,7 @@ export class ThemesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.  - Resets the C64 and ends whatever is running. - The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.  **Validation:** - The device id is 1-32 letters, digits, hyphens or underscores - Each color is 0-15 - The theme id, when given, is lowercase letters, digits and single hyphens
+     * Sends the seven menu colors to a TeensyROM device, then resets it so the C64 shows them.  - Resets the C64 and ends whatever is running. - The colors are recorded for the device once it accepts them. The theme id is recorded only when that theme exists and holds exactly these colors. - Still answers 200 when the record cannot be written. The colors reached the device and `isRecorded` is false. - Answers 409 (code deviceBusyWithTransfer) when the device is busy with a transfer.  **Validation:** - The device id is 1-32 letters, digits, hyphens or underscores - Each color is 0-15 - The theme id, when given, is lowercase letters, digits and single hyphens
      * Apply Device Theme
      */
     async applyDeviceTheme(requestParameters: ApplyDeviceThemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApplyDeviceThemeResponse> {
