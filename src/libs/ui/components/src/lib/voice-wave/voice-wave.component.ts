@@ -48,10 +48,16 @@ export class VoiceWaveComponent {
   /** What the renderer gave back for this window; `null` until it registers. */
   private readonly handle = signal<WaveWindowHandle | null>(null);
 
-  /** Opaque id of the fed bank this window shows; windows with the same id share one feed. */
+  /**
+   * Opaque id of the fed bank this window shows; windows with the same id share one feed.
+   * Read once, when the window registers: a different bank needs a new window (for example `@for` with a `track` expression).
+   */
   readonly bank = input.required<string>();
 
-  /** Which of the bank's three voices this window shows (0, 1 or 2); it selects the trace colour. */
+  /**
+   * Which of the bank's three voices this window shows (0, 1 or 2); it selects the trace colour.
+   * Read once, when the window registers: a different voice needs a new window.
+   */
   readonly voice = input.required<WaveVoice>();
 
   /**

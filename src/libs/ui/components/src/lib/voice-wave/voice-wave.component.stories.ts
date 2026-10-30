@@ -200,12 +200,12 @@ const meta: Meta<VoiceWaveComponent> = {
   argTypes: {
     bank: {
       description:
-        'Opaque id tying the window to a fed bank. The stories give each render its own bank.',
+        'Opaque id tying the window to a fed bank. Read once when the window registers; a different bank needs a new window. The stories give each render its own bank.',
       control: false,
     },
     voice: {
       description:
-        "Which of the bank's three voices (0, 1 or 2) the window shows; it selects the trace colour.",
+        "Which of the bank's three voices (0, 1 or 2) the window shows; it selects the trace colour. Read once when the window registers; a different voice needs a new window.",
       control: false,
     },
     state: {

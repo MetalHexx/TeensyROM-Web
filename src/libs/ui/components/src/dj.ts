@@ -28,6 +28,7 @@ export * from './lib/sets-tree-branch/sets-tree-branch.component';
 export * from './lib/deck-set-row/deck-set-row.component';
 export * from './lib/fold-handle/fold-handle.component';
 export * from './lib/key-match-light/key-match-light.component';
+export * from './lib/voice-wave/model/wave-view';
 export * from './lib/voice-wave/wave-protocol';
 export * from './lib/voice-wave/wave-feed-buffer';
 export * from './lib/voice-wave/wave-worker-host';

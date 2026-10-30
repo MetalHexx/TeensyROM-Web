@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { logWarn } from '@teensyrom-nx/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WaveFeedBuffer } from './wave-feed-buffer';
 import { WAVE_FEED_LENGTH } from './wave-feed-layout';
 import type { MainToWorker, WaveWorkerPort, WorkerToMain } from './wave-protocol';
 import { VoiceWaveRenderer, WAVE_WORKER_FACTORY } from './voice-wave-renderer';
@@ -15,8 +16,24 @@ interface Sent {
 class FakeWorker implements WaveWorkerPort {
   readonly sent: Sent[] = [];
   terminated = false;
-  onmessage: ((event: { data: WorkerToMain }) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
+  readonly assignedInZone: Record<string, boolean> = {};
+  private messageHandler: ((event: { data: WorkerToMain }) => void) | null = null;
+  private errorHandler: ((event: unknown) => void) | null = null;
+
+  get onmessage(): ((event: { data: WorkerToMain }) => void) | null {
+    return this.messageHandler;
+  }
+  set onmessage(handler: ((event: { data: WorkerToMain }) => void) | null) {
+    this.assignedInZone['onmessage'] = NgZone.isInAngularZone();
+    this.messageHandler = handler;
+  }
+  get onerror(): ((event: unknown) => void) | null {
+    return this.errorHandler;
+  }
+  set onerror(handler: ((event: unknown) => void) | null) {
+    this.assignedInZone['onerror'] = NgZone.isInAngularZone();
+    this.errorHandler = handler;
+  }
 
   postMessage(message: MainToWorker, transfer?: Transferable[]): void {
     this.sent.push({ message, transfer });
@@ -43,6 +60,12 @@ class FakeWorker implements WaveWorkerPort {
   }
 }
 
+function acquired(wave: VoiceWaveRenderer, bank: string): WaveFeedBuffer {
+  const feed = wave.acquireFeed(bank);
+  if (!feed) throw new Error(`no feed available for bank ${bank}`);
+  return feed;
+}
+
 function fakeCanvas(): HTMLCanvasElement {
   return {
     clientWidth: 120,
@@ -55,6 +78,7 @@ function fakeCanvas(): HTMLCanvasElement {
 class FakeObserver {
   static instances: FakeObserver[] = [];
   disconnected = false;
+  readonly builtInZone = NgZone.isInAngularZone();
   constructor(readonly callback: (entries: unknown[]) => void) {
     FakeObserver.instances.push(this);
   }
@@ -169,18 +193,51 @@ describe('VoiceWaveRenderer', () => {
   });
 
   describe('outside the zone', () => {
-    it('builds the worker and arms its observers outside Angular, and a recycle stays outside', () => {
+    it('builds the worker and arms its handlers, observers and listeners outside Angular', () => {
       vi.stubGlobal('ResizeObserver', FakeObserver);
       vi.stubGlobal('IntersectionObserver', FakeObserver);
+      const armedInZone: Record<string, boolean> = {};
+      const addWindow = window.addEventListener.bind(window);
+      vi.spyOn(window, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject) => {
+        armedInZone[`window:${type}`] = NgZone.isInAngularZone();
+        return addWindow(type, listener);
+      }) as typeof window.addEventListener);
+      const addDocument = document.addEventListener.bind(document);
+      vi.spyOn(document, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject) => {
+        armedInZone[`document:${type}`] = NgZone.isInAngularZone();
+        return addDocument(type, listener);
+      }) as typeof document.addEventListener);
+      vi.stubGlobal('matchMedia', () => {
+        armedInZone['matchMedia'] = NgZone.isInAngularZone();
+        return { matches: false, addEventListener: () => undefined, removeEventListener: () => undefined };
+      });
+      let factoryInZone: boolean | null = null;
+      factory = () => {
+        factoryInZone = NgZone.isInAngularZone();
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      };
       const zone = TestBed.inject(NgZone);
-      const outside = vi.spyOn(zone, 'runOutsideAngular');
       const inside = vi.spyOn(zone, 'run');
       const wave = renderer();
 
-      wave.register(fakeCanvas(), 'a', 0);
-      expect(outside.mock.calls.length).toBeGreaterThanOrEqual(3);
-      expect(FakeObserver.instances).toHaveLength(2);
+      zone.run(() => {
+        expect(NgZone.isInAngularZone()).toBe(true);
+        wave.register(fakeCanvas(), 'a', 0);
+      });
 
+      expect(factoryInZone).toBe(false);
+      expect(workers[0].assignedInZone).toEqual({ onmessage: false, onerror: false });
+      expect(FakeObserver.instances).toHaveLength(2);
+      expect(FakeObserver.instances.map((observer) => observer.builtInZone)).toEqual([false, false]);
+      expect(armedInZone).toMatchObject({
+        'window:resize': false,
+        'document:visibilitychange': false,
+        matchMedia: false,
+      });
+
+      inside.mockClear();
       wave.acquireFeed('a');
       wave.submitFeed('a');
       workers[0].say({ type: 'recycle', bank: 'a', buffer: new Float64Array(WAVE_FEED_LENGTH) });
@@ -211,34 +268,34 @@ describe('VoiceWaveRenderer', () => {
     it('detaches a submitted buffer and takes the recycled array back', () => {
       const wave = renderer();
       wave.register(fakeCanvas(), 'a', 0);
-      const buffers = [wave.acquireFeed('a')!];
+      const buffers = [acquired(wave, 'a')];
       wave.submitFeed('a');
       expect(buffers[0].array.length).toBe(0);
       expect(workers[0].sent.find((e) => e.message.type === 'feed')?.transfer).toHaveLength(1);
 
-      buffers.push(wave.acquireFeed('a')!);
+      buffers.push(acquired(wave, 'a'));
       wave.submitFeed('a');
-      buffers.push(wave.acquireFeed('a')!);
+      buffers.push(acquired(wave, 'a'));
       wave.submitFeed('a');
       expect(wave.acquireFeed('a')).toBeNull();
 
       workers[0].say({ type: 'recycle', bank: 'a', buffer: new Float64Array(WAVE_FEED_LENGTH) });
       const again = wave.acquireFeed('a');
       expect(again).toBe(buffers[0]);
-      expect(again!.array.length).toBe(WAVE_FEED_LENGTH);
-      expect(again!.entryCount).toBe(0);
+      expect(again?.array.length).toBe(WAVE_FEED_LENGTH);
+      expect(again?.entryCount).toBe(0);
     });
 
     it('hands out the same reset buffer until submitted or discarded', () => {
       const wave = renderer();
       wave.register(fakeCanvas(), 'a', 0);
-      const first = wave.acquireFeed('a')!;
+      const first = acquired(wave, 'a');
       first.beginEntry(5);
       expect(first.entryCount).toBe(1);
 
       const second = wave.acquireFeed('a');
       expect(second).toBe(first);
-      expect(second!.entryCount).toBe(0);
+      expect(second?.entryCount).toBe(0);
 
       wave.discardFeed('a');
       expect(workers[0].of('feed')).toHaveLength(0);
@@ -266,7 +323,7 @@ describe('VoiceWaveRenderer', () => {
     it('returns a buffer to the pool when submitted with no worker', () => {
       const wave = renderer();
       const handle = wave.register(fakeCanvas(), 'a', 0);
-      const buffer = wave.acquireFeed('a')!;
+      const buffer = acquired(wave, 'a');
       handle.release();
       wave.submitFeed('a');
       expect(buffer.array.length).toBe(WAVE_FEED_LENGTH);
@@ -320,6 +377,28 @@ describe('VoiceWaveRenderer', () => {
       workers[0].say({ type: 'fault', message: 'boom' });
       expect(wave.failed).toBe(true);
       expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides already-drawn windows when the worker errors, so they read as dark glass', () => {
+      const wave = renderer();
+      const canvases = [fakeCanvas(), fakeCanvas()];
+      canvases.forEach((canvas, voice) => wave.register(canvas, 'a', voice as 0 | 1));
+
+      workers[0].onerror?.({});
+
+      expect(canvases.map((canvas) => canvas.style.visibility)).toEqual(['hidden', 'hidden']);
+    });
+
+    it('hides already-drawn windows when the worker reports a fault', () => {
+      const wave = renderer();
+      const canvas = fakeCanvas();
+      wave.register(canvas, 'a', 0);
+
+      workers[0].say({ type: 'fault', message: 'boom' });
+
+      expect(canvas.style.visibility).toBe('hidden');
+      wave.setSuppressed(false);
+      expect(canvas.style.visibility).toBe('hidden');
     });
   });
 
@@ -384,11 +463,12 @@ describe('VoiceWaveRenderer', () => {
     });
 
     it('reports reduced motion from matchMedia, live', () => {
-      let onChange: ((event: { matches: boolean }) => void) | null = null;
+      type MotionListener = (event: { matches: boolean }) => void;
+      const motion: { onChange: MotionListener | null } = { onChange: null };
       vi.stubGlobal('matchMedia', (query: string) => ({
         matches: query.includes('reduced-motion'),
-        addEventListener: (_: string, listener: typeof onChange) => {
-          if (query.includes('reduced-motion')) onChange = listener;
+        addEventListener: (_: string, listener: MotionListener) => {
+          if (query.includes('reduced-motion')) motion.onChange = listener;
         },
         removeEventListener: () => undefined,
       }));
@@ -396,7 +476,7 @@ describe('VoiceWaveRenderer', () => {
       wave.register(fakeCanvas(), 'a', 0);
       expect(workers[0].of('motion')).toEqual([{ type: 'motion', reduced: true }]);
 
-      onChange!({ matches: false });
+      motion.onChange?.({ matches: false });
       expect(workers[0].of('motion').pop()).toEqual({ type: 'motion', reduced: false });
     });
   });

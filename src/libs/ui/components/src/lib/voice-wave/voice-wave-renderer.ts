@@ -295,6 +295,8 @@ export class VoiceWaveRenderer {
     for (const win of this.windows.values()) {
       for (const stop of win.disconnect) stop();
       win.disconnect = [];
+      // A transferred canvas keeps the worker's last frame and cannot be cleared from here.
+      win.canvas.style.visibility = 'hidden';
     }
     this.terminate();
   }
