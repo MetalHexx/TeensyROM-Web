@@ -17,6 +17,7 @@
       color="dimmed"
       label="Connect a TeensyROM to apply a theme."
       [truncate]="false"
+      [showNativeTitle]="false"
       role="status"
     />
   }
@@ -27,6 +28,7 @@
       variant="flat"
       color="primary"
       [fullWidth]="false"
+      [showNativeTitle]="false"
       [disabled]="!store.canApply()"
       (buttonClick)="onApply()"
     />
@@ -38,6 +40,7 @@
         variant="stroked"
         color="normal"
         [fullWidth]="false"
+        [showNativeTitle]="false"
         [disabled]="!store.canSave()"
         [ariaLabel]="saveAriaLabel()"
         (buttonClick)="onSave()"
@@ -51,12 +54,13 @@
         variant="stroked"
         color="normal"
         [fullWidth]="false"
+        [showNativeTitle]="false"
         (buttonClick)="saveAs.open()"
       />
       <div dialog-content class="glassy-card">
         @if (saveAsOpen()) {
           <lib-preset-name-dialog
-            title="Save Theme As"
+            [title]="'Save Theme As'"
             fieldLabel="Theme name"
             placeholder="Enter theme name"
             inputAriaLabel="Theme name"
@@ -78,6 +82,7 @@
       variant="stroked"
       color="error"
       [fullWidth]="false"
+      [showNativeTitle]="false"
       [disabled]="!store.canDelete()"
       (buttonClick)="onDelete()"
     />

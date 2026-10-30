@@ -130,6 +130,19 @@ describe('ThemeViewComponent', () => {
     });
   });
 
+  it('renders no native title attribute anywhere in the view', () => {
+    const titled = () => Array.from(fixture.nativeElement.querySelectorAll('[title]'));
+
+    expect(titled()).toEqual([]);
+
+    videoEnabled['d1'].set(true);
+    targetDevices.set([{ deviceId: 'd1', name: 'd1' } as Device]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('lib-theme-preview')).not.toBeNull();
+    expect(titled()).toEqual([]);
+  });
+
   it('loads missing records when the connected devices change', () => {
     const calls = store.loadMissingRecords.mock.calls.length;
 

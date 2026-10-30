@@ -41,6 +41,13 @@ describe('ThemeColorsCardComponent', () => {
     expect(el.querySelector('.info')?.getAttribute('aria-label')).toBe('Info about the colors');
   });
 
+  it('renders the card title without a native title attribute', () => {
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.textContent).toContain('C64 menu colors');
+    expect(el.querySelectorAll('[title]').length).toBe(0);
+  });
+
   it('emits the slot and color index when a row changes', () => {
     const emitted: unknown[] = [];
     fixture.componentInstance.colorChange.subscribe((c) => emitted.push(c));

@@ -8,7 +8,7 @@
   [libTooltip]="tooltip()"
   (click)="onButtonClick()"
 >
-  <lib-icon-label [icon]="icon()" [label]="label()"></lib-icon-label>
+  <lib-icon-label [icon]="icon()" [label]="label()" [showNativeTitle]="showNativeTitle()"></lib-icon-label>
 </button>
 } @case ('flat') {
 <button
@@ -20,7 +20,7 @@
   [libTooltip]="tooltip()"
   (click)="onButtonClick()"
 >
-  <lib-icon-label [icon]="icon()" [label]="label()"></lib-icon-label>
+  <lib-icon-label [icon]="icon()" [label]="label()" [showNativeTitle]="showNativeTitle()"></lib-icon-label>
 </button>
 } @case ('raised') {
 <button
@@ -32,7 +32,7 @@
   [libTooltip]="tooltip()"
   (click)="onButtonClick()"
 >
-  <lib-icon-label [icon]="icon()" [label]="label()"></lib-icon-label>
+  <lib-icon-label [icon]="icon()" [label]="label()" [showNativeTitle]="showNativeTitle()"></lib-icon-label>
 </button>
 } @case ('fab') {
 <button
@@ -44,6 +44,6 @@
   [libTooltip]="tooltip()"
   (click)="onButtonClick()"
 >
-  <lib-icon-label [icon]="icon()" [label]="label()"></lib-icon-label>
+  <lib-icon-label [icon]="icon()" [label]="label()" [showNativeTitle]="showNativeTitle()"></lib-icon-label>
 </button>
 } }

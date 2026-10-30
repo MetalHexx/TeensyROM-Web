@@ -428,4 +428,20 @@ describe('IconLabelComponent', () => {
       expect(hasSecondary).toBe(false);
     });
   });
+
+  describe('native title', () => {
+    it('carries the label as a title by default and drops it when showNativeTitle is false', () => {
+      componentRef.setInput('icon', 'usb');
+      componentRef.setInput('label', 'USB Stick');
+      fixture.detectChanges();
+      const text = () => fixture.nativeElement.querySelector('.icon-label-text.primary') as Element;
+
+      expect(text().getAttribute('title')).toBe('USB Stick');
+
+      componentRef.setInput('showNativeTitle', false);
+      fixture.detectChanges();
+
+      expect(text().hasAttribute('title')).toBe(false);
+    });
+  });
 });

@@ -27,14 +27,14 @@
       <lib-empty-state-message
         class="preview-message"
         icon="videocam_off"
-        title="Camera permission denied"
+        [title]="'Camera permission denied'"
         message="Allow camera access in your browser settings."
       />
     } @else if (session.hasEnumerated() && !session.hasDevices()) {
       <lib-empty-state-message
         class="preview-message"
         icon="videocam_off"
-        title="No video capture device"
+        [title]="'No video capture device'"
         message="Connect a USB video capture device to see the C64’s screen here."
       />
     }

@@ -16,7 +16,6 @@ import {
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import {
-  applyConfirmText,
   MAX_THEME_NAME_LENGTH,
   READ_ONLY_TEXT,
   validateThemeName,
@@ -68,33 +67,7 @@ export class ThemeActionsComponent {
   protected readonly themeNames = computed(() => this.store.themes().map((t) => t.name));
 
   protected onApply(): void {
-    const themeId = this.store.unchangedThemeId();
-    const themeName = themeId ? (this.store.themes().find((t) => t.id === themeId)?.name ?? null) : null;
-    const message = applyConfirmText(
-      themeName,
-      this.store.targetDevices().map(deviceLabel)
-    );
-    const confirmRef = this.dialog.open(ConfirmationDialogComponent, {
-      disableClose: true,
-      panelClass: 'glassy-dialog',
-      backdropClass: 'busy-dialog-backdrop',
-    });
-
-    confirmRef.componentRef?.setInput('title', 'Apply theme?');
-    confirmRef.componentRef?.setInput('message', message);
-    confirmRef.componentRef?.setInput('confirmLabel', 'Apply');
-    confirmRef.componentRef?.setInput('confirmIcon', 'check');
-    confirmRef.componentRef?.setInput('cancelLabel', 'Cancel');
-    confirmRef.componentRef?.setInput('showLabels', true);
-    confirmRef.componentRef?.setInput('confirmColor', 'primary');
-
-    confirmRef.componentInstance.confirmed.subscribe(() => {
-      confirmRef.close();
-      void this.store.apply();
-    });
-    confirmRef.componentInstance.cancelled.subscribe(() => {
-      confirmRef.close();
-    });
+    void this.store.apply();
   }
 
   protected onSave(): void {

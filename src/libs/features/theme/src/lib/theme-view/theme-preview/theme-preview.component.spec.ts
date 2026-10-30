@@ -107,6 +107,20 @@ describe('ThemePreviewComponent', () => {
     expect(el.textContent).toContain('No video capture device');
   });
 
+  it('renders the empty-state titles without native title attributes', () => {
+    session.permissionDenied.set(true);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Camera permission denied');
+    expect(el.querySelectorAll('[title]').length).toBe(0);
+
+    session.permissionDenied.set(false);
+    session.devices.set([]);
+    session.hasDevices.set(false);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No video capture device');
+    expect(el.querySelectorAll('[title]').length).toBe(0);
+  });
+
   it('shows the permission state when the camera is denied', () => {
     session.permissionDenied.set(true);
     fixture.detectChanges();

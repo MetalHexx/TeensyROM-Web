@@ -31,14 +31,12 @@ describe('ThemeActionsComponent', () => {
   let connected: WritableSignal<Device[]>;
   let applyTarget: WritableSignal<string>;
   let canApply: WritableSignal<boolean>;
-  let unchangedThemeId: WritableSignal<string | null>;
   let store: {
     connectedDevices: WritableSignal<Device[]>;
     targetDevices: WritableSignal<Device[]>;
     effectiveApplyTarget: WritableSignal<string>;
     showApplyTarget: WritableSignal<boolean>;
     canApply: WritableSignal<boolean>;
-    unchangedThemeId: WritableSignal<string | null>;
     apply: ReturnType<typeof vi.fn>;
     setApplyTarget: ReturnType<typeof vi.fn>;
     themes: WritableSignal<ColorTheme[]>;
@@ -61,14 +59,12 @@ describe('ThemeActionsComponent', () => {
     connected = signal<Device[]>([makeDevice('d1', 'Bench')]);
     applyTarget = signal(APPLY_TO_ALL_DEVICES);
     canApply = signal(true);
-    unchangedThemeId = signal<string | null>('tr-default');
     store = {
       connectedDevices: connected,
       targetDevices: connected,
       effectiveApplyTarget: applyTarget,
       showApplyTarget: signal(false),
       canApply,
-      unchangedThemeId,
       apply: vi.fn(),
       setApplyTarget: vi.fn(),
       themes: signal([shippedTheme, customTheme]),
@@ -105,20 +101,6 @@ describe('ThemeActionsComponent', () => {
   };
 
   describe('Apply', () => {
-    const openApply = () => {
-      const confirmed = new Subject<void>();
-      const cancelled = new Subject<void>();
-      const setInput = vi.fn();
-      const close = vi.fn();
-      dialog.open.mockReturnValue({
-        componentRef: { setInput },
-        componentInstance: { confirmed, cancelled },
-        close,
-      });
-      buttonByLabel('Apply').click();
-      return { confirmed, cancelled, setInput, close };
-    };
-
     it('hides the chooser and the no-device message for one connected device', () => {
       expect(el.querySelector('lib-segmented-control')).toBeNull();
       expect(el.textContent).not.toContain('Apply to');
@@ -155,19 +137,7 @@ describe('ThemeActionsComponent', () => {
       expect(store.setApplyTarget).toHaveBeenCalledWith('d2');
     });
 
-    it('confirms with the primary button and names the theme and the device', () => {
-      const { setInput } = openApply();
-
-      expect(setInput).toHaveBeenCalledWith('confirmColor', 'primary');
-      expect(setInput).toHaveBeenCalledWith('title', 'Apply theme?');
-      expect(setInput).toHaveBeenCalledWith(
-        'message',
-        'Applying “TR Default” resets the C64 and ends whatever it is running. This will apply the theme to Bench.'
-      );
-      expect(store.apply).not.toHaveBeenCalled();
-    });
-
-    it('names a device without a name by its id in the chooser and the confirmation', () => {
+    it('names a device without a name by its id in the chooser', () => {
       connected.set([makeDevice('d1', ''), makeDevice('d2', 'Desk')]);
       store.showApplyTarget.set(true);
       fixture.detectChanges();
@@ -175,47 +145,13 @@ describe('ThemeActionsComponent', () => {
       const chooser = fixture.debugElement.query(By.directive(SegmentedControlComponent))
         .componentInstance as SegmentedControlComponent;
       expect(chooser.options().map((o) => o.label)).toEqual(['All Devices', 'd1', 'Desk']);
-
-      const { setInput } = openApply();
-      expect(setInput).toHaveBeenCalledWith(
-        'message',
-        expect.stringContaining('This will apply the theme to d1 and Desk.')
-      );
     });
 
-    it('words edited colors for all target devices', () => {
-      unchangedThemeId.set(null);
-      connected.set([
-        makeDevice('d1', 'A'),
-        makeDevice('d2', 'B'),
-        makeDevice('d3', 'C'),
-      ]);
-      fixture.detectChanges();
+    it('applies immediately through the store without opening a confirmation', () => {
+      buttonByLabel('Apply').click();
 
-      const { setInput } = openApply();
-
-      expect(setInput).toHaveBeenCalledWith(
-        'message',
-        'Applying these colors resets the C64 and ends whatever it is running. This will apply them to A, B and C.'
-      );
-    });
-
-    it('applies only on confirm', () => {
-      const { confirmed, close } = openApply();
-
-      confirmed.next();
-
-      expect(close).toHaveBeenCalled();
       expect(store.apply).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not apply on cancel', () => {
-      const { cancelled, close } = openApply();
-
-      cancelled.next();
-
-      expect(close).toHaveBeenCalled();
-      expect(store.apply).not.toHaveBeenCalled();
+      expect(dialog.open).not.toHaveBeenCalled();
     });
   });
 
@@ -307,6 +243,15 @@ describe('ThemeActionsComponent', () => {
       fixture.detectChanges();
 
       expect(saveButton()?.disabled).toBe(true);
+    });
+
+    it('renders the dialog title without a native title attribute', () => {
+      openSaveAs();
+
+      expect(nameDialog()?.textContent).toContain('Save Theme As');
+      expect(nameDialog()?.hasAttribute('title')).toBe(false);
+      expect(el.querySelectorAll('[title]').length).toBe(0);
+      expect(nameDialog()?.querySelectorAll('[title]').length).toBe(0);
     });
 
     it('saves under the confirmed name and closes', () => {

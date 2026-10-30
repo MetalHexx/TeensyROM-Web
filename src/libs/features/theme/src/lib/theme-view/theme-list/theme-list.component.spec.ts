@@ -30,6 +30,13 @@ describe('ThemeListComponent', () => {
     return fixture.nativeElement as HTMLElement;
   };
 
+  it('renders the card title without a native title attribute', () => {
+    const el = setup([makeTheme('c', 'Mine', ColorThemeKind.Custom)]);
+
+    expect(el.textContent).toContain('Themes');
+    expect(el.querySelectorAll('[title]').length).toBe(0);
+  });
+
   it('renders only the shipped group when there are no custom themes', () => {
     const el = setup([]);
 
