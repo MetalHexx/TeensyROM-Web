@@ -1,5 +1,6 @@
-import { Component, input, output, signal, TemplateRef, viewChild, ElementRef, ViewContainerRef } from '@angular/core';
+import { Component, input, output, signal, TemplateRef, viewChild, ElementRef, ViewContainerRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FocusTrap, FocusTrapFactory } from '@angular/cdk/a11y';
 import { Overlay, OverlayModule, OverlayRef } from '@angular/cdk/overlay';
 import { TemplatePortal } from '@angular/cdk/portal';
 import { trigger, transition, style, animate } from '@angular/animations';
@@ -18,6 +19,10 @@ import { trigger, transition, style, animate } from '@angular/animations';
  * since those don't need the menu's glassy card wrapper. Opening and closing is always
  * imperative — there is no input to drive it declaratively — via the `#templateRef` and
  * its `.open()` / `.close()` methods.
+ *
+ * Keyboard and focus: opening moves focus into the popup and keeps Tab inside it, Escape
+ * closes it, and closing returns focus to the element that had it before opening. `closed`
+ * is emitted once per actual close, so a `close()` on an already-closed dialog is a no-op.
  *
  * @example
  * ```html
@@ -59,6 +64,12 @@ export class DropdownDialogComponent {
   private dialogTemplate = viewChild<TemplateRef<unknown>>('dialogTemplate');
   /** Reference to the trigger element the overlay is positioned against. */
   private trigger = viewChild<ElementRef>('trigger');
+  /** Creates the focus trap that keeps Tab inside the open overlay. */
+  private focusTrapFactory = inject(FocusTrapFactory);
+  /** Traps Tab inside the open overlay; `null` when closed. */
+  private focusTrap: FocusTrap | null = null;
+  /** The element that had focus when the dialog opened, refocused on close. */
+  private previouslyFocused: HTMLElement | null = null;
 
   /**
    * Positioning mode (default: `false`). When `false`, the overlay tries below-start,
@@ -91,6 +102,8 @@ export class DropdownDialogComponent {
     const overlay = this.overlay();
 
     if (!triggerEl || !template || !overlay) return;
+
+    this.previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const centeredPositions = [
       { originX: 'center' as const, originY: 'top' as const, overlayX: 'center' as const, overlayY: 'bottom' as const, offsetY: -8 },
@@ -157,14 +170,32 @@ export class DropdownDialogComponent {
     }
 
     overlayRef.backdropClick().subscribe(() => this.close());
+    overlayRef.keydownEvents().subscribe((event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.close();
+      }
+    });
+
+    this.focusTrap = this.focusTrapFactory.create(overlayRef.overlayElement);
+    void this.focusTrap.focusInitialElementWhenReady();
 
     this.overlayRef.set(overlayRef);
     this.isOpen.set(true);
     this.opened.emit();
   }
 
-  /** Disposes the current overlay, restoring any fullscreen-moved elements to the CDK overlay container first. */
+  /**
+   * Disposes the current overlay, restoring any fullscreen-moved elements to the CDK overlay
+   * container first, then emits `closed` and returns focus to the element that had it before
+   * `open()`. No-op when already closed.
+   */
   close(): void {
+    if (!this.isOpen()) return;
+
+    this.focusTrap?.destroy();
+    this.focusTrap = null;
+
     const overlayRef = this.overlayRef();
     
     // Move overlay elements back to body before closing
@@ -193,5 +224,11 @@ export class DropdownDialogComponent {
     }
     this.isOpen.set(false);
     this.closed.emit();
+
+    const previouslyFocused = this.previouslyFocused;
+    this.previouslyFocused = null;
+    if (previouslyFocused?.isConnected) {
+      previouslyFocused.focus();
+    }
   }
 }

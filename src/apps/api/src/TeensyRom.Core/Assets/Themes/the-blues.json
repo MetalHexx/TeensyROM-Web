@@ -1,0 +1,8 @@
+{
+  "id": "the-blues",
+  "name": "The Blues",
+  "sortOrder": 5,
+  "parts": {
+    "device": { "background": 0, "border": 0, "banner": 6, "time": 4, "option": 6, "sources": 5, "name": 14 }
+  }
+}

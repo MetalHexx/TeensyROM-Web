@@ -1,0 +1,8 @@
+{
+  "id": "c64-mono",
+  "name": "C64 Mono",
+  "sortOrder": 3,
+  "parts": {
+    "device": { "background": 6, "border": 14, "banner": 14, "time": 14, "option": 14, "sources": 14, "name": 14 }
+  }
+}

@@ -17,16 +17,14 @@ import {
   isBuiltInPreset,
   TooltipConfig,
   TooltipPosition,
+  VideoDevice,
+  openVideoStream,
+  stopVideoStream,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE, validatePresetName, CRT_PRESET_KEYS, crtVideoStandardFor } from '@teensyrom-nx/domain';
 import { DeviceStore } from '@teensyrom-nx/application';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
-
-export interface VideoDevice {
-  deviceId: string;
-  label: string;
-}
 
 export interface VideoDialogData {
   stream: MediaStream;
@@ -185,17 +183,11 @@ export class VideoDialogComponent implements OnDestroy {
     try {
       // Only stop streams we created, not the parent's original stream
       if (this.ownsCurrentStream) {
-        const current = this.currentStream();
-        if (current) {
-          current.getTracks().forEach(track => track.stop());
-        }
+        stopVideoStream(this.currentStream());
       }
 
       // Get new stream
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: videoDeviceId } },
-        audio: false,
-      });
+      const stream = await openVideoStream(videoDeviceId);
 
       this.currentStream.set(stream);
       this.selectedDeviceId.set(videoDeviceId);
@@ -254,10 +246,7 @@ export class VideoDialogComponent implements OnDestroy {
   /** Cleanup streams we created on destroy */
   ngOnDestroy(): void {
     if (this.ownsCurrentStream) {
-      const stream = this.currentStream();
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopVideoStream(this.currentStream());
     }
   }
 }

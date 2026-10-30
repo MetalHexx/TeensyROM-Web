@@ -1,0 +1,11 @@
+<div class="color-slot-row">
+  <lib-c64-color-picker
+    [value]="value()"
+    [label]="slotLabel()"
+    (valueChange)="valueChange.emit($event)"
+  />
+  <div class="slot-text">
+    <span class="slot-label">{{ slotLabel() }}</span>
+    <span class="slot-description">{{ description() }}</span>
+  </div>
+</div>

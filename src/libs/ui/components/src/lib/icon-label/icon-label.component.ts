@@ -110,6 +110,13 @@ export class IconLabelComponent {
    */
   shrink = input<boolean>(false);
 
+  /**
+   * Whether the primary label carries a native `title` attribute (the browser's own hover
+   * tooltip). Turn off where a `libTooltip` or other custom tooltip already covers the element.
+   * Defaults to `true`.
+   */
+  showNativeTitle = input<boolean>(true);
+
   /** Optional second line of text rendered below `label`, sized proportionally to `size` — defaults to `''` (not rendered). */
   secondaryLabel = input<string>('');
 

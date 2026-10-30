@@ -2,7 +2,7 @@
   <lib-styled-icon [icon]="icon()" [color]="color()" [size]="iconSize()"></lib-styled-icon>
 
   <span class="text-container" [class.shrink]="shrink()">
-    <span [class]="'icon-label-text primary ' + textClass() + ' ' + labelClass()" [class.truncate]="truncate() && !shrink()" [class.truncate-fill]="truncate() && shrink()" [title]="label()">{{ label() }}</span>
+    <span [class]="'icon-label-text primary ' + textClass() + ' ' + labelClass()" [class.truncate]="truncate() && !shrink()" [class.truncate-fill]="truncate() && shrink()" [attr.title]="showNativeTitle() ? label() : null">{{ label() }}</span>
 
     @if (secondaryLabel()) {
       <span [class]="'icon-label-text secondary ' + secondaryTextClass() + ' ' + secondaryLabelClass()">

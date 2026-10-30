@@ -57,3 +57,6 @@ export * from './watch-folder.model';
 
 // CRT models
 export * from './crt-settings.model';
+
+// Color theme models
+export * from './color-theme.model';

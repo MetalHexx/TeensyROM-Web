@@ -8,7 +8,7 @@ export const ROUTES = {
   MIXER: 'dj-mixer',
   DEVICES: 'devices',
   SETTINGS: 'settings',
-  THEME_TESTER: 'themes',
+  THEMES: 'themes',
 } as const;
 
 export const ROUTE_TITLES = {
@@ -17,7 +17,7 @@ export const ROUTE_TITLES = {
   [ROUTES.MIXER]: 'DJ Mixer',
   [ROUTES.DEVICES]: 'Devices',
   [ROUTES.SETTINGS]: 'Settings',
-  [ROUTES.THEME_TESTER]: 'Theme Tester',
+  [ROUTES.THEMES]: 'Theme',
 } as const;
 
 export const NAV_ITEMS: NavItem[] = [
@@ -42,13 +42,13 @@ export const NAV_ITEMS: NavItem[] = [
     route: ROUTES.DEVICES,
   },
   {
+    name: ROUTE_TITLES[ROUTES.THEMES],
+    icon: 'palette',
+    route: ROUTES.THEMES,
+  },
+  {
     name: ROUTE_TITLES[ROUTES.SETTINGS],
     icon: 'settings',
     route: ROUTES.SETTINGS,
   },
-  // {
-  //   name: ROUTE_TITLES[ROUTES.THEME_TESTER],
-  //   icon: 'palette',
-  //   route: ROUTES.THEME_TESTER,
-  // },
 ] as const;

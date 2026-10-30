@@ -28,7 +28,7 @@
       <lib-action-button
         [icon]="confirmIcon()"
         [label]="confirmLabel()"
-        [color]="'error'"
+        [color]="confirmColor()"
         [fullWidth]="false"
         (buttonClick)="onConfirmClick()"
       />
@@ -37,7 +37,7 @@
         [icon]="confirmIcon()"
         [ariaLabel]="confirmLabel()"
         [tooltip]="confirmTooltip()"
-        [color]="'error'"
+        [color]="confirmColor() === 'primary' ? 'highlight' : 'error'"
         (buttonClick)="onConfirmClick()"
       />
       <lib-icon-button

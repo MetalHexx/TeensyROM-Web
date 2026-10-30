@@ -52,7 +52,9 @@ const meta: Meta<DropdownDialogComponent> = {
           'want the menu\'s card chrome. `centered` switches the CDK position-fallback chain ' +
           'from the usual start/end dropdown layout to a horizontally-centered popover, ' +
           'useful for prompts that should hang directly under a single trigger rather than ' +
-          'align to one edge.',
+          'align to one edge. Opening moves focus into the popup and keeps Tab inside it; ' +
+          'Escape closes it, and closing returns focus to the element that had it before ' +
+          'opening. `closed` is emitted once per actual close.',
       },
     },
   },

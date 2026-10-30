@@ -1,0 +1,36 @@
+@use '../../../../styles/src/lib/theme/styles.scss' as styles;
+
+:host {
+  @include styles.selectable-item;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+:host(:focus-visible) {
+  outline: 2px solid var(--color-highlight);
+  outline-offset: -2px;
+}
+
+:host(.disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.selectable-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.selectable-row__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectable-row__spacer {
+  flex: 1;
+}

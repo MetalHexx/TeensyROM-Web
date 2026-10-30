@@ -232,6 +232,38 @@ describe('ConfirmationDialogComponent', () => {
     });
   });
 
+  describe('Confirm color', () => {
+    function confirmIconClass(): string | undefined {
+      return fixture.nativeElement.querySelector('lib-icon-button button mat-icon')?.className;
+    }
+
+    it('renders the red confirm by default in both branches', () => {
+      expect(confirmIconClass()).toContain('error');
+
+      fixture.componentRef.setInput('showLabels', true);
+      fixture.detectChanges();
+      const confirm = fixture.nativeElement.querySelectorAll('lib-action-button button')[1];
+      expect(confirm.classList).toContain('action-button-error');
+    });
+
+    it('renders the primary action button when confirmColor is primary', () => {
+      fixture.componentRef.setInput('confirmColor', 'primary');
+      fixture.componentRef.setInput('showLabels', true);
+      fixture.detectChanges();
+
+      const confirm = fixture.nativeElement.querySelectorAll('lib-action-button button')[1];
+      expect(confirm.classList).not.toContain('action-button-error');
+    });
+
+    it('maps primary to the highlight icon color in the icon-only branch', () => {
+      fixture.componentRef.setInput('confirmColor', 'primary');
+      fixture.detectChanges();
+
+      expect(confirmIconClass()).toContain('highlight');
+      expect(confirmIconClass()).not.toContain('error');
+    });
+  });
+
   describe('Message Text Wrapping', () => {
     it('should support multi-line messages', () => {
       const multiLineMessage = 'Line 1\nLine 2\nLine 3';

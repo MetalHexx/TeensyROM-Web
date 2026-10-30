@@ -67,6 +67,14 @@ export class VideoStreamComponent {
    */
   readonly showLoadingState = input<boolean>(true);
 
+  /**
+   * Opt in to suppressing the browser's own hover overlays on the video (Picture-in-picture,
+   * Edge's "Enhance video", remote playback). Default `false`. When `true` the video element gets
+   * `disablepictureinpicture` and `disableremoteplayback` and stops receiving pointer events, so
+   * pointer activity lands on the surrounding layer (e.g. a `ContentOverlayContainerComponent`).
+   */
+  readonly disableNativeOverlays = input<boolean>(false);
+
   // Outputs
   /** Emits when the video element fires its native `playing` event (stream has started rendering frames). */
   readonly streamReady = output<void>();

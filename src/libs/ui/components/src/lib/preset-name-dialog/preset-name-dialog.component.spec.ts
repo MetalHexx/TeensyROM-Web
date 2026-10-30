@@ -159,6 +159,44 @@ describe('PresetNameDialogComponent', () => {
     });
   });
 
+  describe('Configurable Text and Limit', () => {
+    it('should render the CRT wording and 50-character limit by default', () => {
+      const input = fixture.nativeElement.querySelector('input[matInput]');
+      expect(input.getAttribute('maxlength')).toBe('50');
+      expect(fixture.nativeElement.querySelector('mat-label').textContent.trim()).toBe('Preset Name');
+      expect(fixture.nativeElement.querySelector('lib-icon-button button').getAttribute('aria-label')).toBe(
+        'Save CRT preset'
+      );
+      expect(component.saveTooltip().body).toBe('Save CRT preset');
+    });
+
+    it('should apply a custom maxLength to the input and the counter', () => {
+      fixture.componentRef.setInput('maxLength', 24);
+      component.currentName.set('abc');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('input[matInput]').getAttribute('maxlength')).toBe('24');
+      expect(fixture.nativeElement.querySelector('mat-hint span').textContent.trim()).toBe('3/24');
+    });
+
+    it('should apply custom labels, placeholder and save label', () => {
+      fixture.componentRef.setInput('fieldLabel', 'Theme Name');
+      fixture.componentRef.setInput('placeholder', 'Enter theme name');
+      fixture.componentRef.setInput('inputAriaLabel', 'Theme name');
+      fixture.componentRef.setInput('saveLabel', 'Save theme');
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('input[matInput]');
+      expect(fixture.nativeElement.querySelector('mat-label').textContent.trim()).toBe('Theme Name');
+      expect(input.getAttribute('placeholder')).toBe('Enter theme name');
+      expect(input.getAttribute('aria-label')).toBe('Theme name');
+      expect(fixture.nativeElement.querySelector('lib-icon-button button').getAttribute('aria-label')).toBe(
+        'Save theme'
+      );
+      expect(component.saveTooltip().body).toBe('Save theme');
+    });
+  });
+
   describe('Can Save Logic Tests', () => {
     it('should be false when name is empty', () => {
       const validateFn: PresetNameValidationFn = () => '';

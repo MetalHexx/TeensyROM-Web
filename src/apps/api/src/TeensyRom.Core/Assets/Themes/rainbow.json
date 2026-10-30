@@ -1,0 +1,8 @@
+{
+  "id": "rainbow",
+  "name": "Rainbow",
+  "sortOrder": 6,
+  "parts": {
+    "device": { "background": 1, "border": 5, "banner": 5, "time": 8, "option": 6, "sources": 2, "name": 4 }
+  }
+}

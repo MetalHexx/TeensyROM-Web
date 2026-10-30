@@ -40,3 +40,6 @@ export * from './lib/watch-folder';
 
 // DJ storage implementations
 export * from './lib/dj';
+
+// Color theme implementations
+export * from './lib/color-theme';

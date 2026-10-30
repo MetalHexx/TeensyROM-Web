@@ -13,6 +13,10 @@
     height: 103%;
     display: block;
     object-fit: contain !important;
+
+    &--inert {
+      pointer-events: none;
+    }
   }
 
   .loading-overlay {

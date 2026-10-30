@@ -68,6 +68,16 @@ export class PresetNameDialogComponent implements OnInit {
    * or `''` when the current name is valid. Required — no default.
    */
   validationFn = input.required<PresetNameValidationFn>();
+  /** Maximum name length: caps the input and drives the counter (default: `50`). */
+  maxLength = input<number>(50);
+  /** Floating label of the name field (default: `'Preset Name'`). */
+  fieldLabel = input<string>('Preset Name');
+  /** Placeholder shown in the empty name field (default: `'Enter preset name'`). */
+  placeholder = input<string>('Enter preset name');
+  /** Accessible name of the input (default: `'Preset name'`). */
+  inputAriaLabel = input<string>('Preset name');
+  /** Accessible name and tooltip body of the save button (default: `'Save CRT preset'`). */
+  saveLabel = input<string>('Save CRT preset');
 
   /**
    * Emitted with the trimmed name when Save is activated and `validationFn` currently
@@ -82,10 +92,10 @@ export class PresetNameDialogComponent implements OnInit {
 
   // Tooltip configurations
   /** Tooltip config for the save action. */
-  readonly saveTooltip: TooltipConfig = {
-    body: 'Save CRT preset',
+  readonly saveTooltip = computed<TooltipConfig>(() => ({
+    body: this.saveLabel(),
     position: TooltipPosition.Top,
-  };
+  }));
 
   /** Tooltip config for the cancel action. */
   readonly cancelTooltip: TooltipConfig = {
@@ -101,10 +111,10 @@ export class PresetNameDialogComponent implements OnInit {
     return validateFn(name, reserved);
   });
 
-  /** Character-count display in `"used/50"` form. */
+  /** Character-count display in `"used/max"` form, e.g. `"12/50"`. */
   remainingChars = computed<string>(() => {
     const length = this.currentName().length;
-    return `${length}/50`;
+    return `${length}/${this.maxLength()}`;
   });
 
   /** Whether Save is currently enabled: no validation error and a non-blank name. */

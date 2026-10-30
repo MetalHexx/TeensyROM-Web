@@ -1,0 +1,31 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  --swatch-size: 18px;
+}
+
+:host([data-size='small']) {
+  --swatch-size: 12px;
+}
+
+:host([data-size='large']) {
+  --swatch-size: 24px;
+}
+
+.swatch {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--swatch-size);
+  height: var(--swatch-size);
+  border: 1px solid rgba(var(--glassy-color), 0.35);
+  border-radius: var(--border-radius-sm);
+}
+
+.swatch--unknown {
+  background: transparent;
+}
+
+.name {
+  white-space: nowrap;
+}

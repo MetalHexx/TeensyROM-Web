@@ -8,6 +8,7 @@ export * from './FilesApiService';
 export * from './MidiSettingsApiService';
 export * from './PlayerApiService';
 export * from './SettingsApiService';
+export * from './ThemesApiService';
 export * from './TransfersApiService';
 export * from './VersionApiService';
 export * from './WatchFoldersApiService';

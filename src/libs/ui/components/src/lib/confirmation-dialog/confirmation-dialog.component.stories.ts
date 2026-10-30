@@ -51,3 +51,16 @@ export const LabelledButtons: Story = {
     showLabels: true,
   },
 };
+
+/** A non-destructive confirmation: the confirm action uses the primary colour instead of red. */
+export const PrimaryConfirm: Story = {
+  args: {
+    ...Default.args,
+    title: 'Apply Theme',
+    message: 'Replace the current theme?',
+    confirmLabel: 'Apply',
+    confirmIcon: 'check',
+    showLabels: true,
+    confirmColor: 'primary',
+  },
+};
