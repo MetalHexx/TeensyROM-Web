@@ -71,6 +71,7 @@ function loopMarker(id: string, start: number, end: number | null): DeckLoopMark
     ready: true,
     settings: null,
     ownSettings: false,
+    wraps: false,
   };
 }
 

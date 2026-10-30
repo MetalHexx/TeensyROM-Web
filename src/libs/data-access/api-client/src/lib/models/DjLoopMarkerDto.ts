@@ -76,6 +76,12 @@ export interface DjLoopMarkerDto {
      * @memberof DjLoopMarkerDto
      */
     usesOwnSettings?: boolean | null;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof DjLoopMarkerDto
+     */
+    wraps?: boolean | null;
 }
 
 /**
@@ -105,6 +111,7 @@ export function DjLoopMarkerDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'voices': json['voices'],
         'settings': json['settings'] == null ? undefined : json['settings'],
         'usesOwnSettings': json['usesOwnSettings'] == null ? undefined : json['usesOwnSettings'],
+        'wraps': json['wraps'] == null ? undefined : json['wraps'],
     };
 }
 
@@ -126,6 +133,7 @@ export function DjLoopMarkerDtoToJSONTyped(value?: DjLoopMarkerDto | null, ignor
         'voices': value['voices'],
         'settings': value['settings'],
         'usesOwnSettings': value['usesOwnSettings'],
+        'wraps': value['wraps'],
     };
 }
 

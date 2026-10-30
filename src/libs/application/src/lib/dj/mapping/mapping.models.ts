@@ -57,6 +57,7 @@ export type DeckControlId =
   | 'loop-set-end'
   | 'loop-clear-end'
   | 'loop-global'
+  | 'loop-wrap'
   | 'loop-start-snap-previous'
   | 'loop-start-snap-next'
   | 'loop-end-snap-previous'
@@ -97,6 +98,7 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-set-end',
   'loop-clear-end',
   'loop-global',
+  'loop-wrap',
   'loop-start-snap-previous',
   'loop-start-snap-next',
   'loop-end-snap-previous',

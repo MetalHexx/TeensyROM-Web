@@ -56,8 +56,9 @@ lib-synth-key[data-control='loop-delete'] {
   --synth-key-min-width: 32px;
 }
 
-// GBL takes the mockup's width; its lamp is the key's icon at a lamp's size.
-.global {
+// GBL takes the mockup's width; its lamp is the key's icon at a lamp's size. WRAP matches it.
+.global,
+.wrap {
   --synth-key-min-width: 44px;
   --synth-key-padding: 0 6px;
   --synth-key-icon-size: 10px;

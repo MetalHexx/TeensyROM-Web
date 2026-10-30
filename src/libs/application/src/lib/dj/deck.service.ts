@@ -476,6 +476,14 @@ export class DeckService {
     }
   }
 
+  /** Flips the selected loop's WRAP: lit, a scrubbed record backed past the loop's start wraps to
+   *  its end instead of stopping. Ignored on a cue. */
+  toggleMarkerWrap(slot: Slot): void {
+    if (this.canShape(slot, 'toggleMarkerWrap')) {
+      this.loops.toggleWrap(slot);
+    }
+  }
+
   /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
    *  auditions it on this deck, whatever is running or queued. The edit lands before the first
    *  await; a deck that is not playing is started first, as `toggleMarker` does. */

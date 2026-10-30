@@ -135,6 +135,7 @@ function toLoopMarker(dto: DjLoopMarkerDto): LoopMarker {
     voices: [...dto.voices],
     ...(dto.settings == null ? {} : { settings: dto.settings }),
     ...(dto.usesOwnSettings == null ? {} : { usesOwnSettings: dto.usesOwnSettings }),
+    ...(dto.wraps == null ? {} : { wraps: dto.wraps }),
   };
 }
 
@@ -147,6 +148,7 @@ function toLoopMarkerDto(marker: LoopMarker): DjLoopMarkerDto {
     voices: [...marker.voices],
     settings: marker.settings ?? null,
     usesOwnSettings: marker.usesOwnSettings ?? null,
+    wraps: marker.wraps ?? null,
   };
 }
 

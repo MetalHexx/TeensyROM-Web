@@ -37,7 +37,7 @@ namespace TeensyRom.Api.Tests.Integration
                 "subtunes": [{ "subtune": 1, "settings": { "v": 1 },
                   "markers": [{ "id": "c1", "name": "Drum break", "start": { "frame": 7950, "offsetFrames": 0 },
                                 "end": { "frame": 8360, "offsetFrames": 6 }, "voices": [0, 1, 2],
-                                "settings": { "v": 1 }, "usesOwnSettings": true }] }],
+                                "settings": { "v": 1 }, "usesOwnSettings": true, "wraps": true }] }],
                 "host": { "v": 1 } }] }
             """;
 

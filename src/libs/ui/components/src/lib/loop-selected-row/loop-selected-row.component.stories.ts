@@ -29,6 +29,7 @@ const meta: Meta<LoopSelectedRowComponent> = {
     trigger: { description: 'Emits when the trigger key is pressed.' },
     playNow: { description: 'Emits when the play-now key is pressed.' },
     toggleGlobal: { description: 'Emits when the GBL switch is pressed.' },
+    toggleWrap: { description: 'Emits when the WRAP switch is pressed.' },
     setEnd: { description: "Emits when Set End, in a cue's End slot, is pressed." },
     clearEnd: { description: 'Emits when Clear End is pressed.' },
     deleteMarker: { description: 'Emits when Delete is pressed.' },
@@ -94,6 +95,9 @@ const loop: LoopSelectedRowModel = {
   sharesGlobal: true,
   globalDisabled: false,
   globalAccessibleName: 'GBL Item 3',
+  wraps: false,
+  wrapDisabled: false,
+  wrapAccessibleName: 'WRAP Item 3',
   renameDisabled: false,
   renameLabel: 'Rename Item 3',
   nameMaxLength: 48,
@@ -111,6 +115,7 @@ const none: LoopSelectedRowModel = {
   deleteDisabled: true,
   playNowDisabled: true,
   globalDisabled: true,
+  wrapDisabled: true,
   start: boundary('Start', { disabled: true, tickPercents: [] }),
   end: boundary('End', { empty: true, disabled: true, tickPercents: [] }),
 };
@@ -121,11 +126,13 @@ const cue: LoopSelectedRowModel = {
   kindLabel: 'CUE',
   spanText: '02:43.2',
   clearEndDisabled: true,
+  wrapDisabled: true,
   end: boundary('End', { empty: true, tickPercents: [] }),
   renameLabel: 'Rename Item 4',
   triggerAccessibleName: 'Trigger Item 4',
   playNowAccessibleName: 'Play now Item 4',
   globalAccessibleName: 'GBL Item 4',
+  wrapAccessibleName: 'WRAP Item 4',
 };
 
 /** A selected loop sharing the main track's settings: GBL lit with a ringed-dot lamp, both boundaries nudged. */
@@ -136,6 +143,11 @@ export const LoopSharingGlobal: Story = {
 /** A loop with its own settings: GBL unlit with an empty-ring lamp, and the display says "own settings" to assistive tech. */
 export const LoopOwnSettings: Story = {
   args: { model: { ...loop, sharesGlobal: false }, startDragOffset: null, endDragOffset: null },
+};
+
+/** A loop that wraps a scrubbed record from its start to its end: WRAP lit with a ringed-dot lamp, and the display says "wraps" to assistive tech. */
+export const Wraps: Story = {
+  args: { model: { ...loop, wraps: true }, startDragOffset: null, endDragOffset: null },
 };
 
 /** A selected cue: Clear End disabled, and the End slot holds Set End in place of the snap keys. */

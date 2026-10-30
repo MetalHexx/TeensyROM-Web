@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
-import type { JumpSettings } from '@sidablist/core';
+import type { JumpSettings, VarispeedLoopStart } from '@sidablist/core';
 import type { LoopMarker, LoopPositionsStore, TuneIdentity } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
 import {
@@ -49,10 +49,12 @@ export interface DeckLoopsHolding {
   readonly positions: LoopPositionsStore;
 }
 
-/** A loop's bounds in the engine's terms: the resolved start and end frames. */
+/** A loop's bounds in the engine's terms: the resolved start and end frames, and what backing a
+ *  scrubbed record past the start does. */
 interface LoopBounds {
   readonly startFrame: number;
   readonly endFrame: number;
+  readonly varispeedStart: VarispeedLoopStart;
 }
 
 /** Where a queued marker waits: in the engine, for the end of the running loop's lap, or here, for
@@ -81,18 +83,29 @@ function ownSettingsOf(marker: DeckLoopMarker): DeckMixerSettings | null {
   return marker.ownSettings ? marker.settings : null;
 }
 
-/** What the engine runs for a marker: its bounds as a loop, or null for a cue. */
+/** What the engine runs for a marker: its bounds and WRAP mode as a loop, or null for a cue. */
 function loopBoundsOf(marker: DeckLoopMarker): LoopBounds | null {
   return marker.end !== null && markerKind(marker) === 'loop'
-    ? { startFrame: resolvedFrame(marker.start), endFrame: resolvedFrame(marker.end) }
+    ? {
+        startFrame: resolvedFrame(marker.start),
+        endFrame: resolvedFrame(marker.end),
+        varispeedStart: marker.wraps ? 'wrap' : 'stop',
+      }
     : null;
 }
 
-/** The jump the engine queues for a marker: a loop when it has an end, else a cue. */
-function jumpOf(marker: DeckLoopMarker): { startFrame: number; endFrame: number | null } {
+/** The jump the engine queues for a marker: a loop, with its WRAP mode, when it has an end, else a
+ *  cue. */
+function jumpOf(marker: DeckLoopMarker): {
+  startFrame: number;
+  endFrame: number | null;
+  varispeedStart?: VarispeedLoopStart;
+} {
+  const bounds = loopBoundsOf(marker);
   return {
     startFrame: resolvedFrame(marker.start),
-    endFrame: loopBoundsOf(marker)?.endFrame ?? null,
+    endFrame: bounds?.endFrame ?? null,
+    ...(bounds === null ? {} : { varispeedStart: bounds.varispeedStart }),
   };
 }
 
@@ -106,6 +119,7 @@ function stored(marker: DeckLoopMarker): LoopMarker {
     ...(marker.name === null ? {} : { name: marker.name }),
     ...(marker.settings === null ? {} : { settings: encodeMixerSettings(marker.settings) }),
     ...(marker.ownSettings ? { usesOwnSettings: true } : {}),
+    ...(marker.wraps ? { wraps: true } : {}),
   };
 }
 
@@ -224,6 +238,7 @@ export class DeckLoops {
         voices: record.voices,
         settings,
         ownSettings: record.usesOwnSettings === true && settings !== null,
+        wraps: record.wraps === true,
         ready: false,
       };
     });
@@ -425,6 +440,7 @@ export class DeckLoops {
       voices: ALL_VOICES,
       settings: null,
       ownSettings: false,
+      wraps: false,
       ready: false,
     };
     this.commit(slot, [...this.loopsOf(slot).markers, marker], marker.id);
@@ -611,6 +627,31 @@ export class DeckLoops {
   }
 
   /**
+   * Flips the selected loop's WRAP: lit, a scrubbed or thrown record backed past the loop's start
+   * wraps to its end; unlit, it stops at the start. A running loop passes the new mode to the
+   * engine at once, keeping any jump queued behind it. Refused on a cue, which has no loop to wrap.
+   */
+  toggleWrap(slot: Slot): void {
+    const marker = this.selectedMarker(slot, 'toggleWrap');
+    if (marker === null) {
+      return;
+    }
+    if (markerKind(marker) !== 'loop') {
+      this.refuse(slot, 'toggleWrap', 'has a cue selected');
+      return;
+    }
+    const { markers, selectedId } = this.loopsOf(slot);
+    this.commit(
+      slot,
+      markers.map((other) =>
+        other.id === marker.id ? { ...marker, wraps: !marker.wraps } : other
+      ),
+      selectedId,
+      'settings'
+    );
+  }
+
+  /**
    * Keeps the marker whose own settings are in play true to the deck's mixer: when what is sounding
    * (the panel, the voices' mutes) differs from its copy, the copy takes it. Does nothing while the
    * main track's settings are in play, whose panel already lives in the store. Not gated on the
@@ -713,10 +754,10 @@ export class DeckLoops {
   }
 
   /**
-   * Keeps the engine on the running marker's bounds as its entry changes. A changed end applies at
-   * once, taking effect at the next wrap; a changed start is held until its frame is ready and
-   * takes effect at the next re-entry. Neither seeks. A marker that is gone, or no longer a loop,
-   * is let go.
+   * Keeps the engine on the running marker's bounds as its entry changes. A changed end or WRAP
+   * mode applies at once, taking effect at the next wrap; a changed start is held until its frame
+   * is ready and takes effect at the next re-entry. None seeks. A marker that is gone, or no longer
+   * a loop, is let go.
    */
   private syncRunning(slot: Slot): void {
     const { markers, runningId } = this.loopsOf(slot);
@@ -733,8 +774,12 @@ export class DeckLoops {
     const next = {
       startFrame: marker.ready ? desired.startFrame : engaged.startFrame,
       endFrame: desired.endFrame,
+      varispeedStart: desired.varispeedStart,
     };
-    const unchanged = next.startFrame === engaged.startFrame && next.endFrame === engaged.endFrame;
+    const unchanged =
+      next.startFrame === engaged.startFrame &&
+      next.endFrame === engaged.endFrame &&
+      next.varispeedStart === engaged.varispeedStart;
     if (!unchanged && next.endFrame > next.startFrame) {
       this.engaged[slot] = next;
       this.runtime.setActiveLoop(slot, next);
@@ -763,6 +808,7 @@ export class DeckLoops {
     if (
       queued?.startFrame !== target.startFrame ||
       queued.endFrame !== target.endFrame ||
+      queued.varispeedStart !== target.varispeedStart ||
       this.queuedSource[slot] !== this.settingsToCarry(slot, marker)
     ) {
       this.queueInEngine(slot, marker);

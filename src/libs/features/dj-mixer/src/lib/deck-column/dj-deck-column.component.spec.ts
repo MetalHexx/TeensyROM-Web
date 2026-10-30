@@ -97,6 +97,7 @@ function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelection
     activity: 'idle',
     ready: true,
     sharesGlobal: true,
+    wraps: false,
     spanText: '00:01.0–00:08.8',
     start: boundarySummary(),
     end: boundarySummary(),
@@ -139,6 +140,7 @@ function createDeckServiceStub() {
     toggleMarker: vi.fn().mockResolvedValue(undefined),
     playMarkerNow: vi.fn().mockResolvedValue(undefined),
     toggleMarkerGlobal: vi.fn(),
+    toggleMarkerWrap: vi.fn(),
     selectMarker: vi.fn(),
     setMarkerEnd: vi.fn(),
     clearMarkerEnd: vi.fn(),
@@ -480,6 +482,39 @@ describe('DjDeckColumnComponent', () => {
       ]);
     });
 
+    it('fills the WRAP fields from the selection, and disables the key on a cue and with none', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem()],
+          selected: selection({ wraps: true }),
+        },
+      });
+      let row = plate(fixture).model().selected;
+
+      expect([row.wraps, row.wrapDisabled, row.wrapAccessibleName]).toEqual([
+        true,
+        false,
+        'WRAP Item 1 deck B',
+      ]);
+
+      loopsSummary.set(
+        emptyLoopsSummary({
+          hasTune: true,
+          items: [loopItem()],
+          selected: selection({ kind: 'cue', end: null }),
+        })
+      );
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+      expect([row.wraps, row.wrapDisabled]).toEqual([false, true]);
+
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, items: [loopItem()] }));
+      fixture.detectChanges();
+      row = plate(fixture).model().selected;
+      expect([row.wraps, row.wrapDisabled]).toEqual([false, true]);
+    });
+
     it('marks a tile that keeps its own settings, in its name and for its dot', () => {
       const { fixture } = render(DECK_B, {
         loops: {
@@ -600,6 +635,7 @@ describe('DjDeckColumnComponent', () => {
       ['playNowSelected', 'playMarkerNow', undefined, ['B']],
       ['playNowTile', 'playMarkerNow', 'm2', ['B', 'm2']],
       ['toggleGlobal', 'toggleMarkerGlobal', undefined, ['B']],
+      ['toggleWrap', 'toggleMarkerWrap', undefined, ['B']],
       ['selectTile', 'selectMarker', 'm2', ['B', 'm2']],
       ['setEnd', 'setMarkerEnd', undefined, ['B']],
       ['clearEnd', 'clearMarkerEnd', undefined, ['B']],

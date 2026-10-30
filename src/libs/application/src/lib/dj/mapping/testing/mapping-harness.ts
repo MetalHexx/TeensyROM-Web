@@ -268,6 +268,7 @@ export function setUpMappingHarness(
         voices: [],
         settings: null,
         ownSettings: false,
+        wraps: false,
         ready: true,
       }));
       djStore.setDeckLoops({

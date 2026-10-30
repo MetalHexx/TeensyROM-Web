@@ -191,6 +191,11 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
         /// Whether the marker uses its own settings instead of the subtune's. Null when not set.
         /// </summary>
         public bool? UsesOwnSettings { get; set; }
+
+        /// <summary>
+        /// Whether backing a scrubbed record past the loop's start wraps it to the loop's end instead of stopping it there. Null when not set.
+        /// </summary>
+        public bool? Wraps { get; set; }
     }
 
     /// <summary>

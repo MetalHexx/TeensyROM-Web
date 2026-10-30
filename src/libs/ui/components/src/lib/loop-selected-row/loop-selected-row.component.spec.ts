@@ -42,6 +42,9 @@ const loop: LoopSelectedRowModel = {
   sharesGlobal: true,
   globalDisabled: false,
   globalAccessibleName: 'GBL Item 3',
+  wraps: false,
+  wrapDisabled: false,
+  wrapAccessibleName: 'WRAP Item 3',
   renameDisabled: false,
   renameLabel: 'Rename Item 3',
   nameMaxLength: 48,
@@ -80,18 +83,27 @@ describe('LoopSelectedRowComponent', () => {
     c.trigger.subscribe(() => emitted.push('trigger'));
     c.playNow.subscribe(() => emitted.push('playNow'));
     c.toggleGlobal.subscribe(() => emitted.push('toggleGlobal'));
+    c.toggleWrap.subscribe(() => emitted.push('toggleWrap'));
     c.clearEnd.subscribe(() => emitted.push('clearEnd'));
     c.deleteMarker.subscribe(() => emitted.push('delete'));
     for (const control of [
       'loop-toggle',
       'loop-play-now',
       'loop-global',
+      'loop-wrap',
       'loop-clear-end',
       'loop-delete',
     ]) {
       button(`[data-control="${control}"]`).click();
     }
-    expect(emitted).toEqual(['trigger', 'playNow', 'toggleGlobal', 'clearEnd', 'delete']);
+    expect(emitted).toEqual([
+      'trigger',
+      'playNow',
+      'toggleGlobal',
+      'toggleWrap',
+      'clearEnd',
+      'delete',
+    ]);
   });
 
   it('shows the End boundary on a loop and no Set End key anywhere', () => {
@@ -131,16 +143,33 @@ describe('LoopSelectedRowComponent', () => {
     expect(display().getAttribute('aria-label')).toContain('own settings');
   });
 
+  it('follows wraps in the WRAP key and the display text', () => {
+    const wrap = (): HTMLButtonElement => button('[data-control="loop-wrap"]');
+    expect(wrap().textContent).toContain('WRAP');
+    expect(wrap().getAttribute('aria-pressed')).toBe('false');
+    expect(wrap().hasAttribute('data-lit')).toBe(false);
+    const unlitLamp = wrap().querySelector('.icon')?.textContent?.trim();
+    expect(display().getAttribute('aria-label')).not.toContain('wraps');
+    setModel({ wraps: true });
+    expect(wrap().getAttribute('aria-pressed')).toBe('true');
+    expect(wrap().hasAttribute('data-lit')).toBe(true);
+    const litLamp = wrap().querySelector('.icon')?.textContent?.trim();
+    expect(litLamp).toBeTruthy();
+    expect(litLamp).not.toBe(unlitLamp);
+    expect(display().getAttribute('aria-label')).toContain('wraps');
+  });
+
   it('makes Clear End icon-only', () => {
     const clear = button('[data-control="loop-clear-end"]');
     expect(clear.textContent?.trim()).toBe('close');
     expect(clear.querySelector('.text')).toBeNull();
   });
 
-  it('disables play now and GBL from the model', () => {
-    setModel({ playNowDisabled: true, globalDisabled: true });
+  it('disables play now, GBL and WRAP from the model', () => {
+    setModel({ playNowDisabled: true, globalDisabled: true, wrapDisabled: true });
     expect(button('[data-control="loop-play-now"]').disabled).toBe(true);
     expect(button('[data-control="loop-global"]').disabled).toBe(true);
+    expect(button('[data-control="loop-wrap"]').disabled).toBe(true);
   });
 
   it('tags nudges with the boundary they came from', () => {
@@ -249,5 +278,6 @@ describe('LoopSelectedRowComponent', () => {
     expect(controls.every((control) => control.disabled)).toBe(true);
     expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
     expect(button('[data-control="loop-global"]').hasAttribute('aria-pressed')).toBe(false);
+    expect(button('[data-control="loop-wrap"]').hasAttribute('aria-pressed')).toBe(false);
   });
 });

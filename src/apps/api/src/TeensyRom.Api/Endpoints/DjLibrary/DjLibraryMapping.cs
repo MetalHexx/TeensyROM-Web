@@ -86,7 +86,8 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
             End = dto.End is null ? null : ToDocument(dto.End),
             Voices = [.. dto.Voices],
             Settings = dto.Settings,
-            UsesOwnSettings = dto.UsesOwnSettings
+            UsesOwnSettings = dto.UsesOwnSettings,
+            Wraps = dto.Wraps
         };
 
         private static DjLoopBoundary ToDocument(DjLoopBoundaryDto dto) => new() { Frame = dto.Frame, OffsetFrames = dto.OffsetFrames };
@@ -124,7 +125,8 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
             End = document.End is null ? null : ToDto(document.End),
             Voices = [.. document.Voices ?? []],
             Settings = document.Settings,
-            UsesOwnSettings = document.UsesOwnSettings
+            UsesOwnSettings = document.UsesOwnSettings,
+            Wraps = document.Wraps
         };
 
         private static DjLoopBoundaryDto ToDto(DjLoopBoundary document) => new() { Frame = document.Frame, OffsetFrames = document.OffsetFrames };

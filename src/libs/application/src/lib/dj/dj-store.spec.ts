@@ -422,6 +422,7 @@ describe('DjStore', () => {
         voices: [0, 1, 2],
         settings: null,
         ownSettings: false,
+        wraps: false,
         ready: false,
       };
       store.setLoopMarkers({ slot: 'A', markers: [marker] });

@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import type { VarispeedRateSource } from '@sidablist/core';
-import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore } from './dj-store';
 import { PITCH_BEND_CENTRE, PITCH_BEND_MAX } from './ports';
@@ -74,6 +73,11 @@ interface SlotHand {
  * speed the finger left it and slows, at constant friction, to the deck's own speed (or to a stop
  * on a paused deck). When it gets there the deck leaves varispeed and the engine hands back.
  *
+ * A running marker loop holds the record: forward past the end wraps to its start, and backward
+ * past its start stops there or wraps to the end by the loop's WRAP. The hand never releases the
+ * loop; a record stopped at the loop's start stays still under a backward throw and climbs from
+ * standstill at the strip's grip.
+ *
  * The strip's messages only record values; the position is worked out on the engine's tick, which
  * has the position that tick starts from.
  */
@@ -81,7 +85,6 @@ interface SlotHand {
 export class DeckHand {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
-  private readonly loops = inject(DeckLoops);
 
   private readonly hands: Record<Slot, SlotHand> = this.buildHands();
 
@@ -256,7 +259,7 @@ export class DeckHand {
       case 'held':
         return this.heldRate(hand, position);
       case 'thrown':
-        return this.thrownRate(hand, intervalUs);
+        return this.thrownRate(hand, position, intervalUs);
       default:
         return 0;
     }
@@ -281,8 +284,9 @@ export class DeckHand {
   }
 
   /** The release speed on the throw's first tick, then constant friction toward the deck's own
-   *  speed: 1 on a playing deck, 0 on any other. */
-  private thrownRate(hand: SlotHand, intervalUs: number): number {
+   *  speed: 1 on a playing deck, 0 on any other. A backward rate with the record stopped at a
+   *  running loop's start is 0, so the throw comes up from standstill. */
+  private thrownRate(hand: SlotHand, position: number, intervalUs: number): number {
     const target = this.runtime.snapshot(hand.slot).transport === 'playing' ? 1 : 0;
     if (hand.launching) {
       hand.launching = false;
@@ -292,6 +296,9 @@ export class DeckHand {
       const gap = target - hand.rate;
       hand.rate = Math.abs(gap) <= step ? target : hand.rate + Math.sign(gap) * step;
     }
+    if (hand.rate < 0 && this.stoppedAtLoopStart(hand.slot, position)) {
+      hand.rate = 0;
+    }
     if (hand.rate === target && !hand.arrived) {
       hand.arrived = true;
       queueMicrotask(hand.arrival);
@@ -299,22 +306,23 @@ export class DeckHand {
     return hand.rate;
   }
 
-  /** The throw reached the deck's speed, outside the tick. A marker loop the throw ended past is
-   *  released first, since the engine would otherwise pull the playhead straight back into it. */
+  /** The running loop holds the record at its start by stopping it there, not by wrapping it.
+   *  `position` is the fractional position the engine hands the rate source. */
+  private stoppedAtLoopStart(slot: Slot, position: number): boolean {
+    const loop = this.runtime.snapshot(slot).loop;
+    return (
+      loop !== null &&
+      loop.varispeedStart === 'stop' &&
+      Math.abs(position - loop.startFrame) <= POSITION_EPSILON
+    );
+  }
+
+  /** The throw reached the deck's speed, outside the tick. */
   private arrive(hand: SlotHand): void {
     if (hand.state !== 'thrown' || !hand.arrived) {
       return;
     }
-    const { slot } = hand;
-    const loop = this.runtime.snapshot(slot).loop;
-    if (
-      this.store.loops()[slot].runningId !== null &&
-      loop !== null &&
-      this.runtime.position(slot) >= loop.endFrame
-    ) {
-      this.loops.stop(slot);
-    }
-    this.runtime.leaveVarispeed(slot);
+    this.runtime.leaveVarispeed(hand.slot);
     hand.state = 'idle';
   }
 }
