@@ -793,3 +793,10 @@ two decks. The grip default (250 ms) is the value to tune.
 7. Note any lag or sluggishness.
 8. With both decks playing and one under the hand, read the player's timing stats for new late
    frames against a run without the hand.
+9. Run a loop and beat juggle off its start marker: rock the record back onto the loop's start
+   and hold, then release. It stops at the start, the first transient lands on the beat, and the
+   loop carries on.
+10. Light WRAP on a loop and scratch it forward and backward under the finger. It plays as an
+    endless tone, with no stop at the start and no seam at the end.
+11. Learn WRAP onto a MIDI control and press it. The selected loop's WRAP toggles, and a scrub
+    backward past the start now wraps or stops to match.

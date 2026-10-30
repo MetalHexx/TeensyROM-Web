@@ -347,7 +347,7 @@ describe('DeckHand', () => {
       bend(9000 + 3000);
       tick();
 
-      expect(lastTick().position).toBe(100);
+      expect(lastTick().position).toBeCloseTo(100, 6);
       expect(landing(lastTick())).toBeCloseTo(100 + 3000 * framesPerCount(), 9);
     });
   });
@@ -1047,20 +1047,219 @@ describe('DeckHand', () => {
 
     const frameOf = (value: number): number => Math.floor(110 + (value - 9000) * framesPerCount());
 
-    it('keeps a running loop that the throw landed past the end of, holding the record inside it', async () => {
+    /** Loop `a` running with the deck's playhead at or past `from`, WRAP lit or not. */
+    async function loopRunning(from = 105, wraps = false): Promise<void> {
       await loadWithLoops();
+      if (wraps) {
+        h.deckService.selectMarker('A', 'a');
+        h.deckService.toggleMarkerWrap('A');
+      }
       await h.deckService.toggleMarker('A', 'a');
-      tickUntil(() => position() >= 105);
+      tickUntil(() => position() >= from);
       expect(h.djStore.loops()['A'].runningId).toBe('a');
+    }
 
-      await dragTo(9000 + 8000);
-      tickUntil(() => lastTick().rate === 1);
-      await settle();
+    const countsFor = (frames: number): number => Math.round(frames / framesPerCount());
 
-      expect(position()).toBeGreaterThanOrEqual(100);
-      expect(position()).toBeLessThanOrEqual(120);
-      expect(h.djStore.loops()['A'].runningId).toBe('a');
-      expect(runtime.snapshot('A').loop).not.toBeNull();
+    /** Where the engine puts a playhead that a backward move ended at `to`, below a loop's start. */
+    const wrappedBack = (to: number, start = 100, end = 120): number => {
+      const landed = end - ((start - to) % (end - start));
+      return landed < end ? landed : start;
+    };
+
+    /** The playhead position each tick started from, from the tick at index `from` on. */
+    const positionsSince = (from: number): number[] => ticks.A.slice(from).map((t) => t.position);
+
+    const inLoop = (at: number): boolean => at >= 100 && at < 120;
+
+    const onStart = (at: number): boolean => Math.abs(at - 100) < 1e-6;
+
+    /** A backward flick of 20 counts per millisecond over the last 20 ms, ending `counts` below. */
+    function flingBackTo(counts: number): void {
+      bend(9000, 0);
+      tick();
+      bend(9000 - counts / 4, 100);
+      bend(9000 - counts / 2, 120);
+      bend(9000 - counts, 140);
+      tick();
+    }
+
+    describe('under the finger', () => {
+      it('wraps a forward stroke past the end into the loop, and keeps the loop running', async () => {
+        await loopRunning();
+
+        bend(9000);
+        tick();
+        bend(9000 + countsFor(40), 10);
+        tick();
+        const stroke = lastTick();
+        tick(3);
+
+        expect(landing(stroke)).toBeGreaterThan(120);
+        expect(positionsSince(ticks.A.indexOf(stroke) + 1).every(inLoop)).toBe(true);
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+        expect(engineVarispeed()).toBe(true);
+        expect(ticks.A.slice(-2).map((t) => t.rate)).toEqual([0, 0]);
+      });
+
+      it('holds a backward stroke at the start while the finger keeps going', async () => {
+        await loopRunning();
+
+        bend(9000);
+        tick();
+        bend(9000 - countsFor(40), 10);
+        tick();
+        expect(position()).toBe(100);
+        bend(9000 - countsFor(70), 20);
+        tick(3);
+
+        positionsSince(-3).forEach((at) => expect(at).toBeCloseTo(100, 6));
+        const [pulled, ...rest] = ticks.A.slice(-3);
+        expect(pulled.rate).toBeLessThan(0);
+        rest.forEach((t) => expect(t.rate).toBeCloseTo(0, 6));
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+      });
+
+      it('wraps a backward stroke past the start to the top of the loop when WRAP is lit', async () => {
+        await loopRunning(105, true);
+        expect(runtime.snapshot('A').loop?.varispeedStart).toBe('wrap');
+
+        bend(9000);
+        tick();
+        bend(9000 - countsFor(32), 10);
+        tick();
+        const stroke = lastTick();
+        tick();
+
+        const to = landing(stroke);
+        expect(to).toBeLessThan(100);
+        expect(ticks.A[ticks.A.indexOf(stroke) + 1].position).toBeCloseTo(wrappedBack(to), 6);
+        bend(9000 - countsFor(80), 20);
+        tick(3);
+        expect(positionsSince(-3).every(inLoop)).toBe(true);
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+      });
+
+      it('moves the record on the next tick when the finger turns forward from the held start', async () => {
+        await loopRunning();
+        const low = 9000 - countsFor(40);
+        bend(9000);
+        tick();
+        bend(low, 10);
+        tick(2);
+        expect(lastTick().position).toBeCloseTo(100, 6);
+        expect(lastTick().rate).toBeCloseTo(0, 9);
+
+        bend(low + countsFor(6), 20);
+        tick();
+
+        expect(lastTick().position).toBeCloseTo(100, 6);
+        expect(landing(lastTick())).toBeCloseTo(100 + countsFor(6) * framesPerCount(), 6);
+        tick();
+        expect(lastTick().position).toBeGreaterThan(105);
+      });
+    });
+
+    describe('a throw', () => {
+      it('wraps a forward throw past the end into the loop until it hands back', async () => {
+        await loopRunning();
+        bend(9000, 0);
+        tick();
+        bend(9200, 100);
+        bend(9600, 120);
+        bend(10000, 140);
+        tick();
+        const lifted = ticks.A.length;
+        bend(PITCH_BEND_CENTRE, 145);
+
+        tickUntil(() => lastTick().rate === 1);
+        await settle();
+
+        const positions = positionsSince(lifted);
+        expect(positions.every(inLoop)).toBe(true);
+        expect(positions.some((at, i) => i > 0 && at < positions[i - 1])).toBe(true);
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+        expect(runtime.snapshot('A').loop).not.toBeNull();
+        tickUntil(() => !engineVarispeed());
+        expect(inLoop(position())).toBe(true);
+      });
+
+      it('lifts at the held start from standstill, and climbs at the grip step', async () => {
+        await loopRunning();
+        flingBackTo(countsFor(40));
+        tick();
+        expect(lastTick().position).toBeCloseTo(100, 6);
+
+        bend(PITCH_BEND_CENTRE, 145);
+        tick();
+        const launch = lastTick();
+        tickUntil(() => lastTick().rate === 1);
+        await settle();
+
+        const step = launch.intervalUs / 1e6 / GRIP;
+        const rates = ticks.A.slice(ticks.A.indexOf(launch)).map((t) => t.rate);
+        expect(launch.position).toBeCloseTo(100, 6);
+        expect(rates[0]).toBe(0);
+        expect(rates[1]).toBeCloseTo(step, 9);
+        expect(rates[2] - rates[1]).toBeCloseTo(step, 9);
+        expect(Math.min(...rates)).toBe(0);
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+      });
+
+      it('keeps a forward flick at the held start at its speed', async () => {
+        await loopRunning();
+        flingBackTo(countsFor(40));
+        tick();
+        expect(lastTick().position).toBeCloseTo(100, 6);
+        const low = 9000 - countsFor(40);
+        bend(low + 200, 200);
+        bend(low + 600, 220);
+        bend(low + 1000, 240);
+        tick();
+
+        bend(PITCH_BEND_CENTRE, 245);
+        tick();
+
+        const first = lastTick();
+        expect(first.rate).toBeCloseTo(20 * framesPerCount() * (first.intervalUs / 1000), 9);
+        expect(first.rate).toBeGreaterThan(1);
+      });
+
+      it('comes up from standstill when a backward throw reaches the start', async () => {
+        await loopRunning(115);
+        flingBackTo(countsFor(10));
+        const lifted = ticks.A.length;
+        bend(PITCH_BEND_CENTRE, 145);
+
+        tickUntil(() => lastTick().rate === 1);
+        await settle();
+
+        const thrown = ticks.A.slice(lifted);
+        const reached = thrown.findIndex((t) => onStart(t.position));
+        expect(reached).toBeGreaterThan(0);
+        expect(thrown.slice(0, reached).every((t) => t.rate < 0)).toBe(true);
+        const rates = thrown.slice(reached).map((t) => t.rate);
+        const step = thrown[0].intervalUs / 1e6 / GRIP;
+        expect(rates[0]).toBe(0);
+        expect(rates[1]).toBeCloseTo(step, 9);
+        expect(Math.min(...rates)).toBe(0);
+        expect(h.djStore.loops()['A'].runningId).toBe('a');
+      });
+
+      it('lets a backward throw wrap past the start when WRAP is lit', async () => {
+        await loopRunning(115, true);
+        flingBackTo(countsFor(10));
+        const lifted = ticks.A.length;
+        bend(PITCH_BEND_CENTRE, 145);
+
+        tickUntil(() => lastTick().rate === 1);
+        await settle();
+
+        const thrown = ticks.A.slice(lifted);
+        expect(thrown.some((t) => t.rate < 0 && onStart(t.position))).toBe(false);
+        expect(thrown.every((t) => inLoop(t.position))).toBe(true);
+        expect(thrown.some((t) => t.position > 110 && t.rate < 0)).toBe(true);
+      });
     });
 
     it('keeps a running loop that the throw landed inside, and fires the queued jump at its end', async () => {
@@ -1104,6 +1303,29 @@ describe('DeckHand', () => {
       expect(h.djStore.loops()['A'].queuedId).toBe('b');
       expect(position()).toBeGreaterThanOrEqual(100);
       expect(position()).toBeLessThanOrEqual(120);
+    });
+
+    it('fires the queued jump at the end only after the handback, never on a wrap under the hand', async () => {
+      await loopRunning();
+      await h.deckService.toggleMarker('A', 'b');
+      expect(h.djStore.loops()['A'].queuedId).toBe('b');
+
+      bend(9000);
+      tick();
+      bend(9000 + countsFor(60), 10);
+      tick(5);
+      bend(PITCH_BEND_CENTRE, 500);
+      tickUntil(() => lastTick().rate === 1);
+      await settle();
+
+      expect(h.djStore.loops()['A'].runningId).toBe('a');
+      expect(h.djStore.loops()['A'].queuedId).toBe('b');
+      expect(ticks.A.every((t) => t.position < 120)).toBe(true);
+
+      tickUntil(() => !engineVarispeed());
+      tickUntil(() => position() >= 300);
+      await settle();
+      expect(h.djStore.loops()['A'].runningId).toBe('b');
     });
   });
 });
