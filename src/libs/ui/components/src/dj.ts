@@ -31,3 +31,4 @@ export * from './lib/key-match-light/key-match-light.component';
 export * from './lib/voice-wave/wave-protocol';
 export * from './lib/voice-wave/wave-feed-buffer';
 export * from './lib/voice-wave/wave-worker-host';
+export * from './lib/voice-wave/voice-wave-renderer';
