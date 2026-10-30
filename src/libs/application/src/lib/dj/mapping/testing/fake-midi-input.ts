@@ -73,14 +73,14 @@ export class FakeMidiInput implements IMidiInput {
     number: number,
     value: number,
     channel = 1,
-    timeStampMs = 0
+    timeStampMs = performance.now()
   ): void {
     const pressed = kind === 'note' ? value > 0 : value >= 64;
     this.deliver({ portId, kind, channel, number, value, pressed, timeStampMs });
   }
 
   /** Delivers a pitch bend (0–16383) as an open port would. */
-  emitPitchBend(portId: string, value: number, channel = 1, timeStampMs = 0): void {
+  emitPitchBend(portId: string, value: number, channel = 1, timeStampMs = performance.now()): void {
     this.deliver({
       portId,
       kind: 'pitch-bend',

@@ -47,7 +47,21 @@ describe('ApiMidiSettingsRepository', () => {
 
     await repository.save(settings);
 
-    expect(api.saveMidiSettings).toHaveBeenCalledWith({ saveMidiSettingsRequest: settings });
+    expect(api.saveMidiSettings).toHaveBeenCalledWith(
+      { saveMidiSettingsRequest: settings },
+      undefined
+    );
+  });
+
+  it('passes keepalive to the client as a request override', async () => {
+    const settings: MidiSettingsRecord = { controllers: [], mappings: [], deckBindings: [] };
+
+    await repository.save(settings, { keepalive: true });
+
+    expect(api.saveMidiSettings).toHaveBeenCalledWith(
+      { saveMidiSettingsRequest: settings },
+      { keepalive: true }
+    );
   });
 
   it('lets a failed load propagate', async () => {

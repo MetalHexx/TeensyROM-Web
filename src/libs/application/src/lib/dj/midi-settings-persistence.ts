@@ -1,4 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { DestroyRef, Injectable, inject } from '@angular/core';
 import { ALERT_SERVICE, type IAlertService } from '@teensyrom-nx/domain';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DjStore } from './dj-store';
@@ -15,6 +16,9 @@ import { DECK_SLOTS } from './slot';
 
 const SAVE_DEBOUNCE_MS = 300;
 
+/** The browser caps a `keepalive` request body at 64 KB; warn well before the set gets there. */
+const KEEPALIVE_WARN_BYTES = 60 * 1024;
+
 /** The server rejects a longer name. */
 const MAX_LAST_SEEN_NAME_LENGTH = 128;
 
@@ -27,6 +31,9 @@ const EMPTY_SETTINGS: MidiSettingsRecord = { controllers: [], mappings: [], deck
  *
  * A failed load resolves an empty set and suppresses every save for the rest of the session, so a
  * partial set can never overwrite the server's.
+ *
+ * When the page is going away (`pagehide`), a change still waiting on the debounce, or a save still
+ * in flight, is sent at once with `keepalive` so the unload cannot lose it.
  */
 @Injectable({ providedIn: 'root' })
 export class MidiSettingsPersistence {
@@ -37,11 +44,21 @@ export class MidiSettingsPersistence {
 
   private loading: Promise<MidiSettingsRecord> | null = null;
   private loaded: MidiSettingsRecord = EMPTY_SETTINGS;
+  private loadSucceeded = false;
   private savesSuppressed = false;
 
   private debounce: ReturnType<typeof setTimeout> | null = null;
   private saving = false;
   private saveAgain = false;
+
+  constructor() {
+    const view = inject(DOCUMENT).defaultView;
+    if (view !== null) {
+      const flushNow = (): void => this.flushOnLeave();
+      view.addEventListener('pagehide', flushNow);
+      inject(DestroyRef).onDestroy(() => view.removeEventListener('pagehide', flushNow));
+    }
+  }
 
   /** Fetches the set on the first call; every later call returns the same promise. */
   load(): Promise<MidiSettingsRecord> {
@@ -96,6 +113,7 @@ export class MidiSettingsPersistence {
   private async fetch(): Promise<MidiSettingsRecord> {
     try {
       this.loaded = await this.repository.load();
+      this.loadSucceeded = true;
       return this.loaded;
     } catch (error) {
       logWarn(`MidiSettingsPersistence: load failed — ${describe(error)}`);
@@ -121,6 +139,32 @@ export class MidiSettingsPersistence {
     } finally {
       this.saving = false;
     }
+  }
+
+  /** Sends the latest snapshot at once, fire-and-forget, when anything is pending or in flight. An
+   *  in-flight save may be cancelled by the unload; the set is stored whole, so re-sending is
+   *  harmless. Sends nothing before a successful load, or when saves are suppressed. */
+  private flushOnLeave(): void {
+    if (this.savesSuppressed || !this.loadSucceeded) {
+      return;
+    }
+    if (this.debounce === null && !this.saveAgain && !this.saving) {
+      return;
+    }
+    if (this.debounce !== null) {
+      clearTimeout(this.debounce);
+      this.debounce = null;
+    }
+    const snapshot = this.snapshot();
+    const bytes = new TextEncoder().encode(JSON.stringify(snapshot)).length;
+    if (bytes > KEEPALIVE_WARN_BYTES) {
+      logWarn(
+        `MidiSettingsPersistence: the settings are ${bytes} bytes, near the 64 KB limit of a keepalive save.`
+      );
+    }
+    this.repository.save(snapshot, { keepalive: true }).catch((error: unknown) => {
+      logError('MidiSettingsPersistence: save failed', error);
+    });
   }
 
   private async send(): Promise<void> {

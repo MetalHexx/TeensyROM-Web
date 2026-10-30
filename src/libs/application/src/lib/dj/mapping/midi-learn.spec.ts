@@ -36,10 +36,7 @@ describe('MidiLearn', () => {
   }
 
   /** The app as bootstrap leaves it, with the controller's input plugged in and mapping mode on. */
-  async function start(
-    saved: Partial<MidiSettingsRecord> = {},
-    mappingMode = true
-  ): Promise<void> {
+  async function start(saved: Partial<MidiSettingsRecord> = {}, mappingMode = true): Promise<void> {
     TestBed.resetTestingModule();
     h = setUpMappingHarness({ controllers: [], mappings: [], deckBindings: [], ...saved });
     h.makeShapeable('A');
@@ -112,6 +109,76 @@ describe('MidiLearn', () => {
 
       expect(h.mappingStore.learn()).toBeNull();
       expect(learned()).toHaveLength(0);
+    });
+  });
+
+  describe('a message sent before the control was selected', () => {
+    const SELECTED_AT = 1000;
+    let clock: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      clock = vi.spyOn(performance, 'now').mockReturnValue(SELECTED_AT);
+    });
+
+    afterEach(() => {
+      clock.mockRestore();
+    });
+
+    const sentAt = (timeStampMs: number, number = 36, value = 100): MidiInputMessage => ({
+      portId: PORT,
+      kind: 'note',
+      channel: 1,
+      number,
+      value,
+      pressed: value > 0,
+      timeStampMs,
+    });
+
+    it('is not consumed, and learn keeps waiting', async () => {
+      await start();
+      h.learn.select(PLAY_A);
+
+      expect(h.learn.offer(sentAt(SELECTED_AT - 1), NAME)).toBe(false);
+      h.midiInput.emit(PORT, 'note', 36, 100, 1, SELECTED_AT - 100);
+
+      expect(learned()).toHaveLength(0);
+      expect(h.mappingStore.learn()).toMatchObject({ control: PLAY_A, phase: 'waiting' });
+    });
+
+    it('lets a message sent after the selection bind, and one sent at that instant', async () => {
+      await start();
+      h.learn.select(PLAY_A);
+      h.midiInput.emit(PORT, 'note', 36, 100, 1, SELECTED_AT - 100);
+
+      h.midiInput.emit(PORT, 'note', 37, 100, 1, SELECTED_AT);
+
+      expect(learned()).toHaveLength(1);
+      expect(learned()[0].source.number).toBe(37);
+    });
+
+    it('is ignored while sampling, even from the sampled source', async () => {
+      await start();
+      h.learn.select(SPEED_A);
+      h.midiInput.emit(PORT, 'cc', 7, 100, 1, SELECTED_AT + 10);
+      expect(h.mappingStore.learn()?.phase).toBe('sampling');
+
+      SWEEP.forEach((value) => h.midiInput.emit(PORT, 'cc', 7, value, 1, SELECTED_AT - 500));
+      await vi.advanceTimersByTimeAsync(1500);
+
+      expect(learned()[0].style).toEqual({ kind: 'relative-offset', amount: 0.01 });
+    });
+
+    it('is judged against the latest selection', async () => {
+      await start();
+      h.learn.select(PLAY_A);
+      clock.mockReturnValue(SELECTED_AT + 500);
+      h.learn.select(PLAY_B);
+
+      h.midiInput.emit(PORT, 'note', 36, 100, 1, SELECTED_AT + 100);
+      expect(learned()).toHaveLength(0);
+
+      h.midiInput.emit(PORT, 'note', 36, 100, 1, SELECTED_AT + 500);
+      expect(learned()[0].control).toEqual(PLAY_B);
     });
   });
 
@@ -285,9 +352,7 @@ describe('MidiLearn', () => {
         style: { kind: 'absolute', amount: null },
       });
       expect(h.mappingStore.learn()).toBeNull();
-      expect(h.mappingStore.announcement()).toBe(
-        `Speed, deck A, bound to ${NAME} · ch 1 · CC 7`
-      );
+      expect(h.mappingStore.announcement()).toBe(`Speed, deck A, bound to ${NAME} · ch 1 · CC 7`);
     });
 
     it('proposes relative-offset, at the control sensitivity, for a 64-centred encoder', async () => {
@@ -337,7 +402,10 @@ describe('MidiLearn', () => {
       await start();
       h.learn.select(SPEED_A);
 
-      sendAll(7, Array.from({ length: 24 }, (_, i) => i * 5));
+      sendAll(
+        7,
+        Array.from({ length: 24 }, (_, i) => i * 5)
+      );
 
       expect(learned()).toHaveLength(1);
       expect(learned()[0].style.kind).toBe('absolute');
@@ -355,7 +423,7 @@ describe('MidiLearn', () => {
         number,
         value: 20,
         pressed: false,
-        timeStampMs: 0,
+        timeStampMs: performance.now(),
       });
 
       expect(h.learn.offer(message(7), NAME)).toBe(true);
@@ -414,7 +482,7 @@ describe('MidiLearn', () => {
       );
     });
 
-    it('re-learn replaces only that mapping\'s source', async () => {
+    it("re-learn replaces only that mapping's source", async () => {
       await start(
         {
           controllers: [SAVED_CONTROLLER],
@@ -491,7 +559,11 @@ describe('guessValueStyle', () => {
     ['six distinct 64-centred values', [49, 50, 51, 77, 78, 79], 'relative-offset'],
     ['a sweep', [0, 40, 80, 127], 'absolute'],
     ['four distinct values in no pattern', [10, 10, 20, 30, 40], 'absolute'],
-    ['seven distinct signed-bit values, which is too many to be an encoder', [1, 2, 3, 4, 127, 126, 125], 'absolute'],
+    [
+      'seven distinct signed-bit values, which is too many to be an encoder',
+      [1, 2, 3, 4, 127, 126, 125],
+      'absolute',
+    ],
     ['seven distinct 64-centred values', [49, 50, 51, 52, 77, 78, 79], 'absolute'],
     ['a signed-bit encoder turned up only', [1, 1, 2], 'relative-signed'],
     ['a signed-bit encoder turned down only', [127, 126, 127], 'relative-signed'],

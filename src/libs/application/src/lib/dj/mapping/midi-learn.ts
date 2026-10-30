@@ -62,6 +62,8 @@ export function guessValueStyle(
 interface Sampling {
   readonly source: MidiSource;
   readonly samples: number[];
+  readonly portName: string;
+  lastValue: number;
   readonly timer: ReturnType<typeof setTimeout>;
 }
 
@@ -79,6 +81,7 @@ export class MidiLearn {
   private readonly controls = inject(MappableControls);
 
   private sampling: Sampling | null = null;
+  private selectedAtMs = 0;
 
   /** Starts listening for a control, only while mapping mode is on. Selecting the control that is
    *  already selected cancels. */
@@ -116,11 +119,23 @@ export class MidiLearn {
   /** Takes a message for learn when one is in progress. Returns true when it was consumed, so it
    *  must not reach the engine. A note release is never consumed: it may end a hold. Neither is a
    *  pitch bend at centre, which may end a hand, nor one offered to a control that takes no hand:
-   *  learn keeps waiting. */
+   *  learn keeps waiting. A message stamped before the control was selected is stale and is never
+   *  consumed, so a message the controller sent earlier cannot bind. */
   offer(message: MidiInputMessage, portName: string): boolean {
     const learn = this.store.learn();
     if (learn === null) {
       this.clearSampling();
+      return false;
+    }
+    if (message.timeStampMs < this.selectedAtMs) {
+      logInfo(
+        LogType.Midi,
+        `MIDI learn ignored a stale message ${heard(
+          portName,
+          message,
+          message.value
+        )}, ${Math.round(performance.now() - message.timeStampMs)} ms old`
+      );
       return false;
     }
     if (message.kind === 'pitch-bend' && !message.pressed) {
@@ -152,31 +167,44 @@ export class MidiLearn {
       number: message.number,
     };
     if (message.kind === 'cc' && control.nature === 'value') {
-      this.beginSampling(learn, source, message.value);
+      this.beginSampling(learn, source, message, portName);
     } else {
-      this.finish(learn, source, defaultStyle(control, message.kind));
+      this.finish(
+        learn,
+        source,
+        defaultStyle(control, message.kind),
+        heard(portName, message, message.value)
+      );
     }
     return true;
   }
 
   private start(identity: ControlIdentity, replacing: string | null): void {
     this.clearSampling();
+    this.selectedAtMs = performance.now();
     this.store.setLearn({
       learn: { control: identity, phase: 'waiting', replacing, source: null },
     });
     logInfo(LogType.Midi, `MIDI learn selected ${controlKey(identity)}`);
   }
 
-  private beginSampling(learn: LearnState, source: MidiSource, firstValue: number): void {
+  private beginSampling(
+    learn: LearnState,
+    source: MidiSource,
+    message: MidiInputMessage,
+    portName: string
+  ): void {
     this.clearSampling();
     const sampling: Sampling = {
       source,
-      samples: [firstValue],
+      samples: [message.value],
+      portName,
+      lastValue: message.value,
       timer: setTimeout(() => this.endWindow(sampling), SAMPLING_WINDOW_MS),
     };
     this.sampling = sampling;
     this.store.setLearn({ learn: { ...learn, phase: 'sampling', source } });
-    logInfo(LogType.Midi, `MIDI learn sampling ${sourceKey(source)}`);
+    logInfo(LogType.Midi, `MIDI learn sampling ${heard(portName, message, message.value)}`);
   }
 
   private sample(message: MidiInputMessage): boolean {
@@ -191,6 +219,7 @@ export class MidiLearn {
       return false;
     }
     sampling.samples.push(message.value);
+    sampling.lastValue = message.value;
     if (sampling.samples.length >= MAX_SAMPLES) {
       this.endWindow(sampling);
     }
@@ -215,7 +244,14 @@ export class MidiLearn {
       this.cancel();
       return;
     }
-    this.finish(learn, sampling.source, this.sampledStyle(control, sampling.samples));
+    this.finish(
+      learn,
+      sampling.source,
+      this.sampledStyle(control, sampling.samples),
+      `${heard(sampling.portName, sampling.source, sampling.lastValue)} after ${
+        sampling.samples.length
+      } samples`
+    );
   }
 
   private sampledStyle(control: MappableControl, samples: readonly number[]): MappingStyle {
@@ -225,7 +261,13 @@ export class MidiLearn {
       : { kind, amount: defaultAmountFor(control, kind) };
   }
 
-  private finish(learn: LearnState, source: MidiSource, style: MappingStyle): void {
+  /** Binds `source` and logs it, naming what was `heard` (see `heard`). */
+  private finish(
+    learn: LearnState,
+    source: MidiSource,
+    style: MappingStyle,
+    heardDescription: string
+  ): void {
     this.clearSampling();
     const result =
       learn.replacing !== null
@@ -240,14 +282,13 @@ export class MidiLearn {
       source,
       this.store.controllers()
     )}`;
-    const moved =
-      result.movedFrom === null ? '' : `, moved from ${this.label(result.movedFrom)}`;
+    const moved = result.movedFrom === null ? '' : `, moved from ${this.label(result.movedFrom)}`;
     this.store.announce({ text: `${bound}${moved}` });
     logInfo(
       LogType.Midi,
       `MIDI learn ${moved === '' ? 'bound' : 'moved'} ${controlKey(learn.control)} to ${sourceKey(
         source
-      )}`
+      )}, ${heardDescription}`
     );
   }
 
@@ -263,4 +304,13 @@ export class MidiLearn {
       this.sampling = null;
     }
   }
+}
+
+/** What learn heard, for its log lines: `from "<port>" ch <n> <kind> <number> value <v>`. */
+function heard(
+  portName: string,
+  message: Pick<MidiInputMessage, 'channel' | 'kind' | 'number'>,
+  value: number
+): string {
+  return `from "${portName}" ch ${message.channel} ${message.kind} ${message.number} value ${value}`;
 }

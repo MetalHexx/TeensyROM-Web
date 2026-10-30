@@ -225,6 +225,112 @@ describe('MidiSettingsPersistence', () => {
     });
   });
 
+  describe('when the page is hidden', () => {
+    const pagehide = (): void => {
+      window.dispatchEvent(new Event('pagehide'));
+    };
+
+    beforeEach(async () => {
+      await persistence.load();
+      bind('A', '14470230', 'TR-1');
+    });
+
+    it('saves a pending change at once with keepalive, and the debounce does not send it again', async () => {
+      persistence.scheduleSave();
+      await vi.advanceTimersByTimeAsync(100);
+
+      pagehide();
+
+      expect(repository.save).toHaveBeenCalledTimes(1);
+      expect(repository.save).toHaveBeenCalledWith(
+        {
+          controllers: SERVER_SET.controllers,
+          mappings: SERVER_SET.mappings,
+          deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+        },
+        { keepalive: true }
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(repository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends the mapping set without a mapping deleted inside the debounce window', async () => {
+      TestBed.inject(MidiMappingStore).setMidiMappingData({
+        controllers: [...SERVER_SET.controllers],
+        mappings: [],
+      });
+      persistence.scheduleSave();
+
+      pagehide();
+
+      expect(repository.save.mock.calls[0][0].mappings).toEqual([]);
+      expect(repository.save.mock.calls[0][1]).toEqual({ keepalive: true });
+    });
+
+    it('re-sends the latest snapshot with keepalive while a save is in flight', async () => {
+      repository.save.mockReturnValueOnce(deferred().promise);
+      persistence.scheduleSave();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(repository.save).toHaveBeenCalledTimes(1);
+      bind('B', '19277260', 'TR-2');
+
+      pagehide();
+
+      expect(repository.save).toHaveBeenCalledTimes(2);
+      expect(repository.save.mock.calls[1][0].deckBindings).toHaveLength(2);
+      expect(repository.save.mock.calls[1][1]).toEqual({ keepalive: true });
+    });
+
+    it('sends nothing when nothing is pending and nothing is in flight', async () => {
+      pagehide();
+      expect(repository.save).not.toHaveBeenCalled();
+
+      persistence.scheduleSave();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(repository.save).toHaveBeenCalledTimes(1);
+
+      pagehide();
+      expect(repository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends nothing after the service is destroyed', () => {
+      persistence.scheduleSave();
+      TestBed.resetTestingModule();
+
+      pagehide();
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the page is hidden before a good load', () => {
+    const pagehide = (): void => {
+      window.dispatchEvent(new Event('pagehide'));
+    };
+
+    it('sends nothing after a failed load', async () => {
+      repository.load.mockRejectedValue(new Error('offline'));
+      await persistence.load();
+      bind('A', '14470230', 'TR-1');
+      persistence.scheduleSave();
+
+      pagehide();
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing while the load has not settled', async () => {
+      repository.load.mockReturnValue(deferred<MidiSettingsRecord>().promise);
+      void persistence.load();
+      bind('A', '14470230', 'TR-1');
+      persistence.scheduleSave();
+
+      pagehide();
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+  });
+
   it('waits for an unfinished load before saving, so the pass-through is never lost', async () => {
     const loading = deferred<MidiSettingsRecord>();
     repository.load.mockReturnValue(loading.promise);
