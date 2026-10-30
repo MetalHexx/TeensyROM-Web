@@ -3,9 +3,6 @@
     <lib-scaling-container animationEntry="from-bottom">
       <lib-deck-transport
         [model]="transportModel()"
-        [positionPercent]="positionPercent()"
-        [elapsedText]="elapsedText()"
-        [frameLabel]="frameLabel()"
         (playPauseClick)="onPlayPauseClick()"
         (stopClick)="onStopClick()"
         (repeatTrackChange)="onRepeatTrackChange($event)"
@@ -36,7 +33,6 @@
   <lib-scaling-container class="loops-slot" animationEntry="from-bottom">
     <lib-loops-cues-plate
       [model]="plateModel()"
-      [runningProgressPercent]="loopLapPercent()"
       [startDragOffset]="startDragOffset()"
       [endDragOffset]="endDragOffset()"
       (addMarker)="onAddMarker()"

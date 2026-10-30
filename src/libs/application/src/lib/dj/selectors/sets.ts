@@ -145,8 +145,8 @@ function pendingByGap(pending: readonly PendingRow[], rowCount: number): Map<num
 /**
  * The set card's whole display model: the current set's rows with the SIDs still fetching
  * interleaved at their gaps. Reads each deck's status through its own deep signal and never
- * `store.decks()` — `samplePosition` rewrites `decks` on every animation frame, and this summary
- * can hold a thousand rows.
+ * `store.decks()` — `decks` changes with every deck field (speed, voices, the hand), and this
+ * summary can hold a thousand rows.
  */
 export function setCardSummary(store: WritableStore<DjState>) {
   return {

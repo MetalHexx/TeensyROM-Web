@@ -1,5 +1,5 @@
 import { signalStore, withState } from '@ngrx/signals';
-import { withDevtools } from '@angular-architects/ngrx-toolkit';
+import { withDevtools } from '../with-devtools';
 import { StorageType, PlayerFilterType, FileItem, DirectoryItem } from '@teensyrom-nx/domain';
 import { StorageDirectory } from '@teensyrom-nx/domain';
 import { withStorageActions } from './actions';

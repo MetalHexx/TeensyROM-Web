@@ -1,7 +1,7 @@
 import { computed } from '@angular/core';
 import { DeckState, DeckStatus, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
-import { formatElapsed, formatTotal } from './transport-time';
+import { formatTotal } from './transport-time';
 
 /** The position bar's fixed dead-tail share for an ended tune — a SID that has ended sits in a
  *  static idle cycle forever, so the tail has no finite duration to derive a share from. Matches
@@ -17,6 +17,7 @@ export type DeckBarState =
   | { kind: 'loop'; introPercent: number }
   | { kind: 'ended'; musicPercent: number };
 
+/** Everything the transport shows except the playhead, which `PlayheadPainter` paints. */
 export interface DeckTransportSummary {
   status: DeckStatus;
   led: 'stopped' | 'playing' | 'paused' | 'ended' | 'error' | 'analyzing';
@@ -24,13 +25,9 @@ export interface DeckTransportSummary {
   showing: 'play' | 'pause';
   controlsDisabled: boolean;
   canStop: boolean;
-  scrubPercent: number;
   bar: DeckBarState;
-  frameLabel: string;
   title: string | null;
   author: string | null;
-  /** 'mm:ss.t' playhead time; '00:00.0' while the play-call interval is unknown. */
-  elapsedText: string;
   /** 'mm:ss' tune length; '--:--' while the length or the play-call interval is unknown. */
   totalText: string;
   subtuneText: string;
@@ -76,11 +73,9 @@ function barFor(deck: DeckState): DeckBarState {
   return { kind: 'unknown' };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-/** The transport panel's whole display model for one deck, derived from its raw state. */
+/** The transport panel's display model for one deck, derived from its raw state — all of it but
+ *  the playhead. It never reads `positions`, so a playhead sample leaves it, and every model built
+ *  from it, with the same identity; `PlayheadPainter` paints the readouts that move. */
 export function transportSummary(store: WritableStore<DjState>) {
   return {
     transportSummary: (slot: Slot) =>
@@ -99,15 +94,9 @@ export function transportSummary(store: WritableStore<DjState>) {
           showing: deck.status === 'playing' ? 'pause' : 'play',
           controlsDisabled,
           canStop: (deck.status === 'playing' || deck.status === 'paused') && !deck.busy,
-          scrubPercent:
-            deck.lengthFrames === null
-              ? 0
-              : clamp((deck.positionFrames / deck.lengthFrames) * 100, 0, 100),
           bar: barFor(deck),
-          frameLabel: `frame ${deck.positionFrames}`,
           title: deck.loaded?.title ?? null,
           author: deck.loaded?.author ?? null,
-          elapsedText: formatElapsed(deck.positionFrames, deck.playCallIntervalUs),
           totalText: formatTotal(deck.lengthFrames, deck.playCallIntervalUs),
           subtuneText: `Subtune ${deck.subtune} of ${deck.subtuneCount}`,
           subtuneCompact: deck.subtuneCount === 0 ? '–/–' : `${deck.subtune}/${deck.subtuneCount}`,

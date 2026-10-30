@@ -12,7 +12,7 @@ import {
   clearSearchState,
 } from '../storage-helpers';
 import { LogType, logInfo, logError, logWarn, createAction } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 export function navigateUpOneDirectory(
   store: WritableStore<StorageState>,

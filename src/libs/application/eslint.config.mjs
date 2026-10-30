@@ -27,6 +27,25 @@ export default [
     },
   },
   {
+    files: ['**/*.ts'],
+    ignores: ['**/with-devtools.ts', '**/with-devtools.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@angular-architects/ngrx-toolkit',
+              importNames: ['withDevtools', 'updateState'],
+              message:
+                "Import withDevtools and updateState from with-devtools.ts: the toolkit's own run Redux DevTools sync in production builds.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.html'],
     // Override or add rules here
     rules: {},

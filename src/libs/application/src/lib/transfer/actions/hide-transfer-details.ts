@@ -1,5 +1,5 @@
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { TransferState } from '../transfer-store';
 import { WritableStore, findWaitingRefusalDeviceId } from '../transfer-helpers';
 

@@ -192,9 +192,9 @@ describe('SidVoiceStripComponent', () => {
 
     targets.pulseWidth.setLiveLevel(0.5);
     const ring = control('pulse-width').querySelector('.live-ring') as SVGPathElement;
-    expect(ring.style.strokeDashoffset).toBe('50');
+    expect(ring.getAttribute('stroke-dashoffset')).toBe('50');
     const other = control('fine').querySelector('.live-ring') as SVGPathElement;
-    expect(other.style.strokeDashoffset).toBe('');
+    expect(other.getAttribute('stroke-dashoffset')).toBe('100');
   });
 
   it('keeps every control focusable and in the deck strip order', () => {

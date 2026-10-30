@@ -1,6 +1,6 @@
 import { inject, computed } from '@angular/core';
 import { signalStore, withMethods, withState, withComputed } from '@ngrx/signals';
-import { withDevtools } from '@angular-architects/ngrx-toolkit';
+import { withDevtools } from '../with-devtools';
 import {
   Device,
   DEVICE_SERVICE,

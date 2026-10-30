@@ -1,7 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/angular';
 import { LoopTileComponent, type LoopTileModel } from './loop-tile.component';
 
-const meta: Meta<LoopTileComponent> = {
+/** How far a running loop's timeline fills: the `--loop-tile-progress` the tile inherits until a
+ *  painter sets it live through `setLiveProgress`. A story arg here, set on the tile's wrapper. */
+interface ProgressArgs {
+  progressPercent: number;
+}
+
+const meta: Meta<LoopTileComponent & ProgressArgs> = {
   title: 'DJ/Loop Tile',
   component: LoopTileComponent,
   tags: ['autodocs'],
@@ -12,8 +18,10 @@ const meta: Meta<LoopTileComponent> = {
           'A compact loop or cue tile: a trigger key whose state light shows idle (dark), queued ' +
           '(amber, blinking, steady under reduced motion) or running (green), a one-shot play-now ' +
           'key (bolt), and a select button ' +
-          "over the name, the length and the tile's own timeline. A loop's timeline fills to " +
-          '`progressPercent` with a playhead while running; a cue draws a single magenta tick. A ' +
+          "over the name, the length and the tile's own timeline. A loop's timeline fills, with a " +
+          'playhead, while running — as far as `--loop-tile-progress`, which a painter sets live ' +
+          'through `setLiveProgress` and the tile otherwise inherits; a cue draws a single ' +
+          'magenta tick. A ' +
           'selected tile carries `aria-current` and a cyan ring; a tile that is not ready draws a ' +
           'dashed, dim timeline and says so in its accessible name. A small lit dot beside the name ' +
           'marks a marker that keeps its own settings; it is decorative, so the caller adds the ' +
@@ -24,7 +32,10 @@ const meta: Meta<LoopTileComponent> = {
   },
   argTypes: {
     model: { description: "The tile's state: id, name, kind, length text, activity, flags and names." },
-    progressPercent: { description: '0–100; drawn only while the tile is running.' },
+    progressPercent: {
+      description:
+        '0–100, as the inherited `--loop-tile-progress`; drawn only while the tile is running.',
+    },
     trigger: { description: 'Emits when the trigger key is pressed.' },
     playNow: { description: 'Emits when the play-now key is pressed.' },
     selectTile: { description: 'Emits when the select button is pressed.' },
@@ -32,15 +43,15 @@ const meta: Meta<LoopTileComponent> = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 232px">
-        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
+      <div style="width: 232px" [style.--loop-tile-progress]="progressPercent + '%'">
+        <lib-loop-tile [model]="model" />
       </div>
     `,
   }),
 };
 
 export default meta;
-type Story = StoryObj<LoopTileComponent>;
+type Story = StoryObj<LoopTileComponent & ProgressArgs>;
 
 const base: LoopTileModel = {
   id: 'loop-3',
@@ -73,8 +84,8 @@ export const OwnSettings: Story = {
     props: { ...args, sharing: base },
     template: `
       <div style="width: 232px; display: flex; flex-direction: column; gap: 8px">
-        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
-        <lib-loop-tile [model]="sharing" [progressPercent]="0" />
+        <lib-loop-tile [model]="model" />
+        <lib-loop-tile [model]="sharing" />
       </div>
     `,
   }),
@@ -97,8 +108,8 @@ export const NamedAndUnnamed: Story = {
     props: { ...args, unnamed: base },
     template: `
       <div style="width: 232px; display: flex; flex-direction: column; gap: 8px">
-        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
-        <lib-loop-tile [model]="unnamed" [progressPercent]="0" />
+        <lib-loop-tile [model]="model" />
+        <lib-loop-tile [model]="unnamed" />
       </div>
     `,
   }),
@@ -166,8 +177,8 @@ export const Narrow: Story = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 150px">
-        <lib-loop-tile [model]="model" [progressPercent]="progressPercent" />
+      <div style="width: 150px" [style.--loop-tile-progress]="progressPercent + '%'">
+        <lib-loop-tile [model]="model" />
       </div>
     `,
   }),

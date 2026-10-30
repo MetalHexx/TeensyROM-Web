@@ -3,7 +3,7 @@ import { IStorageService, PlayerFilterType } from '@teensyrom-nx/domain';
 import { StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';
 import { createAction, LogType, logInfo, logError } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 export function searchFiles(store: WritableStore<StorageState>, storageService: IStorageService) {
   return {

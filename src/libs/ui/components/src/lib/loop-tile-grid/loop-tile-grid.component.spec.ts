@@ -69,13 +69,68 @@ describe('LoopTileGridComponent', () => {
     expect(selected).toEqual(['c']);
   });
 
-  it('feeds the running progress to the running tile only', () => {
-    fixture.componentRef.setInput('runningProgressPercent', 40);
-    setTiles([tile('a'), tile('b', { activity: 'running' }), tile('c', { activity: 'queued' })]);
-    const fills = Array.from(el().querySelectorAll<HTMLElement>('.fill'));
-    expect(fills).toHaveLength(1);
-    expect(fills[0].style.width).toBe('40%');
-    expect(items()[1].contains(fills[0])).toBe(true);
+  describe('the running progress', () => {
+    /** The progress each tile's timeline carries, in display order; '' where none was set. */
+    const progress = (): string[] =>
+      items().map(
+        (item) =>
+          item
+            .querySelector<HTMLElement>('.timeline')
+            ?.style.getPropertyValue('--loop-tile-progress') ?? ''
+      );
+
+    it('is drawn by the running tile only, and set on it alone', () => {
+      setTiles([tile('a'), tile('b', { activity: 'running' }), tile('c', { activity: 'queued' })]);
+      fixture.componentInstance.setLiveProgress(40);
+
+      const fills = Array.from(el().querySelectorAll<HTMLElement>('.fill'));
+      expect(fills).toHaveLength(1);
+      expect(items()[1].contains(fills[0])).toBe(true);
+      expect(progress()).toEqual(['', '40%', '']);
+    });
+
+    it('never touches the grid host, where every tile would restyle with it', () => {
+      setTiles([tile('a', { activity: 'running' }), tile('b')]);
+
+      fixture.componentInstance.setLiveProgress(40);
+
+      expect(el().getAttribute('style')).toBeNull();
+    });
+
+    it('is held to 0–100', () => {
+      setTiles([tile('a', { activity: 'running' })]);
+      const grid = fixture.componentInstance;
+
+      grid.setLiveProgress(140);
+      expect(progress()).toEqual(['100%']);
+
+      grid.setLiveProgress(Number.NaN);
+      expect(progress()).toEqual(['0%']);
+    });
+
+    it('reaches a tile that starts running after it was set', () => {
+      fixture.componentInstance.setLiveProgress(25);
+
+      setTiles([tile('a'), tile('b', { activity: 'running' }), tile('c')]);
+
+      expect(items()[1].querySelector('.fill')).not.toBeNull();
+      expect(progress()).toEqual(['', '25%', '']);
+    });
+
+    it('moves to the tile that runs next', () => {
+      setTiles([tile('a', { activity: 'running' }), tile('b')]);
+      fixture.componentInstance.setLiveProgress(30);
+
+      setTiles([tile('a'), tile('b', { activity: 'running' })]);
+
+      expect(progress()[1]).toBe('30%');
+    });
+
+    it('leaves the tiles to an inherited progress until one is set', () => {
+      setTiles([tile('a', { activity: 'running' })]);
+
+      expect(progress()).toEqual(['']);
+    });
   });
 
   it('shows the empty text when there are no tiles', () => {

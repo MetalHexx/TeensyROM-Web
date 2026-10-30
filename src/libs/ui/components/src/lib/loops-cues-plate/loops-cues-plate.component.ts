@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, viewChild } from '@angular/core';
 import {
   LoopSelectedRowComponent,
   type LoopBoundaryNudge,
@@ -7,6 +7,7 @@ import {
 } from '../loop-selected-row/loop-selected-row.component';
 import { LoopTileGridComponent } from '../loop-tile-grid/loop-tile-grid.component';
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
+import type { LiveProgressIndicator } from '../shared/live-indicator';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
 
@@ -31,13 +32,14 @@ export interface LoopsCuesPlateModel {
  * selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
  * Purely presentational and inert — the caller owns every marker, every drag offset and every
  * write. The keys carry their own `data-control` ids (`loop-add`, `loop-stop`), distinct from the
- * transport's `stop`, so the mapping overlay resolves each to the right control.
+ * transport's `stop`, so the mapping overlay resolves each to the right control. The running
+ * tile's progress moves per animation frame, so a painter sets it through `setLiveProgress`
+ * rather than an input.
  *
  * @example
  * ```html
  * <lib-loops-cues-plate
  *   [model]="plateModel()"
- *   [runningProgressPercent]="progress()"
  *   (addMarker)="onAdd()"
  *   (stopLoop)="onStop()"
  *   (triggerTile)="onTrigger($event)"
@@ -55,11 +57,9 @@ export interface LoopsCuesPlateModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SynthPanelComponent, SynthKeyComponent, LoopSelectedRowComponent, LoopTileGridComponent],
 })
-export class LoopsCuesPlateComponent {
+export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   /** The plate's display model and state. */
   readonly model = input.required<LoopsCuesPlateModel>();
-  /** 0–100; reaches only the running tile. */
-  readonly runningProgressPercent = input<number>(0);
   /** While non-null, the selected loop's Start boundary follows it. */
   readonly startDragOffset = input<number | null>(null);
   /** While non-null, the selected loop's End boundary follows it. */
@@ -94,4 +94,12 @@ export class LoopsCuesPlateComponent {
   readonly snap = output<LoopBoundarySnap>();
   /** Emits the new name when the selected row's name is renamed in place. */
   readonly rename = output<string>();
+
+  private readonly grid = viewChild.required(LoopTileGridComponent);
+
+  /** Sets the running tile's progress, 0–100, on the grid — straight on the DOM, outside change
+   *  detection. Valid once the view has rendered. */
+  setLiveProgress(percent: number): void {
+    this.grid().setLiveProgress(percent);
+  }
 }

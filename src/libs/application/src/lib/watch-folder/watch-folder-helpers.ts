@@ -1,5 +1,5 @@
 import { StateSignals, WritableStateSource } from '@ngrx/signals';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../with-devtools';
 import {
   WatchFolder,
   WatchFolderRejectedError,

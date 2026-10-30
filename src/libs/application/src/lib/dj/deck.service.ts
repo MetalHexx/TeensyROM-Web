@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { Injectable, NgZone, effect, inject } from '@angular/core';
 import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
@@ -9,6 +9,9 @@ import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
 import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
+import { LIVE_PAINT_CLOCK } from './live-paint-clock';
+import { LivePaintPacer } from './live-paint-pacer';
+import { PlayheadPainter, scrubPercent } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
 import { RowUnavailableError, TuneLoader, type LoadPhase } from './tune-loader';
 import {
@@ -91,6 +94,9 @@ export class DeckService {
   private readonly keeper = inject(DeckMemoryKeeper);
   private readonly mixerApplier = inject(MixerApplier);
   private readonly panelPainter = inject(SidPanelPainter);
+  private readonly playheadPainter = inject(PlayheadPainter);
+  private readonly zone = inject(NgZone);
+  private readonly clock = inject(LIVE_PAINT_CLOCK);
 
   /** This service's own per-slot command counter — distinct from the loader's generation, which
    *  guards only the loader's own awaits. Bumped by `loadOnto` and `selectSubtune` on entry; every
@@ -123,8 +129,8 @@ export class DeckService {
         }
       });
       this.setRepeat(slot, true);
-      this.watchPosition(slot);
     }
+    this.watchPositions();
   }
 
   /** A SID dropped from the listing: joins the current set, or reuses its row there, and loads that
@@ -567,11 +573,18 @@ export class DeckService {
     this.bindings.identify(slot);
   }
 
-  /** Records this slot's current playhead. Unconditional — the rAF loop gates its own calls on
-   *  the frame having changed, but every explicit transport transition samples regardless, so a
-   *  stop shows the bar back at the start even when the engine happened to land on the same frame
-   *  it was already holding. Specs exercise this indirectly, through the public commands that
-   *  already call it. */
+  /** The playhead as a share of the loaded tune's length, 0–100, read from the engine now; 0 while
+   *  the length is unknown. The store holds the playhead only as of the last transport transition,
+   *  so whatever needs it between those — the MIDI seek control — reads it here. */
+  playheadPercent(slot: Slot): number {
+    return scrubPercent(this.runtime.position(slot), this.store.deck(slot)().lengthFrames);
+  }
+
+  /** Records this slot's current playhead. Called by every explicit transport transition — never
+   *  per frame, since `PlayheadPainter` paints the moving playhead — and unconditional, so a stop
+   *  lands the bar back at the start even when the engine happened to land on the same frame it
+   *  was already holding. Specs exercise this indirectly, through the public commands that already
+   *  call it. */
   private sample(slot: Slot): void {
     this.store.samplePosition({ slot, positionFrames: this.runtime.position(slot) });
   }
@@ -894,29 +907,74 @@ export class DeckService {
     return false;
   }
 
-  /** A `requestAnimationFrame` loop for this slot, running only while it is `playing` or the
-   *  engine is in varispeed (a hand moves the playhead of a paused deck), and paused while the
-   *  document is hidden — the POC's `animationFrameSignal` bridge rule, generalised per slot.
-   *  Samples and paints the SID panel only when the polled frame actually moved; every other
-   *  reason to sample runs through the explicit calls each command already makes. Reschedules
-   *  first, so a fault in either cannot end the loop. */
-  private watchPosition(slot: Slot): void {
+  /** One `requestAnimationFrame` loop for both decks, running only while one of them is `playing`
+   *  or the engine is in varispeed (a hand moves the playhead of a paused deck), and paused while
+   *  the document is hidden — the POC's `animationFrameSignal` bridge rule. On the frames
+   *  `LivePaintPacer` picks, about 30 a second whatever the display's refresh rate, it paints each
+   *  such deck's playhead readouts and SID panel when its polled frame actually moved. It never
+   *  writes the store: a store write per frame meant a change-detection pass per frame, and the
+   *  garbage behind it, on the main thread the decks' frame clocks share; the store's playhead is
+   *  sampled only by the explicit calls each command makes.
+   *
+   *  Between those frames it sleeps and asks for none: each frame a page asks for runs its whole
+   *  rendering lifecycle even when nothing changed, and every frame that changes anything pays for
+   *  a pass over all of the page's layers, so both painters and both decks paint in the same frame.
+   *  It asks for its next frame before painting, so a fault in a painter cannot end the loop, and
+   *  one deck's fault never keeps the other from painting. */
+  private watchPositions(): void {
+    const pacer = new LivePaintPacer();
+    const painted: Record<Slot, number | null> = { A: null, B: null };
     let frameId: number | null = null;
-    let lastFrame: number | null = null;
+    let wakeId: ReturnType<typeof setTimeout> | null = null;
 
-    const tick = (): void => {
+    const moving = (slot: Slot): boolean => {
+      const deck = this.store.deck(slot)();
+      return deck.status === 'playing' || deck.varispeed;
+    };
+
+    const requestFrame = (): void => {
+      wakeId = null;
       frameId = requestAnimationFrame(tick);
+    };
+
+    const paintMoved = (slot: Slot): void => {
+      if (!moving(slot)) {
+        return;
+      }
       const position = this.runtime.position(slot);
-      if (position !== lastFrame) {
-        lastFrame = position;
-        this.sample(slot);
-        this.panelPainter.paint(slot);
+      if (position === painted[slot]) {
+        return;
+      }
+      this.playheadPainter.paint(slot);
+      this.panelPainter.paint(slot);
+      painted[slot] = position;
+    };
+
+    const tick = (frameTimeMs: number): void => {
+      frameId = null;
+      const due = pacer.take(frameTimeMs);
+      const waitMs = pacer.waitMs(this.clock());
+      if (waitMs > 0) {
+        wakeId = setTimeout(requestFrame, waitMs);
+      } else {
+        requestFrame();
+      }
+      if (!due) {
+        return;
+      }
+      try {
+        paintMoved('A');
+      } finally {
+        paintMoved('B');
       }
     };
 
+    // Outside Angular's zone: inside it, every animation frame would end in an app-wide change
+    // detection pass, on the main thread the decks' frame clocks share. Both painters write
+    // straight to the DOM, so nothing here needs the zone.
     const start = (): void => {
-      if (frameId === null && !document.hidden) {
-        frameId = requestAnimationFrame(tick);
+      if (frameId === null && wakeId === null && !document.hidden) {
+        this.zone.runOutsideAngular(requestFrame);
       }
     };
 
@@ -925,15 +983,15 @@ export class DeckService {
         cancelAnimationFrame(frameId);
         frameId = null;
       }
-    };
-
-    const moving = (): boolean => {
-      const deck = this.store.deck(slot)();
-      return deck.status === 'playing' || deck.varispeed;
+      if (wakeId !== null) {
+        clearTimeout(wakeId);
+        wakeId = null;
+      }
+      pacer.stopped();
     };
 
     effect(() => {
-      if (moving()) {
+      if (DECK_SLOTS.some(moving)) {
         start();
       } else {
         stop();
@@ -943,7 +1001,7 @@ export class DeckService {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stop();
-      } else if (moving()) {
+      } else if (DECK_SLOTS.some(moving)) {
         start();
       }
     });

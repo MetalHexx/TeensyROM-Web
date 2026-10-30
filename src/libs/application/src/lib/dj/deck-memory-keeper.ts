@@ -69,10 +69,10 @@ function mutesOf(voices: readonly DeckVoiceState[]): DeckMixerSettings['mutes'] 
  * Keeps what a deck has set — the SID panel, the voices' latched mutes, the speed fader and Repeat —
  * in the row and subtune it holds, and so in the tune's latest version.
  *
- * One effect per deck, tracking only that deck's own fields, each through its own deep signal:
- * `samplePosition` rewrites the whole deck state on every animation frame, and the effect must not
- * re-run for it. The row is read only inside a write, never tracked, so one deck's write cannot
- * re-run the other deck's effect.
+ * One effect per deck, tracking only the fields it keeps, each through its own deep signal: the
+ * deck state changes for much it does not keep (status, the engine's speed, the hand), and the
+ * effect must not re-run for that. The row is read only inside a write, never tracked, so one
+ * deck's write cannot re-run the other deck's effect.
  *
  * It writes only while the deck is shapeable on a held row. A load or subtune switch ends with the
  * deck already showing the row's restored state (or home, for a subtune with nothing kept), so the

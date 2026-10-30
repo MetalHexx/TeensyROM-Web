@@ -6,6 +6,7 @@ import { createRow, createSet } from '@sidablist/tunes';
 import type { LoopMarker, Playable, TuneIdentity } from '@sidablist/tunes';
 import type { TuneIndexRecord } from '@sidablist/analysis';
 import { DeckRuntime } from './deck-runtime';
+import { PlayheadPainter } from './playhead-painter';
 import { PITCH_BEND_CENTRE, PITCH_BEND_MAX } from './ports';
 import type { Slot } from './slot';
 import type { ControlIdentity, MappingStyle } from './mapping/mapping.models';
@@ -987,10 +988,12 @@ describe('DeckHand', () => {
 
   describe('the position poll', () => {
     it('follows the hand on a paused deck, and stops once the deck leaves varispeed', async () => {
+      const playheadPaint = vi.spyOn(TestBed.inject(PlayheadPainter), 'paint');
       await paused(100);
       await settle();
       runAnimationFrames();
       expect(animationFrames.size).toBe(0);
+      const sampled = h.djStore.positions.A();
 
       bend(9000);
       TestBed.flushEffects();
@@ -998,16 +1001,19 @@ describe('DeckHand', () => {
       tick();
       bend(9000 + 3000, 10);
       tick();
+      playheadPaint.mockClear();
       runAnimationFrames();
 
-      expect(deck().positionFrames).toBe(position());
+      // The loop paints the moving playhead; the store keeps the last transition's sample.
+      expect(playheadPaint).toHaveBeenCalledWith('A');
       expect(position()).toBeGreaterThan(100);
+      expect(h.djStore.positions.A()).toBe(sampled);
 
       bend(PITCH_BEND_CENTRE, 15);
       tickUntil(() => lastTick().rate === 0);
       await settle();
       expect(deck().varispeed).toBe(false);
-      expect(deck().positionFrames).toBe(position());
+      expect(h.djStore.positions.A()).toBe(position());
       runAnimationFrames();
       expect(animationFrames.size).toBe(0);
     });

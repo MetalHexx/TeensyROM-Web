@@ -1,7 +1,34 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 import { PositionStripComponent, type PositionMark } from './position-strip.component';
+
+/** Stands in for the browser's observer, and lets a test say how wide the track is. */
+class FakeResizeObserver {
+  static last: FakeResizeObserver | null = null;
+  readonly observed: Element[] = [];
+  disconnected = false;
+
+  constructor(private readonly callback: ResizeObserverCallback) {
+    FakeResizeObserver.last = this;
+  }
+
+  observe(element: Element): void {
+    this.observed.push(element);
+  }
+
+  disconnect(): void {
+    this.disconnected = true;
+  }
+
+  /** Reports the observed track as `width` CSS pixels wide. */
+  resize(width: number): void {
+    this.callback(
+      [{ contentRect: { width } } as ResizeObserverEntry],
+      this as unknown as ResizeObserver
+    );
+  }
+}
 
 describe('PositionStripComponent', () => {
   let fixture: ComponentFixture<PositionStripComponent>;
@@ -9,16 +36,21 @@ describe('PositionStripComponent', () => {
   let commits: number[];
 
   beforeEach(async () => {
+    FakeResizeObserver.last = null;
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     await TestBed.configureTestingModule({ imports: [PositionStripComponent] }).compileComponents();
     fixture = TestBed.createComponent(PositionStripComponent);
     fixture.componentRef.setInput('barState', { kind: 'unknown' } satisfies ScrubBarState);
-    fixture.componentRef.setInput('positionPercent', 0);
     fixture.componentRef.setInput('accessibleName', 'Position deck A');
     inputs = [];
     commits = [];
     fixture.componentInstance.scrubInput.subscribe((value) => inputs.push(value));
     fixture.componentInstance.scrubCommit.subscribe((value) => commits.push(value));
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function set(name: string, value: unknown): void {
@@ -35,12 +67,32 @@ describe('PositionStripComponent', () => {
     range().dispatchEvent(new Event(event, { bubbles: true }));
   }
 
-  function fill(): HTMLElement | null {
-    return fixture.nativeElement.querySelector('.fill');
+  /** Sets the position the way a painter does: straight on the component, outside change
+   *  detection. */
+  function live(percent: number): void {
+    fixture.componentInstance.setLivePosition(percent);
   }
 
+  function host(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  function track(): HTMLElement {
+    return fixture.nativeElement.querySelector('.track');
+  }
+
+  function fills(): HTMLElement[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('.fill'));
+  }
+
+  /** How long the lit bar is, and where the playhead sits: both read it from the track. */
+  function position(): string {
+    return track().style.getPropertyValue('--playhead-position');
+  }
+
+  /** How far the lit bar's first colour reaches, as a share of the whole track. */
   function fillSplit(): string {
-    return fill()?.style.getPropertyValue('--fill-split') ?? '';
+    return track().style.getPropertyValue('--fill-split');
   }
 
   function loopMark(): HTMLElement | null {
@@ -72,12 +124,26 @@ describe('PositionStripComponent', () => {
       expect(inputs).toEqual([]);
     });
 
-    it('is a 0–100 range that shows the position it is given', () => {
-      set('positionPercent', 42);
-
+    it('is a 0–100 range that starts at 0 and shows the position it is given', () => {
       expect(range().min).toBe('0');
       expect(range().max).toBe('100');
+      expect(range().value).toBe('0');
+
+      live(42);
       expect(range().value).toBe('42');
+    });
+
+    it('writes only a changed position, and keeps it through change detection', () => {
+      live(42);
+      range().value = '77';
+
+      live(42);
+      expect(range().value).toBe('77');
+
+      live(43);
+      set('marks', []);
+      expect(range().value).toBe('43');
+      expect(position()).toBe('43%');
     });
 
     it('is disabled while analyzing and enabled otherwise', () => {
@@ -94,44 +160,111 @@ describe('PositionStripComponent', () => {
       expect(range().getAttribute('aria-label')).toBe('Position deck A');
       expect(range().hasAttribute('aria-valuetext')).toBe(false);
 
-      set('valueText', '01:23.4 of 03:12');
+      fixture.componentInstance.setLiveValueText('01:23.4 of 03:12');
+      expect(range().getAttribute('aria-valuetext')).toBe('01:23.4 of 03:12');
+
+      set('accessibleName', 'Position deck B');
       expect(range().getAttribute('aria-valuetext')).toBe('01:23.4 of 03:12');
     });
   });
 
   describe('lit bar', () => {
     it('is empty at the start', () => {
-      expect(fill()?.style.width).toBe('0%');
+      expect(position()).toBe('0%');
     });
 
     it('is as long as the position, including a fractional one', () => {
-      set('positionPercent', 50);
-      expect(fill()?.style.width).toBe('50%');
+      live(50);
+      expect(position()).toBe('50%');
 
-      set('positionPercent', 42.5);
-      expect(fill()?.style.width).toBe('42.5%');
+      live(42.5);
+      expect(position()).toBe('42.5%');
+    });
+
+    it('is two tones taking their length from the track, never from a style of their own', () => {
+      live(50);
+
+      expect(fills()).toHaveLength(2);
+      for (const tone of fills()) {
+        expect(tone.getAttribute('style')).toBeNull();
+      }
+    });
+
+    it('writes nothing on the host, so a new position restyles only the track', () => {
+      set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
+      live(50);
+
+      expect(host().getAttribute('style')).toBeNull();
     });
 
     it('clamps a position outside 0–100 and ignores one that is not a number', () => {
-      set('positionPercent', 140);
-      expect(fill()?.style.width).toBe('100%');
+      live(140);
+      expect(position()).toBe('100%');
+      expect(range().value).toBe('100');
 
-      set('positionPercent', -5);
-      expect(fill()?.style.width).toBe('0%');
+      live(-5);
+      expect(position()).toBe('0%');
 
-      set('positionPercent', Number.NaN);
-      expect(fill()?.style.width).toBe('0%');
+      live(60);
+      live(Number.NaN);
+      expect(position()).toBe('0%');
     });
 
     it('is not drawn while analyzing', () => {
       set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
 
-      expect(fill()).toBeNull();
+      expect(fills()).toEqual([]);
+    });
+  });
+
+  describe('pixel steps', () => {
+    it('watches the track, and stops when the strip goes', () => {
+      expect(FakeResizeObserver.last?.observed).toEqual([track()]);
+
+      fixture.destroy();
+
+      expect(FakeResizeObserver.last?.disconnected).toBe(true);
+    });
+
+    it('moves by whole pixels of the track once it is measured', () => {
+      FakeResizeObserver.last?.resize(200);
+
+      live(42.3);
+      expect(position()).toBe('42.5%');
+      expect(range().value).toBe('42.5');
+    });
+
+    it('writes nothing for a move inside the same pixel', () => {
+      FakeResizeObserver.last?.resize(200);
+      live(42.3);
+      range().value = '77';
+
+      live(42.6);
+
+      expect(range().value).toBe('77');
+      expect(position()).toBe('42.5%');
+    });
+
+    it('counts device pixels, not CSS pixels', () => {
+      vi.stubGlobal('devicePixelRatio', 2);
+      FakeResizeObserver.last?.resize(200);
+
+      live(42.3);
+
+      expect(position()).toBe('42.25%');
+    });
+
+    it('lands exactly on the end', () => {
+      FakeResizeObserver.last?.resize(300);
+
+      live(99.9);
+
+      expect(position()).toBe('100%');
     });
   });
 
   describe('colouring by state', () => {
-    beforeEach(() => set('positionPercent', 100));
+    beforeEach(() => live(100));
 
     it('changes colour at the intro point of a loop', () => {
       set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
@@ -145,26 +278,27 @@ describe('PositionStripComponent', () => {
       expect(fillSplit()).toBe('70%');
     });
 
-    it('measures the change against the lit bar, not the whole strip', () => {
+    it('measures the change against the whole track, not the lit bar', () => {
       set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
-      set('positionPercent', 50);
+      live(50);
 
-      expect(fillSplit()).toBe('50%');
+      expect(fillSplit()).toBe('25%');
     });
 
     it('stays one colour while the position has not reached the change', () => {
       set('barState', { kind: 'loop', introPercent: 25 } satisfies ScrubBarState);
-      set('positionPercent', 0);
-      expect(fillSplit()).toBe('100%');
+      live(0);
+      expect(fillSplit()).toBe('0%');
 
-      set('positionPercent', 20);
-      expect(fillSplit()).toBe('100%');
+      live(20);
+      expect(fillSplit()).toBe('20%');
     });
 
     it('is one colour when the structure is unknown', () => {
       set('barState', { kind: 'unknown' } satisfies ScrubBarState);
+      live(60);
 
-      expect(fillSplit()).toBe('100%');
+      expect(fillSplit()).toBe('60%');
     });
   });
 
@@ -294,11 +428,22 @@ describe('PositionStripComponent', () => {
     }
 
     it('sits at a fractional position as it is, and is not drawn while analyzing', () => {
-      set('positionPercent', 64.25);
-      expect(playhead()?.style.left).toBe('64.25%');
+      live(64.25);
+      expect(position()).toBe('64.25%');
+      expect(playhead()?.getAttribute('style')).toBeNull();
 
       set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
       expect(playhead()).toBeNull();
+    });
+
+    it('comes back at the position it last had once analyzing ends', () => {
+      set('barState', { kind: 'analyzing' } satisfies ScrubBarState);
+      live(30);
+
+      set('barState', { kind: 'unknown' } satisfies ScrubBarState);
+
+      expect(playhead()).not.toBeNull();
+      expect(position()).toBe('30%');
     });
 
     it('carries data-held only while held', () => {

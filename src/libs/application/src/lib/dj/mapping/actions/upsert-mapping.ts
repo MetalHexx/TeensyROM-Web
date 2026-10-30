@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../../with-devtools';
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import type { WritableStore } from '../../dj-store';
 import { sourceKey, type ControlMapping } from '../mapping.models';

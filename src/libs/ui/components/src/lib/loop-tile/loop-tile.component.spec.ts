@@ -84,14 +84,57 @@ describe('LoopTileComponent', () => {
     expect(stateLight()).toBe('playing');
   });
 
-  it('draws progress and a playhead only for a running loop', () => {
-    fixture.componentRef.setInput('progressPercent', 53);
-    fixture.detectChanges();
+  it('draws progress and a playhead only for a running loop, leaving their extent to the progress', () => {
     expect(el().querySelector('.fill')).toBeNull();
     setModel({ activity: 'running' });
     const fill = el().querySelector<HTMLElement>('.fill');
-    expect(fill?.style.width).toBe('53%');
-    expect(el().querySelector('.playhead')).not.toBeNull();
+    const playhead = el().querySelector<HTMLElement>('.playhead');
+    expect(fill).not.toBeNull();
+    expect(playhead).not.toBeNull();
+    // Their extent is `--loop-tile-progress`'s, never an inline style a binding sets.
+    fixture.componentInstance.setLiveProgress(40);
+    expect(fill?.getAttribute('style')).toBeNull();
+    expect(playhead?.getAttribute('style')).toBeNull();
+  });
+
+  describe('the live progress', () => {
+    const timeline = (): HTMLElement => el().querySelector('.timeline') as HTMLElement;
+    const progress = (): string => timeline().style.getPropertyValue('--loop-tile-progress');
+
+    it('is left to an inherited one until it is set', () => {
+      setModel({ activity: 'running' });
+      expect(progress()).toBe('');
+    });
+
+    it('is set on the timeline, never the host, held to 0–100', () => {
+      const tileView = fixture.componentInstance;
+
+      tileView.setLiveProgress(62.5);
+      expect(progress()).toBe('62.5%');
+      expect(el().style.getPropertyValue('--loop-tile-progress')).toBe('');
+
+      tileView.setLiveProgress(140);
+      expect(progress()).toBe('100%');
+
+      tileView.setLiveProgress(-3);
+      expect(progress()).toBe('0%');
+
+      tileView.setLiveProgress(Number.NaN);
+      expect(progress()).toBe('0%');
+    });
+
+    it('writes only a changed progress, and keeps it through change detection', () => {
+      const tileView = fixture.componentInstance;
+      tileView.setLiveProgress(30);
+      timeline().style.setProperty('--loop-tile-progress', 'sentinel');
+
+      tileView.setLiveProgress(30);
+      expect(progress()).toBe('sentinel');
+
+      tileView.setLiveProgress(31);
+      setModel({ activity: 'running' });
+      expect(progress()).toBe('31%');
+    });
   });
 
   it('draws a single tick for a cue and no fill, even while running', () => {

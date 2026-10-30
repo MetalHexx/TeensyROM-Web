@@ -1,18 +1,28 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  afterRenderEffect,
+  computed,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import { DeckSetRowComponent, type DeckSetRowModel } from '../deck-set-row/deck-set-row.component';
 import {
   PositionStripComponent,
   type PositionMark,
 } from '../position-strip/position-strip.component';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
+import type { LivePlayheadIndicator } from '../shared/live-indicator';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
 
 /** What the deck is doing, as the display's state light and the Play/Pause key's light read it. */
 export type DeckTransportState = 'playing' | 'paused' | 'stopped' | 'analyzing' | 'error' | 'empty';
 
-/** Everything the transport draws except the values that move per animation frame — see
- *  `DeckTransportComponent.positionPercent` for why those stay out of here. */
+/** Everything the transport draws except the playhead readouts, which move per animation frame —
+ *  see `DeckTransportComponent.setLivePosition` for why those stay out of here. */
 export interface DeckTransportModel {
   /** The section's own aria-label, e.g. 'Transport deck A'. */
   readonly accessibleName: string;
@@ -33,7 +43,7 @@ export interface DeckTransportModel {
   /** What the position strip draws: how the bar is coloured and whether a loop mark appears. */
   readonly bar: ScrubBarState;
   /** Loop brackets and cue ticks the position strip draws above its bar. A list that changes
-   *  rarely — not a per-frame input; the playhead stays `positionPercent`. Empty reserves the
+   *  rarely — not a per-frame value; the playhead stays `setLivePosition`'s. Empty reserves the
    *  strip's marks lane with nothing in it. */
   readonly marks: readonly PositionMark[];
   /** The position strip's accessible name, e.g. 'Position deck A'. */
@@ -83,13 +93,14 @@ export interface DeckTransportModel {
  * keys losing their labels with the others. It shrinks or clips rather than overflowing at
  * any width.
  *
+ * The playhead readouts — the bar's position, the elapsed time, the frame and the strip's value
+ * text — are not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and
+ * `setLiveFrame`, straight on the DOM, outside change detection.
+ *
  * @example
  * ```html
  * <lib-deck-transport
  *   [model]="transportModel()"
- *   [positionPercent]="scrubDisplayPercent()"
- *   [elapsedText]="elapsedText()"
- *   [frameLabel]="frameLabel()"
  *   (playPauseClick)="onPlayPause()"
  *   (scrubCommit)="onScrubCommit($event)"
  * />
@@ -102,18 +113,9 @@ export interface DeckTransportModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SynthPanelComponent, SynthKeyComponent, PositionStripComponent, DeckSetRowComponent],
 })
-export class DeckTransportComponent {
+export class DeckTransportComponent implements LivePlayheadIndicator {
   /** Everything the transport draws that does not move per animation frame. */
   readonly model = input.required<DeckTransportModel>();
-  /** 0–100. Deliberately not a field of `model`: the playhead is polled per animation frame, and a
-   *  single monolithic model would push a fresh object identity into every `OnPush` child sixty
-   *  times a second. This, `elapsedText` and `frameLabel` are the only per-frame values the
-   *  transport has. */
-  readonly positionPercent = input.required<number>();
-  /** The elapsed time on the display, e.g. '01:23.4' — per-frame, like `positionPercent`. */
-  readonly elapsedText = input.required<string>();
-  /** The frame readout, e.g. 'frame 1234' — per-frame, and caller-composed. */
-  readonly frameLabel = input.required<string>();
   /** The merged Play/Pause key was pressed — whichever it was showing at the time. Named for the
    *  click rather than the verb: `play` and `pause` are standard DOM media events, which an output
    *  may not shadow. */
@@ -141,14 +143,71 @@ export class DeckTransportComponent {
     return state === 'error' || errors.length > 0;
   });
 
-  /** The strip's aria-valuetext: the position as time, e.g. '01:23.4 of 03:12'. */
-  protected readonly valueText = computed<string>(
-    () => `${this.elapsedText()} of ${this.model().totalText}`
-  );
-
   /** The light along the Play/Pause key's top follows the deck's state. */
   protected readonly playLight = computed<'playing' | 'paused' | 'off'>(() => {
     const { state } = this.model();
     return state === 'playing' || state === 'paused' ? state : 'off';
   });
+
+  private readonly totalText = computed(() => this.model().totalText);
+  private readonly strip = viewChild.required(PositionStripComponent);
+  /** Inside the tune display, which the error display replaces: absent while that shows. */
+  private readonly elapsed = viewChild<ElementRef<HTMLElement>>('elapsed');
+  private readonly frame = viewChild<ElementRef<HTMLElement>>('frame');
+  /** The readouts as last set; null until a painter sets them. */
+  private liveElapsed: string | null = null;
+  private liveFrame: string | null = null;
+
+  /** The error display swaps the time line out and back, so whichever readouts render take the
+   *  last live values; the strip's value text follows the total as well as the elapsed time. */
+  constructor() {
+    afterRenderEffect({
+      write: () => {
+        this.writeText(this.elapsed(), this.liveElapsed);
+        this.writeText(this.frame(), this.liveFrame);
+        this.writeValueText(this.totalText());
+      },
+    });
+  }
+
+  /** Sets the bar's position, 0–100. Deliberately not an input or a field of `model`: the
+   *  playhead moves per animation frame, and a binding would put change detection on every one.
+   *  This, `setLiveElapsed` and `setLiveFrame` write straight to the DOM. Valid once the view has
+   *  rendered. */
+  setLivePosition(percent: number): void {
+    this.strip().setLivePosition(percent);
+  }
+
+  /** Sets the elapsed time on the display, e.g. '01:23.4', and the strip's value text with it —
+   *  the position as time, e.g. '01:23.4 of 03:12'. Only a changed text is written. */
+  setLiveElapsed(text: string): void {
+    if (text === this.liveElapsed) {
+      return;
+    }
+    this.liveElapsed = text;
+    this.writeText(this.elapsed(), text);
+    this.writeValueText(this.totalText());
+  }
+
+  /** Sets the frame readout, e.g. 'frame 1234'. Only a changed label is written. */
+  setLiveFrame(label: string): void {
+    if (label === this.liveFrame) {
+      return;
+    }
+    this.liveFrame = label;
+    this.writeText(this.frame(), label);
+  }
+
+  private writeText(element: ElementRef<HTMLElement> | undefined, text: string | null): void {
+    if (element !== undefined && text !== null) {
+      element.nativeElement.textContent = text;
+    }
+  }
+
+  /** The strip says the position as time once the elapsed time is known. */
+  private writeValueText(totalText: string): void {
+    if (this.liveElapsed !== null) {
+      this.strip().setLiveValueText(`${this.liveElapsed} of ${totalText}`);
+    }
+  }
 }

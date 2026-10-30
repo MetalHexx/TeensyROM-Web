@@ -1,5 +1,5 @@
 import { signalStore, withState, StateSignals, WritableStateSource } from '@ngrx/signals';
-import { withDevtools } from '@angular-architects/ngrx-toolkit';
+import { withDevtools } from '../with-devtools';
 import { withDjActions } from './actions';
 import { withDjSelectors } from './selectors';
 import type { Slot } from './slot';
@@ -119,7 +119,6 @@ export interface DeckState {
    *  shows — a cache hit never reports `loading`/`indexing`, so this is what actually gates the
    *  transport while one is in flight. */
   busy: boolean;
-  positionFrames: number;
   lengthFrames: number | null;
   structure: DeckStructure | null;
   subtune: number;
@@ -134,7 +133,7 @@ export interface DeckState {
   /** True while either nudge is held. The speed display tints magenta while this is set. */
   nudging: boolean;
   /** Microseconds per play call for the loaded tune, or null while nothing is loaded. Converts
-   *  `positionFrames` (play calls) to time. */
+   *  the deck's playhead (`DjState.positions`, in play calls) to time. */
   playCallIntervalUs: number | null;
   voices: readonly DeckVoiceState[];
   detectedKey: DeckDetectedKey | null;
@@ -253,6 +252,11 @@ export interface DjSetsState {
 
 export interface DjState {
   decks: Record<Slot, DeckState>;
+  /** Each deck's playhead, in play calls, as of its last transport transition — a stop, pause,
+   *  seek, load or a hand letting go. Never sampled per frame: `PlayheadPainter` paints the moving
+   *  playhead from the engine, and reads this only to repaint a deck that is not playing. Its own
+   *  slice rather than a field of `DeckState`, so a sample reaches nothing that reads `decks`. */
+  positions: Record<Slot, number>;
   bindings: Record<Slot, DeckBindingState>;
   midi: MidiState;
   seen: Record<DjFileKey, TuneReference>;
@@ -280,7 +284,6 @@ const initialDeckState: DeckState = {
   loaded: null,
   status: 'empty',
   busy: false,
-  positionFrames: 0,
   lengthFrames: null,
   structure: null,
   subtune: 0,
@@ -311,6 +314,7 @@ const initialBindingState: DeckBindingState = {
 
 const initialState: DjState = {
   decks: { A: { ...initialDeckState }, B: { ...initialDeckState } },
+  positions: { A: 0, B: 0 },
   bindings: { A: { ...initialBindingState }, B: { ...initialBindingState } },
   midi: { accessState: 'idle', ports: [], lastError: null },
   seen: {},

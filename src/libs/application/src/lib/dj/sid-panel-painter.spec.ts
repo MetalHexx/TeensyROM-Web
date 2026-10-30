@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SID_REGISTER_COUNT } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
@@ -73,6 +73,16 @@ describe('SidPanelPainter', () => {
     }
   }
 
+  /** The loop's paint on the next frame it paints on. */
+  function paintNextFrame(slot: Slot = 'A'): void {
+    painter.paint(slot);
+  }
+
+  /** How many paints ran for `slot`: every paint reads the registers once. */
+  function readsOf(slot: Slot): number {
+    return readRegisters.mock.calls.filter(([readSlot]) => readSlot === slot).length;
+  }
+
   function clearCalls(recording: RecordingTargets): void {
     for (const fn of [...recording.levels, ...recording.lights]) {
       fn.mockClear();
@@ -116,7 +126,7 @@ describe('SidPanelPainter', () => {
     expect(recording.lights.every((fn) => fn.mock.calls.length === 1)).toBe(true);
 
     clearCalls(recording);
-    painter.paint('A');
+    paintNextFrame();
 
     expect(totalCalls(recording)).toBe(0);
   });
@@ -127,31 +137,49 @@ describe('SidPanelPainter', () => {
     clearCalls(recording);
 
     sent[5 + 7] = 0xf0; // voice 1 attack 15
-    painter.paint('A');
+    paintNextFrame();
 
     expect(recording.targets.voices[1].attack.setLiveLevel).toHaveBeenCalledExactlyOnceWith(1);
     expect(totalCalls(recording)).toBe(1);
   });
 
-  it('paints pitch on an octave scale, to both coarse and fine', () => {
+  it('paints pitch on an octave scale, to both coarse and fine, in two hundred steps', () => {
     const recording = recordingTargets();
     painter.attach('A', recording.targets);
 
     sent[0] = 0x00;
     sent[1] = 0x10; // 4096
-    painter.paint('A');
+    paintNextFrame();
     const strip = recording.targets.voices[0];
     expect(strip.coarse.setLiveLevel).toHaveBeenLastCalledWith(0.75);
     expect(strip.fine.setLiveLevel).toHaveBeenLastCalledWith(0.75);
 
-    sent[1] = 0x20; // 8192, one octave up
-    painter.paint('A');
-    expect(strip.coarse.setLiveLevel).toHaveBeenLastCalledWith(0.813);
+    sent[1] = 0x20; // 8192, one octave up: 13/16 = 0.8125, shown at the nearest 200th
+    paintNextFrame();
+    expect(strip.coarse.setLiveLevel).toHaveBeenLastCalledWith(0.815);
 
     sent[0] = 0;
     sent[1] = 0;
-    painter.paint('A');
+    paintNextFrame();
     expect(strip.coarse.setLiveLevel).toHaveBeenLastCalledWith(0);
+  });
+
+  it('leaves a ring alone for a change smaller than one of its two hundred steps', () => {
+    const recording = recordingTargets();
+    sent[2] = 0x00;
+    sent[3] = 0x08; // pulse width 2048: 0.50012, step 100
+    painter.attach('A', recording.targets);
+    const pulseWidth = recording.targets.voices[0].pulseWidth;
+    expect(pulseWidth.setLiveLevel).toHaveBeenLastCalledWith(0.5);
+    clearCalls(recording);
+
+    sent[2] = 0x08; // 2056: 0.50208, still step 100
+    paintNextFrame();
+    expect(totalCalls(recording)).toBe(0);
+
+    sent[2] = 0x0e; // 2062: 0.50354, step 101
+    paintNextFrame();
+    expect(pulseWidth.setLiveLevel).toHaveBeenCalledExactlyOnceWith(0.505);
   });
 
   it('shows a ghost on a waveform the tune wrote but a lock replaced', () => {
@@ -160,7 +188,7 @@ describe('SidPanelPainter', () => {
 
     written[4] = SAWTOOTH;
     sent[4] = TRIANGLE;
-    painter.paint('A');
+    paintNextFrame();
 
     const [triangle, sawtooth, pulse, noise] = recording.targets.voices[0].waveforms;
     expect(triangle.setLiveLight).toHaveBeenLastCalledWith(true, false);
@@ -179,7 +207,7 @@ describe('SidPanelPainter', () => {
     sent[22] = 0xff; // cutoff 2047
     sent[24] = 0x20; // band-pass
     written[24] = 0x10; // low-pass written by the tune
-    painter.paint('A');
+    paintNextFrame();
 
     const { voices, cutoff, resonance, filterModes } = recording.targets;
     expect(voices[2].sync.setLiveLight).toHaveBeenLastCalledWith(true, false);
@@ -195,8 +223,8 @@ describe('SidPanelPainter', () => {
 
   it('reads through the same two buffers on every call', () => {
     painter.attach('A', recordingTargets().targets);
-    painter.paint('A');
-    painter.paint('A');
+    paintNextFrame();
+    paintNextFrame();
 
     const [first, second, third] = readRegisters.mock.calls;
     expect(second[1]).toBe(first[1]);
@@ -216,7 +244,7 @@ describe('SidPanelPainter', () => {
     readRegisters.mockClear();
     detach();
     sent[5] = 0xf0;
-    painter.paint('A');
+    paintNextFrame();
 
     expect(readRegisters).not.toHaveBeenCalled();
     expect(totalCalls(recording)).toBe(0);
@@ -231,7 +259,7 @@ describe('SidPanelPainter', () => {
 
     detachFirst();
     sent[5] = 0xf0;
-    painter.paint('A');
+    paintNextFrame();
 
     expect(second.targets.voices[0].attack.setLiveLevel).toHaveBeenCalledTimes(1);
   });
@@ -254,10 +282,42 @@ describe('SidPanelPainter', () => {
     clearCalls(a);
     clearCalls(b);
 
-    painter.paint('A');
+    paintNextFrame('A');
 
     expect(readRegisters).toHaveBeenLastCalledWith('A', expect.any(Uint8Array), expect.any(Uint8Array));
     expect(totalCalls(b)).toBe(0);
+  });
+
+  describe('a hand on a deck that is not playing', () => {
+    function setVarispeed(varispeed: boolean): void {
+      store.setDeckEngineControls({
+        slot: 'A',
+        speed: 1,
+        faderSpeed: 1,
+        nudging: false,
+        varispeed,
+        voices: store.decks().A.voices,
+      });
+      TestBed.flushEffects();
+    }
+
+    it('paints once on the next frame when the throw settles, showing frames the loop had not painted', () => {
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      setVarispeed(true);
+      runFrames();
+      paintNextFrame();
+      clearCalls(recording);
+      readRegisters.mockClear();
+
+      sent[5 + 7] = 0xf0; // voice 1 attack 15, built between the loop's paints
+      setVarispeed(false);
+      expect(totalCalls(recording)).toBe(0);
+
+      runFrames();
+      expect(readsOf('A')).toBe(1);
+      expect(recording.targets.voices[1].attack.setLiveLevel).toHaveBeenCalledExactlyOnceWith(1);
+    });
   });
 
   describe('a read that throws', () => {
@@ -268,9 +328,10 @@ describe('SidPanelPainter', () => {
       });
 
       expect(() => painter.attach('A', recording.targets)).not.toThrow();
-      painter.paint('A');
-      painter.paint('A');
+      paintNextFrame();
+      paintNextFrame();
 
+      expect(readsOf('A')).toBe(3);
       expect(totalCalls(recording)).toBe(0);
       expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(logWarn).mock.calls[0][0]).toBe(
@@ -281,12 +342,7 @@ describe('SidPanelPainter', () => {
 
   describe('holding still', () => {
     // Angular's own scheduler also asks for animation frames, so the scheduled paints are counted
-    // at `paint` rather than at the frame queue.
-    let paintSpy: MockInstance<SidPanelPainter['paint']>;
-
-    beforeEach(() => {
-      paintSpy = vi.spyOn(painter, 'paint');
-    });
+    // at the register read rather than at the frame queue.
 
     it('paints once on the next frame when a lock changes on a paused deck', () => {
       const recording = recordingTargets();
@@ -295,36 +351,41 @@ describe('SidPanelPainter', () => {
       painter.attach('A', recording.targets);
       runFrames();
       clearCalls(recording);
-      paintSpy.mockClear();
+      readRegisters.mockClear();
 
       sent[4] = TRIANGLE;
       store.setVoiceStrip({ slot: 'A', voice: 0, patch: { waveformLock: 'triangle' } });
       TestBed.flushEffects();
-      expect(paintSpy).not.toHaveBeenCalled();
+      expect(readRegisters).not.toHaveBeenCalled();
       expect(totalCalls(recording)).toBe(0);
 
       runFrames();
-      expect(paintSpy).toHaveBeenCalledExactlyOnceWith('A');
+      expect(readRegisters).toHaveBeenCalledExactlyOnceWith('A', expect.any(Uint8Array), expect.any(Uint8Array));
       expect(recording.targets.voices[0].waveforms[0].setLiveLight).toHaveBeenCalledExactlyOnceWith(true, false);
     });
 
     it('de-duplicates the scheduled paint per deck', () => {
       store.setDeckStatus({ slot: 'A', status: 'paused' });
       TestBed.flushEffects();
+      painter.attach('A', recordingTargets().targets);
+      runFrames();
+      readRegisters.mockClear();
+
       store.setVoiceStrip({ slot: 'A', voice: 0, patch: { waveformLock: 'pulse' } });
       TestBed.flushEffects();
       store.setVoiceStrip({ slot: 'A', voice: 1, patch: { waveformLock: 'noise' } });
       TestBed.flushEffects();
       runFrames();
 
-      expect(paintSpy).toHaveBeenCalledExactlyOnceWith('A');
+      expect(readsOf('A')).toBe(1);
     });
 
-    it('a playing deck schedules nothing, and its per-frame position samples do not rerun the effect', () => {
+    it('a playing deck schedules nothing, and its position samples do not rerun the effect', () => {
       store.setDeckStatus({ slot: 'A', status: 'playing' });
       TestBed.flushEffects();
+      painter.attach('A', recordingTargets().targets);
       runFrames();
-      paintSpy.mockClear();
+      readRegisters.mockClear();
 
       for (let frame = 1; frame <= 5; frame++) {
         store.samplePosition({ slot: 'A', positionFrames: frame });
@@ -332,7 +393,7 @@ describe('SidPanelPainter', () => {
       }
       runFrames();
 
-      expect(paintSpy).not.toHaveBeenCalled();
+      expect(readRegisters).not.toHaveBeenCalled();
     });
   });
 });

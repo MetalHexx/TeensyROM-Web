@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { IWatchFolderService } from '@teensyrom-nx/domain';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { WatchFolderStoreState } from '../watch-folder-store';

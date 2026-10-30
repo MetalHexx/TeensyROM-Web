@@ -1,10 +1,66 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  afterRenderEffect,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
+import { moduleMetadata } from '@storybook/angular';
 import type { Meta, StoryObj } from '@storybook/angular';
+import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
 import { PositionStripComponent, type PositionMark } from './position-strip.component';
 
-const meta: Meta<PositionStripComponent> = {
+/** Sets the position and value text once rendered, and whenever a control changes them, the way a
+ *  painter would. */
+@Component({
+  selector: 'lib-position-strip-live-demo',
+  imports: [PositionStripComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<lib-position-strip
+    [barState]="barState()"
+    [accessibleName]="accessibleName()"
+    [marks]="marks()"
+    [held]="held()"
+    (scrubInput)="scrubInput.emit($event)"
+    (scrubCommit)="scrubCommit.emit($event)"
+  />`,
+})
+class LiveDemoComponent {
+  readonly barState = input.required<ScrubBarState>();
+  readonly accessibleName = input.required<string>();
+  readonly marks = input<readonly PositionMark[] | null>(null);
+  readonly held = input(false);
+  readonly positionPercent = input(0);
+  readonly valueText = input<string | null>(null);
+  readonly scrubInput = output<number>();
+  readonly scrubCommit = output<number>();
+
+  private readonly strip = viewChild.required(PositionStripComponent);
+
+  constructor() {
+    afterRenderEffect(() => {
+      const strip = this.strip();
+      strip.setLivePosition(this.positionPercent());
+      const valueText = this.valueText();
+      if (valueText !== null) {
+        strip.setLiveValueText(valueText);
+      }
+    });
+  }
+}
+
+/** What a painter sets live, as story args. */
+interface LiveArgs {
+  positionPercent: number;
+  valueText: string | null;
+}
+
+const meta: Meta<PositionStripComponent & LiveArgs> = {
   title: 'DJ/Position Strip',
   component: PositionStripComponent,
   tags: ['autodocs'],
+  decorators: [moduleMetadata({ imports: [LiveDemoComponent] })],
   parameters: {
     docs: {
       description: {
@@ -12,7 +68,8 @@ const meta: Meta<PositionStripComponent> = {
           'One continuous bar, lit up to the position, with a loop mark and a playhead, over a ' +
           'native range input that does the scrubbing — so a click anywhere, a drag, the arrow ' +
           'keys, Home and End all work, and the drag is continuous. Purely presentational: it ' +
-          'holds no drag-pin state, so `positionPercent` is whatever the caller shows, and ' +
+          'holds no drag-pin state, so the position is whatever the caller shows, set live ' +
+          'through `setLivePosition` (and the value text through `setLiveValueText`), and ' +
           '`scrubInput` (every drag tick, a preview) and ' +
           '`scrubCommit` (release only, the one that seeks) are how the caller hears what the ' +
           'operator did. The bar before the loop point is intro purple, after it music cyan, ' +
@@ -23,10 +80,16 @@ const meta: Meta<PositionStripComponent> = {
   },
   argTypes: {
     barState: { description: 'How the bar is coloured and whether a loop mark appears.' },
-    positionPercent: { description: '0–100: the live playhead, or the caller’s drag pin.' },
+    positionPercent: {
+      description:
+        '0–100: the live playhead, or the caller’s drag pin — set through `setLivePosition`.',
+    },
     accessibleName: { description: "The range's accessible name, e.g. 'Position deck A'." },
     held: { description: 'A finger is on this deck’s record: the playhead turns warning amber.' },
-    valueText: { description: "The range's aria-valuetext, e.g. '01:23.4 of 03:12'." },
+    valueText: {
+      description:
+        "The range's aria-valuetext, e.g. '01:23.4 of 03:12' — set through `setLiveValueText`.",
+    },
     marks: {
       description:
         'Loop brackets and cue ticks in a lane above the strip. null reserves no lane; an array, ' +
@@ -38,7 +101,7 @@ const meta: Meta<PositionStripComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<PositionStripComponent>;
+type Story = StoryObj<PositionStripComponent & LiveArgs>;
 
 const base = {
   accessibleName: 'Position deck A',
@@ -51,7 +114,7 @@ const wrapped: Story['render'] = (args) => ({
   props: args,
   template: `
     <div style="width: 420px">
-      <lib-position-strip
+      <lib-position-strip-live-demo
         [barState]="barState"
         [positionPercent]="positionPercent"
         [accessibleName]="accessibleName"
@@ -181,7 +244,7 @@ export const Interactive: Story = {
     },
     template: `
       <div style="width: 420px">
-        <lib-position-strip
+        <lib-position-strip-live-demo
           [barState]="barState"
           [positionPercent]="positionPercent"
           [accessibleName]="accessibleName"

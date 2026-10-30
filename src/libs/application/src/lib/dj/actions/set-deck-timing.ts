@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { createAction } from '@teensyrom-nx/utils';
 import { DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';

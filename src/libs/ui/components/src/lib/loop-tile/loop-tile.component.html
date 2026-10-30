@@ -25,12 +25,12 @@
     }
     <span class="length" [class.length--cue]="model().kind === 'cue'">{{ model().lengthText }}</span>
   </span>
-  <span class="timeline" [class.timeline--cue]="model().kind === 'cue'" aria-hidden="true">
+  <span #timeline class="timeline" [class.timeline--cue]="model().kind === 'cue'" aria-hidden="true">
     @if (model().kind === 'cue') {
     <span class="cue-tick"></span>
     } @else if (model().activity === 'running') {
-    <span class="fill" [style.width.%]="clampedProgress()"></span>
-    <span class="playhead" [style.left.%]="clampedProgress()"></span>
+    <span class="fill"></span>
+    <span class="playhead"></span>
     }
   </span>
 </button>

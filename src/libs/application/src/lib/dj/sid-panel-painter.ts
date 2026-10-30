@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject } from '@angular/core';
 import { SID_REGISTER_COUNT, readSidField } from '@sidablist/core';
 import type { SidField } from '@sidablist/core';
-import { logWarn } from '@teensyrom-nx/utils';
+import { LIVE_LEVEL_STEPS, liveLevelStep, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore } from './dj-store';
 import { DECK_SLOTS, type Slot } from './slot';
@@ -33,9 +33,6 @@ const LIGHT_FILTER = 6;
 /** Marks a ring or light as never painted, so the first paint writes everything. */
 const LEVEL_UNPAINTED = -1;
 const LIGHT_UNPAINTED = 0xff;
-
-/** Rings move in thousandths; a smaller change is not a visible one. */
-const LEVEL_STEPS = 1000;
 
 const FREQUENCY_BITS = 16;
 const PULSE_WIDTH_MAX = 4095;
@@ -96,11 +93,11 @@ function createSlotPaint(): SlotPaint {
 
 /**
  * Paints a deck's live SID registers straight into the panel's indicators, bypassing the store and
- * change detection. The deck's animation-frame loop calls `paint` whenever the engine has built a
- * new frame; each call reads the registers once and writes only the rings and lights whose value
- * changed. While the deck is not playing that loop is stopped, so one extra paint is scheduled for
- * anything that changes in the meantime (a lock press, a stop re-init, a load). Never writes the
- * store.
+ * change detection. The decks' animation-frame loop calls `paint` on the frames it paints on, about
+ * 30 a second, when the engine has built a new frame; each paint reads the registers once and
+ * writes only the rings and lights whose shown value changed. While the deck is not playing that
+ * loop does not paint it, so one extra paint is scheduled for anything that changes in the
+ * meantime (a lock press, a stop re-init, a load, a hand letting go). Never writes the store.
  */
 @Injectable({ providedIn: 'root' })
 export class SidPanelPainter {
@@ -110,14 +107,18 @@ export class SidPanelPainter {
 
   constructor() {
     for (const slot of DECK_SLOTS) {
-      // Narrow on purpose: `deck(slot)` also carries `positionFrames`, rewritten every animation
-      // frame while playing, and an effect reading it would rerun at that rate.
+      // Narrow on purpose: `deck(slot)` carries every deck field — speed, voices, the hand — and an
+      // effect reading it whole would rerun for each of them. (The playhead lives in `positions`.)
       const status = computed(() => this.store.deck(slot)().status);
       const loaded = computed(() => this.store.deck(slot)().loaded);
+      const varispeed = computed(() => this.store.deck(slot)().varispeed);
       const panel = this.store.deckPanel(slot);
+      // A hand runs the loop on a deck that is not playing, and the loop paints only every interval,
+      // so the frames the hand moved through last may not be on the panel when it lets go.
       effect(() => {
         const current = status();
         loaded();
+        varispeed();
         panel();
         if (current !== 'playing') {
           this.scheduleStillPaint(slot);
@@ -141,9 +142,8 @@ export class SidPanelPainter {
     };
   }
 
-  /** One read and a paint of whatever changed. Called by the deck's animation-frame loop only when
-   *  the engine has built a new frame. A no-op with nothing attached; a failed read warns once per
-   *  deck and skips the paint. */
+  /** One read and a paint of whatever changed, now. A no-op with nothing attached; a failed read
+   *  warns once per deck and skips the paint. */
   paint(slot: Slot): void {
     const state = this.slots[slot];
     const targets = state.targets;
@@ -199,11 +199,13 @@ export class SidPanelPainter {
     }
   }
 
+  /** Hands the target the level quantised to the shared `LIVE_LEVEL_STEPS`, the resolution the
+   *  ring itself draws at, and only when that step changed. */
   private paintLevel(target: PanelLevelTarget, cache: Int16Array, index: number, level: number): void {
-    const step = Math.round(level * LEVEL_STEPS);
+    const step = liveLevelStep(level);
     if (cache[index] !== step) {
       cache[index] = step;
-      target.setLiveLevel(step / LEVEL_STEPS);
+      target.setLiveLevel(step / LIVE_LEVEL_STEPS);
     }
   }
 

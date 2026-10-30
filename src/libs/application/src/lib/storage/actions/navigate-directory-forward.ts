@@ -14,7 +14,7 @@ import {
 } from '../storage-helpers';
 import { createAction } from '@teensyrom-nx/utils';
 import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 export function navigateDirectoryForward(
   store: WritableStore<StorageState>,

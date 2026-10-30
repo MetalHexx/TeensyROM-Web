@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { WritableStateSource } from '@ngrx/signals';
 import { IDeviceService, DEVICE_SERVICE, ICrtStorage, CRT_STORAGE } from '@teensyrom-nx/domain';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';

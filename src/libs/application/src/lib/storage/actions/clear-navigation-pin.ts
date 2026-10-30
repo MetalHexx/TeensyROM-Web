@@ -1,7 +1,7 @@
 import { StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';
 import { createAction } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 /**
  * Releases the navigation pin for `deviceId`. Only clears when this device currently holds it,

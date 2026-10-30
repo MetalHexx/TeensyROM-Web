@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../with-devtools';
 import type { StateSignals, WritableStateSource } from '@ngrx/signals';
 import { PlayerFilterType } from '@teensyrom-nx/domain';
 import type { Settings } from '@teensyrom-nx/domain';

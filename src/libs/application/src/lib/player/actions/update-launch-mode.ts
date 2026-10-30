@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { createAction, LogType, logInfo, logError } from '@teensyrom-nx/utils';
 import { WritableStore, ensurePlayerState } from '../player-helpers';
 import { PlayerState } from '../player-store';

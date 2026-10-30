@@ -1,7 +1,7 @@
 import { StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';
 import { createAction } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 /**
  * Holds the directory list for `deviceId` against playback-driven realignment. A mounted view

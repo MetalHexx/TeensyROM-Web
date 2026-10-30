@@ -1,5 +1,5 @@
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { DeviceTransferState, TransferState } from '../transfer-store';
 import { WritableStore, createDefaultDeviceTransferState } from '../transfer-helpers';
 

@@ -101,7 +101,9 @@ input[type='range'] {
 }
 
 // The track holds the fill, the loop mark and the playhead on one 0–100 scale; the frame's small
-// inset applies to it as a whole.
+// inset applies to it as a whole. The component sets `--playhead-position` and `--fill-split` on it
+// as the playhead moves. Only the few elements inside inherit them, and those move by `scale` and
+// `translate` alone, so a new position restyles them and lays nothing out.
 .track {
   position: absolute;
   inset: 2px;
@@ -109,19 +111,26 @@ input[type='range'] {
   background: rgba(var(--glassy-color), 0.07);
 }
 
-// A colour change is a hard edge: two stops at the same point, never a blend. `--fill-split` is
-// where it falls along the fill's own width.
+// The lit bar is two tones stacked, each the track's full width scaled from the left: the second
+// colour runs to the position, and the first covers it as far as `--fill-split` — the colour
+// change, never past the position — so the change is a hard edge, never a blend. No
+// `will-change`: measured, a layer per moving part made the page's per-frame layerize 2.5× dearer.
 .fill {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
+  inset: 0;
   border-radius: 1px;
-  background: linear-gradient(
-    to right,
-    var(--fill-before) var(--fill-split, 100%),
-    var(--fill-after, var(--fill-before)) var(--fill-split, 100%)
-  );
+  transform-origin: left;
+}
+
+.fill--after {
+  background: var(--fill-after, var(--fill-before));
+  scale: var(--playhead-position, 0%) 100%;
+}
+
+.fill--before {
+  border-radius: 1px 0 0 1px;
+  background: var(--fill-before);
+  scale: var(--fill-split, 0%) 100%;
 }
 
 .strip[data-state='loop'] .fill {
@@ -138,26 +147,39 @@ input[type='range'] {
   --fill-before: var(--color-highlight);
 }
 
-.loop-mark,
-.playhead {
+.loop-mark {
   position: absolute;
   top: -2px;
   bottom: -2px;
   width: 2px;
   transform: translateX(-50%);
-}
-
-.loop-mark {
   background: var(--color-directory);
   box-shadow: 0 0 6px color-mix(in srgb, var(--color-directory) 85%, transparent);
 }
 
+// The playhead is the right edge of a track-wide box that starts wholly before the track and
+// slides right by the position; the strip clips the rest of the box, which draws nothing.
 .playhead {
-  background: var(--synth-pointer);
-  box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
+  position: absolute;
+  top: -2px;
+  right: 100%;
+  bottom: -2px;
+  width: 100%;
+  translate: var(--playhead-position, 0%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -1px;
+    bottom: 0;
+    width: 2px;
+    background: var(--synth-pointer);
+    box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
+  }
 }
 
-.playhead[data-held] {
+.playhead[data-held]::before {
   background: var(--color-warning);
   box-shadow: 0 0 6px color-mix(in srgb, var(--color-warning) 85%, transparent);
 }

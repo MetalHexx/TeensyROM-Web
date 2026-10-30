@@ -4,7 +4,13 @@ import type { LoopSelectedRowModel } from '../loop-selected-row/loop-selected-ro
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
 import { LoopsCuesPlateComponent, type LoopsCuesPlateModel } from './loops-cues-plate.component';
 
-const meta: Meta<LoopsCuesPlateComponent> = {
+/** How far the running tile's timeline fills: what a painter sets live through `setLiveProgress`
+ *  (the `--loop-tile-progress` the tiles inherit). A story arg here, set on the wrapper. */
+interface ProgressArgs {
+  runningProgressPercent: number;
+}
+
+const meta: Meta<LoopsCuesPlateComponent & ProgressArgs> = {
   title: 'DJ/Loops Cues Plate',
   component: LoopsCuesPlateComponent,
   tags: ['autodocs'],
@@ -15,7 +21,8 @@ const meta: Meta<LoopsCuesPlateComponent> = {
           "One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the " +
           'fixed selected-loop row, and a two-column tile grid that takes the remaining height and ' +
           'scrolls. Purely presentational — it holds no state of its own; the caller owns every ' +
-          'marker, the drag offsets and the running tile’s progress. Each tile and the selected row ' +
+          'marker, the drag offsets and the running tile’s progress, which a painter sets live ' +
+          'through `setLiveProgress`. Each tile and the selected row ' +
           'carry a play-now key; the selected row adds the GBL switch, and a marker with its own ' +
           'settings shows a lit dot on its tile.',
       },
@@ -23,7 +30,9 @@ const meta: Meta<LoopsCuesPlateComponent> = {
   },
   argTypes: {
     model: { description: "Everything the plate draws: names, flags, the selected row and the tiles." },
-    runningProgressPercent: { description: '0–100; reaches only the running tile.' },
+    runningProgressPercent: {
+      description: '0–100, as `setLiveProgress` sets it; reaches only the running tile.',
+    },
     playNowSelected: { description: "Emits when the selected row's play-now key is pressed." },
     toggleGlobal: { description: "Emits when the selected row's GBL switch is pressed." },
     playNowTile: { description: "Emits a tile's id when its play-now key is pressed." },
@@ -31,18 +40,18 @@ const meta: Meta<LoopsCuesPlateComponent> = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 474px; height: 360px; display: flex; flex-direction: column">
-        <lib-loops-cues-plate
-          [model]="model"
-          [runningProgressPercent]="runningProgressPercent"
-        />
+      <div
+        style="width: 474px; height: 360px; display: flex; flex-direction: column"
+        [style.--loop-tile-progress]="runningProgressPercent + '%'"
+      >
+        <lib-loops-cues-plate [model]="model" />
       </div>
     `,
   }),
 };
 
 export default meta;
-type Story = StoryObj<LoopsCuesPlateComponent>;
+type Story = StoryObj<LoopsCuesPlateComponent & ProgressArgs>;
 
 function boundary(tag: string, overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
   const lower = tag.toLowerCase();
@@ -261,11 +270,11 @@ export const Narrow: Story = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 300px; height: 360px; display: flex; flex-direction: column">
-        <lib-loops-cues-plate
-          [model]="model"
-          [runningProgressPercent]="runningProgressPercent"
-        />
+      <div
+        style="width: 300px; height: 360px; display: flex; flex-direction: column"
+        [style.--loop-tile-progress]="runningProgressPercent + '%'"
+      >
+        <lib-loops-cues-plate [model]="model" />
       </div>
     `,
   }),

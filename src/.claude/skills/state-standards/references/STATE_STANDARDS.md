@@ -12,7 +12,9 @@ This document establishes standards for state management using NgRx Signal Store
 
 ### Use updateState with actionMessage for ALL State Mutations
 
-**REQUIRED**: All store actions MUST use `updateState()` from `@angular-architects/ngrx-toolkit` with an `actionMessage` parameter instead of `patchState()` from `@ngrx/signals`.
+**REQUIRED**: All store actions MUST use `updateState()` with an `actionMessage` parameter instead of `patchState()` from `@ngrx/signals`.
+
+**Import source**: take `updateState` and `withDevtools` from `libs/application/src/lib/with-devtools.ts`, never from `@angular-architects/ngrx-toolkit` directly (lint enforces this). The wrappers are the toolkit's own in dev builds and switch Redux DevTools sync off in production, where it costs main-thread time on every store write — the DJ mixer's real-time MIDI path shares that thread.
 
 **Rationale**: The `patchState()` function does not support the `actionMessage` parameter required for Redux DevTools correlation. Without `actionMessage` tracking:
 
@@ -24,7 +26,7 @@ This document establishes standards for state management using NgRx Signal Store
 **Correct Pattern**:
 
 ```typescript
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools'; // libs/application/src/lib/with-devtools.ts
 import { createAction } from '@teensyrom-nx/utils';
 
 export function someAction(store: WritableStore<DomainState>) {
@@ -159,7 +161,7 @@ export function withExampleActions() {
 **Requirements**:
 
 - Use `providedIn: 'root'` for application-level stores
-- Always include `withDevtools()` with descriptive store name
+- Always include `withDevtools()` with descriptive store name — imported from `with-devtools.ts`, not the toolkit
 - Define explicit TypeScript interfaces for state
 - Use `inject()` within `withMethods()` for service dependency injection
 - Separate read-only operations (selectors) from state-changing operations (actions)
@@ -254,7 +256,7 @@ export function getSelectedItem(store: WritableStore<ExampleState>) {
 
 ```typescript
 // actions/load-data.ts
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools'; // libs/application/src/lib/with-devtools.ts
 import { createAction } from '@teensyrom-nx/utils';
 
 export function loadData(store: WritableStore<ExampleState>, service: ExampleService) {
@@ -294,7 +296,7 @@ export function loadData(store: WritableStore<ExampleState>, service: ExampleSer
 
 **Requirements**:
 
-1. Import necessary dependencies at the top (including `updateState` from `@angular-architects/ngrx-toolkit`)
+1. Import necessary dependencies at the top (including `updateState` from `with-devtools.ts`)
 2. Define SignalStore type helper (if needed)
 3. Export single function that returns object with one property (a function)
 4. Use descriptive parameter names
@@ -305,7 +307,7 @@ export function loadData(store: WritableStore<ExampleState>, service: ExampleSer
 **Template Pattern**:
 
 ```typescript
-import { updateState } from '@angular-architects/ngrx-toolkit'; // REQUIRED
+import { updateState } from '../../with-devtools'; // REQUIRED — libs/application/src/lib/with-devtools.ts
 import { WritableStateSource } from '@ngrx/signals';
 import { firstValueFrom } from 'rxjs';
 import { createAction, LogType, logInfo } from '@teensyrom-nx/utils';

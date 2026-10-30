@@ -130,9 +130,9 @@ describe('SidFilterSectionComponent', () => {
 
     targets.resonance.setLiveLevel(0.5);
     const ring = control('filter-resonance').querySelector('.live-ring') as SVGPathElement;
-    expect(ring.style.strokeDashoffset).toBe('50');
+    expect(ring.getAttribute('stroke-dashoffset')).toBe('50');
     const other = control('filter-cutoff').querySelector('.live-ring') as SVGPathElement;
-    expect(other.style.strokeDashoffset).toBe('');
+    expect(other.getAttribute('stroke-dashoffset')).toBe('100');
   });
 
   it('keeps every control focusable and in order', () => {

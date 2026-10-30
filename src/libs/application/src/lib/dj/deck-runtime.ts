@@ -1,6 +1,13 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, isDevMode } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { createSidPlayer, parseSidFile, frames, clamp, playCallIntervalUs } from '@sidablist/core';
+import {
+  createSidPlayer,
+  parseSidFile,
+  frames,
+  clamp,
+  milliseconds,
+  playCallIntervalUs,
+} from '@sidablist/core';
 import type {
   SidPlayer,
   PlayerSnapshot,
@@ -23,10 +30,25 @@ import {
 } from './ports';
 import type { RegisterRecorder } from './ports';
 import type { Slot } from './slot';
+import { DeliveryProbe } from './bench/delivery-probe';
+import { installDeckBench } from './bench/deck-bench';
 
 /** How many seconds of play a tune's register record covers beyond the longest position the
  *  transport can show, so a hand has room to run past the end of the bar. */
 const RECORD_MARGIN_SECONDS = 5;
+
+/**
+ * How far past its due time each frame is stamped for the MIDI stack: not at all, so Chrome sends
+ * each frame the moment the clock hands it over, and nothing a deck does is delayed. The clock
+ * releases frames in bursts — the audio device runs in ~10.7 ms periods — so at zero a frame pair
+ * now and then lands on the same instant, where stamping ahead would put every frame on the grid.
+ *
+ * Bench and ear on InSID3 Out at 1×, real hardware, once the page stopped blocking the main thread:
+ * collapsed pairs 3.8% at 0 against 0% at 12 and 20 ms (17% at 0 before), yet the three sounded
+ * about the same by ear and 0 the best. The ASID sink caps it at 40 ms for a port that cannot
+ * cancel; `djBench.lookahead(ms)` tries another value in a dev build.
+ */
+const DECK_SCHEDULE_AHEAD_MS = milliseconds(0);
 
 /** One deck slot's whole engine bundle: the core player, its ASID sink, the audio-graph clock
  *  driving it, the two replay threads it uses — one for jumps, one for prepared builds — and the
@@ -69,6 +91,21 @@ export class DeckRuntime {
   private readonly chipModels = new Map<Slot, SidModel>();
   /** Bumped by every `load`: a record scan that comes back after a newer load is stale. */
   private readonly loadGenerations = new Map<Slot, number>();
+  /** Each slot's delivery probe — dev builds only, read through the console bench. */
+  private readonly probes = new Map<Slot, DeliveryProbe>();
+
+  constructor() {
+    if (isDevMode()) {
+      installDeckBench(() =>
+        [...this.slots].map(([slot, { player, sink }]) => ({
+          slot,
+          player,
+          sink,
+          probe: this.requireProbe(slot),
+        }))
+      );
+    }
+  }
 
   /** Builds this slot's engine bundle, once. A second call is a no-op — the sink, the player, the
    *  clock and the replay threads are never rebuilt for a slot already built. */
@@ -79,9 +116,14 @@ export class DeckRuntime {
 
     const facade: FacadeState = { portId: null, warned: false };
     this.facades.set(slot, facade);
+    if (isDevMode()) {
+      const probe = new DeliveryProbe();
+      probe.setScheduleAhead(DECK_SCHEDULE_AHEAD_MS);
+      this.probes.set(slot, probe);
+    }
 
     const port = this.createOutputPort(slot, facade);
-    const sink = createAsidSink(port);
+    const sink = createAsidSink(port, { scheduleAheadMs: DECK_SCHEDULE_AHEAD_MS });
     const clock = this.clockFactory();
     const replay = this.replayFactory();
     const prepare = this.replayFactory();
@@ -327,6 +369,8 @@ export class DeckRuntime {
   private createOutputPort(slot: Slot, facade: FacadeState): MidiOutputPort {
     const resolve = (): MidiOutputPort | null =>
       facade.portId === null ? null : this.midiAccess.outputPortFor(facade.portId);
+    // Recorded before the port resolves, so a deck with nothing bound still measures its timing.
+    const probe = this.probes.get(slot) ?? null;
 
     return {
       get portId(): string | null {
@@ -336,6 +380,9 @@ export class DeckRuntime {
         return resolve()?.supportsCancel ?? false;
       },
       send: (bytes: Uint8Array, timestampMs?: number): void => {
+        if (probe !== null && timestampMs !== undefined) {
+          probe.record(timestampMs);
+        }
         const resolved = resolve();
         if (resolved === null) {
           if (!facade.warned) {
@@ -356,6 +403,14 @@ export class DeckRuntime {
       throw new Error(`DeckRuntime: slot ${slot} has not been built`);
     }
     return entry;
+  }
+
+  private requireProbe(slot: Slot): DeliveryProbe {
+    const probe = this.probes.get(slot);
+    if (probe === undefined) {
+      throw new Error(`DeckRuntime: slot ${slot} has not been built`);
+    }
+    return probe;
   }
 
   private requireFacade(slot: Slot): FacadeState {

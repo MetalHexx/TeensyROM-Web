@@ -286,7 +286,6 @@ export class MappableControls {
     const mixer = this.mixerService;
     const deck = this.djStore.deck(slot);
     const panel = this.djStore.deckPanel(slot);
-    const transport = this.djStore.transportSummary(slot);
     const loops = this.djStore.deckLoops(slot);
     const id = (control: DeckControlId): ControlIdentity => ({ owner: slot, control });
     const warnOnFailure = (what: string, command: Promise<void>): Promise<void> =>
@@ -311,7 +310,8 @@ export class MappableControls {
         'Seek',
         { min: 0, max: 100, home: 0, step: null },
         SEEK_DEFAULTS,
-        () => seek.pending() ?? transport().scrubPercent,
+        // Read from the engine on demand: the store holds no per-frame playhead.
+        () => seek.pending() ?? decks.playheadPercent(slot),
         seek.request,
         this.deckHand.handFor(slot)
       ),
