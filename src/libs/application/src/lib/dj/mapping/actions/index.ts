@@ -10,6 +10,7 @@ import { setMappingMode } from './set-mapping-mode';
 import { setLearn } from './set-learn';
 import { setControllerRuntime } from './set-controller-runtime';
 import { announce } from './announce';
+import { repairControllers } from './repair-controllers';
 
 export function withMidiMappingActions() {
   return withMethods((store) => {
@@ -24,6 +25,7 @@ export function withMidiMappingActions() {
       ...setLearn(writableStore),
       ...setControllerRuntime(writableStore),
       ...announce(writableStore),
+      ...repairControllers(writableStore),
     };
   });
 }

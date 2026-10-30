@@ -27,6 +27,14 @@ const speedMapping = (controllerId = LAUNCH_CONTROL, number = 7) => ({
   style: { kind: 'absolute' as const, amount: null },
 });
 
+const selectMapping = (id: string, controllerId: string, number: number) => ({
+  id,
+  source: ccSource(number, 1, controllerId),
+  owner: 'set' as const,
+  control: 'set-select',
+  style: { kind: 'absolute' as const, amount: null },
+});
+
 const settings = (
   controllers: KnownControllerRecord[],
   mappings: MidiSettingsRecord['mappings'] = controllers.map((known) => speedMapping(known.id))
@@ -66,10 +74,20 @@ describe('MidiControllers', () => {
   }
 
   const status = (id = LAUNCH_CONTROL) => h.mappingStore.controllerStatus()[id];
-  const savedControllers = async () => {
+  const savedSettings = async () => {
     await vi.advanceTimersByTimeAsync(300);
-    return (h.repository.save.mock.calls.at(-1)?.[0] as MidiSettingsRecord).controllers;
+    return h.repository.save.mock.calls.at(-1)?.[0] as MidiSettingsRecord;
   };
+  const savedControllers = async () => (await savedSettings()).controllers;
+
+  /** The controllers the engine hears from when `portId` sends a CC. */
+  function heardFrom(portId: string, number = 7): string[] {
+    h.router.start();
+    const handle = vi.spyOn(h.engine, 'handle');
+    handle.mockClear();
+    h.midiInput.emit(portId, 'cc', number, 100);
+    return handle.mock.calls.map(([message]) => message.controllerId);
+  }
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -297,13 +315,86 @@ describe('MidiControllers', () => {
   });
 
   describe('finding a saved controller again', () => {
-    it('finds it by its port id', async () => {
+    it('finds it by its name when the browser hands out new port ids, and its mappings fire', async () => {
+      await start(settings([controller({ lastPortId: 'input-2' })]), [['input-0', NAME]]);
+
+      expect(status()).toBe('listening');
+      expect(h.controllers.controllerForPort('input-0')).toBe(LAUNCH_CONTROL);
+      expect(heardFrom('input-0')).toEqual([LAUNCH_CONTROL]);
+    });
+
+    it('does not take a port at its saved id that has another name, and reads missing', async () => {
       await start(settings([controller({ lastPortId: 'port-9' })]), [
         ['port-9', 'Renamed by the OS'],
       ]);
 
+      expect(status()).toBe('missing');
+      expect(h.controllers.controllerForPort('port-9')).toBeNull();
+      expect(h.midiInput.openCalls).toEqual([]);
+      expect(h.alerts.warning).toHaveBeenCalledWith(MISSING_ALERT);
+    });
+
+    it('does not take a cartridge input at its saved id, even one carrying its name', async () => {
+      const cartridge = 'TeensyROM-12345678';
+      await start(settings([controller({ name: cartridge, lastPortId: 'port-9' })]), [
+        ['port-9', cartridge],
+      ]);
+
+      expect(status()).toBe('missing');
+      expect(h.controllers.controllerForPort('port-9')).toBeNull();
+      expect(h.midiInput.openCalls).toEqual([]);
+    });
+
+    it('keeps two same-named devices on their own ports when one is unplugged', async () => {
+      await start(
+        settings([
+          controller({ lastPortId: 'port-a' }),
+          controller({ id: 'twin', lastPortId: 'port-b' }),
+        ]),
+        [
+          ['port-a', NAME],
+          ['port-b', NAME],
+        ]
+      );
       expect(status()).toBe('listening');
-      expect(h.controllers.controllerForPort('port-9')).toBe(LAUNCH_CONTROL);
+      expect(status('twin')).toBe('listening');
+
+      h.midiInput.unplug('port-a');
+      await settle();
+
+      expect(status()).toBe('missing');
+      expect(status('twin')).toBe('listening');
+      expect(h.controllers.controllerForPort('port-b')).toBe('twin');
+      expect(h.mappingStore.controller('twin')()?.lastPortId).toBe('port-b');
+    });
+
+    it('keeps a mapping per controller on one control through a reshuffle', async () => {
+      await start(
+        settings(
+          [
+            controller({ lastPortId: 'input-2' }),
+            controller({ id: 'nano', name: 'Nano', lastPortId: 'input-3' }),
+          ],
+          [
+            selectMapping('launch-select', LAUNCH_CONTROL, 20),
+            selectMapping('nano-select', 'nano', 21),
+          ]
+        ),
+        [
+          ['input-0', 'Nano'],
+          ['input-1', NAME],
+        ]
+      );
+
+      expect(h.mappingStore.mappings().map((mapping) => mapping.id)).toEqual([
+        'launch-select',
+        'nano-select',
+      ]);
+      expect(heardFrom('input-1', 20)).toEqual([LAUNCH_CONTROL]);
+      expect(heardFrom('input-0', 21)).toEqual(['nano']);
+      expect(
+        (await savedSettings()).mappings.map((mapping) => mapping.source.controllerId)
+      ).toEqual([LAUNCH_CONTROL, 'nano']);
     });
 
     it('finds it by its unique name after its port id changes, and settles after one extra run', async () => {
@@ -348,6 +439,38 @@ describe('MidiControllers', () => {
       expect(h.midiInput.isOpen('port-a')).toBe(false);
       expect((await savedControllers())[0].lastPortId).toBe('port-b');
       expect(h.alerts.warning).toHaveBeenCalledTimes(1);
+    });
+
+    it('renames a missing controller to the differently named port the operator chooses, and its mappings fire', async () => {
+      await start(settings([controller({ lastPortId: 'port-9' })]), [
+        ['port-9', 'Renamed by the OS'],
+      ]);
+      expect(status()).toBe('missing');
+
+      h.controllers.pointAt(LAUNCH_CONTROL, 'port-9');
+      await settle();
+
+      expect(h.mappingStore.controller(LAUNCH_CONTROL)()?.name).toBe('Renamed by the OS');
+      expect(status()).toBe('listening');
+      expect(heardFrom('port-9')).toEqual([LAUNCH_CONTROL]);
+      expect((await savedControllers())[0]).toMatchObject({
+        name: 'Renamed by the OS',
+        lastPortId: 'port-9',
+      });
+
+      await start(settings([...(await savedControllers())]), [['port-new', 'Renamed by the OS']]);
+      expect(status()).toBe('listening');
+    });
+
+    it('ignores a port that is not in the input list', async () => {
+      await start(settings([controller()]));
+      const saves = h.repository.save.mock.calls.length;
+
+      h.controllers.pointAt(LAUNCH_CONTROL, 'port-nowhere');
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(h.mappingStore.controller(LAUNCH_CONTROL)()).toEqual(controller());
+      expect(h.repository.save.mock.calls.length).toBe(saves);
     });
 
     it('gives one port to one controller when two share a name and one is found by id', async () => {
@@ -443,6 +566,53 @@ describe('MidiControllers', () => {
       expect(h.mappingStore.controller(LAUNCH_CONTROL)()?.lastPortId).toBe('port-new');
     });
 
+    const reusable: [string, MidiSettingsRecord, [string, string][]][] = [
+      ['off', settings([controller({ listening: false })]), []],
+      ['idle', settings([controller()], []), []],
+      [
+        'unmatched',
+        settings([controller({ lastPortId: 'port-old' })]),
+        [
+          ['port-a', NAME],
+          ['port-b', NAME],
+        ],
+      ],
+    ];
+    it.each(reusable)(
+      'reuses a %s controller of the same name instead of adding one',
+      async (expected, saved, ports) => {
+        await start(saved, ports);
+        expect(status()).toBe(expected);
+
+        const id = h.controllers.ensureController('port-new', NAME);
+
+        expect(id).toBe(LAUNCH_CONTROL);
+        expect(h.mappingStore.controllers()).toHaveLength(1);
+        expect(h.mappingStore.controller(LAUNCH_CONTROL)()?.lastPortId).toBe('port-new');
+      }
+    );
+
+    it('reuses a controller whose status is not known yet instead of adding one', async () => {
+      await start(settings([controller()]), [], () => h.accessState.set('idle'));
+      expect(status()).toBeUndefined();
+
+      expect(h.controllers.ensureController('port-new', NAME)).toBe(LAUNCH_CONTROL);
+      expect(h.mappingStore.controllers()).toHaveLength(1);
+    });
+
+    it('adds a controller for a second device that carries the name of one already on another port', async () => {
+      await start(settings([controller()]), [['port-1', NAME]]);
+      expect(status()).toBe('listening');
+      h.midiInput.plug('port-2', NAME);
+
+      const id = h.controllers.ensureController('port-2', NAME);
+
+      expect(id).not.toBe(LAUNCH_CONTROL);
+      expect(h.mappingStore.controllers()).toHaveLength(2);
+      expect(h.mappingStore.controller(LAUNCH_CONTROL)()?.lastPortId).toBe('port-1');
+      expect(h.controllers.controllerForPort('port-2')).toBe(id);
+    });
+
     it('creates a listening controller for an unknown port and saves it', async () => {
       await start(settings([]));
 
@@ -477,6 +647,148 @@ describe('MidiControllers', () => {
       await settle();
 
       expect(h.mappingStore.controller(id)()?.lastPortId).toBe('p2');
+    });
+  });
+
+  describe('repairing duplicate controllers', () => {
+    const MRCC = 'MIDIIN3 (MRCC)';
+    const duplicates = (overrides: Partial<KnownControllerRecord>[] = []) => [
+      controller({
+        id: 'dup-a',
+        name: MRCC,
+        lastPortId: 'input-2',
+        listening: false,
+        ...overrides[0],
+      }),
+      controller({ id: 'dup-b', name: MRCC, lastPortId: 'input-5', ...overrides[1] }),
+    ];
+    const duplicateMappings = () => [
+      { ...speedMapping('dup-a', 7), id: 'speed-a' },
+      { ...speedMapping('dup-b', 7), id: 'speed-b' },
+      selectMapping('select-a', 'dup-a', 20),
+      selectMapping('select-b', 'dup-b', 21),
+    ];
+
+    it('merges the controllers of one name into one with every mapping, keeps distinct sources and drops an exact duplicate', async () => {
+      await start(settings(duplicates(), duplicateMappings()), [['input-0', MRCC]]);
+
+      expect(h.mappingStore.controllers()).toEqual([
+        { id: 'dup-a', name: MRCC, lastPortId: 'input-0', listening: true },
+      ]);
+      expect(h.mappingStore.mappings().map((mapping) => mapping.id)).toEqual([
+        'speed-a',
+        'select-a',
+        'select-b',
+      ]);
+      expect(
+        new Set(h.mappingStore.mappings().map((mapping) => mapping.source.controllerId))
+      ).toEqual(new Set(['dup-a']));
+      expect(status('dup-a')).toBe('listening');
+      expect(status('dup-b')).toBeUndefined();
+      expect(heardFrom('input-0', 21)).toEqual(['dup-a']);
+    });
+
+    it('saves the merged controllers and the rewritten mappings', async () => {
+      await start(settings(duplicates(), duplicateMappings()), [['input-0', MRCC]]);
+
+      const saved = await savedSettings();
+
+      expect(saved.controllers).toEqual([
+        { id: 'dup-a', name: MRCC, lastPortId: 'input-0', listening: true },
+      ]);
+      expect(saved.mappings.map((mapping) => [mapping.id, mapping.source.controllerId])).toEqual([
+        ['speed-a', 'dup-a'],
+        ['select-a', 'dup-a'],
+        ['select-b', 'dup-a'],
+      ]);
+    });
+
+    it('keeps the controller that was on the connected input', async () => {
+      await start(settings(duplicates([{}, { lastPortId: 'input-0' }]), duplicateMappings()), [
+        ['input-0', MRCC],
+      ]);
+
+      expect(h.mappingStore.controllers().map((known) => known.id)).toEqual(['dup-b']);
+      expect(status('dup-b')).toBe('listening');
+      expect(
+        h.mappingStore.mappings().map((mapping) => [mapping.id, mapping.source.controllerId])
+      ).toEqual([
+        ['speed-a', 'dup-b'],
+        ['select-a', 'dup-b'],
+        ['select-b', 'dup-b'],
+      ]);
+    });
+
+    it('merges when no input carries the name, and the merged controller listens once it is plugged in', async () => {
+      await start(settings(duplicates(), duplicateMappings()));
+
+      expect(h.mappingStore.controllers().map((known) => known.id)).toEqual(['dup-a']);
+      expect(status('dup-a')).toBe('missing');
+
+      h.midiInput.plug('input-9', MRCC);
+      await settle();
+
+      expect(status('dup-a')).toBe('listening');
+      expect(heardFrom('input-9', 20)).toEqual(['dup-a']);
+    });
+
+    it('leaves same-named controllers alone while two inputs carry the name', async () => {
+      await start(settings(duplicates(), duplicateMappings()), [
+        ['input-2', MRCC],
+        ['input-5', MRCC],
+      ]);
+
+      expect(h.mappingStore.controllers().map((known) => known.id)).toEqual(['dup-a', 'dup-b']);
+      expect(h.mappingStore.mappings()).toHaveLength(4);
+      expect(h.controllers.controllerForPort('input-2')).toBe('dup-a');
+      expect(h.controllers.controllerForPort('input-5')).toBe('dup-b');
+    });
+
+    it('does not merge controllers of different names', async () => {
+      await start(
+        settings([controller(), controller({ id: 'nano', name: 'Nano', lastPortId: 'input-3' })]),
+        [['input-0', NAME]]
+      );
+
+      expect(h.mappingStore.controllers().map((known) => known.id)).toEqual([
+        LAUNCH_CONTROL,
+        'nano',
+      ]);
+    });
+
+    it('runs once per session and writes nothing when it has nothing to merge', async () => {
+      let repairs!: MockInstance;
+      await start(settings(duplicates(), duplicateMappings()), [['input-0', MRCC]], () => {
+        repairs = vi.spyOn(h.mappingStore, 'repairControllers');
+      });
+      expect(repairs).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(300);
+      const saves = h.repository.save.mock.calls.length;
+      await h.controllers.applyPolicy();
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(repairs).toHaveBeenCalledTimes(1);
+      expect(h.repository.save.mock.calls.length).toBe(saves);
+      expect(h.mappingStore.controllers()).toHaveLength(1);
+
+      await start(settings([controller()]), [['port-1', NAME]], () => {
+        repairs = vi.spyOn(h.mappingStore, 'repairControllers');
+      });
+      expect(repairs).not.toHaveBeenCalled();
+    });
+
+    it('waits for MIDI access, since the inputs are not listed before it', async () => {
+      await start(settings(duplicates(), duplicateMappings()), [['input-0', MRCC]], () =>
+        h.accessState.set('idle')
+      );
+      expect(h.mappingStore.controllers()).toHaveLength(2);
+
+      h.accessState.set('granted');
+      await settle();
+
+      expect(h.mappingStore.controllers()).toHaveLength(1);
     });
   });
 
