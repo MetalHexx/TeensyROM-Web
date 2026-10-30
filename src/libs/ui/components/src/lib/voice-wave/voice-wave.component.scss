@@ -1,0 +1,13 @@
+:host {
+  display: block;
+  box-sizing: border-box;
+  height: 44px;
+  background: var(--synth-display-face);
+  border: 1px solid var(--synth-display-border);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

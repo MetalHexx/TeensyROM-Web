@@ -32,3 +32,4 @@ export * from './lib/voice-wave/wave-protocol';
 export * from './lib/voice-wave/wave-feed-buffer';
 export * from './lib/voice-wave/wave-worker-host';
 export * from './lib/voice-wave/voice-wave-renderer';
+export * from './lib/voice-wave/voice-wave.component';
