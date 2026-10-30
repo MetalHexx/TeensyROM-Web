@@ -1,7 +1,12 @@
 <lib-scaling-compact-card [enableOverflow]="true">
   <div class="preview">
     <lib-content-overlay-container [showOverlaysOnHover]="!selectorOpen()">
-      <lib-video-stream content [stream]="session.stream()" objectFit="contain" />
+      <lib-video-stream
+        content
+        [stream]="session.stream()"
+        objectFit="contain"
+        [disableNativeOverlays]="true"
+      />
 
       <lib-video-device-selector
         topRightCorner

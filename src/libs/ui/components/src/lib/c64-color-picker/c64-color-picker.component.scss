@@ -1,5 +1,6 @@
 :host {
   display: inline-block;
+  min-width: 11rem;
 }
 
 .trigger,
@@ -31,13 +32,21 @@
 }
 
 .trigger {
+  width: 100%;
   padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.trigger-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .trigger-arrow {
   width: 20px;
   height: 20px;
   font-size: 20px;
+  line-height: 20px;
   color: var(--color-dimmed);
 }
 

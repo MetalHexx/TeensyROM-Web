@@ -85,6 +85,14 @@ describe('ThemePreviewComponent', () => {
     expect(el.querySelector('lib-crt-effect-wrapper')).toBeNull();
   });
 
+  it('keeps the browser picture-in-picture and enhance overlays off the preview video', () => {
+    const video = el.querySelector('video') as HTMLVideoElement;
+
+    expect(video.hasAttribute('disablepictureinpicture')).toBe(true);
+    expect(video.hasAttribute('disableremoteplayback')).toBe(true);
+    expect(el.querySelector('lib-video-device-selector')).not.toBeNull();
+  });
+
   it('selects the camera and remembers it for the device', () => {
     fixture.debugElement
       .query(By.directive(VideoDeviceSelectorComponent))
