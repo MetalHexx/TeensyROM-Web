@@ -1,10 +1,59 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  afterRenderEffect,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
+import { moduleMetadata } from '@storybook/angular';
 import type { Meta, StoryObj } from '@storybook/angular';
 import { DeckTransportComponent, DeckTransportModel } from './deck-transport.component';
 
-const meta: Meta<DeckTransportComponent> = {
+/** Sets the playhead readouts once rendered, and whenever a control changes them, the way a
+ *  painter would. */
+@Component({
+  selector: 'lib-deck-transport-live-demo',
+  imports: [DeckTransportComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<lib-deck-transport
+    [model]="model()"
+    (scrubInput)="scrubInput.emit($event)"
+    (scrubCommit)="scrubCommit.emit($event)"
+  />`,
+})
+class LiveDemoComponent {
+  readonly model = input.required<DeckTransportModel>();
+  readonly positionPercent = input(0);
+  readonly elapsedText = input('00:00.0');
+  readonly frameLabel = input('frame 0');
+  readonly scrubInput = output<number>();
+  readonly scrubCommit = output<number>();
+
+  private readonly transport = viewChild.required(DeckTransportComponent);
+
+  constructor() {
+    afterRenderEffect(() => {
+      const transport = this.transport();
+      transport.setLivePosition(this.positionPercent());
+      transport.setLiveElapsed(this.elapsedText());
+      transport.setLiveFrame(this.frameLabel());
+    });
+  }
+}
+
+/** The playhead readouts a painter sets live, as story args. */
+interface LiveArgs {
+  positionPercent: number;
+  elapsedText: string;
+  frameLabel: string;
+}
+
+const meta: Meta<DeckTransportComponent & LiveArgs> = {
   title: 'DJ/Deck Transport',
   component: DeckTransportComponent,
   tags: ['autodocs'],
+  decorators: [moduleMetadata({ imports: [LiveDemoComponent] })],
   parameters: {
     docs: {
       description: {
@@ -16,15 +65,22 @@ const meta: Meta<DeckTransportComponent> = {
           'the end, labelled from about 436px and icon-only from about 336px; below that the ' +
           'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
           'Every state story below shows the transport at 560, 400 and 300px. An error replaces ' +
-          'the display, and each reason is a `role="alert"` line.',
+          'the display, and each reason is a `role="alert"` line. The playhead readouts are ' +
+          'not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and ' +
+          '`setLiveFrame`.',
       },
     },
   },
   argTypes: {
     model: { description: 'Everything the transport draws that does not move per frame.' },
-    positionPercent: { description: '0–100: the live playhead, or the caller’s drag pin.' },
-    elapsedText: { description: "The elapsed time, 'mm:ss.t'." },
-    frameLabel: { description: "The frame readout, e.g. 'frame 1234'." },
+    positionPercent: {
+      description:
+        '0–100: the live playhead, or the caller’s drag pin — set through `setLivePosition`.',
+    },
+    elapsedText: { description: "The elapsed time, 'mm:ss.t' — set through `setLiveElapsed`." },
+    frameLabel: {
+      description: "The frame readout, e.g. 'frame 1234' — set through `setLiveFrame`.",
+    },
     playPauseClick: { description: 'The Play/Pause key was pressed.' },
     stopClick: { description: 'The Stop key was pressed.' },
     repeatTrackChange: { description: 'The Repeat key was pressed; carries the new latch.' },
@@ -38,7 +94,7 @@ const meta: Meta<DeckTransportComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<DeckTransportComponent>;
+type Story = StoryObj<DeckTransportComponent & LiveArgs>;
 
 /** A stopped deck with a three-subtune tune loaded — every story below overrides one group. */
 function baseModel(): DeckTransportModel {
@@ -46,6 +102,7 @@ function baseModel(): DeckTransportModel {
     accessibleName: 'Transport deck A',
     state: 'stopped',
     stateLabel: 'Stop',
+    held: false,
     title: 'Last Ninja 2 - The Wilderness',
     author: 'Ben Daglish',
     emptyText: 'No tune — drop a SID here',
@@ -96,7 +153,7 @@ const atEveryWidth: Story['render'] = (args) => ({
     <div style="display: flex; flex-direction: column; gap: 1rem">
       @for (width of widths; track width) {
         <div [style.width.px]="width">
-          <lib-deck-transport
+          <lib-deck-transport-live-demo
             [model]="model"
             [positionPercent]="positionPercent"
             [elapsedText]="elapsedText"
@@ -129,6 +186,18 @@ export const Paused: Story = {
   render: atEveryWidth,
 };
 
+/** A finger is on the strip: the state word reads Held and its light is steady amber, over a
+ *  paused deck — the Play key keeps its own blinking amber light. */
+export const Held: Story = {
+  args: {
+    model: { ...baseModel(), state: 'paused', stateLabel: 'Held', held: true },
+    positionPercent: 42,
+    elapsedText: '01:20.7',
+    frameLabel: 'frame 4035',
+  },
+  render: atEveryWidth,
+};
+
 export const Stopped: Story = {
   args: { model: baseModel(), positionPercent: 0, elapsedText: '00:00.0', frameLabel: 'frame 0' },
   render: atEveryWidth,
@@ -140,9 +209,30 @@ export const WithMarks: Story = {
     model: {
       ...playingModel(),
       marks: [
-        { id: 'a', kind: 'loop', startPercent: 18, endPercent: 34, activity: 'running', selected: true },
-        { id: 'b', kind: 'loop', startPercent: 48, endPercent: 60, activity: 'queued', selected: false },
-        { id: 'c', kind: 'cue', startPercent: 78, endPercent: null, activity: 'idle', selected: false },
+        {
+          id: 'a',
+          kind: 'loop',
+          startPercent: 18,
+          endPercent: 34,
+          activity: 'running',
+          selected: true,
+        },
+        {
+          id: 'b',
+          kind: 'loop',
+          startPercent: 48,
+          endPercent: 60,
+          activity: 'queued',
+          selected: false,
+        },
+        {
+          id: 'c',
+          kind: 'cue',
+          startPercent: 78,
+          endPercent: null,
+          activity: 'idle',
+          selected: false,
+        },
       ],
     },
     positionPercent: 26,
@@ -307,7 +397,7 @@ export const MidScrub: Story = {
     },
     template: `
       <div style="width: 400px">
-        <lib-deck-transport
+        <lib-deck-transport-live-demo
           [model]="model"
           [positionPercent]="positionPercent"
           [elapsedText]="elapsedText"

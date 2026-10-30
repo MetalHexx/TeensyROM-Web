@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
+import type { LiveProgressIndicator } from '../shared/live-indicator';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 
 /** Whether a loop or cue is idle, queued to fire at the next boundary, or running now. */
@@ -32,16 +41,20 @@ export interface LoopTileModel {
  * timeline. Purely presentational: it computes no time or percentage and the caller supplies every
  * label.
  *
- * A loop's timeline fills to `progressPercent` with a playhead while running; a cue draws a single
- * magenta tick. A selected tile carries `aria-current` and a cyan ring. A small lit dot beside the
- * name marks a marker that keeps its own settings; it is decorative, so the caller puts the same
- * fact into `selectAccessibleName`.
+ * A loop's timeline fills, with a playhead, while running; a cue draws a single magenta tick. How
+ * far it fills is `--loop-tile-progress`, a percentage: a painter sets it as the running loop's lap
+ * moves through `setLiveProgress`, which writes it straight on the timeline, so the lap never
+ * passes through an input and restyles only the fill and the playhead, which move by `scale` and
+ * `translate` alone. Until then the tile inherits it, so a caller can also set it above the tile.
+ * A selected tile carries `aria-current` and a cyan ring. A small lit dot beside the name
+ * marks a marker that keeps its own settings; it is decorative, so the caller puts the same fact
+ * into `selectAccessibleName`.
  *
  * @example
  * ```html
  * <lib-loop-tile
  *   [model]="tile"
- *   [progressPercent]="53"
+ *   style="--loop-tile-progress: 53%"
  *   (trigger)="onTrigger(tile.id)"
  *   (playNow)="onPlayNow(tile.id)"
  *   (selectTile)="onSelect(tile.id)"
@@ -61,11 +74,9 @@ export interface LoopTileModel {
     '[attr.data-ready]': 'model().ready',
   },
 })
-export class LoopTileComponent {
+export class LoopTileComponent implements LiveProgressIndicator {
   /** The tile's state. */
   readonly model = input.required<LoopTileModel>();
-  /** 0–100; drawn only while the tile is running. */
-  readonly progressPercent = input<number>(0);
   /** Emits when the trigger key is pressed. */
   readonly trigger = output<void>();
   /** Emits when the play-now key is pressed. */
@@ -84,5 +95,19 @@ export class LoopTileComponent {
     }
   });
 
-  protected readonly clampedProgress = computed(() => Math.min(100, Math.max(0, this.progressPercent())));
+  private readonly timeline = viewChild.required<ElementRef<HTMLElement>>('timeline');
+  /** The progress as last set; null until it is, so an inherited one shows. */
+  private liveProgress: number | null = null;
+
+  /** Sets how far a running loop's timeline fills, 0–100: held to that range, and 0 when not a
+   *  number. Writes `--loop-tile-progress` on the timeline directly — no signal, no change
+   *  detection — and only when it changed. Valid once the view has rendered. */
+  setLiveProgress(percent: number): void {
+    const clamped = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+    if (clamped === this.liveProgress) {
+      return;
+    }
+    this.liveProgress = clamped;
+    this.timeline().nativeElement.style.setProperty('--loop-tile-progress', `${clamped}%`);
+  }
 }

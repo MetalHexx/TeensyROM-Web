@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import {
   LaunchMode,
   PlayerStatus,

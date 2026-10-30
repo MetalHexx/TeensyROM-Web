@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { frames } from '@sidablist/core';
 import type { MappableControl } from './mappable-controls';
 import { logWarn } from '@teensyrom-nx/utils';
+import { DeckRuntime } from '../deck-runtime';
 import {
   DECK_CONTROL_IDS,
   SET_CONTROL_IDS,
@@ -130,15 +132,25 @@ describe('MappableControls', () => {
       expect(speed.read()).toBe(1.2);
     });
 
-    it('seek reads the scrub position as a percentage', () => {
+    it("seek reads the engine's live playhead as a percentage, not the store's last sample", () => {
       h.djStore.setDeckStructure({
         slot: 'A',
         structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
         lengthFrames: 200,
       });
-      h.djStore.samplePosition({ slot: 'A', positionFrames: 50 });
+      h.djStore.samplePosition({ slot: 'A', positionFrames: 10 });
+      vi.spyOn(TestBed.inject(DeckRuntime), 'position').mockReturnValue(frames(50));
 
       expect(pick('A', 'seek', 'value').read()).toBe(25);
+    });
+
+    it("seek carries its deck's hand, and no other control carries one", () => {
+      const withHand = h.controls.all
+        .filter((control) => control.nature === 'value' && control.hand !== undefined)
+        .map((control) => controlKey(control.identity));
+
+      expect(withHand).toEqual(['A:seek', 'B:seek']);
+      expect(pick('A', 'seek', 'value').hand).not.toBe(pick('B', 'seek', 'value').hand);
     });
 
     it('declares each value control with its range, home, step and CC defaults', () => {

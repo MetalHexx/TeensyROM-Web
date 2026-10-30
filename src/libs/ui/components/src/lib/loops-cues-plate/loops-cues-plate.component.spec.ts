@@ -255,4 +255,18 @@ describe('LoopsCuesPlateComponent', () => {
       expect(names).toEqual(['Item 1', 'Item 2', 'Item 3']);
     });
   });
+
+  it("hands a live progress to the grid, for the running tile's timeline", () => {
+    setModel(model({ tiles: [tile(1), tile(2, { activity: 'running' })] }));
+
+    fixture.componentInstance.setLiveProgress(42);
+
+    const grid = fixture.nativeElement.querySelector('lib-loop-tile-grid') as HTMLElement;
+    const timelines = Array.from<HTMLElement>(grid.querySelectorAll('.timeline'));
+    expect(timelines.map((t) => t.style.getPropertyValue('--loop-tile-progress'))).toEqual([
+      '',
+      '42%',
+    ]);
+    expect(grid.querySelectorAll('.fill')).toHaveLength(1);
+  });
 });

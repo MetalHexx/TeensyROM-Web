@@ -5,9 +5,9 @@ import type { TuneIndexRecord } from '@sidablist/analysis';
 import { WorkerAnalysisScanner } from './worker-analysis-scanner';
 
 /**
- * `TuneIndexer` over a worker-backed `WorkerAnalysisScanner` — the application's only reach into
- * `analysis`, and it stays inside this module (see `providers.ts`). One scanner for the app's
- * whole lifetime: `@Injectable({ providedIn: 'root' })`, never disposed. The scanner itself starts
+ * `TuneIndexer` over a worker-backed `WorkerAnalysisScanner` — with `WorkerRegisterRecorder`, the
+ * application's only reach into `analysis`, and it stays inside this module (see `providers.ts`).
+ * One scanner for the app's whole lifetime:`@Injectable({ providedIn: 'root' })`, never disposed. The scanner itself starts
  * its worker lazily, on the first scan — see `WorkerAnalysisScanner` — so a session that never
  * indexes a tune never pays for the worker either.
  */

@@ -131,7 +131,7 @@ export interface ControlIdentity {
  *  is on only while its key is down. */
 export type ControlNature = 'trigger' | 'state' | 'value' | 'hold';
 
-export type MidiSourceKind = 'note' | 'cc';
+export type MidiSourceKind = 'note' | 'cc' | 'pitch-bend';
 
 export interface MidiSource {
   readonly controllerId: string;
@@ -146,6 +146,8 @@ export interface MappingStyle {
   readonly kind: MappingStyleKind;
   /** A fraction of the control's range; `null` for every kind that takes none. */
   readonly amount: number | null;
+  /** The hand's grip in seconds from a standstill to normal speed; present only on a `hand` style. */
+  readonly grip?: number;
 }
 
 export interface ControlMapping {
@@ -162,10 +164,12 @@ export interface KnownController {
   readonly listening: boolean;
 }
 
-/** One decoded message from a source: `value` is 0–127 and `pressed` is its key edge state. */
+/** One decoded message from a source: `value` is 0–127 (0–16383 for a pitch bend), `pressed` is
+ *  its key edge state and `timeStampMs` is when it arrived. */
 export interface SourceEvent extends MidiSource {
   readonly value: number;
   readonly pressed: boolean;
+  readonly timeStampMs: number;
 }
 
 const CONTROL_IDS: ReadonlySet<string> = new Set<string>([...DECK_CONTROL_IDS, ...SET_CONTROL_IDS]);

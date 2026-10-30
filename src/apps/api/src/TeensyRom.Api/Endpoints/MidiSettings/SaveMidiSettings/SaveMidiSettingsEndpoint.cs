@@ -23,6 +23,8 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                     "- Each mapping source names a controller in the same request, and no two mappings share a source\n" +
                     "- Mapping owner is A, B, mixer or set; the control must be a known deck control (A, B) or a set control (set: set-select, set-load-a, set-load-b); the mixer owns none\n" +
                     "- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed, step and step-release, optional (range-checked) for hold, and null otherwise\n" +
+                    "- A pitch-bend source (number 0) pairs only with the hand style, and a hand style only with a pitch-bend source; it drives only a deck's seek control\n" +
+                    "- A hand style needs a reach (amount, 0.02-2 seconds) and a grip (0.05-3 seconds); grip must be null for every other style\n" +
                     "- Deck slots are A or B, each bound at most once, to different devices\n\n" +
                     "Anything outside these rules is rejected with a 400 and nothing is written."
                 );

@@ -108,6 +108,39 @@ public class MidiSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Save_ThenGetFromNewService_RoundTripsAHandMappingWithItsGrip()
+    {
+        var hand = new MidiControlMapping
+        {
+            Id = "m3",
+            Source = new MidiSource { ControllerId = "c1", Channel = 1, Kind = "pitch-bend", Number = 0 },
+            Owner = "A",
+            Control = "seek",
+            Style = new MidiMappingStyle { Kind = "hand", Amount = 0.13, Grip = 0.25 }
+        };
+
+        new MidiSettingsService(_log).Save(new MidiSettings { Mappings = [hand] }).Should().BeTrue();
+        var loaded = new MidiSettingsService(_log).Get();
+
+        loaded.Mappings.Should().Equal(hand);
+    }
+
+    [Fact]
+    public void Get_WhenAStoredStyleHasNoGrip_LoadsItWithGripNull()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        File.WriteAllText(_filePath, """
+            {"mappings":[{"id":"m1","source":{"controllerId":"c1","channel":1,"kind":"cc","number":21},
+            "owner":"A","control":"speed","style":{"kind":"relative-offset","amount":0.01}}]}
+            """);
+
+        var settings = new MidiSettingsService(_log).Get();
+
+        settings.Mappings.Should().ContainSingle().Which.Style.Should().BeEquivalentTo(
+            new MidiMappingStyle { Kind = "relative-offset", Amount = 0.01, Grip = null });
+    }
+
+    [Fact]
     public void Save_ReturnsTrue_WritesTheFileAndUpdatesTheCache()
     {
         var service = new MidiSettingsService(_log);

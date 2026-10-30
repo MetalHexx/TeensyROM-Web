@@ -50,7 +50,11 @@ function toMappingRecord(dto: MidiControlMappingDto): ControlMappingRecord {
     },
     owner: dto.owner as ControlMappingRecord['owner'],
     control: dto.control,
-    style: { kind: dto.style.kind as MappingStyleKind, amount: dto.style.amount ?? null },
+    style: {
+      kind: dto.style.kind as MappingStyleKind,
+      amount: dto.style.amount ?? null,
+      ...(dto.style.grip == null ? {} : { grip: dto.style.grip }),
+    },
   };
 }
 
@@ -77,7 +81,11 @@ function toMappingDto(record: ControlMappingRecord): MidiControlMappingDto {
     source: { ...record.source },
     owner: record.owner,
     control: record.control,
-    style: { kind: record.style.kind, amount: record.style.amount },
+    style: {
+      kind: record.style.kind,
+      amount: record.style.amount,
+      grip: record.style.grip ?? null,
+    },
   };
 }
 

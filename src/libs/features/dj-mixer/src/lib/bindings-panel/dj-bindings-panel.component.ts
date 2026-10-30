@@ -11,6 +11,8 @@ import {
 import { MatSlideToggle, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {
   DECK_SLOTS,
+  HAND_GRIP_SECONDS,
+  HAND_REACH_SECONDS,
   MappableControls,
   MidiControllers,
   MidiLearn,
@@ -34,6 +36,7 @@ import {
   type ControllerStatus,
   type KnownController,
   type MappableControl,
+  type MappingStyle,
   type MappingStyleKind,
   type StyleAction,
   type StyleTrigger,
@@ -74,6 +77,9 @@ const CONTROLLER_STATUS_TEXT: Record<ControllerStatus, string> = {
 /** The one place the percent shown in the panel meets the fraction the mapping keeps. */
 const PERCENT = 100;
 
+/** The one place the milliseconds shown for a hand meet the seconds the mapping keeps. */
+const MS_PER_SECOND = 1000;
+
 /** The statuses whose controller has no port the app can use, and so offers a port to choose. */
 const PORTLESS_STATUSES: readonly ControllerStatus[] = ['missing', 'unmatched'];
 
@@ -108,6 +114,35 @@ function ownerHeading(owner: ControlOwner): string {
 /** A fraction as the percent the panel shows, to the one decimal the style chip uses. */
 function toPercent(amount: number): number {
   return Number((amount * PERCENT).toFixed(1));
+}
+
+/** Seconds as the whole milliseconds the panel shows. */
+function toMilliseconds(seconds: number): number {
+  return Math.round(seconds * MS_PER_SECOND);
+}
+
+/** A hand's Reach, in milliseconds. */
+function reachField(style: MappingStyle): BindingRowAmount {
+  return {
+    label: 'Reach',
+    value: toMilliseconds(style.amount ?? HAND_REACH_SECONDS.home),
+    min: toMilliseconds(HAND_REACH_SECONDS.min),
+    max: toMilliseconds(HAND_REACH_SECONDS.max),
+    step: 10,
+    suffix: 'ms',
+  };
+}
+
+/** A hand's Grip, in milliseconds. */
+function gripField(style: MappingStyle): BindingRowAmount {
+  return {
+    label: 'Grip',
+    value: toMilliseconds(style.grip ?? HAND_GRIP_SECONDS.home),
+    min: toMilliseconds(HAND_GRIP_SECONDS.min),
+    max: toMilliseconds(HAND_GRIP_SECONDS.max),
+    step: 10,
+    suffix: 'ms',
+  };
 }
 
 /** The amount field for a style that takes one, or `null`. The field works in percent, and the
@@ -321,10 +356,31 @@ export class DjBindingsPanelComponent {
     });
   }
 
-  onAmountChange(row: BindingRowView, percent: number): void {
+  /** Saves the amount: a hand's Reach (milliseconds, keeping its Grip) or the percent of any other
+   *  style. */
+  onAmountChange(row: BindingRowView, value: number): void {
+    const style = row.mapping.style;
+    if (style.kind === 'hand') {
+      this.midiMappings.setStyle(row.mapping.id, {
+        kind: 'hand',
+        amount: value / MS_PER_SECOND,
+        grip: style.grip,
+      });
+      return;
+    }
+    this.midiMappings.setStyle(row.mapping.id, { kind: style.kind, amount: value / PERCENT });
+  }
+
+  /** Saves a hand's Grip (milliseconds), keeping its Reach. */
+  onSecondAmountChange(row: BindingRowView, ms: number): void {
+    const style = row.mapping.style;
+    if (style.kind !== 'hand') {
+      return;
+    }
     this.midiMappings.setStyle(row.mapping.id, {
-      kind: row.mapping.style.kind,
-      amount: percent / PERCENT,
+      kind: 'hand',
+      amount: style.amount,
+      grip: ms / MS_PER_SECOND,
     });
   }
 
@@ -377,7 +433,11 @@ export class DjBindingsPanelComponent {
                 label: describeTrigger(edge, mapping.source.kind),
               })),
         selectedTriggerId: trigger,
-        amount: amountField(control, mapping.style.kind, mapping.style.amount),
+        amount:
+          mapping.style.kind === 'hand'
+            ? reachField(mapping.style)
+            : amountField(control, mapping.style.kind, mapping.style.amount),
+        secondAmount: mapping.style.kind === 'hand' ? gripField(mapping.style) : null,
         statusText: BINDING_STATUS_TEXT[statuses[mapping.source.controllerId] ?? 'missing'],
         editAccessibleName: `Edit ${control.name} binding, ${owner}`,
         deleteAccessibleName: `Delete ${control.name} binding, ${owner}`,

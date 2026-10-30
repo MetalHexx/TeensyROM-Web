@@ -24,6 +24,7 @@ import { voicePitchMultiplier } from './mixer/pitch';
 import {
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
 } from './ports';
 import type {
@@ -203,6 +204,10 @@ describe('DeckLoops', () => {
           },
         },
         {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
+        {
           provide: REPLAY_RUNNER_FACTORY,
           useValue: (): ReplayRunner => {
             const index = created++;
@@ -248,6 +253,7 @@ describe('DeckLoops', () => {
         speed: tempo.multiplier,
         faderSpeed: deck.faderSpeed,
         nudging: deck.nudging,
+        varispeed: false,
         voices,
       });
     }

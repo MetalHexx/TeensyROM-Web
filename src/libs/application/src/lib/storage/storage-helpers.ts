@@ -4,7 +4,7 @@ import { StorageState, StorageDirectoryState, NavigationHistory } from './storag
 import { StorageKey, StorageKeyUtil } from './storage-key.util';
 import { StorageType, IStorageService } from '@teensyrom-nx/domain';
 import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../with-devtools';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 

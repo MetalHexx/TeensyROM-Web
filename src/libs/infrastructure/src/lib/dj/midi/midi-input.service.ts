@@ -1,6 +1,11 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { logError, logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
-import type { IMidiInput, MidiInputMessage, MidiInputOpenResult } from '@teensyrom-nx/application';
+import {
+  PITCH_BEND_CENTRE,
+  type IMidiInput,
+  type MidiInputMessage,
+  type MidiInputOpenResult,
+} from '@teensyrom-nx/application';
 import { MidiAccessService, type MIDIInputLike } from './midi-access.service';
 
 type MidiInputListener = (message: MidiInputMessage) => void;
@@ -52,7 +57,8 @@ export class MidiInputService implements IMidiInput {
       return 'unavailable';
     }
 
-    input.onmidimessage = (event) => this.handle(portId, event.data);
+    input.onmidimessage = (event) =>
+      this.handle(portId, event.data, event.timeStamp ?? performance.now());
     this.opened.set(portId, input);
     logInfo(LogType.Midi, `MIDI: input "${portId}" opened.`);
     return 'open';
@@ -83,8 +89,8 @@ export class MidiInputService implements IMidiInput {
     };
   }
 
-  private handle(portId: string, data: Uint8Array | null): void {
-    const message = decode(portId, data);
+  private handle(portId: string, data: Uint8Array | null, timeStampMs: number): void {
+    const message = decode(portId, data, timeStampMs);
     if (message === null) {
       return;
     }
@@ -98,9 +104,13 @@ export class MidiInputService implements IMidiInput {
   }
 }
 
-/** A note or CC message, or null for anything else — malformed data, system messages and every
- *  channel message type other than note-on, note-off and control change. */
-function decode(portId: string, data: Uint8Array | null): MidiInputMessage | null {
+/** A note, CC or pitch bend message, or null for anything else — malformed data, system messages
+ *  and every channel message type other than note-on, note-off, control change and pitch bend. */
+function decode(
+  portId: string,
+  data: Uint8Array | null,
+  timeStampMs: number
+): MidiInputMessage | null {
   if (data === null || data.length < 3) {
     return null;
   }
@@ -117,11 +127,32 @@ function decode(portId: string, data: Uint8Array | null): MidiInputMessage | nul
   const channel = (status & 0x0f) + 1;
   switch (status & 0xf0) {
     case 0x90:
-      return { portId, kind: 'note', channel, number, value, pressed: value > 0 };
+      return { portId, kind: 'note', channel, number, value, pressed: value > 0, timeStampMs };
     case 0x80:
-      return { portId, kind: 'note', channel, number, value: 0, pressed: false };
+      return { portId, kind: 'note', channel, number, value: 0, pressed: false, timeStampMs };
     case 0xb0:
-      return { portId, kind: 'cc', channel, number, value, pressed: value >= CC_PRESSED_THRESHOLD };
+      return {
+        portId,
+        kind: 'cc',
+        channel,
+        number,
+        value,
+        pressed: value >= CC_PRESSED_THRESHOLD,
+        timeStampMs,
+      };
+    case 0xe0: {
+      // The first data byte is the least significant 7 bits, the second the most.
+      const bend = (value << 7) | number;
+      return {
+        portId,
+        kind: 'pitch-bend',
+        channel,
+        number: 0,
+        value: bend,
+        pressed: bend !== PITCH_BEND_CENTRE,
+        timeStampMs,
+      };
+    }
     default:
       return null;
   }

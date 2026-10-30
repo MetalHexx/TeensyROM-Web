@@ -30,6 +30,13 @@ const RECORD: MidiSettingsRecord = {
       control: 'set-select',
       style: { kind: 'relative-offset', amount: 1 },
     },
+    {
+      id: 'm4',
+      source: { controllerId: 'nano', channel: 1, kind: 'pitch-bend', number: 0 },
+      owner: 'A',
+      control: 'seek',
+      style: { kind: 'hand', amount: 0.13, grip: 0.25 },
+    },
   ],
   deckBindings: [
     { slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' },
@@ -71,5 +78,19 @@ describe('midi settings mapper', () => {
     expect(request.controllers[1].lastPortId).toBeNull();
     expect(request.mappings[0].style.amount).toBeNull();
     expect(request.mappings[1].style.amount).toBe(0.25);
+  });
+
+  it('sends a hand grip and null for a style without one, and omits a missing grip on load', () => {
+    const request = toSaveMidiSettingsRequest(RECORD);
+
+    expect(request.mappings[3].style).toEqual({ kind: 'hand', amount: 0.13, grip: 0.25 });
+    expect(request.mappings[0].style.grip).toBeNull();
+
+    const record = toMidiSettingsRecord({
+      controllers: [],
+      mappings: [{ ...request.mappings[0], style: { kind: 'press', amount: null, grip: null } }],
+      deckBindings: [],
+    });
+    expect(record.mappings[0].style).toEqual({ kind: 'press', amount: null });
   });
 });

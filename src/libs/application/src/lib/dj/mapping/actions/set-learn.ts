@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../../with-devtools';
 import { createAction } from '@teensyrom-nx/utils';
 import type { WritableStore } from '../../dj-store';
 import type { LearnState, MidiMappingState } from '../midi-mapping-store';

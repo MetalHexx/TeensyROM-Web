@@ -2,6 +2,8 @@ import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, computed, inject } from '@angular/core';
 import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
+import type { HandTarget } from '../deck-hand';
+import { HAND_GRIP_SECONDS } from './hand-settings';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { relativeTicks, type RelativeStyleKind } from './mapping-styles';
 import {
@@ -24,6 +26,14 @@ interface ActiveHold {
   readonly control: HoldControl;
 }
 
+/** A strip mapped as a hand with a finger on it: lifted by its source going away or by one of the
+ *  engine's release paths. */
+interface ActiveHand {
+  readonly mappingId: string;
+  readonly controllerId: string;
+  readonly hand: HandTarget;
+}
+
 /** Absorbs floating-point error when a sum of fractional ticks lands a hair under a whole step. */
 const STEP_EPSILON = 1e-9;
 
@@ -43,7 +53,8 @@ function quantize(control: ValueControl, value: number): number {
  * on the key-down edge and the release kinds (`release`, `latch-release`, `on-release`,
  * `off-release`, `step-release`) on the key-up edge; a release with no press seen is no edge. A
  * hold must never stay stuck, so it is let go by its release edge, by `releaseHolds` (a controller
- * going away), by `releaseMapping` (its mapping removed or moved) and by the page being hidden.
+ * going away), by `releaseMapping` (its mapping removed or moved) and by the page being hidden. A
+ * pitch bend strip mapped as a hand is let go the same ways, as a lift.
  */
 @Injectable({ providedIn: 'root' })
 export class MidiMappingEngine {
@@ -61,6 +72,8 @@ export class MidiMappingEngine {
   private readonly remainders = new Map<string, number>();
   /** Active holds by source key. */
   private readonly holds = new Map<string, ActiveHold>();
+  /** Strips mapped as a hand with a finger on them, by source key. */
+  private readonly hands = new Map<string, ActiveHand>();
   private readonly warnedControls = new Set<string>();
 
   constructor() {
@@ -130,6 +143,16 @@ export class MidiMappingEngine {
           this.applyHold(mapping, control, event, pressEdge, releaseEdge);
         }
         return;
+      case 'hand':
+        if (
+          event.kind === 'pitch-bend' &&
+          control.nature === 'value' &&
+          control.hand !== undefined &&
+          amount !== null
+        ) {
+          this.applyHand(mapping, control.hand, event, amount);
+        }
+        return;
       case 'absolute':
         if (event.kind === 'cc' && control.nature === 'value' && !control.wholeSteps) {
           const fraction = event.value / 127;
@@ -155,13 +178,19 @@ export class MidiMappingEngine {
     }
   }
 
-  /** Lets go of every active hold, or only those of one controller, and forgets the key states
-   *  of the same scope so the next press is a fresh edge. */
+  /** Lets go of every active hold and hand, or only those of one controller, and forgets the key
+   *  states of the same scope so the next press is a fresh edge. */
   releaseHolds(controllerId?: string): void {
     for (const [key, hold] of [...this.holds]) {
       if (controllerId === undefined || hold.controllerId === controllerId) {
         this.holds.delete(key);
         this.letGo(hold);
+      }
+    }
+    for (const [key, active] of [...this.hands]) {
+      if (controllerId === undefined || active.controllerId === controllerId) {
+        this.hands.delete(key);
+        this.loseHand(active);
       }
     }
     if (controllerId === undefined) {
@@ -176,18 +205,26 @@ export class MidiMappingEngine {
     }
   }
 
-  /** Whether the source's key is down on a hold, so its release is what lets the hold go. */
+  /** Whether the source's key is down on a hold, or a finger is on it as a hand, so its release is
+   *  what lets that go. */
   isHolding(source: MidiSource): boolean {
-    return this.holds.has(sourceKey(source));
+    const key = sourceKey(source);
+    return this.holds.has(key) || this.hands.has(key);
   }
 
-  /** Lets go of the mapping's hold and drops its edge and accumulator state. Call it before the
-   *  mapping is removed or moved to another source. */
+  /** Lets go of the mapping's hold or hand and drops its edge and accumulator state. Call it before
+   *  the mapping is removed or moved to another source. */
   releaseMapping(mappingId: string): void {
     for (const [key, hold] of [...this.holds]) {
       if (hold.mappingId === mappingId) {
         this.holds.delete(key);
         this.letGo(hold);
+      }
+    }
+    for (const [key, active] of [...this.hands]) {
+      if (active.mappingId === mappingId) {
+        this.hands.delete(key);
+        this.loseHand(active);
       }
     }
     this.remainders.delete(mappingId);
@@ -212,6 +249,27 @@ export class MidiMappingEngine {
       this.holds.delete(key);
       control.set(false, null);
     }
+  }
+
+  /** Passes the strip's value to the deck's hand; the hand reads a return to centre as the lift. */
+  private applyHand(
+    mapping: ControlMapping,
+    hand: HandTarget,
+    event: SourceEvent,
+    reachSeconds: number
+  ): void {
+    const key = sourceKey(event);
+    if (!event.pressed) {
+      this.hands.delete(key);
+    } else if (!this.hands.has(key)) {
+      this.hands.set(key, { mappingId: mapping.id, controllerId: event.controllerId, hand });
+    }
+    hand.strip(
+      event.value,
+      event.timeStampMs,
+      reachSeconds,
+      mapping.style.grip ?? HAND_GRIP_SECONDS.home
+    );
   }
 
   private applyRelative(
@@ -279,6 +337,19 @@ export class MidiMappingEngine {
     } catch (error) {
       logWarn(
         `MidiMappingEngine: releasing ${controlKey(hold.control.identity)} failed — ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  /** Lifts a hand, logging rather than throwing so one failing lift cannot strand the rest. */
+  private loseHand(active: ActiveHand): void {
+    try {
+      active.hand.lose();
+    } catch (error) {
+      logWarn(
+        `MidiMappingEngine: lifting mapping ${active.mappingId}'s hand failed — ${
           error instanceof Error ? error.message : String(error)
         }`
       );

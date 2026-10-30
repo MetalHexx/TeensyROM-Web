@@ -9,7 +9,12 @@ import { MixerService } from './mixer.service';
 import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, HOME_DECK_PANEL, type DeckDetectedKey } from './dj-store';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  REGISTER_RECORDER_FACTORY,
+  MIDI_ACCESS,
+} from './ports';
 import type {
   IMidiAccess,
   MidiAccessState,
@@ -90,6 +95,10 @@ describe('MixerService', () => {
       providers: [
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess() },
         { provide: DeckLoops, useValue: { saveSettingsInPlay } },
       ],
@@ -314,6 +323,7 @@ describe('MixerService', () => {
         speed: 1.25,
         faderSpeed: 1.25,
         nudging: false,
+        varispeed: false,
         voices: [
           { muted: true, held: false },
           { muted: false, held: true },

@@ -11,13 +11,13 @@ Standards for implementing NgRx Signal Store state with async/await patterns, en
 
 ## Critical State Mutation Requirement
 
-**REQUIRED**: All store actions MUST use `updateState()` from `@angular-architects/ngrx-toolkit` with an `actionMessage` parameter - **never** `patchState()` from `@ngrx/signals`.
+**REQUIRED**: All store actions MUST use `updateState()` with an `actionMessage` parameter - **never** `patchState()` from `@ngrx/signals`. Import `updateState` and `withDevtools` from `libs/application/src/lib/with-devtools.ts`, never from `@angular-architects/ngrx-toolkit` directly: the wrappers switch Redux DevTools sync off in production builds, where it costs main-thread time on every store write (lint enforces this).
 
 `patchState()` does not support `actionMessage`, so mutations using it cannot be correlated in Redux DevTools, multi-step operations can't be traced, and debugging complex state flows becomes very difficult (this was the root cause of a real production bug where state updates silently failed to be traceable).
 
 ```typescript
 // CORRECT
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools'; // libs/application/src/lib/with-devtools.ts
 import { createAction } from '@teensyrom-nx/utils';
 
 export function someAction(store: WritableStore<DomainState>) {

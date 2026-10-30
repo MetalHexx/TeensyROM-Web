@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../with-devtools';
 import { FileItemType, LaunchMode, PlayerStatus } from '@teensyrom-nx/domain';
 import { createPlayerHarness, type PlayerHarness } from './testing/player-context-harness';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';

@@ -9,9 +9,11 @@ import {
   DeviceStore,
   DjStore,
   MARKER_NAME_MAX_LENGTH,
+  PlayheadPainter,
   type DeckBindingState,
   type DeckBindingSummary,
   type DeckLoopsSummary,
+  type DeckPlayheadTargets,
   type DeckSetSummary,
   type DeckTransportSummary,
   type LoopItemSummary,
@@ -42,17 +44,15 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
     showing: 'play',
     controlsDisabled: true,
     canStop: false,
-    scrubPercent: 0,
     bar: { kind: 'unknown' },
-    frameLabel: 'frame 0',
     title: null,
     author: null,
-    elapsedText: '00:00.0',
     totalText: '--:--',
     subtuneText: 'Subtune 0 of 0',
     subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
+    held: false,
     errors: [],
     ...overrides,
   };
@@ -152,6 +152,16 @@ function createDeckServiceStub() {
   };
 }
 
+/** The painter the column hands its readouts to; the detach it returns is recorded. */
+function createPlayheadPainterStub() {
+  const detach = vi.fn();
+  return {
+    attach: vi.fn<(slot: Slot, targets: DeckPlayheadTargets) => () => void>(() => detach),
+    pin: vi.fn(),
+    detach,
+  };
+}
+
 function deckSetSummary(overrides: Partial<DeckSetSummary> = {}): DeckSetSummary {
   return {
     available: false,
@@ -186,7 +196,6 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
   const bindingSummary = signal(idleBindingSummary(options.binding));
   const loopsSummary = signal(emptyLoopsSummary(options.loops));
   const deckSet = signal(deckSetSummary(options.set));
-  const loopLapPercent = signal(0);
   const settingsInPlay = signal<SettingsInPlaySummary>({ markerId: null, name: 'Main' });
   const deckState = signal({
     subtune: options.subtune ?? 0,
@@ -213,6 +222,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     lastError: null,
   });
   const deckService = createDeckServiceStub();
+  const painter = createPlayheadPainterStub();
 
   TestBed.configureTestingModule({
     imports: [DjDeckColumnComponent],
@@ -225,7 +235,6 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
           bindingSummary: () => bindingSummary,
           loopsSummary: () => loopsSummary,
           deckSetSummary: () => deckSet,
-          loopLapPercent: () => loopLapPercent,
           settingsInPlay: () => settingsInPlay,
           deck: () => deckState,
           canShape: () => signal(false),
@@ -234,6 +243,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
         },
       },
       { provide: DeckService, useValue: deckService },
+      { provide: PlayheadPainter, useValue: painter },
       { provide: DeviceStore, useValue: { devices } },
     ],
   });
@@ -249,10 +259,10 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     bindingSummary,
     loopsSummary,
     deckSet,
-    loopLapPercent,
     settingsInPlay,
     deckState,
     deckService,
+    painter,
     devices,
     bindings,
     midi,
@@ -269,6 +279,7 @@ function renderLive(deck: DeckRef) {
     providers: [
       provideNoopAnimations(),
       { provide: DeckService, useValue: deckService },
+      { provide: PlayheadPainter, useValue: createPlayheadPainterStub() },
       { provide: DeviceStore, useValue: { devices: signal<Device[]>([]) } },
     ],
   });
@@ -572,27 +583,13 @@ describe('DjDeckColumnComponent', () => {
       expect(row.start.disabled).toBe(true);
     });
 
-    it('hands the transport the markers and the plate the lap, from the store', () => {
-      const { fixture, loopsSummary, loopLapPercent } = render(DECK_B);
+    it('hands the transport the markers from the store', () => {
+      const { fixture, loopsSummary } = render(DECK_B);
       const items = [loopItem({ activity: 'running' })];
       loopsSummary.set(emptyLoopsSummary({ hasTune: true, items }));
-      loopLapPercent.set(42);
       fixture.detectChanges();
 
       expect(transport(fixture).model().marks).toEqual(items);
-      expect(plate(fixture).runningProgressPercent()).toBe(42);
-    });
-
-    it('does not rebuild the plate model when only the lap changes', () => {
-      const { fixture, loopLapPercent } = render(DECK_B, {
-        loops: { hasTune: true, items: [loopItem()] },
-      });
-      const before = fixture.componentInstance.plateModel();
-
-      loopLapPercent.set(77);
-      fixture.detectChanges();
-
-      expect(fixture.componentInstance.plateModel()).toBe(before);
     });
 
     it.each([
@@ -785,6 +782,32 @@ describe('DjDeckColumnComponent', () => {
       expect([model.state, model.stateLabel]).toEqual([state, label]);
     });
 
+    it.each([
+      ['playing', 'playing'],
+      ['paused', 'paused'],
+    ] as const)('reads a held %s deck as held, labelled Held, over its own state', (led, state) => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { status: led, led, held: true } }
+      );
+      const model = fixture.componentInstance.transportModel();
+
+      expect([model.held, model.state, model.stateLabel]).toEqual([true, state, 'Held']);
+      expect(fixture.nativeElement.querySelector('.state')?.getAttribute('data-state')).toBe(
+        'held'
+      );
+    });
+
+    it('keeps the deck’s own label and is not held while no finger is down', () => {
+      const { fixture } = render(
+        { slot: 'A', letter: 'A', index: 0 },
+        { transport: { status: 'paused', led: 'paused', held: false } }
+      );
+      const model = fixture.componentInstance.transportModel();
+
+      expect([model.held, model.state, model.stateLabel]).toEqual([false, 'paused', 'Pause']);
+    });
+
     it("carries a failed load's reason in errors so the display announces it", () => {
       const { fixture } = render(
         { slot: 'A', letter: 'A', index: 0 },
@@ -824,42 +847,16 @@ describe('DjDeckColumnComponent', () => {
       expect(enabled.fixture.componentInstance.transportModel().playPause.disabled).toBe(false);
     });
 
-    it('uses the drag pin for positionPercent while held, falling back to the summary otherwise', () => {
-      const { fixture } = render(
-        { slot: 'A', letter: 'A', index: 0 },
-        { transport: { scrubPercent: 33 } }
-      );
-
-      expect(fixture.componentInstance.positionPercent()).toBe(33);
+    it("pins the readouts to every drag tick, through the painter, with this deck's slot", () => {
+      const { fixture, painter } = render({ slot: 'B', letter: 'B', index: 1 });
 
       transport(fixture).scrubInput.emit(80);
-      fixture.detectChanges();
+      transport(fixture).scrubInput.emit(81.5);
 
-      expect(fixture.componentInstance.positionPercent()).toBe(80);
-    });
-
-    it('makes the elapsed time and frame label follow the drag pin', () => {
-      const { fixture, deckState } = render(
-        { slot: 'A', letter: 'A', index: 0 },
-        { transport: { elapsedText: '00:05.0', frameLabel: 'frame 250' } }
-      );
-      deckState.update((state) => ({
-        ...state,
-        lengthFrames: 3000,
-        playCallIntervalUs: 20000,
-      }));
-      fixture.detectChanges();
-
-      expect(fixture.componentInstance.elapsedText()).toBe('00:05.0');
-      expect(fixture.componentInstance.frameLabel()).toBe('frame 250');
-
-      transport(fixture).scrubInput.emit(50);
-      fixture.detectChanges();
-
-      // 50% of 3000 frames at 20ms each is 30s.
-      expect(fixture.componentInstance.elapsedText()).toBe('00:30.0');
-      expect(fixture.componentInstance.frameLabel()).toBe('frame 1500');
-      expect(transport(fixture).frameLabel()).toBe('frame 1500');
+      expect(painter.pin.mock.calls).toEqual([
+        ['B', 80],
+        ['B', 81.5],
+      ]);
     });
 
     it("dispatches togglePlayPause, stop and setRepeat with this deck's slot", () => {
@@ -885,11 +882,8 @@ describe('DjDeckColumnComponent', () => {
       expect(deckService.nextSubtune).toHaveBeenCalledWith('B');
     });
 
-    it('pins the position on scrubCommit, dispatches seek, and releases the pin once it lands', async () => {
-      const { fixture, deckService } = render(
-        { slot: 'A', letter: 'A', index: 0 },
-        { transport: { scrubPercent: 0 } }
-      );
+    it('pins the readouts on scrubCommit, dispatches seek, and releases the pin once it lands', async () => {
+      const { fixture, deckService, painter } = render({ slot: 'A', letter: 'A', index: 0 });
       let landSeek: () => void = () => undefined;
       deckService.seek.mockImplementation(
         () =>
@@ -899,16 +893,71 @@ describe('DjDeckColumnComponent', () => {
       );
 
       transport(fixture).scrubCommit.emit(64);
-      fixture.detectChanges();
 
       expect(deckService.seek).toHaveBeenCalledWith('A', 64);
-      expect(fixture.componentInstance.positionPercent()).toBe(64); // pinned mid-seek
+      expect(painter.pin.mock.calls).toEqual([['A', 64]]); // pinned mid-seek
 
       landSeek();
       await fixture.whenStable();
+
+      expect(painter.pin.mock.calls).toEqual([
+        ['A', 64],
+        ['A', null], // released back to the playhead
+      ]);
+    });
+
+    it("keeps a newer scrub's pin when an older seek lands late", async () => {
+      const { fixture, deckService, painter } = render({ slot: 'A', letter: 'A', index: 0 });
+      const lands: (() => void)[] = [];
+      deckService.seek.mockImplementation(
+        () => new Promise<void>((resolve) => lands.push(resolve))
+      );
+
+      transport(fixture).scrubCommit.emit(30);
+      transport(fixture).scrubInput.emit(70);
+      lands[0]();
+      await fixture.whenStable();
+
+      expect(painter.pin).toHaveBeenLastCalledWith('A', 70);
+      expect(painter.pin).not.toHaveBeenCalledWith('A', null);
+    });
+
+    it("hands the transport and the plate to the playhead painter once rendered, for this deck's slot, and detaches on destroy", () => {
+      const { fixture, painter } = render({ slot: 'B', letter: 'B', index: 1 });
+
+      expect(painter.attach).toHaveBeenCalledTimes(1);
+      const [slot, targets] = painter.attach.mock.calls[0];
+      expect(slot).toBe('B');
+      expect(targets.transport).toBe(transport(fixture));
+      expect(targets.loops).toBe(plate(fixture));
+
+      fixture.destroy();
+      expect(painter.detach).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps every model as it was through a playhead sample', () => {
+      const { fixture, store } = renderLive({ slot: 'A', letter: 'A', index: 0 });
+      makeShapeable(store, 'A');
+      store.setDeckTiming({ slot: 'A', playCallIntervalUs: 20_000 });
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+        lengthFrames: 1000,
+      });
+      fixture.detectChanges();
+      const column = fixture.componentInstance;
+      const transportModel = column.transportModel();
+      const channelModel = column.channelModel();
+      const bindingModel = column.bindingModel();
+      const plateModel = column.plateModel();
+
+      store.samplePosition({ slot: 'A', positionFrames: 250 });
       fixture.detectChanges();
 
-      expect(fixture.componentInstance.positionPercent()).toBe(0); // released back to the summary
+      expect(column.transportModel()).toBe(transportModel);
+      expect(column.channelModel()).toBe(channelModel);
+      expect(column.bindingModel()).toBe(bindingModel);
+      expect(column.plateModel()).toBe(plateModel);
     });
   });
 
@@ -940,6 +989,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.75,
         faderSpeed: 0.75,
         nudging: false,
+        varispeed: false,
         voices: store.decks().B.voices,
       });
       fixture.detectChanges();
@@ -979,6 +1029,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.7,
         faderSpeed: 1.7,
         nudging: false,
+        varispeed: false,
         voices,
       });
       fixture.detectChanges();
@@ -990,6 +1041,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.3,
         faderSpeed: 0.3,
         nudging: false,
+        varispeed: false,
         voices,
       });
       fixture.detectChanges();
@@ -1006,6 +1058,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.05,
         faderSpeed: 1,
         nudging: true,
+        varispeed: false,
         voices: store.decks().B.voices,
       });
       fixture.detectChanges();
@@ -1080,6 +1133,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1,
         faderSpeed: 1,
         nudging: false,
+        varispeed: false,
         voices: [
           { muted: true, held: false },
           { muted: false, held: false },
@@ -1131,6 +1185,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.2,
         faderSpeed: 1.2,
         nudging: false,
+        varispeed: false,
         voices: [
           { muted: true, held: false },
           { muted: true, held: false },

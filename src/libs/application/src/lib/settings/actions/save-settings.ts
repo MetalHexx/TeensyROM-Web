@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { firstValueFrom } from 'rxjs';
 import { ISettingsService } from '@teensyrom-nx/domain';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';

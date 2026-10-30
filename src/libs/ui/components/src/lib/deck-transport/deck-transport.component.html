@@ -11,7 +11,7 @@
     } @else {
     <div class="lcd">
       <div class="lcd-line lcd-line--tune">
-        <span class="state" [attr.data-state]="model().state">
+        <span class="state" [attr.data-state]="model().held ? 'held' : model().state">
           <span class="state-light" aria-hidden="true"></span>
           <span class="state-word">{{ model().stateLabel }}</span>
         </span>
@@ -27,9 +27,9 @@
         }
       </div>
       <div class="lcd-line lcd-line--time">
-        <span class="elapsed">{{ elapsedText() }}</span>
+        <span #elapsed class="elapsed"></span>
         <span class="total">/ {{ model().totalText }}</span>
-        <span class="frame">{{ frameLabel() }}</span>
+        <span #frame class="frame"></span>
       </div>
     </div>
     }
@@ -38,9 +38,8 @@
       data-control="seek"
       [barState]="model().bar"
       [marks]="model().marks"
-      [positionPercent]="positionPercent()"
+      [held]="model().held"
       [accessibleName]="model().scrubAccessibleName"
-      [valueText]="valueText()"
       (scrubInput)="scrubInput.emit($event)"
       (scrubCommit)="scrubCommit.emit($event)"
     />

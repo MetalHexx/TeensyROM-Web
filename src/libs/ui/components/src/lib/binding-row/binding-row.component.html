@@ -77,6 +77,27 @@
     </div>
     @if (amountError(); as error) {
     <p class="error-text" role="alert" [id]="amountInputId + '-error'">{{ error }}</p>
+    } } @if (model().secondAmount; as second) {
+    <div class="edit-row">
+      <label class="edit-label" [for]="secondAmountInputId">{{ second.label }}</label>
+      <input
+        class="edit-control edit-input"
+        type="number"
+        [id]="secondAmountInputId"
+        [min]="second.min"
+        [max]="second.max"
+        [step]="second.step"
+        [value]="second.value"
+        [attr.aria-invalid]="secondAmountError() ? true : null"
+        [attr.aria-describedby]="secondAmountError() ? secondAmountInputId + '-error' : null"
+        (change)="onSecondAmountChange($event, second)"
+      />
+      @if (second.suffix) {
+      <span class="edit-suffix">{{ second.suffix }}</span>
+      }
+    </div>
+    @if (secondAmountError(); as error) {
+    <p class="error-text" role="alert" [id]="secondAmountInputId + '-error'">{{ error }}</p>
     } }
 
     <div class="edit-row edit-actions">

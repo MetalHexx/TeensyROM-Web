@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import '@analogjs/vitest-angular/setup-zone';
 import { StorageStore, StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';

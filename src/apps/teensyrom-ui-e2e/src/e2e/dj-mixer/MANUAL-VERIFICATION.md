@@ -771,3 +771,25 @@ it, and it is disabled while a launch is running.
       and the info alert says it moved to USB as well.
 - [ ] Press while a directory listing is still loading from a network cartridge: the listing may
       fail once as the cartridge moves to USB; the next request is served over USB.
+
+## A hand on the deck (ASID-DJ-15)
+
+Not run. A pitch bend strip mapped onto a deck's position strip works as a hand: the record follows
+the finger, carries on when it lets go and slows to the deck's own speed. The automated checks
+cover the maths and the wiring; how it sounds and feels needs a bench with a pitch bend strip and
+two decks. The grip default (250 ms) is the value to tune.
+
+1. Map a pitch bend strip onto a deck's position strip in mapping mode, and check that a knob on
+   the same strip still jumps.
+2. Load a tune (it starts playing) and stop it. Rock over its first kick, hold still and hear
+   silence, and release it on the other deck's beat. Then grab a playing deck mid-phrase and do the
+   same.
+3. Note whether a drum hit's sharp edge, landing late when moving backward, misleads the cue. If it
+   does, the attack-and-release swap is next.
+4. Throw forward and backward on a playing deck and hear it come back to speed like a slipmat, with
+   no seam when live playback takes over. Throw on a paused deck and see it stay put.
+5. Change Reach and Grip in the panel and feel the difference.
+6. Read *Held* at a glance, and tell the amber playhead from a yellow queued marker.
+7. Note any lag or sluggishness.
+8. With both decks playing and one under the hand, read the player's timing stats for new late
+   frames against a run without the hand.

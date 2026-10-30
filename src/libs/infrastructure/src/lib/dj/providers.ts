@@ -14,15 +14,18 @@ import {
   MIDI_ACCESS,
   MIDI_INPUT,
   MIDI_SETTINGS_REPOSITORY,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from '@teensyrom-nx/application';
+import type { RegisterRecorder } from '@teensyrom-nx/application';
 import { IndexedDbTuneStore } from './database';
 import { ApiDjLibraryStateRepository, ApiSetStore, ApiTuneMemoryStore } from './dj-library';
 import { ApiMidiSettingsRepository } from './midi-settings';
+import { WorkerRegisterRecorder } from './analysis/worker-register-recorder';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
 import { MidiAccessService } from './midi/midi-access.service';
 import { MidiInputService } from './midi/midi-input.service';
@@ -95,6 +98,10 @@ export const DJ_ENGINE_PROVIDERS: Provider[] = [
             type: 'module',
           })
       ),
+  },
+  {
+    provide: REGISTER_RECORDER_FACTORY,
+    useValue: (): RegisterRecorder => new WorkerRegisterRecorder(),
   },
   { provide: TUNE_INSERTER, useFactory: () => createTuneInserter(inject(IndexedDbTuneStore)) },
   {

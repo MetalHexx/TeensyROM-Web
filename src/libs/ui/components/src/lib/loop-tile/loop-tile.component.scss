@@ -139,25 +139,41 @@
   }
 }
 
+// `--loop-tile-progress` is a percentage the component sets on the timeline as the lap moves (or
+// the tile inherits). The fill and the playhead move by `scale` and `translate` alone, so a new
+// value restyles the two of them and lays nothing out. Both span the bar inside the 1px rim.
 .fill {
   position: absolute;
-  top: 1px;
-  bottom: 1px;
-  left: 1px;
-  max-width: calc(100% - 2px);
+  inset: 1px;
   border-radius: 2px;
   background: var(--color-highlight);
   box-shadow: 0 0 6px rgba(var(--color-highlight-rgb), 0.6);
+  transform-origin: left;
+  scale: var(--loop-tile-progress, 0%) 100%;
 }
 
+// The playhead is the right edge of a bar-wide box that starts wholly before the bar and slides
+// right by the progress, so nothing it moves ever reaches past the tile's right edge into the
+// grid's scrollable overflow. The box draws nothing and takes no pointer.
 .playhead {
   position: absolute;
   top: -2px;
+  right: calc(100% - 1px);
   bottom: -2px;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--synth-pointer);
-  box-shadow: 0 0 5px rgba(var(--glassy-color), 0.8);
+  width: calc(100% - 2px);
+  pointer-events: none;
+  translate: var(--loop-tile-progress, 0%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -1px;
+    bottom: 0;
+    width: 2px;
+    background: var(--synth-pointer);
+    box-shadow: 0 0 5px rgba(var(--glassy-color), 0.8);
+  }
 }
 
 .cue-tick {

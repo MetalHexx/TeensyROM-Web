@@ -32,10 +32,13 @@ import { DeviceStore } from '../device/device-store';
 import { DeckService } from './deck.service';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
+import { DeckHand } from './deck-hand';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
+import { LIVE_PAINT_CLOCK } from './live-paint-clock';
+import { PlayheadPainter } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
 import { TuneLoader } from './tune-loader';
 import { DjStore, HOME_DECK_PANEL, type DeckHolding, type DeckMixerSettings } from './dj-store';
@@ -46,6 +49,7 @@ import { decodeRowHost } from './sets/row-host';
 import {
   DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
+  REGISTER_RECORDER_FACTORY,
   REPLAY_RUNNER_FACTORY,
   MIDI_ACCESS,
   SET_STORE,
@@ -199,6 +203,8 @@ describe('DeckService', () => {
   let libraryState: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   let alerts: { warning: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
   let usableDevices: WritableSignal<Device[]>;
+  /** The animation-frame loop's clock: the specs that drive the loop keep it at the frame's time. */
+  let loopNowMs: number;
 
   function register(fixture: TuneFixture): TuneFixture {
     byPath.set(fixture.source.path, fixture);
@@ -244,6 +250,7 @@ describe('DeckService', () => {
     libraryState = { load: vi.fn().mockResolvedValue(null), save: vi.fn().mockResolvedValue(undefined) };
     alerts = { warning: vi.fn(), error: vi.fn() };
     usableDevices = signal<Device[]>([{ deviceId: 'device-1' } as Device]);
+    loopNowMs = 0;
 
     fileContentMock = vi.fn((deviceId: string, storageType: StorageType, path: string) => {
       const fixture = byPath.get(path);
@@ -297,6 +304,10 @@ describe('DeckService', () => {
           },
         },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
+        {
+          provide: REGISTER_RECORDER_FACTORY,
+          useValue: () => ({ record: () => Promise.resolve(null), dispose: () => undefined }),
+        },
         { provide: MIDI_ACCESS, useValue: fakeMidiAccess((id) => outputPortForMock(id) as MidiOutputPort | null) },
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService },
         { provide: TUNE_INSERTER, useValue: { insert: insertMock } },
@@ -306,6 +317,7 @@ describe('DeckService', () => {
         { provide: DJ_LIBRARY_STATE_REPOSITORY, useValue: libraryState },
         { provide: ALERT_SERVICE, useValue: alerts },
         { provide: DeviceStore, useValue: { usableDevices } },
+        { provide: LIVE_PAINT_CLOCK, useValue: () => loopNowMs },
       ],
     });
 
@@ -685,6 +697,23 @@ describe('DeckService', () => {
 
     expect(seekSpy).toHaveBeenCalledWith('A', 50);
     expect(sampleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the playhead percent from the engine on demand, held to the length, writing nothing', () => {
+    const positionSpy = vi.spyOn(runtime, 'position').mockReturnValue(frames(50));
+    expect(service.playheadPercent('A')).toBe(0);
+
+    store.setDeckStructure({
+      slot: 'A',
+      structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+      lengthFrames: 200,
+    });
+    const sampleSpy = vi.spyOn(store, 'samplePosition');
+
+    expect(service.playheadPercent('A')).toBe(25);
+    positionSpy.mockReturnValue(frames(500));
+    expect(service.playheadPercent('A')).toBe(100);
+    expect(sampleSpy).not.toHaveBeenCalled();
   });
 
   it('seek and selectSubtune are no-ops while loading or indexing', async () => {
@@ -1526,6 +1555,7 @@ describe('DeckService', () => {
     let pending: Map<number, FrameRequestCallback>;
     let nextFrameId: number;
     let paintSpy: MockInstance<SidPanelPainter['paint']>;
+    let playheadSpy: MockInstance<PlayheadPainter['paint']>;
     let positionSpy: MockInstance<DeckRuntime['position']>;
     let hidden = false;
 
@@ -1534,22 +1564,39 @@ describe('DeckService', () => {
       return paintSpy.mock.calls.filter(([slot]) => slot === 'A').length;
     }
 
+    /** The loop's playhead paints for the A deck. */
+    function playheadPaintsOfA(): number {
+      return playheadSpy.mock.calls.filter(([slot]) => slot === 'A').length;
+    }
+
     function setPosition(position: number): void {
       positionSpy.mockReturnValue(frames(position));
     }
 
-    /** Runs the callbacks that are due now; any a callback schedules wait for the next call. */
-    function runFrame(): void {
+    /** The time of the `n`th frame of a 60 Hz display. */
+    function frameAt(n: number): number {
+      return 1000 + (n * 1000) / 60;
+    }
+
+    /** Runs the callbacks that are due now as the `n`th frame of a 60 Hz display, with the loop's
+     *  clock at that frame's time; any a callback schedules wait for the next call. */
+    function runFrame(n = 0): void {
+      loopNowMs = frameAt(n);
       const due = [...pending.values()];
       pending.clear();
       for (const callback of due) {
-        callback(0);
+        callback(frameAt(n));
       }
     }
 
     function setHidden(value: boolean): void {
       hidden = value;
       document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    /** Lets the loop's sleep between frames run out, so it asks for its next frame. */
+    function wake(): void {
+      vi.runOnlyPendingTimers();
     }
 
     beforeEach(async () => {
@@ -1566,55 +1613,162 @@ describe('DeckService', () => {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 
       paintSpy = vi.spyOn(TestBed.inject(SidPanelPainter), 'paint');
+      playheadSpy = vi.spyOn(TestBed.inject(PlayheadPainter), 'paint');
       positionSpy = vi.spyOn(runtime, 'position');
       await loadAndWait('A', register(makeFixture()));
       TestBed.flushEffects();
       paintSpy.mockClear();
+      playheadSpy.mockClear();
       setPosition(5);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       delete (document as { hidden?: boolean }).hidden;
     });
 
-    it('paints only when the position moved, and always reschedules', () => {
-      runFrame();
+    it('paints only when the position moved, and always comes back for another frame', () => {
+      runFrame(0);
       expect(paintsOfA()).toBe(1);
+      wake();
       expect(pending.size).toBe(1);
 
-      runFrame();
+      runFrame(2);
       expect(paintsOfA()).toBe(1);
+      wake();
       expect(pending.size).toBe(1);
 
       setPosition(6);
-      runFrame();
+      runFrame(4);
       expect(paintsOfA()).toBe(2);
+    });
+
+    it('sleeps between the frames it paints on rather than asking for every display frame', () => {
+      runFrame(0);
+
+      expect(pending.size).toBe(0);
+      expect(vi.getTimerCount()).toBe(1);
+
+      wake();
+      expect(pending.size).toBe(1);
+    });
+
+    it('asks for the very next frame when the one it woke to is too early to paint on, and paints that', () => {
+      runFrame(0);
+      wake();
+      setPosition(6);
+
+      // A frame before the paint interval is up is turned away.
+      runFrame(1);
+      expect(paintsOfA()).toBe(1);
+      expect(pending.size).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      runFrame(2);
+      expect(paintsOfA()).toBe(2);
+      expect(playheadPaintsOfA()).toBe(2);
+    });
+
+    it('paints both decks in the same frame', async () => {
+      await loadAndWait('B', register(makeFixture()));
+      TestBed.flushEffects();
+      runFrame(0);
+      paintSpy.mockClear();
+      playheadSpy.mockClear();
+
+      setPosition(6);
+      wake();
+      runFrame(2);
+
+      expect(paintSpy.mock.calls.map(([slot]) => slot)).toEqual(['A', 'B']);
+      expect(playheadSpy.mock.calls.map(([slot]) => slot)).toEqual(['A', 'B']);
+    });
+
+    it('hands every frame that moved to the playhead painter, and never writes the playhead into the store', () => {
+      const sampleSpy = vi.spyOn(store, 'samplePosition');
+      const sampledBefore = store.positions.A();
+
+      runFrame(0);
+      setPosition(6);
+      wake();
+      runFrame(2);
+      wake();
+      runFrame(4);
+      setPosition(7);
+      wake();
+      runFrame(6);
+
+      expect(playheadPaintsOfA()).toBe(3);
+      expect(paintsOfA()).toBe(3);
+      expect(sampleSpy).not.toHaveBeenCalled();
+      expect(store.positions.A()).toBe(sampledBefore);
     });
 
     it('does not paint while paused', async () => {
       await service.togglePlayPause('A');
       TestBed.flushEffects();
       expect(store.deck('A')().status).toBe('paused');
-      // The painter's own one-shot paint for the status change runs here; the loop's must not.
-      runFrame();
+      // The painters' own one-shot paints for the status change run here; the loop's must not.
+      runFrame(0);
       paintSpy.mockClear();
+      playheadSpy.mockClear();
 
       setPosition(9);
-      runFrame();
+      wake();
+      runFrame(2);
 
       expect(paintsOfA()).toBe(0);
+      expect(playheadPaintsOfA()).toBe(0);
+      expect(pending.size).toBe(0);
+    });
+
+    it('polls a paused deck while the engine is in varispeed, and stops when it leaves', async () => {
+      await service.togglePlayPause('A');
+      TestBed.flushEffects();
+      runFrame(0);
+      expect(pending.size).toBe(0);
+      const controls = (varispeed: boolean) =>
+        store.setDeckEngineControls({
+          slot: 'A',
+          speed: 1,
+          faderSpeed: 1,
+          nudging: false,
+          varispeed,
+          voices: store.decks().A.voices,
+        });
+
+      controls(true);
+      TestBed.flushEffects();
+      // The loop's first frame, and the painters' one-shot paints for the hand landing.
+      runFrame(2);
+      paintSpy.mockClear();
+      setPosition(9);
+      wake();
+      runFrame(4);
+      expect(paintsOfA()).toBe(1);
+      wake();
+      expect(pending.size).toBe(1);
+
+      controls(false);
+      TestBed.flushEffects();
+      // The loop's frame is cancelled; all that is left is each painter's one-shot repaint of where
+      // the hand let go, which schedules nothing after it.
+      setPosition(10);
+      runFrame(6);
+      expect(paintsOfA()).toBe(2);
       expect(pending.size).toBe(0);
     });
 
     it('does not paint while the document is hidden, and resumes when it is shown', () => {
       setHidden(true);
       setPosition(9);
-      runFrame();
+      runFrame(0);
       expect(paintsOfA()).toBe(0);
       expect(pending.size).toBe(0);
 
       setHidden(false);
-      runFrame();
+      runFrame(2);
       expect(paintsOfA()).toBe(1);
     });
 
@@ -1653,7 +1807,8 @@ describe('DeckService', () => {
 
         for (const position of [5, 6, 7]) {
           setPosition(position);
-          runFrame();
+          runFrame((position - 5) * 2);
+          wake();
           expect(pending.size).toBe(1);
         }
 
@@ -1670,6 +1825,7 @@ describe('DeckService', () => {
 
         expect(() => runFrame()).toThrow('boom');
 
+        wake();
         expect(pending.size).toBe(1);
       });
     });
@@ -3251,6 +3407,40 @@ describe('DeckService', () => {
         expect(currentSet().rows[0].lastSubtune).toBe(3);
         expect((await memoryStore.load(held.sidHash))?.lastSubtune).toBe(3);
       });
+    });
+  });
+
+  describe('letting go of the hand', () => {
+    let drop: MockInstance<DeckHand['drop']>;
+
+    beforeEach(() => {
+      drop = vi.spyOn(TestBed.inject(DeckHand), 'drop');
+    });
+
+    it("drops the deck's hand on a load, a subtune switch and a stop, once each", async () => {
+      await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+      expect(drop.mock.calls).toEqual([['A']]);
+
+      await service.selectSubtune('A', 2);
+      expect(drop.mock.calls).toEqual([['A'], ['A']]);
+
+      service.stop('A');
+      expect(drop.mock.calls).toEqual([['A'], ['A'], ['A']]);
+    });
+
+    it('leaves the hand alone when a stop or a subtune switch is refused by its guards', async () => {
+      await loadAndWait('A', register(makeFixture({ subtuneCount: 3 })));
+      service.stop('A');
+      drop.mockClear();
+
+      service.stop('A');
+      service.stop('B');
+      await service.selectSubtune('B', 2);
+      store.setDeckBusy({ slot: 'A', busy: true });
+      service.stop('A');
+      await service.selectSubtune('A', 2);
+
+      expect(drop).not.toHaveBeenCalled();
     });
   });
 

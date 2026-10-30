@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import type { TuneReference } from '@sidablist/tunes';
 import { DjState, WritableStore } from '../dj-store';
@@ -24,12 +24,12 @@ export function setDeckLoaded(store: WritableStore<DjState>) {
             loaded: reference,
             subtune: reference.identity.subtune,
             subtuneCount: reference.subtuneCount,
-            positionFrames: 0,
             lengthFrames: null,
             structure: null,
             error: null,
           },
         },
+        positions: { ...state.positions, [slot]: 0 },
       }));
     },
   };

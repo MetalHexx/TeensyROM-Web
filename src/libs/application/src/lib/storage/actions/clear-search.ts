@@ -1,7 +1,7 @@
 import { StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';
 import { createAction, LogType, logInfo } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 export function clearSearch(store: WritableStore<StorageState>) {
   return {

@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import type { HandTarget } from '../deck-hand';
 import type { MappableControl, ValueDefaults } from './mappable-controls';
 import type { MappingStyleKind } from '../ports';
 import {
   actionOf,
   actionsForControl,
   clampAmount,
+  clampGrip,
   defaultAmountFor,
   defaultStyle,
   isStyleAvailableFor,
@@ -40,7 +42,7 @@ const nudge: MappableControl = {
   set: () => undefined,
 };
 
-function value(defaults: ValueDefaults): MappableControl {
+function value(defaults: ValueDefaults, hand?: HandTarget): MappableControl {
   return {
     identity,
     name: 'V',
@@ -52,6 +54,7 @@ function value(defaults: ValueDefaults): MappableControl {
     defaults,
     read: () => 0,
     set: () => undefined,
+    ...(hand === undefined ? {} : { hand }),
   };
 }
 
@@ -272,5 +275,58 @@ describe('clampAmount', () => {
     expect(clampAmount(trigger, 'press', 0.5)).toBeNull();
     expect(clampAmount(knob, 'relative-offset', null)).toBe(0.02);
     expect(clampAmount(knob, 'step', Number.NaN)).toBe(0.05);
+  });
+
+  it("keeps a hand's reach in 0.02-2 seconds, falling back to home for a missing one", () => {
+    expect(clampAmount(knob, 'hand', 0.5)).toBe(0.5);
+    expect(clampAmount(knob, 'hand', 0.001)).toBe(0.02);
+    expect(clampAmount(knob, 'hand', 9)).toBe(2);
+    expect(clampAmount(knob, 'hand', null)).toBe(0.13);
+    expect(clampAmount(knob, 'hand', Number.NaN)).toBe(0.13);
+  });
+});
+
+describe('clampGrip', () => {
+  it("keeps a hand's grip in 0.05-3 seconds, falling back to home for a missing one", () => {
+    expect(clampGrip('hand', 1)).toBe(1);
+    expect(clampGrip('hand', 0.01)).toBe(0.05);
+    expect(clampGrip('hand', 10)).toBe(3);
+    expect(clampGrip('hand', undefined)).toBe(0.25);
+    expect(clampGrip('hand', Number.NaN)).toBe(0.25);
+  });
+
+  it('is undefined for every other kind', () => {
+    expect(clampGrip('relative-offset', 1)).toBeUndefined();
+    expect(clampGrip('press', 0.25)).toBeUndefined();
+  });
+});
+
+describe('pitch bend', () => {
+  const withHand = value(
+    { ccStyle: 'absolute', sensitivity: 0.01, stepAmount: 0.1 },
+    { strip: () => undefined, lose: () => undefined }
+  );
+
+  it('offers no style on a control without a hand, and always defaults to the hand', () => {
+    for (const nature of ['trigger', 'state', 'hold', 'value'] as const) {
+      expect(stylesFor(nature, 'pitch-bend')).toEqual([]);
+    }
+    for (const control of [trigger, toggle, held, fader]) {
+      expect(stylesForControl(control, 'pitch-bend')).toEqual([]);
+    }
+    expect(defaultStyle(fader, 'pitch-bend')).toEqual({ kind: 'hand', amount: 0.13, grip: 0.25 });
+    expect(isStyleAvailableFor(fader, 'pitch-bend', 'hand')).toBe(false);
+  });
+
+  it('offers the hand, and only the hand, on a control that has one', () => {
+    expect(stylesForControl(withHand, 'pitch-bend')).toEqual(['hand']);
+    expect(actionsForControl(withHand, 'pitch-bend')).toEqual(['hand']);
+    expect(isStyleAvailableFor(withHand, 'pitch-bend', 'hand')).toBe(true);
+    expect(stylesForControl(withHand, 'cc')).toEqual(stylesForControl(fader, 'cc'));
+  });
+
+  it('reads the hand as its own action with no trigger', () => {
+    expect(actionOf('hand')).toBe('hand');
+    expect(triggerOf('hand')).toBeNull();
   });
 });

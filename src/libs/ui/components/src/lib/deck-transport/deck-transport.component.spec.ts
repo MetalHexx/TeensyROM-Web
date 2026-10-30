@@ -7,6 +7,7 @@ function testModel(): DeckTransportModel {
     accessibleName: 'Transport deck A',
     state: 'stopped',
     stateLabel: 'Stop',
+    held: false,
     title: 'Commando',
     author: 'Rob Hubbard',
     emptyText: 'No tune — drop a SID here',
@@ -50,9 +51,6 @@ describe('DeckTransportComponent', () => {
 
     fixture = TestBed.createComponent(DeckTransportComponent);
     fixture.componentRef.setInput('model', testModel());
-    fixture.componentRef.setInput('positionPercent', 40);
-    fixture.componentRef.setInput('elapsedText', '01:23.4');
-    fixture.componentRef.setInput('frameLabel', 'frame 1234');
 
     emitted = [];
     const component = fixture.componentInstance;
@@ -66,6 +64,11 @@ describe('DeckTransportComponent', () => {
     component.scrubInput.subscribe((value) => emitted.push(`input:${value}`));
     component.scrubCommit.subscribe((value) => emitted.push(`commit:${value}`));
     fixture.detectChanges();
+
+    // The playhead readouts, set the way a painter sets them.
+    component.setLivePosition(40);
+    component.setLiveElapsed('01:23.4');
+    component.setLiveFrame('frame 1234');
   });
 
   function setModel(overrides: Partial<DeckTransportModel>): void {
@@ -215,12 +218,60 @@ describe('DeckTransportComponent', () => {
     });
   });
 
-  describe('seek strip', () => {
-    it('says the position as time', () => {
-      const range = root().querySelector('input[type="range"]') as HTMLInputElement;
+  describe('held', () => {
+    const stateAttr = (): string | null =>
+      root().querySelector('.state')?.getAttribute('data-state') ?? null;
+    const playheadHeld = (): boolean =>
+      root().querySelector('.playhead')?.hasAttribute('data-held') ?? false;
 
-      expect(range.getAttribute('aria-label')).toBe('Position deck A');
-      expect(range.getAttribute('aria-valuetext')).toBe('01:23.4 of 03:12');
+    it('shows the held state and passes held to the strip while a finger is down', () => {
+      setModel({ state: 'paused', stateLabel: 'Held', held: true });
+
+      expect(stateAttr()).toBe('held');
+      expect(root().querySelector('.state-word')?.textContent).toBe('Held');
+      expect(playheadHeld()).toBe(true);
+    });
+
+    it('keeps the Play key on the deck’s own state while held', () => {
+      setModel({ state: 'playing', held: true, playPause: { showing: 'pause', disabled: false } });
+
+      expect(keyButton('[data-control="play-pause"]').getAttribute('data-state-light')).toBe(
+        'playing'
+      );
+    });
+
+    it('shows the deck’s own state and a plain playhead otherwise', () => {
+      setModel({ state: 'paused' });
+
+      expect(stateAttr()).toBe('paused');
+      expect(playheadHeld()).toBe(false);
+    });
+  });
+
+  describe('seek strip', () => {
+    function range(): HTMLInputElement {
+      return root().querySelector('input[type="range"]') as HTMLInputElement;
+    }
+
+    it('says the position as time', () => {
+      expect(range().getAttribute('aria-label')).toBe('Position deck A');
+      expect(range().getAttribute('aria-valuetext')).toBe('01:23.4 of 03:12');
+    });
+
+    it('shows the live position on the strip', () => {
+      expect(range().value).toBe('40');
+
+      fixture.componentInstance.setLivePosition(62.5);
+
+      expect(range().value).toBe('62.5');
+    });
+
+    it('follows the elapsed time and a new total in its value text', () => {
+      fixture.componentInstance.setLiveElapsed('01:30.0');
+      expect(range().getAttribute('aria-valuetext')).toBe('01:30.0 of 03:12');
+
+      setModel({ totalText: '04:00' });
+      expect(range().getAttribute('aria-valuetext')).toBe('01:30.0 of 04:00');
     });
 
     it('is disabled while analyzing', () => {
@@ -240,7 +291,14 @@ describe('DeckTransportComponent', () => {
             activity: 'running',
             selected: true,
           },
-          { id: 'cue-1', kind: 'cue', startPercent: 60, endPercent: null, activity: 'idle', selected: false },
+          {
+            id: 'cue-1',
+            kind: 'cue',
+            startPercent: 60,
+            endPercent: null,
+            activity: 'idle',
+            selected: false,
+          },
         ],
       });
 
@@ -256,6 +314,32 @@ describe('DeckTransportComponent', () => {
       expect(text()).toContain('01:23.4');
       expect(text()).toContain('/ 03:12');
       expect(text()).toContain('frame 1234');
+    });
+
+    it('writes the live elapsed time and frame straight to the display, with no change detection', () => {
+      fixture.componentInstance.setLiveElapsed('00:07.5');
+      fixture.componentInstance.setLiveFrame('frame 375');
+
+      expect(root().querySelector('.elapsed')?.textContent).toBe('00:07.5');
+      expect(root().querySelector('.frame')?.textContent).toBe('frame 375');
+    });
+
+    it('keeps the live readouts through a change-detection pass', () => {
+      setModel({ stateLabel: 'Play', state: 'playing' });
+
+      expect(root().querySelector('.elapsed')?.textContent).toBe('01:23.4');
+      expect(root().querySelector('.frame')?.textContent).toBe('frame 1234');
+    });
+
+    it('brings back the latest readouts when an error display gives way to the tune again', () => {
+      setModel({ state: 'error', stateLabel: 'Error', errors: ['Delivery stalled.'] });
+      fixture.componentInstance.setLiveElapsed('00:10.0');
+      fixture.componentInstance.setLiveFrame('frame 500');
+
+      setModel({});
+
+      expect(root().querySelector('.elapsed')?.textContent).toBe('00:10.0');
+      expect(root().querySelector('.frame')?.textContent).toBe('frame 500');
     });
 
     it('shows the empty text, and no author, when nothing is loaded', () => {

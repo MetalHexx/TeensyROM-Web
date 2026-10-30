@@ -34,12 +34,14 @@ namespace TeensyRom.Core.Settings
     }
 
     /// <summary>
-    /// How a mapped message drives its control. <see cref="Amount"/> is only set for relative and step styles.
+    /// How a mapped message drives its control. <see cref="Amount"/> is only set for relative, step, hold and hand
+    /// styles; <see cref="Grip"/> only for a hand.
     /// </summary>
     public record MidiMappingStyle
     {
         public string Kind { get; init; } = string.Empty;
         public double? Amount { get; init; }
+        public double? Grip { get; init; }
     }
 
     /// <summary>

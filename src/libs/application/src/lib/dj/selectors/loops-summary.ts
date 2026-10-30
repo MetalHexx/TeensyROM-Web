@@ -91,8 +91,8 @@ function boundarySummary(
 
 /**
  * A deck's loop tiles and its selected marker's boundaries, ready to draw. Reads the deck's fields
- * one signal at a time and never `positionFrames`, so a frame tick does not rebuild it — the lap
- * indicator has its own selector for that.
+ * one signal at a time and never the playhead (`positions`), so a sample does not rebuild it — the
+ * lap indicator has its own selector for that.
  */
 export function loopsSummary(store: WritableStore<DjState>) {
   return {

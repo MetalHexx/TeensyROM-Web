@@ -20,7 +20,7 @@ const meta: Meta<BindingRowComponent> = {
           'behaves. Collapsed, it is two lines — the name, a style chip and the edit and delete ' +
           'buttons, then the source. Expanded in place, it frames itself in the highlight colour ' +
           'and offers the style (or Action) as a segmented control, a Trigger control where the ' +
-          'style has one, the amount where the style takes one, and Re-learn source and Delete. The amount is a native number input that emits on `change` ' +
+          'style has one, the amount where the style takes one (a hand adds a second, Grip), and Re-learn source and Delete. Each amount is a native number input that emits on `change` ' +
           'only for a finite value within its range; anything else shows an inline error. A ' +
           '`statusText` — e.g. that the controller is not connected — dims the row and says why. ' +
           'Purely presentational: the caller owns the model, including `expanded`.',
@@ -32,7 +32,7 @@ const meta: Meta<BindingRowComponent> = {
       description:
         "The binding's display state: `name`, `sourceText`, `styleText`, `expanded`, " +
         '`styleLabel`, `styleOptions`, `selectedStyleId`, `triggerOptions` and ' +
-        '`selectedTriggerId` (or `null` when the style has no trigger), `amount` (or `null` when the style takes none), ' +
+        '`selectedTriggerId` (or `null` when the style has no trigger), `amount` (or `null` when the style takes none), `secondAmount` (or `null`), ' +
         '`statusText` (or `null`) and the edit and delete accessible names.',
     },
     editToggle: {
@@ -43,6 +43,9 @@ const meta: Meta<BindingRowComponent> = {
     amountChange: {
       description:
         "Emits a new amount, only for a finite value within the amount's `min` and `max`.",
+    },
+    secondAmountChange: {
+      description: 'Emits a new second amount, only for a finite value within its `min` and `max`.',
     },
     relearn: { description: 'Emits when Re-learn source is pressed.' },
     deleteBinding: { description: 'Emits when either delete control is pressed.' },
@@ -88,6 +91,24 @@ const stepAmount: BindingRowAmount = {
   suffix: '%',
 };
 
+const handReach: BindingRowAmount = {
+  label: 'Reach',
+  value: 130,
+  min: 20,
+  max: 2000,
+  step: 10,
+  suffix: 'ms',
+};
+
+const handGrip: BindingRowAmount = {
+  label: 'Grip',
+  value: 250,
+  min: 50,
+  max: 3000,
+  step: 10,
+  suffix: 'ms',
+};
+
 function baseModel(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
   return {
     name: 'Speed',
@@ -100,6 +121,7 @@ function baseModel(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
     triggerOptions: null,
     selectedTriggerId: null,
     amount: relativeAmount,
+    secondAmount: null,
     statusText: null,
     editAccessibleName: 'Edit Speed binding',
     deleteAccessibleName: 'Delete Speed binding',
@@ -190,6 +212,23 @@ export const ExpandedOneShot: Story = {
  *  cut off in the control's equal-width cells. */
 export const ExpandedFourStyles: Story = {
   args: { model: baseModel({ expanded: true }) },
+};
+
+/** A pitch bend strip as a hand: the single Hand style, then Reach and Grip in milliseconds. Enter
+ *  a value outside a field's range to see its own inline error. */
+export const ExpandedHand: Story = {
+  args: {
+    model: baseModel({
+      name: 'Seek',
+      sourceText: 'Launch Control XL · ch 1 · Pitch bend',
+      styleText: 'Hand · reach 130 ms · grip 250 ms',
+      expanded: true,
+      styleOptions: [{ id: 'hand', label: 'Hand' }],
+      selectedStyleId: 'hand',
+      amount: handReach,
+      secondAmount: handGrip,
+    }),
+  },
 };
 
 /** Interactive: the story owns the model, as a caller would. Expand the row, change the style,

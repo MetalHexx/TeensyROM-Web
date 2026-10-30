@@ -2,7 +2,13 @@ import type { Meta, StoryObj } from '@storybook/angular';
 import { LoopTileGridComponent } from './loop-tile-grid.component';
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
 
-const meta: Meta<LoopTileGridComponent> = {
+/** How far the running tile's timeline fills: what a painter sets live through `setLiveProgress`
+ *  (the `--loop-tile-progress` the tiles inherit). A story arg here, set on the wrapper. */
+interface ProgressArgs {
+  runningProgressPercent: number;
+}
+
+const meta: Meta<LoopTileGridComponent & ProgressArgs> = {
   title: 'DJ/Loop Tile Grid',
   component: LoopTileGridComponent,
   tags: ['autodocs'],
@@ -11,7 +17,8 @@ const meta: Meta<LoopTileGridComponent> = {
       description: {
         component:
           'Two columns of loop tiles, scrolling vertically inside the height its parent gives it. ' +
-          '`runningProgressPercent` reaches only the running tile. When the selected tile changes ' +
+          'Only the running tile draws the progress a painter sets through `setLiveProgress`, ' +
+          'which the grid hands to that tile alone. When the selected tile changes ' +
           "it is scrolled into view (`block: 'nearest'`); other changes never scroll. With no tiles " +
           'it shows `emptyText`. Presentational only: the caller supplies every tile model.',
       },
@@ -19,7 +26,9 @@ const meta: Meta<LoopTileGridComponent> = {
   },
   argTypes: {
     tiles: { description: 'The tiles, in display order.' },
-    runningProgressPercent: { description: '0–100; reaches only the running tile.' },
+    runningProgressPercent: {
+      description: '0–100, as `setLiveProgress` sets it; reaches only the running tile.',
+    },
     accessibleName: { description: "Names the list, e.g. 'Loops and cues, deck A'." },
     emptyText: { description: 'Shown when there are no tiles; null shows nothing.' },
     triggerTile: { description: "Emits the tile's id when its trigger key is pressed." },
@@ -29,10 +38,12 @@ const meta: Meta<LoopTileGridComponent> = {
   render: (args) => ({
     props: args,
     template: `
-      <div style="width: 474px; height: 180px; display: flex; flex-direction: column">
+      <div
+        style="width: 474px; height: 180px; display: flex; flex-direction: column"
+        [style.--loop-tile-progress]="runningProgressPercent + '%'"
+      >
         <lib-loop-tile-grid
           [tiles]="tiles"
-          [runningProgressPercent]="runningProgressPercent"
           [accessibleName]="accessibleName"
           [emptyText]="emptyText"
         />
@@ -42,7 +53,7 @@ const meta: Meta<LoopTileGridComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<LoopTileGridComponent>;
+type Story = StoryObj<LoopTileGridComponent & ProgressArgs>;
 
 function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
   const kind = overrides.kind ?? 'loop';
@@ -105,10 +116,12 @@ export const Narrow: Story = {
   render: (storyArgs) => ({
     props: storyArgs,
     template: `
-      <div style="width: 300px; height: 180px; display: flex; flex-direction: column">
+      <div
+        style="width: 300px; height: 180px; display: flex; flex-direction: column"
+        [style.--loop-tile-progress]="runningProgressPercent + '%'"
+      >
         <lib-loop-tile-grid
           [tiles]="tiles"
-          [runningProgressPercent]="runningProgressPercent"
           [accessibleName]="accessibleName"
           [emptyText]="emptyText"
         />

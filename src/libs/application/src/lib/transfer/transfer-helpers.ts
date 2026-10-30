@@ -1,5 +1,5 @@
 import { StateSignals, WritableStateSource } from '@ngrx/signals';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../with-devtools';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { TransferJobState } from '@teensyrom-nx/domain';
 import {

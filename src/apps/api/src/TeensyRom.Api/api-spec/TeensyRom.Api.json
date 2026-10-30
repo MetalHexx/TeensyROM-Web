@@ -1529,7 +1529,7 @@
           "MidiSettings"
         ],
         "summary": "Save MIDI Settings",
-        "description": "Saves the whole MIDI settings set: known controllers, control mappings and deck-to-cartridge bindings.\n\nThe set replaces the stored one and is persisted to midi-settings.json beside Settings.json.\n\n**Validation:**\n- At most 64 controllers, 1024 mappings and 2 deck bindings\n- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique\n- Each mapping source names a controller in the same request, and no two mappings share a source\n- Mapping owner is A, B, mixer or set; the control must be a known deck control (A, B) or a set control (set: set-select, set-load-a, set-load-b); the mixer owns none\n- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed, step and step-release, optional (range-checked) for hold, and null otherwise\n- Deck slots are A or B, each bound at most once, to different devices\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "description": "Saves the whole MIDI settings set: known controllers, control mappings and deck-to-cartridge bindings.\n\nThe set replaces the stored one and is persisted to midi-settings.json beside Settings.json.\n\n**Validation:**\n- At most 64 controllers, 1024 mappings and 2 deck bindings\n- Controller and mapping IDs are 1-64 letters, digits, hyphens or underscores, and unique\n- Each mapping source names a controller in the same request, and no two mappings share a source\n- Mapping owner is A, B, mixer or set; the control must be a known deck control (A, B) or a set control (set: set-select, set-load-a, set-load-b); the mixer owns none\n- Style kind must be known; amount is required (and range-checked) for relative-offset, relative-signed, step and step-release, optional (range-checked) for hold, and null otherwise\n- A pitch-bend source (number 0) pairs only with the hand style, and a hand style only with a pitch-bend source; it drives only a deck's seek control\n- A hand style needs a reach (amount, 0.02-2 seconds) and a grip (0.05-3 seconds); grip must be null for every other style\n- Deck slots are A or B, each bound at most once, to different devices\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
         "operationId": "SaveMidiSettings",
         "requestBody": {
           "content": {
@@ -4190,6 +4190,11 @@
             "type": "string"
           },
           "amount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "grip": {
             "type": "number",
             "format": "double",
             "nullable": true

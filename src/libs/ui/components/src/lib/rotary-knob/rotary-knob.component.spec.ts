@@ -576,30 +576,38 @@ describe('RotaryKnobComponent', () => {
     it('writes the dash offset immediately, without change detection', () => {
       component.setLiveLevel(0.5);
 
-      expect(ring().style.strokeDashoffset).toBe('50');
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('50');
     });
 
     it('clamps below 0 to empty, above 1 to full, and reads NaN as empty', () => {
       component.setLiveLevel(2);
-      expect(ring().style.strokeDashoffset).toBe('0');
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('0');
 
       component.setLiveLevel(-1);
-      expect(ring().style.strokeDashoffset).toBe('100');
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('100');
 
       component.setLiveLevel(1);
       component.setLiveLevel(Number.NaN);
-      expect(ring().style.strokeDashoffset).toBe('100');
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('100');
     });
 
-    it('does not rewrite the offset when the quantized level is unchanged', () => {
-      component.setLiveLevel(0.5);
-      ring().style.strokeDashoffset = 'sentinel';
+    it('shows the level in two hundred steps, half a percent of the sweep each', () => {
+      component.setLiveLevel(0.503);
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('49.5');
 
-      component.setLiveLevel(0.5004);
-      expect(ring().style.strokeDashoffset).toBe('sentinel');
+      component.setLiveLevel(0.005);
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('99.5');
+    });
+
+    it('does not rewrite the offset for a change inside one step', () => {
+      component.setLiveLevel(0.5);
+      ring().setAttribute('stroke-dashoffset', 'sentinel');
+
+      component.setLiveLevel(0.502);
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('sentinel');
 
       component.setLiveLevel(0.6);
-      expect(ring().style.strokeDashoffset).toBe('40');
+      expect(ring().getAttribute('stroke-dashoffset')).toBe('40');
     });
   });
 });

@@ -37,7 +37,7 @@ export interface MIDIInputLike {
   connection: 'open' | 'closed' | 'pending';
   open(): Promise<unknown>;
   close(): Promise<unknown>;
-  onmidimessage: ((event: { data: Uint8Array | null }) => void) | null;
+  onmidimessage: ((event: { data: Uint8Array | null; timeStamp?: number }) => void) | null;
 }
 interface MIDIAccessLike {
   inputs: Map<string, MIDIInputLike>;

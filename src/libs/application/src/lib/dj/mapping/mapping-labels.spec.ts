@@ -19,6 +19,18 @@ describe('mapping labels', () => {
     ).toBe('Unknown controller · ch 1 · CC 1');
   });
 
+  it('describes a pitch bend source with no number', () => {
+    expect(
+      describeSource({ controllerId: 'lc', channel: 1, kind: 'pitch-bend', number: 0 }, controllers)
+    ).toBe('Launch Control XL · ch 1 · Pitch bend');
+  });
+
+  it('describes a hand style with its reach and grip in milliseconds', () => {
+    expect(describeStyle({ kind: 'hand', amount: 0.13, grip: 0.25 }, 'pitch-bend')).toBe(
+      'Hand · reach 130 ms · grip 250 ms'
+    );
+  });
+
   it.each([
     ['note', { kind: 'press', amount: null }, 'Note On'],
     ['note', { kind: 'release', amount: null }, 'Note Off'],

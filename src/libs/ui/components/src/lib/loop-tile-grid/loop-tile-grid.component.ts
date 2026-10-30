@@ -4,27 +4,34 @@ import {
   ElementRef,
   Injector,
   afterNextRender,
+  afterRenderEffect,
   computed,
   effect,
   inject,
   input,
   output,
+  untracked,
+  viewChildren,
 } from '@angular/core';
 import { LoopTileComponent, type LoopTileModel } from '../loop-tile/loop-tile.component';
+import type { LiveProgressIndicator } from '../shared/live-indicator';
 
 /**
  * Two columns of `lib-loop-tile`, scrolling vertically inside whatever height its parent gives it.
  * Purely presentational: the caller supplies every tile model and the running tile's progress.
  *
- * `runningProgressPercent` feeds only the tile whose activity is `running`. When the selected tile
- * changes it is scrolled into view (`block: 'nearest'`); other model changes never scroll. With no
- * tiles the grid shows `emptyText`, if given.
+ * The running tile's progress moves per animation frame, so it is not an input: a painter sets it
+ * through `setLiveProgress`, which hands it to the running tile alone — never to the grid's host,
+ * where every tile would restyle with it — and to a tile as it starts running. Until it is set the
+ * tiles inherit `--loop-tile-progress`, so a caller can set it above the grid. When the selected
+ * tile changes it is scrolled into
+ * view (`block: 'nearest'`); other model changes never scroll. With no tiles the grid shows
+ * `emptyText`, if given.
  *
  * @example
  * ```html
  * <lib-loop-tile-grid
  *   [tiles]="tiles()"
- *   [runningProgressPercent]="progress()"
  *   accessibleName="Loops and cues, deck A"
  *   emptyText="No loops or cues yet"
  *   (triggerTile)="onTrigger($event)"
@@ -40,11 +47,9 @@ import { LoopTileComponent, type LoopTileModel } from '../loop-tile/loop-tile.co
   styleUrl: './loop-tile-grid.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LoopTileGridComponent {
+export class LoopTileGridComponent implements LiveProgressIndicator {
   /** The tiles, in display order. */
   readonly tiles = input.required<readonly LoopTileModel[]>();
-  /** 0–100; reaches only the running tile. */
-  readonly runningProgressPercent = input<number>(0);
   /** Names the list, e.g. 'Loops and cues, deck A'. */
   readonly accessibleName = input.required<string>();
   /** Shown in place of the list when there are no tiles; `null` shows nothing. */
@@ -63,11 +68,37 @@ export class LoopTileGridComponent {
     () => this.tiles().find((tile) => tile.selected)?.id ?? null
   );
 
+  private readonly tileViews = viewChildren(LoopTileComponent);
+  /** The tile drawn running — the only one that shows the progress — or null. */
+  private readonly runningTile = computed(
+    () => this.tileViews().find((tile) => tile.model().activity === 'running') ?? null
+  );
+
+  /** The running tile's progress as last set; null until it is. */
+  private liveProgress: number | null = null;
+
   constructor() {
     effect(() => {
       if (this.selectedId() === null) return;
       afterNextRender(() => this.scrollSelectedIntoView(), { injector: this.injector });
     });
+    // A tile that starts running takes the progress as last set.
+    afterRenderEffect({
+      write: () => {
+        const tile = this.runningTile();
+        const progress = this.liveProgress;
+        if (tile !== null && progress !== null) {
+          untracked(() => tile.setLiveProgress(progress));
+        }
+      },
+    });
+  }
+
+  /** Sets the running tile's progress, 0–100 — the tile holds it to that range — straight on its
+   *  timeline: no signal, no change detection, and nothing written when it did not change. */
+  setLiveProgress(percent: number): void {
+    this.liveProgress = percent;
+    this.runningTile()?.setLiveProgress(percent);
   }
 
   private scrollSelectedIntoView(): void {

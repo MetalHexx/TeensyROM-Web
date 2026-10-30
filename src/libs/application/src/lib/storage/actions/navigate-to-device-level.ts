@@ -2,7 +2,7 @@ import { StorageState, NavigationHistory, NavigationHistoryItem } from '../stora
 import { WritableStore, clearSearchState } from '../storage-helpers';
 import { createAction } from '@teensyrom-nx/utils';
 import { LogType, logInfo } from '@teensyrom-nx/utils';
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 
 export function navigateToDeviceLevel(store: WritableStore<StorageState>) {
   return {

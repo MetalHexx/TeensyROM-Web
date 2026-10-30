@@ -58,6 +58,7 @@ export class MidiInputRouter {
       number: message.number,
       value: message.value,
       pressed: message.pressed,
+      timeStampMs: message.timeStampMs,
     });
   }
 

@@ -129,13 +129,15 @@ svg {
   stroke-linecap: round;
 }
 
-// `pathLength="100"` makes the dash offset a percentage; `setLiveLevel` writes it inline.
+// `pathLength="100"` makes the dash offset a percentage. The offset itself is the path's
+// `stroke-dashoffset` attribute (empty in the template, then written by `setLiveLevel`) and must
+// never be set here: any CSS rule overrides a presentation attribute, so the live writes would stop
+// showing.
 .live-ring {
   stroke: var(--color-highlight);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 100 100;
-  stroke-dashoffset: 100;
   filter: drop-shadow(0 0 3px rgba(var(--color-highlight-rgb), 0.85));
 }
 

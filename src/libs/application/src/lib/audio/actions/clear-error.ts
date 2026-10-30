@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import { AudioStreamState } from '@teensyrom-nx/domain';
 import { AudioState } from '../audio-store.state';

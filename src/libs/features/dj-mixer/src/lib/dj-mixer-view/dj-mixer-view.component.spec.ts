@@ -21,6 +21,7 @@ import {
   MidiMappings,
   MidiMappingStore,
   MixerService,
+  PlayheadPainter,
   SidPanelPainter,
   StorageStore,
   controlKey,
@@ -107,17 +108,15 @@ function idleTransportSummary(): DeckTransportSummary {
     showing: 'play',
     controlsDisabled: true,
     canStop: false,
-    scrubPercent: 0,
     bar: { kind: 'unknown' },
-    frameLabel: 'frame 0',
     title: null,
     author: null,
-    elapsedText: '00:00.0',
     totalText: '--:--',
     subtuneText: 'Subtune 0 of 0',
     subtuneCompact: '–/–',
     subtuneDisabled: true,
     repeat: true,
+    held: false,
     errors: [],
   };
 }
@@ -225,7 +224,6 @@ function createDjStoreStub(
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
     loopsSummary: () => signal(loops),
-    loopLapPercent: () => signal(0),
     settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
     asidLaunching,
     bindings: signal({
@@ -265,6 +263,10 @@ function createMixerServiceStub() {
 
 function createSidPanelPainterStub() {
   return { attach: vi.fn(() => () => undefined) };
+}
+
+function createPlayheadPainterStub() {
+  return { attach: vi.fn(() => () => undefined), pin: vi.fn() };
 }
 
 function createDeckServiceStub() {
@@ -354,6 +356,7 @@ function render(
       { provide: AsidPlayerLauncher, useValue: launcher },
       { provide: MixerService, useValue: createMixerServiceStub() },
       { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
+      { provide: PlayheadPainter, useValue: createPlayheadPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
       { provide: MidiControllers, useValue: midi.controllers },
       { provide: MidiLearn, useValue: midi.learn },

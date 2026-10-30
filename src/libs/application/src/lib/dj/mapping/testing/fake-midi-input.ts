@@ -1,9 +1,10 @@
 import { signal } from '@angular/core';
-import type {
-  IMidiInput,
-  MidiInputMessage,
-  MidiInputOpenResult,
-  MidiInputPort,
+import {
+  PITCH_BEND_CENTRE,
+  type IMidiInput,
+  type MidiInputMessage,
+  type MidiInputOpenResult,
+  type MidiInputPort,
 } from '../../ports';
 
 /**
@@ -71,11 +72,29 @@ export class FakeMidiInput implements IMidiInput {
     kind: 'note' | 'cc',
     number: number,
     value: number,
-    channel = 1
+    channel = 1,
+    timeStampMs = 0
   ): void {
     const pressed = kind === 'note' ? value > 0 : value >= 64;
+    this.deliver({ portId, kind, channel, number, value, pressed, timeStampMs });
+  }
+
+  /** Delivers a pitch bend (0–16383) as an open port would. */
+  emitPitchBend(portId: string, value: number, channel = 1, timeStampMs = 0): void {
+    this.deliver({
+      portId,
+      kind: 'pitch-bend',
+      channel,
+      number: 0,
+      value,
+      pressed: value !== PITCH_BEND_CENTRE,
+      timeStampMs,
+    });
+  }
+
+  private deliver(message: MidiInputMessage): void {
     for (const listener of [...this.listeners]) {
-      listener({ portId, kind, channel, number, value, pressed });
+      listener(message);
     }
   }
 

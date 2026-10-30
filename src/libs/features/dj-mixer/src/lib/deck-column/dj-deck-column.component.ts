@@ -1,12 +1,15 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
+  afterNextRender,
   computed,
   effect,
   inject,
   input,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { ScalingContainerComponent } from '@teensyrom-nx/ui/components';
 import type { BindingCardModel, BindingPortModel } from '@teensyrom-nx/ui/components';
@@ -32,6 +35,7 @@ import {
   DeviceStore,
   DjStore,
   MARKER_NAME_MAX_LENGTH,
+  PlayheadPainter,
   SPEED_FADER_RANGE,
   type DeckTransportSummary,
   type LoopActivity,
@@ -39,7 +43,6 @@ import {
   type LoopItemSummary,
   type LoopSelectionSummary,
   cartridgeOptions,
-  formatElapsed,
 } from '@teensyrom-nx/application';
 import { isDjFileDrag, readDjFileDragData } from '../drag/dj-file-drag';
 import { isSetRowDrag, readSetRowDragId } from '../drag/dj-set-row-drag';
@@ -166,12 +169,19 @@ export class DjDeckColumnComponent {
   private readonly djStore = inject(DjStore);
   private readonly deviceStore = inject(DeviceStore);
   private readonly deckService = inject(DeckService);
+  private readonly playheadPainter = inject(PlayheadPainter);
 
   readonly deck = input.required<DeckRef>();
 
   /** Whether a SID drag is currently in flight anywhere in the view — lights this deck's overlay. */
   readonly dropActive = input<boolean>(false);
 
+  /** The playhead readouts' targets: `PlayheadPainter` writes the transport's position, elapsed
+   *  time and frame, and the running tile's lap, straight to them. */
+  private readonly transport = viewChild.required(DeckTransportComponent);
+  private readonly loopsPlate = viewChild.required(LoopsCuesPlateComponent);
+
+  /** Never reads the playhead, so `transportModel` keeps its identity while the deck plays. */
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
   private readonly binding = computed(() => this.djStore.bindingSummary(this.deck().slot)());
   private readonly deckState = computed(() => this.djStore.deck(this.deck().slot)());
@@ -181,8 +191,6 @@ export class DjDeckColumnComponent {
 
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
   readonly loops = computed(() => this.djStore.loopsSummary(this.deck().slot)());
-  /** The one per-frame value the plate takes: the running tile's lap. */
-  readonly loopLapPercent = computed(() => this.djStore.loopLapPercent(this.deck().slot)());
 
   // Non-null only while a nudge strip is being dragged: the pointer's offset pins the boundary
   // readout until the nudge is committed or the selection moves on.
@@ -228,12 +236,21 @@ export class DjDeckColumnComponent {
         this.endDragOffset.set(null);
       });
     });
+
+    let detach: (() => void) | null = null;
+    afterNextRender(() => {
+      detach = this.playheadPainter.attach(this.deck().slot, {
+        transport: this.transport(),
+        loops: this.loopsPlate(),
+      });
+    });
+    inject(DestroyRef).onDestroy(() => detach?.());
   }
 
-  // Non-null only mid-drag or mid-seek: the pointer's own value pins the thumb so a polled
-  // position update can't fight it — the POC transport adapter's pin-until-landed rule, carried
-  // over verbatim (see `onScrubCommit`).
-  private readonly scrubDragValue = signal<number | null>(null);
+  // Non-null only mid-drag or mid-seek: the pointer's own value pins the transport's readouts, in
+  // the painter, so the moving playhead can't fight it — the POC transport adapter's
+  // pin-until-landed rule, carried over verbatim (see `onScrubCommit`).
+  private scrubDragValue: number | null = null;
 
   readonly transportModel = computed<DeckTransportModel>(() => {
     const { letter } = this.deck();
@@ -244,7 +261,8 @@ export class DjDeckColumnComponent {
     return {
       accessibleName: `Transport deck ${letter}`,
       state,
-      stateLabel: STATE_LABELS[state],
+      stateLabel: summary.held ? 'Held' : STATE_LABELS[state],
+      held: summary.held,
       title: summary.title,
       author: summary.author,
       emptyText: 'No tune — drop a SID here',
@@ -278,28 +296,6 @@ export class DjDeckColumnComponent {
         nextAccessibleName: `Next in the set deck ${letter}`,
       },
     };
-  });
-
-  /** The playhead as a percentage, or the drag pin while one is held. */
-  readonly positionPercent = computed(() => this.scrubDragValue() ?? this.summary().scrubPercent);
-
-  /** The frame under the drag pin, or null when no drag or seek is in flight. */
-  private readonly pinFrames = computed<number | null>(() => {
-    const pin = this.scrubDragValue();
-    return pin === null ? null : (pin / 100) * (this.deckState().lengthFrames ?? 0);
-  });
-
-  /** Follows the drag pin like the thumb does, so the display tracks the pointer. */
-  readonly elapsedText = computed(() => {
-    const frames = this.pinFrames();
-    return frames === null
-      ? this.summary().elapsedText
-      : formatElapsed(frames, this.deckState().playCallIntervalUs);
-  });
-
-  readonly frameLabel = computed(() => {
-    const frames = this.pinFrames();
-    return frames === null ? this.summary().frameLabel : `frame ${Math.round(frames)}`;
   });
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
@@ -450,19 +446,21 @@ export class DjDeckColumnComponent {
     void this.deckService.nextRow(this.deck().slot);
   }
 
-  /** Pins the thumb at the dragged value for as long as the drag lasts. */
+  /** Pins the thumb, the elapsed time and the frame at the dragged value for as long as the drag
+   *  lasts. */
   onScrubInput(value: number): void {
-    this.scrubDragValue.set(value);
+    this.pinScrub(value);
   }
 
-  /** The release, not every drag tick. The pin stays set — holding the thumb at the released spot
-   *  — until the seek actually lands, guarded on the pin still being this call's own value so a
-   *  superseded scrub settling late cannot clear a newer one's pin out from under it. */
+  /** The release, not every drag tick. The pin stays set — holding the readouts at the released
+   *  spot — until the seek actually lands, guarded on the pin still being this call's own value so
+   *  a superseded scrub settling late cannot clear a newer one's pin out from under it. Clearing it
+   *  repaints the landed playhead at once. */
   async onScrubCommit(value: number): Promise<void> {
-    this.scrubDragValue.set(value);
+    this.pinScrub(value);
     await this.deckService.seek(this.deck().slot, value);
-    if (this.scrubDragValue() === value) {
-      this.scrubDragValue.set(null);
+    if (this.scrubDragValue === value) {
+      this.pinScrub(null);
     }
   }
 
@@ -562,5 +560,12 @@ export class DjDeckColumnComponent {
 
   onIdentify(): void {
     this.deckService.identify(this.deck().slot);
+  }
+
+  /** Records the pin and hands it to the painter, which paints it — or, cleared, the playhead —
+   *  at once. */
+  private pinScrub(value: number | null): void {
+    this.scrubDragValue = value;
+    this.playheadPainter.pin(this.deck().slot, value);
   }
 }

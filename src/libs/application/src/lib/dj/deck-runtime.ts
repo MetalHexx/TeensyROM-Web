@@ -1,6 +1,13 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, isDevMode } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { createSidPlayer, parseSidFile, frames, clamp, playCallIntervalUs } from '@sidablist/core';
+import {
+  createSidPlayer,
+  parseSidFile,
+  frames,
+  clamp,
+  milliseconds,
+  playCallIntervalUs,
+} from '@sidablist/core';
 import type {
   SidPlayer,
   PlayerSnapshot,
@@ -10,21 +17,49 @@ import type {
   JumpSettings,
   SidField,
   SidModel,
+  VarispeedRateSource,
 } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
-import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
+import {
+  FRAME_CLOCK_FACTORY,
+  REPLAY_RUNNER_FACTORY,
+  REGISTER_RECORDER_FACTORY,
+  MIDI_ACCESS,
+} from './ports';
+import type { RegisterRecorder } from './ports';
 import type { Slot } from './slot';
+import { DeliveryProbe } from './bench/delivery-probe';
+import { installDeckBench } from './bench/deck-bench';
+
+/** How many seconds of play a tune's register record covers beyond the longest position the
+ *  transport can show, so a hand has room to run past the end of the bar. */
+const RECORD_MARGIN_SECONDS = 5;
+
+/**
+ * How far past its due time each frame is stamped for the MIDI stack: not at all, so Chrome sends
+ * each frame the moment the clock hands it over, and nothing a deck does is delayed. The clock
+ * releases frames in bursts — the audio device runs in ~10.7 ms periods — so at zero a frame pair
+ * now and then lands on the same instant, where stamping ahead would put every frame on the grid.
+ *
+ * Bench and ear on InSID3 Out at 1×, real hardware, once the page stopped blocking the main thread:
+ * collapsed pairs 3.8% at 0 against 0% at 12 and 20 ms (17% at 0 before), yet the three sounded
+ * about the same by ear and 0 the best. The ASID sink caps it at 40 ms for a port that cannot
+ * cancel; `djBench.lookahead(ms)` tries another value in a dev build.
+ */
+const DECK_SCHEDULE_AHEAD_MS = milliseconds(0);
 
 /** One deck slot's whole engine bundle: the core player, its ASID sink, the audio-graph clock
- *  driving it and the two replay threads it uses — one for jumps, one for prepared builds. */
+ *  driving it, the two replay threads it uses — one for jumps, one for prepared builds — and the
+ *  recorder that scans the loaded tune's register record. */
 export interface SlotRuntime {
   readonly player: SidPlayer;
   readonly sink: AsidSink;
   readonly clock: FrameClock;
   readonly replay: ReplayRunner;
   readonly prepare: ReplayRunner;
+  readonly recorder: RegisterRecorder;
 }
 
 /** The façade's mutable target: which port id a slot currently points at, and whether the
@@ -47,12 +82,30 @@ interface FacadeState {
 export class DeckRuntime {
   private readonly clockFactory = inject(FRAME_CLOCK_FACTORY);
   private readonly replayFactory = inject(REPLAY_RUNNER_FACTORY);
+  private readonly recorderFactory = inject(REGISTER_RECORDER_FACTORY);
   private readonly midiAccess = inject(MIDI_ACCESS);
 
   private readonly slots = new Map<Slot, SlotRuntime>();
   private readonly facades = new Map<Slot, FacadeState>();
   /** The chip model of the tune each slot last loaded — what `resync` hands the sink's `begin`. */
   private readonly chipModels = new Map<Slot, SidModel>();
+  /** Bumped by every `load`: a record scan that comes back after a newer load is stale. */
+  private readonly loadGenerations = new Map<Slot, number>();
+  /** Each slot's delivery probe — dev builds only, read through the console bench. */
+  private readonly probes = new Map<Slot, DeliveryProbe>();
+
+  constructor() {
+    if (isDevMode()) {
+      installDeckBench(() =>
+        [...this.slots].map(([slot, { player, sink }]) => ({
+          slot,
+          player,
+          sink,
+          probe: this.requireProbe(slot),
+        }))
+      );
+    }
+  }
 
   /** Builds this slot's engine bundle, once. A second call is a no-op — the sink, the player, the
    *  clock and the replay threads are never rebuilt for a slot already built. */
@@ -63,15 +116,21 @@ export class DeckRuntime {
 
     const facade: FacadeState = { portId: null, warned: false };
     this.facades.set(slot, facade);
+    if (isDevMode()) {
+      const probe = new DeliveryProbe();
+      probe.setScheduleAhead(DECK_SCHEDULE_AHEAD_MS);
+      this.probes.set(slot, probe);
+    }
 
     const port = this.createOutputPort(slot, facade);
-    const sink = createAsidSink(port);
+    const sink = createAsidSink(port, { scheduleAheadMs: DECK_SCHEDULE_AHEAD_MS });
     const clock = this.clockFactory();
     const replay = this.replayFactory();
     const prepare = this.replayFactory();
+    const recorder = this.recorderFactory();
     const player = createSidPlayer({ sink, clock, replayRunner: replay, prepareRunner: prepare });
 
-    this.slots.set(slot, { player, sink, clock, replay, prepare });
+    this.slots.set(slot, { player, sink, clock, replay, prepare, recorder });
   }
 
   /** Re-targets this slot's port façade. The sink and player are never rebuilt — only the id the
@@ -94,10 +153,12 @@ export class DeckRuntime {
     }
   }
 
-  /** Hands a resolved tune to this slot's player: loads it, selects its subtune, and lands
-   *  whatever structure the tune's index carries. */
+  /** Hands a resolved tune to this slot's player: loads it, selects its subtune, lands whatever
+   *  structure the tune's index carries, and asks the slot's recorder for the tune's register
+   *  record, which the player takes when it arrives. The one funnel for a tune load and a subtune
+   *  switch, so both get a record. */
   load(slot: Slot, playable: Playable): void {
-    const { player } = this.requireSlot(slot);
+    const { player, recorder } = this.requireSlot(slot);
     const file = parseSidFile(playable.bytes);
     player.loadTune(file);
     this.chipModels.set(slot, file.model);
@@ -109,6 +170,27 @@ export class DeckRuntime {
       loopPeriodFrames: index.loopPeriodFrames === null ? null : frames(index.loopPeriodFrames),
       endedAtFrame: index.endedAtFrame === null ? null : frames(index.endedAtFrame),
     });
+
+    const generation = (this.loadGenerations.get(slot) ?? 0) + 1;
+    this.loadGenerations.set(slot, generation);
+    const { basis } = player.getSnapshot();
+    const recordFrames =
+      Math.max(basis.positionBasisFrames, basis.ceilingFrames) +
+      Math.round((RECORD_MARGIN_SECONDS * 1e6) / this.playCallIntervalUs(slot));
+    recorder
+      .record(playable.bytes, playable.reference.identity.subtune, recordFrames)
+      .then((record) => {
+        if (record !== null && this.loadGenerations.get(slot) === generation) {
+          player.setRegisterRecord(record);
+        }
+      })
+      .catch((error: unknown) =>
+        logWarn(
+          `DeckRuntime: slot ${slot} register scan failed — ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      );
   }
 
   play(slot: Slot): Promise<void> {
@@ -256,11 +338,25 @@ export class DeckRuntime {
     this.requireSlot(slot).sink.showText(text);
   }
 
-  /** Disposes this slot's player, which releases both replay threads. Nothing else holds the
-   *  clock's audio graph, the ASID session or the threads — a player left running keeps streaming
-   *  frames with no UI left to reach `stop()`. */
+  /** Puts this slot's player in varispeed, the rate named by `source` once a tick. False, with no
+   *  effect, when there is no record yet or the position lies past it. */
+  enterVarispeed(slot: Slot, source: VarispeedRateSource): boolean {
+    return this.requireSlot(slot).player.enterVarispeed(source);
+  }
+
+  /** Takes this slot out of varispeed: a playing deck hands back to live playback, any other is
+   *  left paused where the hand stopped. Does nothing outside varispeed. */
+  leaveVarispeed(slot: Slot): void {
+    this.requireSlot(slot).player.leaveVarispeed();
+  }
+
+  /** Disposes this slot's player, which releases both replay threads, and its recorder. Nothing
+   *  else holds the clock's audio graph, the ASID session or the threads — a player left running
+   *  keeps streaming frames with no UI left to reach `stop()`. */
   dispose(slot: Slot): void {
-    this.requireSlot(slot).player.dispose();
+    const { player, recorder } = this.requireSlot(slot);
+    player.dispose();
+    recorder.dispose();
   }
 
   /**
@@ -273,6 +369,8 @@ export class DeckRuntime {
   private createOutputPort(slot: Slot, facade: FacadeState): MidiOutputPort {
     const resolve = (): MidiOutputPort | null =>
       facade.portId === null ? null : this.midiAccess.outputPortFor(facade.portId);
+    // Recorded before the port resolves, so a deck with nothing bound still measures its timing.
+    const probe = this.probes.get(slot) ?? null;
 
     return {
       get portId(): string | null {
@@ -282,6 +380,9 @@ export class DeckRuntime {
         return resolve()?.supportsCancel ?? false;
       },
       send: (bytes: Uint8Array, timestampMs?: number): void => {
+        if (probe !== null && timestampMs !== undefined) {
+          probe.record(timestampMs);
+        }
         const resolved = resolve();
         if (resolved === null) {
           if (!facade.warned) {
@@ -302,6 +403,14 @@ export class DeckRuntime {
       throw new Error(`DeckRuntime: slot ${slot} has not been built`);
     }
     return entry;
+  }
+
+  private requireProbe(slot: Slot): DeliveryProbe {
+    const probe = this.probes.get(slot);
+    if (probe === undefined) {
+      throw new Error(`DeckRuntime: slot ${slot} has not been built`);
+    }
+    return probe;
   }
 
   private requireFacade(slot: Slot): FacadeState {

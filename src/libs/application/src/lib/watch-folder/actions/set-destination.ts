@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import {
   IWatchFolderService,
   WatchFolderDestinationChange,

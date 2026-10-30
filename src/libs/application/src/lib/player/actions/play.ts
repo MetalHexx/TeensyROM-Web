@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { firstValueFrom } from 'rxjs';
 import { PlayerStatus } from '@teensyrom-nx/domain';
 import { IPlayerService } from '@teensyrom-nx/domain';

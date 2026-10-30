@@ -1,5 +1,5 @@
 import { signalStore, withState } from '@ngrx/signals';
-import { withDevtools } from '@angular-architects/ngrx-toolkit';
+import { withDevtools } from '../with-devtools';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { WatchFolder } from '@teensyrom-nx/domain';
 import { withWatchFolderSelectors } from './selectors';

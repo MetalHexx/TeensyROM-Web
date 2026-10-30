@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { logWarn } from '@teensyrom-nx/utils';
+import type { HandTarget } from '../deck-hand';
 import type { ControlIdentity, MappingStyle, MidiSource, SourceEvent } from './mapping.models';
 import {
   LAUNCH_CONTROL,
@@ -8,6 +9,8 @@ import {
   ccSource,
   note,
   noteSource,
+  pitchBend,
+  pitchBendSource,
   setUpMappingHarness,
   type MappingHarness,
 } from './testing/mapping-harness';
@@ -719,6 +722,163 @@ describe('MidiMappingEngine', () => {
       h.engine.handle(note(60, 0));
 
       expect(held(0)).toBe(false);
+    });
+  });
+
+  describe('a hand', () => {
+    const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
+    const STRIP = pitchBendSource();
+    const HAND: MappingStyle = { kind: 'hand', amount: 0.4, grip: 0.9 };
+
+    function handOf(owner: 'A' | 'B'): HandTarget {
+      const control = h.controls.find({ owner, control: 'seek' });
+      if (control?.nature !== 'value' || control.hand === undefined) {
+        throw new Error('seek offers no hand');
+      }
+      return control.hand;
+    }
+
+    let strip: MockInstance<HandTarget['strip']>;
+    let lose: MockInstance<HandTarget['lose']>;
+
+    beforeEach(() => {
+      strip = vi.spyOn(handOf('A'), 'strip').mockImplementation(() => undefined);
+      lose = vi.spyOn(handOf('A'), 'lose').mockImplementation(() => undefined);
+    });
+
+    it("hands the strip's value and time to the control's hand with the mapping's reach and grip", () => {
+      map(STRIP, SEEK_A, HAND);
+
+      h.engine.handle(pitchBend(12000, 55));
+
+      expect(strip).toHaveBeenCalledExactlyOnceWith(12000, 55, 0.4, 0.9);
+    });
+
+    it('uses the home grip for a mapping that has none', () => {
+      h.mappingStore.upsertMapping({
+        mapping: {
+          id: 'saved',
+          source: STRIP,
+          control: SEEK_A,
+          style: { kind: 'hand', amount: 0.4 },
+        },
+      });
+
+      h.engine.handle(pitchBend(12000));
+
+      expect(strip).toHaveBeenCalledExactlyOnceWith(12000, 0, 0.4, 0.25);
+    });
+
+    it("passes the return to centre on too, which is the hand's lift", () => {
+      map(STRIP, SEEK_A, HAND);
+
+      h.engine.handle(pitchBend(12000));
+      h.engine.handle(pitchBend(8192, 30));
+
+      expect(strip.mock.calls.map((call) => call[0])).toEqual([12000, 8192]);
+    });
+
+    it('is deaf to a hand mapping on a control that takes none, and to a CC or a note on a hand mapping', () => {
+      h.mappingStore.upsertMapping({
+        mapping: { id: 'no-hand', source: STRIP, control: SPEED_A, style: HAND },
+      });
+      h.mappingStore.upsertMapping({
+        mapping: { id: 'cc-hand', source: ccSource(7), control: SEEK_A, style: HAND },
+      });
+
+      expect(() => {
+        h.engine.handle(pitchBend(12000));
+        h.engine.handle(cc(7, 100));
+      }).not.toThrow();
+
+      expect(strip).not.toHaveBeenCalled();
+      expect(speed()).toBe(1);
+    });
+
+    it('leaves a knob mapped to the same control driving it', () => {
+      const seek = vi.spyOn(h.deckService, 'seek').mockResolvedValue(undefined);
+      map(STRIP, SEEK_A, HAND);
+      map(ccSource(7), SEEK_A, style('absolute'));
+
+      h.engine.handle(cc(7, 127));
+      h.engine.handle(pitchBend(12000));
+
+      expect(seek).toHaveBeenCalledExactlyOnceWith('A', 100);
+      expect(strip).toHaveBeenCalledTimes(1);
+    });
+
+    it('holds the source from the touch to the return to centre', () => {
+      map(STRIP, SEEK_A, HAND);
+      expect(h.engine.isHolding(STRIP)).toBe(false);
+
+      h.engine.handle(pitchBend(12000));
+      h.engine.handle(pitchBend(12500));
+      expect(h.engine.isHolding(STRIP)).toBe(true);
+      expect(h.engine.isHolding(pitchBendSource(2))).toBe(false);
+
+      h.engine.handle(pitchBend(8192));
+      expect(h.engine.isHolding(STRIP)).toBe(false);
+      expect(lose).not.toHaveBeenCalled();
+    });
+
+    describe('letting go with a finger down', () => {
+      it.each([
+        ['every hold is released', () => h.engine.releaseHolds()],
+        ['its controller is lost', () => h.engine.releaseHolds(LAUNCH_CONTROL)],
+        ['the page is hidden', () => window.dispatchEvent(new Event('pagehide'))],
+        ['its mapping is deleted', () => h.mappings.remove(mappingId())],
+        ['its mapping is released', () => h.engine.releaseMapping(mappingId())],
+        [
+          'its strip is learned onto the other deck',
+          () => h.mappings.bind(STRIP, { owner: 'B', control: 'seek' }, HAND),
+        ],
+      ])('lifts it once when %s', (_when, release) => {
+        map(STRIP, SEEK_A, HAND);
+        h.engine.handle(pitchBend(12000));
+
+        release();
+
+        expect(lose).toHaveBeenCalledTimes(1);
+        expect(h.engine.isHolding(STRIP)).toBe(false);
+      });
+
+      it("spares another controller's strip", () => {
+        map(STRIP, SEEK_A, HAND);
+        h.engine.handle(pitchBend(12000));
+
+        h.engine.releaseHolds('other-controller');
+
+        expect(lose).not.toHaveBeenCalled();
+        expect(h.engine.isHolding(STRIP)).toBe(true);
+      });
+
+      it('has nothing to lift once the finger is off', () => {
+        map(STRIP, SEEK_A, HAND);
+        h.engine.handle(pitchBend(12000));
+        h.engine.handle(pitchBend(8192));
+
+        h.engine.releaseHolds();
+
+        expect(lose).not.toHaveBeenCalled();
+      });
+
+      it('carries on lifting the rest when one lift throws', () => {
+        map(STRIP, SEEK_A, HAND);
+        h.engine.handle(pitchBend(12000));
+        lose.mockImplementationOnce(() => {
+          throw new Error('boom');
+        });
+        map(noteSource(70), HOLD_1_A, style('hold'));
+        h.engine.handle(note(70, 100));
+
+        expect(() => h.engine.releaseHolds()).not.toThrow();
+
+        expect(held(0)).toBe(false);
+      });
+
+      function mappingId(): string {
+        return h.mappingStore.mappingBySource(`${LAUNCH_CONTROL}|1|pitch-bend|0`)()?.id as string;
+      }
     });
   });
 });

@@ -31,6 +31,12 @@ export interface MidiMappingStyleDto {
      * @memberof MidiMappingStyleDto
      */
     amount?: number | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof MidiMappingStyleDto
+     */
+    grip?: number | null;
 }
 
 /**
@@ -53,6 +59,7 @@ export function MidiMappingStyleDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'kind': json['kind'],
         'amount': json['amount'] == null ? undefined : json['amount'],
+        'grip': json['grip'] == null ? undefined : json['grip'],
     };
 }
 
@@ -69,6 +76,7 @@ export function MidiMappingStyleDtoToJSONTyped(value?: MidiMappingStyleDto | nul
         
         'kind': value['kind'],
         'amount': value['amount'],
+        'grip': value['grip'],
     };
 }
 

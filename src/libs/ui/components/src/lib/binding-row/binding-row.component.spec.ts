@@ -12,6 +12,15 @@ const AMOUNT: BindingRowAmount = {
   suffix: '%',
 };
 
+const SECOND_AMOUNT: BindingRowAmount = {
+  label: 'Grip',
+  value: 250,
+  min: 50,
+  max: 3000,
+  step: 10,
+  suffix: 'ms',
+};
+
 function modelWith(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
   return {
     name: 'Speed',
@@ -27,6 +36,7 @@ function modelWith(overrides: Partial<BindingRowModel> = {}): BindingRowModel {
     triggerOptions: null,
     selectedTriggerId: null,
     amount: AMOUNT,
+    secondAmount: null,
     statusText: null,
     editAccessibleName: 'Edit Speed binding',
     deleteAccessibleName: 'Delete Speed binding',
@@ -42,6 +52,7 @@ describe('BindingRowComponent', () => {
   let styles: string[];
   let triggers: string[];
   let amounts: number[];
+  let secondAmounts: number[];
   let relearns: number;
   let deletes: number;
 
@@ -58,10 +69,12 @@ describe('BindingRowComponent', () => {
     styles = [];
     triggers = [];
     amounts = [];
+    secondAmounts = [];
     component.editToggle.subscribe(() => editToggles++);
     component.styleSelect.subscribe((id) => styles.push(id));
     component.triggerSelect.subscribe((id) => triggers.push(id));
     component.amountChange.subscribe((value) => amounts.push(value));
+    component.secondAmountChange.subscribe((value) => secondAmounts.push(value));
     component.relearn.subscribe(() => relearns++);
     component.deleteBinding.subscribe(() => deletes++);
 
@@ -92,6 +105,17 @@ describe('BindingRowComponent', () => {
   function enterAmount(text: string): void {
     amountInput().value = text;
     amountInput().dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function secondAmountInput(): HTMLInputElement | null {
+    return (root().querySelectorAll('input[type="number"]')[1] as HTMLInputElement) ?? null;
+  }
+
+  function enterSecondAmount(text: string): void {
+    const input = secondAmountInput() as HTMLInputElement;
+    input.value = text;
+    input.dispatchEvent(new Event('change'));
     fixture.detectChanges();
   }
 
@@ -302,6 +326,78 @@ describe('BindingRowComponent', () => {
 
       setModel({ expanded: false });
       setModel({ expanded: true });
+
+      expect(alerts()).toEqual([]);
+    });
+  });
+
+  describe('second amount', () => {
+    beforeEach(() => setModel({ expanded: true, secondAmount: SECOND_AMOUNT }));
+
+    it('labels its own native number input, after the amount, with its range and step', () => {
+      const input = secondAmountInput() as HTMLInputElement;
+      const label = root().querySelector(`label[for="${input.id}"]`);
+
+      expect(label?.textContent?.trim()).toBe('Grip');
+      expect(input.id).not.toBe(amountInput().id);
+      expect([input.min, input.max, input.step, input.value]).toEqual(['50', '3000', '10', '250']);
+    });
+
+    it('is not shown without a second amount', () => {
+      setModel({ expanded: true, secondAmount: null });
+
+      expect(secondAmountInput()).toBeNull();
+    });
+
+    it('emits a valid entry, including the boundaries, on secondAmountChange only', () => {
+      enterSecondAmount('400');
+      enterSecondAmount('50');
+      enterSecondAmount('3000');
+
+      expect(secondAmounts).toEqual([400, 50, 3000]);
+      expect(amounts).toEqual([]);
+      expect(alerts()).toEqual([]);
+    });
+
+    it.each([
+      ['above the maximum', '3001'],
+      ['below the minimum', '49'],
+      ['empty', ''],
+      ['not a number', 'abc'],
+    ])(
+      'shows an inline error on its own field and emits nothing for an entry %s',
+      (_case, text) => {
+        enterSecondAmount(text);
+
+        const input = secondAmountInput() as HTMLInputElement;
+        expect(secondAmounts).toEqual([]);
+        expect(alerts()).toEqual(['Enter a number from 50 to 3000.']);
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(
+          root().querySelector(`#${input.getAttribute('aria-describedby')}`)?.textContent
+        ).toContain('Enter a number');
+        expect(amountInput().hasAttribute('aria-invalid')).toBe(false);
+      }
+    );
+
+    it('keeps the amount and second amount errors apart', () => {
+      enterAmount('99');
+      enterSecondAmount('9999');
+
+      expect(alerts()).toEqual([
+        'Enter a number from 0.1 to 10.',
+        'Enter a number from 50 to 3000.',
+      ]);
+
+      enterSecondAmount('300');
+      expect(alerts()).toEqual(['Enter a number from 0.1 to 10.']);
+    });
+
+    it('drops a stale error when the row is collapsed and expanded again', () => {
+      enterSecondAmount('9999');
+
+      setModel({ expanded: false, secondAmount: SECOND_AMOUNT });
+      setModel({ expanded: true, secondAmount: SECOND_AMOUNT });
 
       expect(alerts()).toEqual([]);
     });

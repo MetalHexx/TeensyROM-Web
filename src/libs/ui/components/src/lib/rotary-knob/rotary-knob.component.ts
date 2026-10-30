@@ -8,6 +8,7 @@ import {
   output,
   viewChild,
 } from '@angular/core';
+import { LIVE_LEVEL_STEPS, liveLevelStep } from '@teensyrom-nx/utils';
 import type { ControlSize } from '../shared/control-size';
 import type { LiveLevelIndicator } from '../shared/live-indicator';
 
@@ -30,8 +31,8 @@ const PANEL_POINTER_INNER_RADIUS = 6;
 const PANEL_POINTER_OUTER_RADIUS = 17;
 /** Right-hand end of the sweep, +45°. */
 const END_ANGLE_DEG = HOME_ANGLE_DEG + TRAVEL_DEG;
-/** The live ring's resolution: the level is quantized to thousandths. */
-const LIVE_LEVEL_STEPS = 1000;
+/** The live ring's `pathLength` in the template, which makes its dash offset a share of the sweep. */
+const LIVE_RING_PATH_LENGTH = 100;
 /** Vertical pixels of drag for a full min→max sweep — DAW convention (Ableton etc.), not the
  * native range's own horizontal click-and-drag. Tunable by ear. */
 const PIXELS_PER_FULL_RANGE = 200;
@@ -65,9 +66,10 @@ function fullSweepPath(radius: number): string {
 const INNER_TRACK_PATH = fullSweepPath(PANEL_ARC_RADIUS);
 const LIVE_TRACK_PATH = fullSweepPath(LIVE_RING_RADIUS);
 
-/** The live ring's `stroke-dashoffset` for each step, prebuilt so `setLiveLevel` builds no string. */
+/** The live ring's `stroke-dashoffset` for each of the shared `LIVE_LEVEL_STEPS`, prebuilt so
+ *  `setLiveLevel` builds no string. */
 const LIVE_DASH_OFFSETS: readonly string[] = Array.from({ length: LIVE_LEVEL_STEPS + 1 }, (_, i) =>
-  String(100 - i / 10),
+  String(LIVE_RING_PATH_LENGTH - (i * LIVE_RING_PATH_LENGTH) / LIVE_LEVEL_STEPS),
 );
 
 /** How the dial is drawn: today's outline dial, or the SID panel's skirt-and-cap dial. */
@@ -243,22 +245,28 @@ export class RotaryKnobComponent implements LiveLevelIndicator {
     });
   }
 
-  /** Sets the live ring to `level` (0…1, clamped; non-finite reads as 0). Writes the ring's
-   *  stroke-dashoffset directly — no signal, no change detection, no layout. A no-op without
-   *  `liveRing()` in the panel look. */
+  /** Sets the live ring to `level` (0…1, clamped; non-finite reads as 0), shown in the shared
+   *  `LIVE_LEVEL_STEPS`. Writes the ring's stroke-dashoffset directly — no signal, no change
+   *  detection, no layout — and only when the step changed. A no-op without `liveRing()` in the
+   *  panel look.
+   *
+   *  The write is the `stroke-dashoffset` attribute, not an inline style: on a register-heavy tune
+   *  the panel makes hundreds of these writes a second, and in Chromium each inline SVG style write
+   *  measured about four times the garbage of an attribute write — enough to bring on the
+   *  garbage-collection pauses that stall the deck's MIDI timing. The stylesheet must leave the
+   *  offset alone, since any CSS rule overrides the attribute. */
   setLiveLevel(level: number): void {
     const path = this.liveRingPath()?.nativeElement;
     if (!path) {
       return;
     }
-    const clamped = Number.isFinite(level) ? Math.min(Math.max(level, 0), 1) : 0;
-    const step = Math.round(clamped * LIVE_LEVEL_STEPS);
+    const step = liveLevelStep(level);
     if (path === this.lastLivePath && step === this.lastLiveStep) {
       return;
     }
     this.lastLivePath = path;
     this.lastLiveStep = step;
-    path.style.strokeDashoffset = LIVE_DASH_OFFSETS[step];
+    path.setAttribute('stroke-dashoffset', LIVE_DASH_OFFSETS[step]);
   }
 
   /** The arc from home to the current value on `radius`, or `null` at home. */

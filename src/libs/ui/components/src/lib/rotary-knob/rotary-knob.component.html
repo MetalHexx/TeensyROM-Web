@@ -36,7 +36,13 @@
     <svg viewBox="0 0 80 80" aria-hidden="true">
       @if (showLiveRing()) {
       <path class="live-track" [attr.d]="liveTrackPath" />
-      <path #liveRingPath class="live-ring" [attr.d]="liveTrackPath" pathLength="100" />
+      <path
+        #liveRingPath
+        class="live-ring"
+        [attr.d]="liveTrackPath"
+        pathLength="100"
+        stroke-dashoffset="100"
+      />
       }
       <path class="inner-track" [attr.d]="innerTrackPath" />
       @if (panelArcPath(); as arcPath) {
