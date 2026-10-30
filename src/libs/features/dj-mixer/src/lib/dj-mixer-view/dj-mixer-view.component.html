@@ -30,6 +30,7 @@
           class="browse-card"
           cardClass="compact-card--fill"
           animationEntry="from-bottom"
+          animationParent="auto"
         >
           <lib-dj-browse-trees
             class="scroll-edge-end"
@@ -56,6 +57,7 @@
           class="directory-listing-card"
           cardClass="compact-card--fill"
           animationEntry="from-bottom"
+          animationParent="auto"
           [class.directory-listing-card--folded]="listingFoldedEffective()"
           (transitionend)="onListingCardTransitionEnd($event)"
         >
@@ -89,6 +91,7 @@
           class="set-card"
           cardClass="compact-card--fill"
           animationEntry="from-bottom"
+          animationParent="auto"
         >
           <lib-dj-set-card
             [listingDragActive]="dragging()"

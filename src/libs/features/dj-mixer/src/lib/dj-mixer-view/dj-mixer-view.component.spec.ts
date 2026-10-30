@@ -36,6 +36,7 @@ import {
 } from '@teensyrom-nx/application';
 import {
   MappingOverlayLayerComponent,
+  ScalingCompactCardComponent,
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
 import { FoldHandleComponent } from '@teensyrom-nx/ui/components/dj';
@@ -478,6 +479,17 @@ describe('DjMixerViewComponent', () => {
       ).map((el) => el.className.split(' ')[0]);
 
       expect(order).toEqual(['browse-card', 'directory-listing-card', 'set-card']);
+    });
+
+    it('has the tree, the listing and the set card wait for the band to finish sliding in', () => {
+      const { fixture } = render([device()]);
+      const cards = fixture.debugElement
+        .query(By.css('.bottom-band'))
+        .queryAll(By.directive(ScalingCompactCardComponent))
+        .map((el) => el.componentInstance as ScalingCompactCardComponent);
+
+      expect(cards.length).toBe(3);
+      expect(cards.map((card) => card.animationParent())).toEqual(['auto', 'auto', 'auto']);
     });
   });
 
