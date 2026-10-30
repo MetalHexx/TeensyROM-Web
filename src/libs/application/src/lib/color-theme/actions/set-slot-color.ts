@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { DeviceColors } from '@teensyrom-nx/domain';
 import { createAction } from '@teensyrom-nx/utils';
 import { ColorThemeActionStore } from './action-store';

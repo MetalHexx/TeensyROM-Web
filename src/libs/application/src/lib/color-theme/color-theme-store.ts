@@ -1,5 +1,5 @@
 import { signalStore, withState } from '@ngrx/signals';
-import { withDevtools } from '@angular-architects/ngrx-toolkit';
+import { withDevtools } from '../with-devtools';
 import { APPLY_TO_ALL_DEVICES } from '@teensyrom-nx/domain';
 import { ColorThemeState } from './color-theme-state.interface';
 import { withColorThemeSelectors } from './selectors';

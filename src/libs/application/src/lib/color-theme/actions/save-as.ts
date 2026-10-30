@@ -1,4 +1,4 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
+import { updateState } from '../../with-devtools';
 import { firstValueFrom } from 'rxjs';
 import { ColorTheme, ColorThemeKind, IColorThemeService } from '@teensyrom-nx/domain';
 import { createAction, logError, logInfo, LogType } from '@teensyrom-nx/utils';
