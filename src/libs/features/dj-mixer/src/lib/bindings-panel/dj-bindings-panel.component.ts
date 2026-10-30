@@ -1,12 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
   output,
   signal,
   viewChild,
+  viewChildren,
 } from '@angular/core';
 import { MatSlideToggle, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {
@@ -20,7 +24,6 @@ import {
   MidiMappingStore,
   actionOf,
   actionsForControl,
-  controlKey,
   defaultAmountFor,
   describeAction,
   describeSource,
@@ -50,6 +53,9 @@ import {
   type BindingRowModel,
   type ControllerRowModel,
 } from '@teensyrom-nx/ui/components';
+
+/** Orders names the way a person reads them: 'Loop 2' before 'Loop 10', 'a' beside 'A'. */
+const NAME_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const GROUP_OWNERS: readonly ControlOwner[] = [...DECK_SLOTS, 'mixer', 'set'];
 
@@ -103,6 +109,11 @@ interface BindingGroupView {
 interface ControllerView {
   readonly id: string;
   readonly model: ControllerRowModel;
+}
+
+/** The `id` of a section's heading, which takes programmatic focus. */
+function groupTitleId(owner: ControlOwner): string {
+  return `bindings-group-${owner}`;
 }
 
 /** `deck A` as `Deck A`, `mixer` as `Mixer`, `set` as `Set`. */
@@ -219,6 +230,7 @@ export class DjBindingsPanelComponent {
   private readonly midiControllers = inject(MidiControllers);
   private readonly midiLearn = inject(MidiLearn);
   private readonly midiMappings = inject(MidiMappings);
+  private readonly injector = inject(Injector);
 
   /** Duration in milliseconds of the panel card's own entry animation; `0` for reduced motion. */
   readonly animationDuration = input<number>(400);
@@ -227,6 +239,8 @@ export class DjBindingsPanelComponent {
   readonly closePanel = output<void>();
 
   private readonly mappingSwitch = viewChild(MatSlideToggle);
+  private readonly bindingRows = viewChildren(BindingRowComponent);
+  private readonly groupTitles = viewChildren<ElementRef<HTMLElement>>('groupTitle');
 
   readonly mappingMode = this.store.mappingMode;
   readonly announcement = this.store.announcement;
@@ -248,14 +262,11 @@ export class DjBindingsPanelComponent {
   });
 
   /** Each owner that has controls (Deck A and Deck B, the Set; the Mixer owns none today), with its
-   *  mappings in control-list order, then source order. */
+   *  mappings by control name (naturally, ignoring case), then source order. */
   readonly groups = computed<readonly BindingGroupView[]>(() => {
     const controllers = this.store.controllers();
     const statuses = this.store.controllerStatus();
     const expandedId = this.expandedId();
-    const controlOrder = new Map(
-      this.controls.all.map((control, index) => [controlKey(control.identity), index])
-    );
     const controllerOrder = new Map(controllers.map((controller, index) => [controller.id, index]));
     const mappings = this.store.mappings();
     const owners = new Set(this.controls.all.map((control) => control.identity.owner));
@@ -269,8 +280,7 @@ export class DjBindingsPanelComponent {
         })
         .sort(
           (a, b) =>
-            (controlOrder.get(controlKey(a.mapping.control)) ?? 0) -
-              (controlOrder.get(controlKey(b.mapping.control)) ?? 0) ||
+            NAME_COLLATOR.compare(a.control.name, b.control.name) ||
             compareSources(a.mapping, b.mapping, controllerOrder)
         )
         .map(({ mapping, control }) =>
@@ -280,13 +290,17 @@ export class DjBindingsPanelComponent {
     });
   });
 
-  /** One row per known controller, in the order they were first seen. */
+  /** One row per known controller, by name. */
   readonly controllerRows = computed<readonly ControllerView[]>(() => {
     const statuses = this.store.controllerStatus();
     const ports = this.store.controllerPorts();
     const inputs = this.midiControllers.connectedInputs();
 
-    return this.store.controllers().map((controller) => {
+    const controllers = [...this.store.controllers()].sort((a, b) =>
+      NAME_COLLATOR.compare(a.name, b.name)
+    );
+
+    return controllers.map((controller) => {
       const status = statuses[controller.id] ?? 'missing';
       const heldElsewhere = new Set(
         Object.entries(ports)
@@ -312,6 +326,9 @@ export class DjBindingsPanelComponent {
       };
     });
   });
+
+  /** The `id` of a section's heading. */
+  protected readonly groupTitleId = groupTitleId;
 
   /** Moves keyboard focus to the mapping mode switch, the panel's first control. */
   focusEntry(): void {
@@ -388,8 +405,34 @@ export class DjBindingsPanelComponent {
     void this.midiLearn.relearn(id);
   }
 
+  /** Deletes the binding, then keeps keyboard focus in place: on the edit button of the row that
+   *  slid into its spot, or on the section heading when it was the section's last row. */
   onDelete(id: string): void {
+    const groups = this.groups();
+    const group = groups.find((candidate) => candidate.rows.some((row) => row.mapping.id === id));
+    const index = group?.rows.findIndex((row) => row.mapping.id === id) ?? -1;
     this.midiMappings.remove(id);
+    if (group === undefined) {
+      return;
+    }
+    afterNextRender(() => this.focusAfterDelete(group.owner, index), { injector: this.injector });
+  }
+
+  private focusAfterDelete(owner: ControlOwner, index: number): void {
+    const groups = this.groups();
+    const groupIndex = groups.findIndex((candidate) => candidate.owner === owner);
+    if (groupIndex < 0) {
+      return;
+    }
+    if (index < groups[groupIndex].rows.length) {
+      const flat =
+        groups.slice(0, groupIndex).reduce((total, group) => total + group.rows.length, 0) + index;
+      this.bindingRows()[flat]?.focusEdit();
+      return;
+    }
+    this.groupTitles()
+      .find((title) => title.nativeElement.id === groupTitleId(owner))
+      ?.nativeElement.focus();
   }
 
   onListeningChange(controllerId: string, on: boolean): void {

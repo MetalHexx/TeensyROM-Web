@@ -1,7 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { BindingRowAmount, BindingRowComponent, BindingRowModel } from './binding-row.component';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  BindingRowAmount,
+  BindingRowComponent,
+  BindingRowModel,
+  DELETE_ARM_MS,
+} from './binding-row.component';
 
 const AMOUNT: BindingRowAmount = {
   label: 'Amount',
@@ -134,9 +139,13 @@ describe('BindingRowComponent', () => {
       expect(text).toContain('Launch Control XL · ch 1 · CC 21');
     });
 
-    it('offers edit and delete, with edit reporting it is collapsed', () => {
-      expect(buttonNamed('Edit Speed binding').getAttribute('aria-expanded')).toBe('false');
-      expect(buttonNamed('Delete Speed binding')).toBeTruthy();
+    it('offers only the edit button, reporting it is collapsed', () => {
+      const buttons = Array.from(root().querySelectorAll('button'));
+
+      expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Edit Speed binding',
+      ]);
+      expect(buttons[0].getAttribute('aria-expanded')).toBe('false');
     });
 
     it('shows no editing controls', () => {
@@ -148,12 +157,6 @@ describe('BindingRowComponent', () => {
       buttonNamed('Edit Speed binding').click();
 
       expect(editToggles).toBe(1);
-    });
-
-    it('emits deleteBinding from the delete icon', () => {
-      buttonNamed('Delete Speed binding').click();
-
-      expect(deletes).toBe(1);
     });
   });
 
@@ -199,8 +202,8 @@ describe('BindingRowComponent', () => {
     });
 
     it('emits relearn from Re-learn source', () => {
-      const relearn = Array.from(root().querySelectorAll('button')).find(
-        (button) => button.textContent?.trim() === 'Re-learn source'
+      const relearn = Array.from(root().querySelectorAll('button')).find((button) =>
+        button.textContent?.includes('Re-learn source')
       ) as HTMLButtonElement;
 
       relearn.click();
@@ -208,14 +211,90 @@ describe('BindingRowComponent', () => {
       expect(relearns).toBe(1);
     });
 
-    it('emits deleteBinding from Delete', () => {
-      const deleteButton = Array.from(root().querySelectorAll('button')).find(
-        (button) => button.textContent?.trim() === 'Delete'
-      ) as HTMLButtonElement;
-
-      deleteButton.click();
+    it('emits deleteBinding from Delete, named for the binding', () => {
+      buttonNamed('Delete Speed binding').click();
 
       expect(deletes).toBe(1);
+    });
+  });
+
+  describe('edit button', () => {
+    function topLineControls(): (string | null)[] {
+      return Array.from(root().querySelectorAll('.binding-line button')).map((button) =>
+        button.getAttribute('aria-label')
+      );
+    }
+
+    it('stays the last control on the top line, collapsed and expanded', () => {
+      expect(topLineControls()).toEqual(['Edit Speed binding']);
+
+      setModel({ expanded: true });
+
+      expect(topLineControls()).toEqual(['Edit Speed binding']);
+    });
+
+    it('takes focus from focusEdit', () => {
+      component.focusEdit();
+
+      expect(document.activeElement).toBe(buttonNamed('Edit Speed binding'));
+    });
+  });
+
+  describe('delete guard', () => {
+    let now: number;
+
+    beforeEach(() => {
+      now = 10_000;
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      setModel({ expanded: true });
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    function pointerClickDelete(): void {
+      const button = buttonNamed('Delete Speed binding');
+      button
+        .closest('lib-action-button')
+        ?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      button.click();
+    }
+
+    it('ignores a pointer press within the arming window of the row opening', () => {
+      now += DELETE_ARM_MS - 1;
+
+      pointerClickDelete();
+
+      expect(deletes).toBe(0);
+    });
+
+    it('deletes on a pointer press once the window has passed', () => {
+      now += DELETE_ARM_MS;
+
+      pointerClickDelete();
+
+      expect(deletes).toBe(1);
+    });
+
+    it('deletes at once on keyboard activation, even after a stale pointer press', () => {
+      const button = buttonNamed('Delete Speed binding');
+      const host = button.closest('lib-action-button') as HTMLElement;
+
+      button.click();
+      host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      host.dispatchEvent(new Event('keydown', { bubbles: true }));
+      button.click();
+
+      expect(deletes).toBe(2);
+    });
+
+    it('arms again from the moment the row next opens', () => {
+      now += DELETE_ARM_MS;
+      setModel({ expanded: false });
+      setModel({ expanded: true });
+
+      pointerClickDelete();
+
+      expect(deletes).toBe(0);
     });
   });
 

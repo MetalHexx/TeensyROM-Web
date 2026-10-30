@@ -17,8 +17,8 @@ const meta: Meta<BindingRowComponent> = {
       description: {
         component:
           'One MIDI binding in a list: the control it drives, where it listens and how it ' +
-          'behaves. Collapsed, it is two lines — the name, a style chip and the edit and delete ' +
-          'buttons, then the source. Expanded in place, it frames itself in the highlight colour ' +
+          'behaves. Collapsed, it is two lines — the name, a style chip and the edit button, then ' +
+          'the source. Expanded in place, it frames itself in the highlight colour ' +
           'and offers the style (or Action) as a segmented control, a Trigger control where the ' +
           'style has one, the amount where the style takes one (a hand adds a second, Grip), and Re-learn source and Delete. Each amount is a native number input that emits on `change` ' +
           'only for a finite value within its range; anything else shows an inline error. A ' +
@@ -33,7 +33,7 @@ const meta: Meta<BindingRowComponent> = {
         "The binding's display state: `name`, `sourceText`, `styleText`, `expanded`, " +
         '`styleLabel`, `styleOptions`, `selectedStyleId`, `triggerOptions` and ' +
         '`selectedTriggerId` (or `null` when the style has no trigger), `amount` (or `null` when the style takes none), `secondAmount` (or `null`), ' +
-        '`statusText` (or `null`) and the edit and delete accessible names.',
+        '`statusText` (or `null`) and the edit and delete accessible names (the delete name labels the one Delete button, in the open row).',
     },
     editToggle: {
       description: 'Emits when the edit button is pressed, to expand or collapse the row.',
@@ -48,7 +48,7 @@ const meta: Meta<BindingRowComponent> = {
       description: 'Emits a new second amount, only for a finite value within its `min` and `max`.',
     },
     relearn: { description: 'Emits when Re-learn source is pressed.' },
-    deleteBinding: { description: 'Emits when either delete control is pressed.' },
+    deleteBinding: { description: 'Emits when Delete in the open row is activated.' },
   },
 };
 

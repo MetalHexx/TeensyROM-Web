@@ -248,7 +248,7 @@ describe('DjBindingsPanelComponent', () => {
       expect(groupRows(fixture, 'Set')).toEqual(['Load A']);
     });
 
-    it('places each mapping under its owner, in control-list order and then by source', () => {
+    it('places each mapping under its owner, by control name and then by source', () => {
       const { fixture, seed } = render();
       seed(
         [XL, NANO],
@@ -265,14 +265,71 @@ describe('DjBindingsPanelComponent', () => {
         ]
       );
 
-      expect(groupRows(fixture, 'Deck A')).toEqual(['Stop', 'Speed', 'Speed']);
+      expect(groupRows(fixture, 'Deck A')).toEqual(['Speed', 'Speed', 'Stop']);
       expect(rows(fixture).map((r) => r.model().sourceText)).toEqual([
-        'Launch Control XL · ch 1 · Note 36',
         'Launch Control XL · ch 1 · CC 9',
         'nanoKONTROL · ch 1 · CC 3',
+        'Launch Control XL · ch 1 · Note 36',
         'Launch Control XL · ch 1 · Note 37',
       ]);
       expect(groupRows(fixture, 'Deck B')).toEqual(['Stop']);
+    });
+
+    it('orders names naturally and ignoring case', () => {
+      const named = (control: string, name: string): MappableControl => ({
+        identity: { owner: 'A', control } as ControlIdentity,
+        name,
+        nature: 'trigger',
+        fire: () => undefined,
+      });
+      const controls = [
+        named('loop-10', 'Loop 10'),
+        named('loop-2', 'Loop 2'),
+        named('zeta', 'Zeta'),
+        named('alpha', 'alpha'),
+        named('beta', 'Beta'),
+      ];
+      const { fixture, seed } = render(controls);
+      seed(
+        [XL],
+        controls.map((control, index) =>
+          mapping(`m${index}`, control.identity, { kind: 'press', amount: null }, { number: index })
+        )
+      );
+
+      expect(groupRows(fixture, 'Deck A')).toEqual(['alpha', 'Beta', 'Loop 2', 'Loop 10', 'Zeta']);
+    });
+
+    it('keeps several sources on one control together, in controller order', () => {
+      const select = (identity: ControlIdentity): MappableControl => ({
+        identity,
+        name: 'Select',
+        nature: 'trigger',
+        fire: () => undefined,
+      });
+      const selectSet = select({ owner: 'set', control: 'set-select' } as ControlIdentity);
+      const other = { ...select(SET_LOAD_A), name: 'Zap' };
+      const { fixture, seed } = render([selectSet, other]);
+      seed(
+        [XL, NANO],
+        [
+          mapping(
+            'n',
+            selectSet.identity,
+            { kind: 'press', amount: null },
+            { controllerId: 'nano' }
+          ),
+          mapping('z', other.identity, { kind: 'press', amount: null }, { number: 1 }),
+          mapping('x', selectSet.identity, { kind: 'press', amount: null }, { number: 2 }),
+        ]
+      );
+
+      expect(rows(fixture).map((r) => r.model().name)).toEqual(['Select', 'Select', 'Zap']);
+      expect(rows(fixture).map((r) => r.model().sourceText.split(' · ')[0])).toEqual([
+        'Launch Control XL',
+        'nanoKONTROL',
+        'Launch Control XL',
+      ]);
     });
   });
 
@@ -379,10 +436,10 @@ describe('DjBindingsPanelComponent', () => {
         styleText: 'Relative (binary offset) · 1.5%',
         amount: { label: 'Sensitivity', value: 1.5, min: 0.1, max: 100, suffix: '%' },
       });
-      expect(modelOf(fixture, 2).amount).toEqual(
+      expect(modelOf(fixture, 1).amount).toEqual(
         expect.objectContaining({ label: 'Amount', value: -10, min: -100, max: 100 })
       );
-      expect(modelOf(fixture, 1).amount).toBeNull();
+      expect(modelOf(fixture, 2).amount).toBeNull();
     });
 
     const selection: MappableControl = {
@@ -545,10 +602,10 @@ describe('DjBindingsPanelComponent', () => {
       const { fixture } = seedTwo();
 
       clickButton(fixture, 'Edit Stop binding, deck A');
-      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([true, false]);
+      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([false, true]);
 
       clickButton(fixture, 'Edit Speed binding, deck A');
-      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([false, true]);
+      expect(rows(fixture).map((r) => r.model().expanded)).toEqual([true, false]);
 
       clickButton(fixture, 'Edit Speed binding, deck A');
       expect(rows(fixture).map((r) => r.model().expanded)).toEqual([false, false]);
@@ -558,9 +615,9 @@ describe('DjBindingsPanelComponent', () => {
       const { fixture, mappings } = seedTwo();
       clickButton(fixture, 'Edit Speed binding, deck A');
 
-      rows(fixture)[1].styleSelect.emit('step');
-      rows(fixture)[1].styleSelect.emit('absolute');
-      rows(fixture)[1].styleSelect.emit('not-an-action');
+      rows(fixture)[0].styleSelect.emit('step');
+      rows(fixture)[0].styleSelect.emit('absolute');
+      rows(fixture)[0].styleSelect.emit('not-an-action');
 
       expect(mappings.setStyle.mock.calls).toEqual([
         ['relative', { kind: 'step', amount: DEFAULTS.stepAmount }],
@@ -634,11 +691,57 @@ describe('DjBindingsPanelComponent', () => {
     it('starts re-learning the source, and deletes the binding', () => {
       const { fixture, learn, mappings } = seedTwo();
 
-      rows(fixture)[1].relearn.emit();
-      rows(fixture)[0].deleteBinding.emit();
+      rows(fixture)[0].relearn.emit();
+      rows(fixture)[1].deleteBinding.emit();
 
       expect(learn.relearn).toHaveBeenCalledWith('relative');
       expect(mappings.remove).toHaveBeenCalledWith('trigger');
+    });
+
+    describe('focus after a delete', () => {
+      function seedFour() {
+        const rendered = render();
+        rendered.seed(
+          [XL],
+          [
+            mapping('seek', SEEK_A, { kind: 'hand', amount: 0.13, grip: 0.25 }, PITCH_BEND),
+            mapping('speed', SPEED_A, { kind: 'relative-offset', amount: 0.01 }, { number: 2 }),
+            mapping('key', KEY_B, { kind: 'absolute', amount: null }, { number: 3 }),
+            mapping('stop', STOP_B, { kind: 'press', amount: null }, { kind: 'note', number: 4 }),
+          ]
+        );
+        rendered.mappings.remove.mockImplementation((id: string) =>
+          rendered.store.removeMapping({ id })
+        );
+        return rendered;
+      }
+
+      function editButton(fixture: Fixture, name: string): HTMLButtonElement {
+        return fixture.nativeElement.querySelector(`button[aria-label="${name}"]`);
+      }
+
+      it('lands on the edit button of the row that slid into place, across sections', () => {
+        const { fixture } = seedFour();
+
+        rows(fixture)[2].deleteBinding.emit();
+        fixture.detectChanges();
+
+        expect(groupRows(fixture, 'Deck B')).toEqual(['Stop']);
+        expect(document.activeElement).toBe(editButton(fixture, 'Edit Stop binding, deck B'));
+      });
+
+      it('lands on the section heading after deleting its last row', () => {
+        const { fixture } = seedFour();
+
+        rows(fixture)[1].deleteBinding.emit();
+        fixture.detectChanges();
+
+        expect(groupRows(fixture, 'Deck A')).toEqual(['Seek']);
+        const heading = fixture.nativeElement.querySelector('#bindings-group-A') as HTMLElement;
+        expect(heading.textContent?.trim()).toBe('Deck A');
+        expect(heading.getAttribute('tabindex')).toBe('-1');
+        expect(document.activeElement).toBe(heading);
+      });
     });
 
     it('speaks the store announcement in a polite live region', () => {
@@ -713,6 +816,17 @@ describe('DjBindingsPanelComponent', () => {
   });
 
   describe('the controllers section', () => {
+    it('lists controllers alphabetically', () => {
+      const { fixture, seed } = render();
+      seed([XL, NANO, { ...XL, id: 'apc', name: 'apc40' }], []);
+
+      expect(controllerRows(fixture).map((r) => r.model().name)).toEqual([
+        'apc40',
+        'Launch Control XL',
+        'nanoKONTROL',
+      ]);
+    });
+
     it('gives each controller its status as text and its listening switch', () => {
       const { fixture, seed, controllers } = render();
       seed([XL, { ...NANO, listening: false }], [], { xl: 'listening', nano: 'off' });
