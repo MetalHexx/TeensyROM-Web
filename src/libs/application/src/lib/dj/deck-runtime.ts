@@ -17,6 +17,7 @@ import type {
   JumpSettings,
   SidField,
   SidModel,
+  VarispeedLoopStart,
   VarispeedRateSource,
 } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
@@ -296,12 +297,20 @@ export class DeckRuntime {
     return this.requireSlot(slot).player.capturePosition();
   }
 
-  /** Runs a loop between two frames; null stops looping. */
-  setActiveLoop(slot: Slot, loop: { startFrame: number; endFrame: number } | null): void {
+  /** Runs a loop between two frames, holding varispeed inside it when `varispeedStart` is given;
+   *  null stops looping. */
+  setActiveLoop(
+    slot: Slot,
+    loop: { startFrame: number; endFrame: number; varispeedStart?: VarispeedLoopStart } | null
+  ): void {
     this.requireSlot(slot).player.setActiveLoop(
       loop === null
         ? null
-        : { startFrame: frames(loop.startFrame), endFrame: frames(loop.endFrame) }
+        : {
+            startFrame: frames(loop.startFrame),
+            endFrame: frames(loop.endFrame),
+            ...(loop.varispeedStart === undefined ? {} : { varispeedStart: loop.varispeedStart }),
+          }
     );
   }
 
@@ -309,7 +318,12 @@ export class DeckRuntime {
    *  the jump. */
   queueJump(
     slot: Slot,
-    target: { startFrame: number; endFrame: number | null; settings?: JumpSettings } | null
+    target: {
+      startFrame: number;
+      endFrame: number | null;
+      varispeedStart?: VarispeedLoopStart;
+      settings?: JumpSettings;
+    } | null
   ): void {
     this.requireSlot(slot).player.queueJump(
       target === null
@@ -317,6 +331,9 @@ export class DeckRuntime {
         : {
             startFrame: frames(target.startFrame),
             endFrame: target.endFrame === null ? null : frames(target.endFrame),
+            ...(target.varispeedStart === undefined
+              ? {}
+              : { varispeedStart: target.varispeedStart }),
             ...(target.settings === undefined ? {} : { settings: target.settings }),
           }
     );

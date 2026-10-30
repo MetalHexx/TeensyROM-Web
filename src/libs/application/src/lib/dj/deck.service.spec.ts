@@ -1907,11 +1907,12 @@ describe('DeckService', () => {
       await service.toggleMarker('A');
       service.stopMarkerLoop('A');
       service.toggleMarkerGlobal('A');
+      service.toggleMarkerWrap('A');
 
       const refusals = vi
         .mocked(logWarn)
         .mock.calls.filter(([message]) => message.startsWith('DeckService'));
-      expect(refusals).toHaveLength(12);
+      expect(refusals).toHaveLength(13);
       expect(markersOf('A')).toEqual([]);
     });
 
@@ -2000,7 +2001,7 @@ describe('DeckService', () => {
       await service.toggleMarker('A');
 
       expect(loopsOf('A').runningId).toBe('a');
-      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
     });
 
     it('presses the marker it is given', async () => {
@@ -2019,7 +2020,7 @@ describe('DeckService', () => {
       expect(loopsOf('A').queuedId).toBe('b');
 
       tickUntil('A', () => loopsOf('A').runningId === 'b');
-      expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+      expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
 
       service.stopMarkerLoop('A');
       expect(loopsOf('A').runningId).toBeNull();
@@ -2048,7 +2049,7 @@ describe('DeckService', () => {
 
       expect(store.deck('A')().status).toBe('playing');
       expect(loopsOf('A').runningId).toBe('a');
-      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
     });
 
     it('plays the selected marker now when no id is given, and does nothing with none selected', async () => {
@@ -2061,7 +2062,7 @@ describe('DeckService', () => {
       await service.playMarkerNow('A');
 
       expect(loopsOf('A').runningId).toBe('a');
-      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+      expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
     });
 
     it('plays a marker now over a running loop, without queuing behind it', async () => {
@@ -2216,6 +2217,18 @@ describe('DeckService', () => {
         expect(store.panel().A).toEqual(SETTINGS_A.panel);
       });
 
+      it('flips the selected loop WRAP without touching its settings', async () => {
+        await loadWithSettings('A');
+        service.selectMarker('A', 'a');
+        const before = markerOf('A', 'a');
+
+        service.toggleMarkerWrap('A');
+
+        expect(markerOf('A', 'a')).toEqual({ ...before, wraps: true });
+        service.toggleMarkerWrap('A');
+        expect(markerOf('A', 'a')?.wraps).toBe(false);
+      });
+
       it('keeps a performer mute in the marker whose own settings are in play', async () => {
         await loadWithSettings('A');
         await service.toggleMarker('A', 'a');
@@ -2312,7 +2325,7 @@ describe('DeckService', () => {
         await service.nudgeMarker('A', 'start', 5);
 
         await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
         await vi.waitFor(() => expect(runtime.position('A')).toBe(305));
       });
 
@@ -2323,7 +2336,7 @@ describe('DeckService', () => {
         await service.nudgeMarker('A', 'end', 10);
 
         await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
-        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 330 });
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 330, varispeedStart: 'stop' });
       });
 
       it('seeks a running loop to its nudged end without arming it again', async () => {
@@ -2334,7 +2347,7 @@ describe('DeckService', () => {
 
         await service.nudgeMarker('A', 'end', 10);
 
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
         expect(setActiveLoop).toHaveBeenCalledTimes(1);
         expect(seek).toHaveBeenCalledTimes(1);
         expect(seek).toHaveBeenCalledWith('A', 100);
@@ -2351,7 +2364,7 @@ describe('DeckService', () => {
         expect(seek).toHaveBeenCalledTimes(1);
         expect(loopsOf('A').runningId).toBe('a');
         expect(loopsOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120, varispeedStart: 'stop' });
       });
 
       it('auditions a snap on an idle marker', async () => {
@@ -2362,7 +2375,7 @@ describe('DeckService', () => {
         expect(loopsOf('A').markers[0].start.offsetFrames).toBe(10);
         await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('a'));
         await vi.waitFor(() => expect(runtime.position('A')).toBe(110));
-        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
       });
 
       it('auditions a snap that finds no moment in reach', async () => {
@@ -2385,7 +2398,7 @@ describe('DeckService', () => {
 
         expect(store.deck('A')().status).toBe('playing');
         expect(loopsOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
       });
 
       it('restarts a stopped deck from the top first, then auditions', async () => {
@@ -2398,7 +2411,7 @@ describe('DeckService', () => {
 
         expect(store.deck('A')().status).toBe('playing');
         expect(loopsOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
       });
 
       it('skips the audition when the selection moves while playback starts', async () => {
@@ -2450,7 +2463,13 @@ describe('DeckService', () => {
         await service.nudgeMarker('A', 'end', 10);
 
         await vi.waitFor(() => expect(seek).toHaveBeenCalledWith('A', 105));
-        await vi.waitFor(() => expect(engineLoop('B')).toEqual({ startFrame: 105, endFrame: 130 }));
+        await vi.waitFor(() =>
+          expect(engineLoop('B')).toEqual({
+            startFrame: 105,
+            endFrame: 130,
+            varispeedStart: 'stop',
+          })
+        );
         expect(seek.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
       });
     });
@@ -2481,7 +2500,7 @@ describe('DeckService', () => {
       await service.toggleMarker('B', 'a');
 
       await service.nudgeMarker('A', 'end', 10);
-      expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130 });
+      expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
 
       service.clearMarkerEnd('A');
       expect(loopsOf('B').runningId).toBeNull();

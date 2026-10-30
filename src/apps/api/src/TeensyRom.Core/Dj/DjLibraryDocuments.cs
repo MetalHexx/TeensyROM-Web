@@ -60,6 +60,7 @@ namespace TeensyRom.Core.Dj
         public IReadOnlyList<int> Voices { get; init; } = [];
         public JsonElement? Settings { get; init; }
         public bool? UsesOwnSettings { get; init; }
+        public bool? Wraps { get; init; }
     }
 
     public record DjLoopBoundary

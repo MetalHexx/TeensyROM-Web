@@ -46,6 +46,9 @@ function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelecte
     sharesGlobal: true,
     globalDisabled: false,
     globalAccessibleName: 'GBL selected deck A',
+    wraps: false,
+    wrapDisabled: false,
+    wrapAccessibleName: 'WRAP selected deck A',
     renameDisabled: false,
     renameLabel: 'Rename selected deck A',
     nameMaxLength: 48,
@@ -113,6 +116,7 @@ describe('LoopsCuesPlateComponent', () => {
     component.toggleSelected.subscribe(plain('toggle'));
     component.playNowSelected.subscribe(plain('playNowSelected'));
     component.toggleGlobal.subscribe(plain('toggleGlobal'));
+    component.toggleWrap.subscribe(plain('toggleWrap'));
     component.setEnd.subscribe(plain('setEnd'));
     component.clearEnd.subscribe(plain('clearEnd'));
     component.deleteSelected.subscribe(plain('delete'));
@@ -160,10 +164,18 @@ describe('LoopsCuesPlateComponent', () => {
       byName('Trigger selected deck A').click();
       byName('Play now selected deck A').click();
       byName('GBL selected deck A').click();
+      byName('WRAP selected deck A').click();
       byName('Clear end deck A').click();
       byName('Delete selected deck A').click();
 
-      expect(emitted).toEqual(['toggle', 'playNowSelected', 'toggleGlobal', 'clearEnd', 'delete']);
+      expect(emitted).toEqual([
+        'toggle',
+        'playNowSelected',
+        'toggleGlobal',
+        'toggleWrap',
+        'clearEnd',
+        'delete',
+      ]);
     });
 
     it("re-emits Set End from a cue's End slot", () => {

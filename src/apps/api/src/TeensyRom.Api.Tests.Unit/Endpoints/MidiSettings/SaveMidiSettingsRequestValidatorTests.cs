@@ -387,9 +387,9 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsEightyOneNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsEightyTwoNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(81);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(82);
         MidiSettingsAllowLists.SetControls.Should().HaveCount(3);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }

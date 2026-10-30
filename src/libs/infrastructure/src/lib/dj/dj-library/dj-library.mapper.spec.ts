@@ -37,6 +37,7 @@ const FULL_SET: TuneSet = {
               voices: [0, 1, 2],
               settings: SETTINGS,
               usesOwnSettings: true,
+              wraps: true,
             },
           ],
         },
@@ -84,13 +85,14 @@ describe('dj library mapper', () => {
     expect(row.copiedFrom).toBeNull();
     expect(row.host).toBeNull();
     expect(row.subtunes[0].settings).toBeNull();
-    expect(marker).toMatchObject({ name: null, end: null, settings: null, usesOwnSettings: null });
+    expect(marker).toMatchObject({ name: null, end: null, settings: null, usesOwnSettings: null, wraps: null });
 
     const read = toTuneSet(dto);
     expect(read.rows[0]).not.toHaveProperty('host');
     expect(read.rows[0].subtunes[0]).not.toHaveProperty('settings');
     expect(read.rows[0].subtunes[0].markers[0]).not.toHaveProperty('name');
     expect(read.rows[0].subtunes[0].markers[0]).not.toHaveProperty('usesOwnSettings');
+    expect(read.rows[0].subtunes[0].markers[0]).not.toHaveProperty('wraps');
   });
 
   it('reads a DTO whose optional fields are missing rather than null', () => {

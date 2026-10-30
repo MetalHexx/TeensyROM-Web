@@ -52,6 +52,8 @@ export interface LoopSelectionSummary {
   readonly ready: boolean;
   /** GBL latched: the marker shares the main track's mixer settings. */
   readonly sharesGlobal: boolean;
+  /** WRAP latched: a scrubbed record wraps from the loop's start to its end instead of stopping. */
+  readonly wraps: boolean;
   /** 'start–end' elapsed times for a loop, the start alone for a cue. */
   readonly spanText: string;
   readonly start: LoopBoundarySummary;
@@ -143,6 +145,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
             activity: activityOf(marker),
             ready: marker.ready,
             sharesGlobal: !marker.ownSettings,
+            wraps: marker.wraps,
             spanText:
               kind === 'loop' && marker.end !== null
                 ? `${startText}–${formatElapsed(resolvedFrame(marker.end), intervalUs)}`

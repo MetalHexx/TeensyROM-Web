@@ -45,6 +45,16 @@
     (press)="toggleGlobal.emit()"
   />
   <lib-synth-key
+    class="wrap"
+    data-control="loop-wrap"
+    label="WRAP"
+    [icon]="wrapLamp()"
+    [accessibleName]="model().wrapAccessibleName"
+    [latched]="wrapLatched()"
+    [disabled]="model().empty || model().wrapDisabled"
+    (press)="toggleWrap.emit()"
+  />
+  <lib-synth-key
     class="icon-only"
     data-control="loop-clear-end"
     icon="close"

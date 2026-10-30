@@ -22,7 +22,8 @@ public class SaveDjSetRequestValidatorTests
         End = new DjLoopBoundaryDto { Frame = 8360, OffsetFrames = 6 },
         Voices = [0, 1, 2],
         Settings = Opaque("""{ "v": 1 }"""),
-        UsesOwnSettings = true
+        UsesOwnSettings = true,
+        Wraps = true
     };
 
     private static DjSubtuneMemoryDto Subtune(int number = 1) => new()
@@ -98,6 +99,7 @@ public class SaveDjSetRequestValidatorTests
             row.Subtunes[0].Markers[0].Name = null;
             row.Subtunes[0].Markers[0].End = null;
             row.Subtunes[0].Markers[0].UsesOwnSettings = null;
+            row.Subtunes[0].Markers[0].Wraps = null;
         }));
     }
 

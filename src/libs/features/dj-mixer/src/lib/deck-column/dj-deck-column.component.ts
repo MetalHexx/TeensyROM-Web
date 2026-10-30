@@ -132,6 +132,9 @@ function selectedRowModel(
     sharesGlobal: selection?.sharesGlobal ?? true,
     globalDisabled: selection === null,
     globalAccessibleName: `GBL ${name} deck ${letter}`,
+    wraps: selection?.wraps ?? false,
+    wrapDisabled: selection?.kind !== 'loop',
+    wrapAccessibleName: `WRAP ${name} deck ${letter}`,
     renameDisabled: selection === null,
     renameLabel: `Rename ${name}`,
     nameMaxLength: MARKER_NAME_MAX_LENGTH,
@@ -490,6 +493,10 @@ export class DjDeckColumnComponent {
 
   onToggleGlobal(): void {
     this.deckService.toggleMarkerGlobal(this.deck().slot);
+  }
+
+  onToggleWrap(): void {
+    this.deckService.toggleMarkerWrap(this.deck().slot);
   }
 
   onSelectTile(id: string): void {

@@ -62,7 +62,8 @@ public class DjLibraryServiceTests : IDisposable
                 End = new DjLoopBoundary { Frame = 8360, OffsetFrames = 6 },
                 Voices = [0, 1, 2],
                 Settings = Opaque("""{ "v": 1 }"""),
-                UsesOwnSettings = true
+                UsesOwnSettings = true,
+                Wraps = true
             }
         ]
     };

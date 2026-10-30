@@ -35,6 +35,7 @@ function marker(
     voices: [0, 1, 2],
     settings: null,
     ownSettings: false,
+    wraps: false,
     ready: false,
     ...extra,
   };
@@ -129,6 +130,18 @@ describe('loopsSummary', () => {
     });
 
     expect(store.loopsSummary('A')().canStop).toBe(true);
+  });
+
+  describe('WRAP', () => {
+    beforeEach(() => loadTune());
+
+    it('reports the selected marker WRAP', () => {
+      setLoops([marker('a', 100, 200, { wraps: true }), marker('b', 300, 400)]);
+      expect(store.loopsSummary('A')().selected?.wraps).toBe(true);
+
+      store.setLoopSelection({ slot: 'A', selectedId: 'b', selectionMovedWhileQueued: false });
+      expect(store.loopsSummary('A')().selected?.wraps).toBe(false);
+    });
   });
 
   describe('GBL', () => {

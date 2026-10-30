@@ -1047,7 +1047,7 @@ describe('DeckHand', () => {
 
     const frameOf = (value: number): number => Math.floor(110 + (value - 9000) * framesPerCount());
 
-    it('releases a running loop that the throw landed past the end of', async () => {
+    it('keeps a running loop that the throw landed past the end of, holding the record inside it', async () => {
       await loadWithLoops();
       await h.deckService.toggleMarker('A', 'a');
       tickUntil(() => position() >= 105);
@@ -1057,9 +1057,10 @@ describe('DeckHand', () => {
       tickUntil(() => lastTick().rate === 1);
       await settle();
 
-      expect(position()).toBeGreaterThanOrEqual(120);
-      expect(h.djStore.loops()['A'].runningId).toBeNull();
-      expect(runtime.snapshot('A').loop).toBeNull();
+      expect(position()).toBeGreaterThanOrEqual(100);
+      expect(position()).toBeLessThanOrEqual(120);
+      expect(h.djStore.loops()['A'].runningId).toBe('a');
+      expect(runtime.snapshot('A').loop).not.toBeNull();
     });
 
     it('keeps a running loop that the throw landed inside, and fires the queued jump at its end', async () => {
@@ -1076,7 +1077,11 @@ describe('DeckHand', () => {
 
       expect(h.djStore.loops()['A'].runningId).toBe('a');
       expect(h.djStore.loops()['A'].queuedId).toBe('b');
-      expect(runtime.snapshot('A').loop).toEqual({ startFrame: 100, endFrame: 120 });
+      expect(runtime.snapshot('A').loop).toEqual({
+        startFrame: 100,
+        endFrame: 120,
+        varispeedStart: 'stop',
+      });
 
       tickUntil(() => !engineVarispeed());
       tickUntil(() => position() >= 300);
@@ -1097,7 +1102,8 @@ describe('DeckHand', () => {
 
       expect(h.djStore.loops()['A'].runningId).toBe('a');
       expect(h.djStore.loops()['A'].queuedId).toBe('b');
-      expect(position()).toBeGreaterThan(120);
+      expect(position()).toBeGreaterThanOrEqual(100);
+      expect(position()).toBeLessThanOrEqual(120);
     });
   });
 });

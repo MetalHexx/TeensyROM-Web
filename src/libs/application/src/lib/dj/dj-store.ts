@@ -186,6 +186,9 @@ export interface DeckLoopMarker {
   /** GBL unlatched: the marker plays with `settings`. False, the default, shares the main track's.
    *  Implies `settings !== null`. */
   readonly ownSettings: boolean;
+  /** WRAP latched: a scrubbed or thrown record wraps from the loop's start to its end; false, the
+   *  default, stops it at the start. */
+  readonly wraps: boolean;
 }
 
 /** One deck's markers for the tune it holds, and where the performer is working in them. */

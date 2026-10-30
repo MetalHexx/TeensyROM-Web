@@ -6924,6 +6924,9 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("usesOwnSettings")]
         public bool? UsesOwnSettings { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("wraps")]
+        public bool? Wraps { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]

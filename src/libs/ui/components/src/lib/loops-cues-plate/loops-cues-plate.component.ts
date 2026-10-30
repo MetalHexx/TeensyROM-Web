@@ -46,6 +46,7 @@ export interface LoopsCuesPlateModel {
  *   (playNowTile)="onPlayNow($event)"
  *   (playNowSelected)="onPlayNowSelected()"
  *   (toggleGlobal)="onToggleGlobal()"
+ *   (toggleWrap)="onToggleWrap()"
  *   (selectTile)="onSelect($event)"
  * />
  * ```
@@ -74,6 +75,8 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly playNowSelected = output<void>();
   /** Emits when the selected row's GBL switch is pressed. */
   readonly toggleGlobal = output<void>();
+  /** Emits when the selected row's WRAP switch is pressed. */
+  readonly toggleWrap = output<void>();
   /** Emits when the selected row's Set End key, in a cue's End slot, is pressed. */
   readonly setEnd = output<void>();
   /** Emits when the selected row's Clear End key is pressed. */

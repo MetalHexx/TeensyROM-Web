@@ -488,6 +488,7 @@ describe('DjSidPanelComponent', () => {
       voices: [0, 1, 2],
       settings: null,
       ownSettings: true,
+      wraps: false,
       ready: true,
     });
 

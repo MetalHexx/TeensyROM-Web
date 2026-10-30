@@ -39,6 +39,11 @@ export interface LoopSelectedRowModel {
   readonly sharesGlobal: boolean;
   readonly globalDisabled: boolean;
   readonly globalAccessibleName: string;
+  /** WRAP lit: a scrubbed record wraps from the loop's start to its end instead of stopping. */
+  readonly wraps: boolean;
+  /** True with nothing selected and on a cue. */
+  readonly wrapDisabled: boolean;
+  readonly wrapAccessibleName: string;
   /** The name cannot be edited, e.g. while the marker is not yet saved. */
   readonly renameDisabled: boolean;
   /** Names the rename button and field, e.g. 'Rename Item 5'. */
@@ -68,24 +73,26 @@ const ACTIVITY_WORDS: Record<LoopTileActivity, string> = {
 const NOTHING_SELECTED = 'nothing selected';
 const NOT_READY = 'not ready';
 const OWN_SETTINGS = 'own settings';
+const WRAPS = 'wraps';
 const SET_END_LABEL = 'Set End';
 const SET_END_ICON = 'last_page';
 const SET_END_CONTROL = 'loop-set-end';
-const GLOBAL_LAMP_ON = 'radio_button_checked';
-const GLOBAL_LAMP_OFF = 'radio_button_unchecked';
+const LAMP_ON = 'radio_button_checked';
+const LAMP_OFF = 'radio_button_unchecked';
 
 /**
  * The selected loop or cue, across both columns of the plate: a trigger key, a small display of the
- * name, kind and span, a play-now key, the GBL switch, the Clear End and Delete keys, and beneath
- * them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key.
+ * name, kind and span, a play-now key, the GBL and WRAP switches, the Clear End and Delete keys, and
+ * beneath them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key.
  * The GBL switch draws a lamp beside its label, a ringed dot while the marker shares the main
  * track's settings and an empty ring while it has its own, and is a plain disabled key (no pressed
- * state) with nothing selected. Purely presentational: it computes no time or snap target and holds
+ * state) with nothing selected. WRAP draws the same lamp, lit while a scrubbed record wraps from the
+ * loop's start to its end, and is disabled on a cue as well. Purely presentational: it computes no time or snap target and holds
  * no drag value. The caller supplies every label and the drag offsets.
  *
  * The name is renamed in place — click it, type, Enter; an empty name is allowed. With
  * `model.empty` the display is blank and every key and boundary is disabled. The display's
- * accessible text carries the running, queued, not-ready and own-settings state in words.
+ * accessible text carries the running, queued, not-ready, own-settings and wraps state in words.
  *
  * @example
  * ```html
@@ -96,6 +103,7 @@ const GLOBAL_LAMP_OFF = 'radio_button_unchecked';
  *   (trigger)="onTrigger()"
  *   (playNow)="onPlayNow()"
  *   (toggleGlobal)="onToggleGlobal()"
+ *   (toggleWrap)="onToggleWrap()"
  *   (setEnd)="onSetEnd()"
  *   (clearEnd)="onClearEnd()"
  *   (deleteMarker)="onDelete()"
@@ -129,6 +137,8 @@ export class LoopSelectedRowComponent {
   readonly playNow = output<void>();
   /** Emits when the GBL switch is pressed. */
   readonly toggleGlobal = output<void>();
+  /** Emits when the WRAP switch is pressed. */
+  readonly toggleWrap = output<void>();
   /** Emits when Set End, in a cue's End slot, is pressed. */
   readonly setEnd = output<void>();
   /** Emits when Clear End is pressed. */
@@ -163,8 +173,17 @@ export class LoopSelectedRowComponent {
 
   /** GBL's lamp icon; its shape, not only its colour, tells shared from own settings. */
   protected readonly globalLamp = computed(() =>
-    this.globalLatched() === true ? GLOBAL_LAMP_ON : GLOBAL_LAMP_OFF
+    this.globalLatched() === true ? LAMP_ON : LAMP_OFF
   );
+
+  /** WRAP's pressed state: `null` with nothing selected. */
+  protected readonly wrapLatched = computed(() => {
+    const model = this.model();
+    return model.empty ? null : model.wraps;
+  });
+
+  /** WRAP's lamp icon, the same pair GBL draws. */
+  protected readonly wrapLamp = computed(() => (this.wrapLatched() === true ? LAMP_ON : LAMP_OFF));
 
   /** The display read aloud: the name and kind, then the state in words, then the span. */
   protected readonly displayText = computed(() => {
@@ -174,6 +193,7 @@ export class LoopSelectedRowComponent {
       ACTIVITY_WORDS[model.activity],
       model.ready ? '' : NOT_READY,
       model.sharesGlobal ? '' : OWN_SETTINGS,
+      model.wraps ? WRAPS : '',
     ]
       .filter((word) => word !== '')
       .join(', ');

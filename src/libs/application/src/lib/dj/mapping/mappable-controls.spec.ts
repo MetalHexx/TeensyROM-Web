@@ -54,15 +54,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 81 controls per deck and 3 for the set, 165 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(165);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(165);
+    it('holds 82 controls per deck and 3 for the set, 167 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(167);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(167);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(81);
+        expect(ids).toHaveLength(82);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -329,6 +329,7 @@ describe('MappableControls', () => {
       ['loop-toggle', 'toggleMarker', []],
       ['loop-play-now', 'playMarkerNow', []],
       ['loop-global', 'toggleMarkerGlobal', []],
+      ['loop-wrap', 'toggleMarkerWrap', []],
       ['loop-add', 'addMarker', []],
       ['loop-stop', 'stopMarkerLoop', []],
       ['loop-set-end', 'setMarkerEnd', []],

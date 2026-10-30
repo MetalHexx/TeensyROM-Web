@@ -167,6 +167,7 @@ const SELECTED_CUE: DeckLoopsSummary = {
     activity: 'idle',
     ready: true,
     sharesGlobal: true,
+    wraps: false,
     spanText: '00:01.0',
     start: {
       offsetFrames: 0,
@@ -1280,7 +1281,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(160);
+      expect(ALL_IDENTITIES).toHaveLength(162);
       expect(mismatched).toEqual([]);
     });
 

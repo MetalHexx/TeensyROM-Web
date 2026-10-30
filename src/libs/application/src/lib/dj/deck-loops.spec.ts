@@ -1052,7 +1052,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('a');
         expect(stateOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(100);
       });
 
@@ -1072,8 +1072,12 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('a');
         expect(stateOf('A').queuedId).toBe('b');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
-        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
       });
 
       it('replaces the queued marker when another is pressed', async () => {
@@ -1134,6 +1138,102 @@ describe('DeckLoops', () => {
       });
     });
 
+    describe('WRAP', () => {
+      const wrapsOf = () => stateOf('A').markers.map((marker) => marker.wraps);
+
+      it('loads a stored wraps flag and starts every other marker without it', async () => {
+        await positions.save(TUNE_X, [
+          { ...loopOf('a', 100, 120), wraps: true },
+          loopOf('b', 300, 320),
+        ]);
+
+        await loadOn('A', TUNE_X);
+
+        expect(wrapsOf()).toEqual([true, false]);
+      });
+
+      it('flips the selected loop and saves the flag with the list, storing nothing when unlit', async () => {
+        loops.toggleWrap('A');
+
+        expect(wrapsOf()).toEqual([true, false, false, false]);
+        expect((await positions.load(TUNE_X))[0]).toEqual({
+          ...loopOf('a', 100, 120),
+          wraps: true,
+        });
+
+        loops.toggleWrap('A');
+
+        expect(wrapsOf()).toEqual([false, false, false, false]);
+        expect((await positions.load(TUNE_X))[0]).toEqual(loopOf('a', 100, 120));
+      });
+
+      it('refuses on a cue, leaving the list as it was', async () => {
+        loops.select('A', 'c');
+        const before = stateOf('A').markers;
+
+        loops.toggleWrap('A');
+
+        expect(stateOf('A').markers).toBe(before);
+        expect(refusals()).toHaveLength(1);
+      });
+
+      it('runs a loop in stop mode, and passes WRAP to the engine at once with the queued jump kept', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'a');
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+
+        loops.toggleWrap('A');
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'wrap' });
+        expect(stateOf('A').queuedId).toBe('b');
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
+
+        loops.toggleWrap('A');
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
+      });
+
+      it('carries the mode of a queued loop, and follows it being flipped', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+
+        loops.toggleWrap('A');
+
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'wrap',
+        });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe('b');
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'wrap' });
+      });
+
+      it('hands a stored wrapping loop to the engine in wrap mode when it is engaged', async () => {
+        await positions.save(TUNE_X, [{ ...loopOf('a', 100, 120), wraps: true }]);
+        await loadOn('A', TUNE_X);
+        await settle();
+
+        await engage('a');
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'wrap' });
+      });
+    });
+
     describe('playing now', () => {
       async function notReady(id: string): Promise<void> {
         gates.A.holding = true;
@@ -1146,7 +1246,7 @@ describe('DeckLoops', () => {
         await flush();
 
         expect(stateOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(100);
       });
 
@@ -1160,7 +1260,7 @@ describe('DeckLoops', () => {
         expect(stateOf('A').runningId).toBe('wide');
         expect(stateOf('A').queuedId).toBeNull();
         expect(engineQueue('A')).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(600);
       });
 
@@ -1201,7 +1301,11 @@ describe('DeckLoops', () => {
         expect(setActiveLoop).not.toHaveBeenCalled();
         expect(stateOf('A').runningId).toBe('wide');
         expect(stateOf('A').queuedId).toBe('b');
-        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
       });
 
       it('restarts the running marker on every press', async () => {
@@ -1215,7 +1319,7 @@ describe('DeckLoops', () => {
           expect(runtime.position('A')).toBe(600);
           expect(stateOf('A').runningId).toBe('wide');
         }
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800, varispeedStart: 'stop' });
       });
 
       it('waits for a marker whose start is not ready, replacing a queued one, then engages it', async () => {
@@ -1234,7 +1338,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('b');
         expect(stateOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(305);
       });
 
@@ -1272,7 +1376,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('b');
         expect(stateOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
         expect(engineQueue('A')).toBeNull();
         expect(runtime.position('A')).toBeGreaterThanOrEqual(300);
         expect(runtime.position('A')).toBeLessThan(320);
@@ -1307,7 +1411,7 @@ describe('DeckLoops', () => {
         tickUntil('A', () => handOffsOf('A') === 1);
 
         expect(stateOf('A').runningId).toBe('b');
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
       });
 
       it('moves the selection to the landed marker', async () => {
@@ -1381,7 +1485,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').queuedId).toBeNull();
         expect(stateOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(105);
       });
 
@@ -1454,7 +1558,7 @@ describe('DeckLoops', () => {
 
         loops.nudge('A', 'end', 10);
 
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
         expect(stateOf('A').runningId).toBe('a');
         expect(seek).not.toHaveBeenCalled();
       });
@@ -1473,9 +1577,9 @@ describe('DeckLoops', () => {
 
         loops.nudge('A', 'start', 10);
 
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         await settle();
-        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
         expect(stateOf('A').runningId).toBe('a');
         expect(seek).not.toHaveBeenCalled();
       });
@@ -1498,7 +1602,11 @@ describe('DeckLoops', () => {
         loops.nudge('A', 'end', 10);
 
         expect(stateOf('A').queuedId).toBe('b');
-        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
         tickUntil('A', () => handOffsOf('A') === 1);
         expect(stateOf('A').runningId).toBe('b');
       });
@@ -1511,8 +1619,12 @@ describe('DeckLoops', () => {
 
         await settle();
 
-        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120 });
-        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
       });
 
       it('lets a loop go as a stop when its end is cleared', async () => {
@@ -1547,10 +1659,18 @@ describe('DeckLoops', () => {
         loops.select('A', 'b');
 
         loops.nudge('A', 'start', 5);
-        expect(engineQueue('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 305,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
 
         loops.nudge('A', 'end', 10);
-        expect(engineQueue('A')).toEqual({ startFrame: 305, endFrame: 330 });
+        expect(engineQueue('A')).toEqual({
+          startFrame: 305,
+          endFrame: 330,
+          varispeedStart: 'stop',
+        });
         expect(stateOf('A').queuedId).toBe('b');
       });
 
@@ -1577,7 +1697,7 @@ describe('DeckLoops', () => {
         expect(stateOf('A').queuedId).toBeNull();
         expect(engineQueue('A')).toBeNull();
         expect(stateOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
       });
     });
 
@@ -1593,7 +1713,7 @@ describe('DeckLoops', () => {
         expect(stateOf('A').runningId).toBe('b');
         expect(stateOf('A').queuedId).toBeNull();
         expect(engineQueue('A')).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(300);
       });
 
@@ -1609,7 +1729,7 @@ describe('DeckLoops', () => {
         await settle();
 
         expect(stateOf('A').runningId).toBe('b');
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320 });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
       });
 
       it('drops a marker queued in the engine when it waits instead for a start', async () => {
@@ -1635,7 +1755,7 @@ describe('DeckLoops', () => {
         await flush();
 
         expect(stateOf('A').runningId).toBe('wide');
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(800 - 2 * SECOND);
       });
 
@@ -1699,7 +1819,11 @@ describe('DeckLoops', () => {
           expect(stateOf('A').runningId).toBe('wide');
           expect(stateOf('A').queuedId).toBeNull();
           expect(engineQueue('A')).toBeNull();
-          expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 600,
+            endFrame: 810,
+            varispeedStart: 'stop',
+          });
           expect(runtime.position('A')).toBe(810 - 2 * SECOND);
         });
 
@@ -1718,7 +1842,11 @@ describe('DeckLoops', () => {
 
           expect(stateOf('A').runningId).toBe('wide');
           expect(stateOf('A').queuedId).toBeNull();
-          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 610,
+            endFrame: 800,
+            varispeedStart: 'stop',
+          });
           expect(runtime.position('A')).toBe(610);
         });
       });
@@ -1748,7 +1876,7 @@ describe('DeckLoops', () => {
         await flush();
 
         expect(setActiveLoop).not.toHaveBeenCalled();
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810 });
+        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810, varispeedStart: 'stop' });
         expect(stateOf('A').runningId).toBe('wide');
         expect(runtime.position('A')).toBe(810 - 2 * SECOND);
       });
@@ -1775,7 +1903,7 @@ describe('DeckLoops', () => {
         editStart(10);
         await flush();
 
-        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
         expect(seek).toHaveBeenCalledTimes(1);
         expect(seek).toHaveBeenCalledWith('A', 610);
         expect(stateOf('A').queuedId).toBeNull();
@@ -1795,7 +1923,11 @@ describe('DeckLoops', () => {
           editStart(10);
           await flush();
 
-          expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 600,
+            endFrame: 800,
+            varispeedStart: 'stop',
+          });
           expect(stateOf('A').runningId).toBe('wide');
           expect(stateOf('A').queuedId).toBeNull();
           expect(setActiveLoop).not.toHaveBeenCalled();
@@ -1803,7 +1935,11 @@ describe('DeckLoops', () => {
 
           await settle();
 
-          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 610,
+            endFrame: 800,
+            varispeedStart: 'stop',
+          });
           expect(setActiveLoop).toHaveBeenCalledTimes(1);
           expect(seek).toHaveBeenCalledTimes(1);
           expect(seek).toHaveBeenCalledWith('A', 610);
@@ -1816,7 +1952,11 @@ describe('DeckLoops', () => {
 
           await settle();
 
-          expect(engineLoop('A')).toEqual({ startFrame: 620, endFrame: 800 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 620,
+            endFrame: 800,
+            varispeedStart: 'stop',
+          });
           expect(seek).toHaveBeenCalledTimes(1);
           expect(seek).toHaveBeenCalledWith('A', 620);
         });
@@ -1833,7 +1973,11 @@ describe('DeckLoops', () => {
           await settle();
 
           expect(seek).toHaveBeenCalledTimes(1);
-          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 790 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 610,
+            endFrame: 790,
+            varispeedStart: 'stop',
+          });
         });
 
         it('is dropped by a Stop', async () => {
@@ -1907,7 +2051,11 @@ describe('DeckLoops', () => {
           await settle();
 
           expect(seek).not.toHaveBeenCalled();
-          expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 790 });
+          expect(engineLoop('A')).toEqual({
+            startFrame: 610,
+            endFrame: 790,
+            varispeedStart: 'stop',
+          });
         });
       });
     });
@@ -1929,7 +2077,7 @@ describe('DeckLoops', () => {
         loops.nudge('A', 'end', 10);
 
         expect(stateOf('B').runningId).toBe('a');
-        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130 });
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
         expect(stateOf('A').runningId).toBeNull();
         expect(engineLoop('A')).toBeNull();
       });
@@ -1940,9 +2088,9 @@ describe('DeckLoops', () => {
 
         loops.nudge('A', 'start', 10);
 
-        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         await settle();
-        expect(engineLoop('B')).toEqual({ startFrame: 110, endFrame: 120 });
+        expect(engineLoop('B')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
       });
 
       it("re-issues the other deck's queue after the edit", () => {
@@ -1952,7 +2100,11 @@ describe('DeckLoops', () => {
         loops.nudge('A', 'end', 10);
 
         expect(stateOf('B').queuedId).toBe('b');
-        expect(engineQueue('B')).toEqual({ startFrame: 300, endFrame: 320 });
+        expect(engineQueue('B')).toEqual({
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
       });
 
       it('lets the other deck go when the marker it runs loses its end', () => {
@@ -1985,7 +2137,7 @@ describe('DeckLoops', () => {
         expect(stateOf('B').queuedId).toBeNull();
         expect(engineQueue('B')).toBeNull();
         expect(stateOf('B').runningId).toBe('a');
-        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
       });
     });
 
@@ -2218,7 +2370,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('a');
         expect(stateOf('A').mainSettings).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
       });
     });
 
@@ -2432,6 +2584,7 @@ describe('DeckLoops', () => {
         expect(queue).toHaveBeenLastCalledWith('A', {
           startFrame: 100,
           endFrame: 120,
+          varispeedStart: 'stop',
           settings: engineSettingsOf(SETTINGS_A.panel, SETTINGS_A.mutes),
         });
         expect(panelOn('A')).toBe(main.panel);
@@ -2459,6 +2612,7 @@ describe('DeckLoops', () => {
         expect(queue).toHaveBeenLastCalledWith('A', {
           startFrame: 600,
           endFrame: 620,
+          varispeedStart: 'stop',
           settings: engineSettingsOf(main.panel, main.mutes),
         });
 
@@ -2536,12 +2690,17 @@ describe('DeckLoops', () => {
         const queue = vi.spyOn(runtime, 'queueJump');
 
         loops.toggleGlobal('A');
-        expect(queue).toHaveBeenLastCalledWith('A', { startFrame: 300, endFrame: 320 });
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 300,
+          endFrame: 320,
+          varispeedStart: 'stop',
+        });
 
         loops.toggleGlobal('A');
         expect(queue).toHaveBeenLastCalledWith('A', {
           startFrame: 300,
           endFrame: 320,
+          varispeedStart: 'stop',
           settings: engineSettingsOf(SETTINGS_B.panel, SETTINGS_B.mutes),
         });
         expect(stateOf('A').queuedId).toBe('b');
@@ -2556,7 +2715,11 @@ describe('DeckLoops', () => {
         const queue = vi.spyOn(runtime, 'queueJump');
 
         loops.toggleGlobal('A');
-        expect(queue).toHaveBeenLastCalledWith('A', { startFrame: 600, endFrame: 620 });
+        expect(queue).toHaveBeenLastCalledWith('A', {
+          startFrame: 600,
+          endFrame: 620,
+          varispeedStart: 'stop',
+        });
         expect(stateOf('A').queuedId).toBe('d');
 
         loops.toggleGlobal('A');
@@ -2564,6 +2727,7 @@ describe('DeckLoops', () => {
         expect(queue).toHaveBeenLastCalledWith('A', {
           startFrame: 600,
           endFrame: 620,
+          varispeedStart: 'stop',
           settings: engineSettingsOf(mainPanel, [false, false, false]),
         });
       });
@@ -2766,7 +2930,7 @@ describe('DeckLoops', () => {
         gates.B.holding = false;
         await settle();
         expect(runtime.position('B')).toBe(605);
-        expect(engineLoop('B')).toEqual({ startFrame: 605, endFrame: 620 });
+        expect(engineLoop('B')).toEqual({ startFrame: 605, endFrame: 620, varispeedStart: 'stop' });
       });
 
       it('cancels a start audition waiting on the other deck when a position edit comes from this one', async () => {

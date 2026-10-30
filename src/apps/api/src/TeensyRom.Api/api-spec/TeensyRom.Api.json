@@ -3311,6 +3311,10 @@
           "usesOwnSettings": {
             "type": "boolean",
             "nullable": true
+          },
+          "wraps": {
+            "type": "boolean",
+            "nullable": true
           }
         }
       },
