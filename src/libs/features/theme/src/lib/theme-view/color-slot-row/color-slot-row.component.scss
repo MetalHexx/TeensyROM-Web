@@ -1,0 +1,26 @@
+:host {
+  display: block;
+}
+
+.color-slot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.slot-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slot-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.slot-description {
+  font-size: 0.875rem;
+  opacity: 0.7;
+  line-height: 1.4;
+}

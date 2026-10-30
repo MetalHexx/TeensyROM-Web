@@ -69,6 +69,12 @@ export class ConfirmationDialogComponent {
   cancelIcon = input<string>('close');
   /** Renders two labelled `lib-action-button` actions instead of icon-only buttons. */
   showLabels = input<boolean>(false);
+  /**
+   * Colour of the confirm action (default: `'error'`, the destructive red). `'primary'` renders
+   * the primary action button; the icon-only form maps it to the `highlight` icon colour,
+   * since `lib-icon-button` has no primary.
+   */
+  confirmColor = input<'error' | 'primary'>('error');
 
   // Output events
   /**

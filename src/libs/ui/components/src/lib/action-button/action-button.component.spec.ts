@@ -215,4 +215,18 @@ describe('ActionButtonComponent', () => {
     expect(button).toBeTruthy();
     expect(component.tooltip()).toBeUndefined();
   });
+
+  it('keeps the native title on the label unless showNativeTitle is false', () => {
+    componentRef.setInput('icon', 'refresh');
+    componentRef.setInput('label', 'Refresh');
+    fixture.detectChanges();
+    const text = () => fixture.nativeElement.querySelector('lib-icon-label .icon-label-text') as Element;
+
+    expect(text().getAttribute('title')).toBe('Refresh');
+
+    componentRef.setInput('showNativeTitle', false);
+    fixture.detectChanges();
+
+    expect(text().hasAttribute('title')).toBe(false);
+  });
 });

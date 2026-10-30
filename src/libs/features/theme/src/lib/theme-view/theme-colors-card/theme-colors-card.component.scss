@@ -1,0 +1,14 @@
+:host {
+  display: block;
+}
+
+.info {
+  display: inline-flex;
+  align-items: center;
+}
+
+.slot-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}

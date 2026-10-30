@@ -1,7 +1,7 @@
 <nav class="bottom-bar" role="navigation" aria-label="Main navigation">
   <ul class="bottom-bar__list" role="menubar">
     @for (item of items(); track item.route) {
-      <li role="menuitem">
+      <li class="bottom-bar__entry" role="menuitem">
         <button
           class="bottom-bar__item"
           [class.active]="isActive(item)"

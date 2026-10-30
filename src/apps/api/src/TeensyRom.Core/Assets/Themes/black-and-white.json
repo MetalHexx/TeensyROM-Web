@@ -1,0 +1,8 @@
+{
+  "id": "black-and-white",
+  "name": "Black & White",
+  "sortOrder": 2,
+  "parts": {
+    "device": { "background": 0, "border": 11, "banner": 11, "time": 1, "option": 15, "sources": 11, "name": 12 }
+  }
+}

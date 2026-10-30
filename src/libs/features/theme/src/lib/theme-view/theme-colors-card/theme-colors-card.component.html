@@ -1,0 +1,21 @@
+<lib-scaling-card [title]="'C64 menu colors'" [subtitle]="subtitle()">
+  <span
+    slot="corner"
+    class="info"
+    role="img"
+    [attr.aria-label]="infoText()"
+    [libTooltip]="{ body: infoText(), position: TooltipPosition.Bottom }"
+  >
+    <lib-styled-icon icon="info" color="dimmed" size="medium" />
+  </span>
+  <div class="slot-rows">
+    @for (slot of slots; track slot) {
+      <lib-color-slot-row
+        [slotLabel]="slotLabels[slot].label"
+        [description]="slotLabels[slot].description"
+        [value]="colors()[slot]"
+        (valueChange)="colorChange.emit({ slot, colorIndex: $event })"
+      />
+    }
+  </div>
+</lib-scaling-card>

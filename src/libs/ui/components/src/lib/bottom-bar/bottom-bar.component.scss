@@ -30,6 +30,13 @@
   list-style: none;
 }
 
+.bottom-bar__entry {
+  // Equal share of the bar per entry, so any number of items fits the width
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
+
 .bottom-bar__item {
   // Reset button defaults
   appearance: none;
@@ -45,10 +52,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xs);
-  flex: 1;
-  min-width: 64px;
+  min-width: 0;
+  width: 100%;
   height: 100%;
-  padding: 0 var(--spacing-sm);
+  padding: 0 var(--spacing-xs);
   position: relative;
   transition: color 0.2s ease;
 
@@ -92,7 +99,11 @@
 .bottom-bar__label {
   font-size: 11px;
   font-weight: var(--font-weight-medium, 500);
-  white-space: nowrap;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   text-align: center;
   line-height: 1.2;
 }

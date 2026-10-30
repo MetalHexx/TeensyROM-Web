@@ -5,6 +5,9 @@
     muted
     playsinline
     class="video-element"
+    [class.video-element--inert]="disableNativeOverlays()"
+    [attr.disablepictureinpicture]="disableNativeOverlays() ? '' : null"
+    [attr.disableremoteplayback]="disableNativeOverlays() ? '' : null"
     [style.objectFit]="objectFit()"
     (playing)="onVideoPlaying()"
     (error)="onVideoError($event)"

@@ -1,0 +1,27 @@
+:host {
+  display: block;
+}
+
+.group-heading {
+  margin: var(--spacing-sm) 0 var(--spacing-xs);
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.theme-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.lock {
+  display: inline-flex;
+  align-items: center;
+}
+
+.swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}

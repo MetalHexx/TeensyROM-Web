@@ -1,0 +1,41 @@
+<lib-dropdown-dialog #dialog (opened)="onOpened()" (closed)="expanded.set(false)">
+  <button
+    type="button"
+    class="trigger"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="expanded()"
+    [attr.aria-label]="label() + ' color: ' + currentName() + '. Change'"
+    [disabled]="disabled()"
+    (click)="dialog.open()"
+  >
+    <lib-c64-color-swatch [colorIndex]="value()" [decorative]="true" />
+    <span class="trigger-name">{{ currentName() }}</span>
+    <mat-icon class="trigger-arrow" aria-hidden="true">arrow_drop_down</mat-icon>
+  </button>
+
+  <div dialog-content class="popover" role="dialog" [attr.aria-label]="'Choose a color for ' + label()">
+    <lib-compact-card-layout cardClass="glassy-card">
+      <div class="grid" role="radiogroup" [attr.aria-label]="'Choose a color for ' + label()">
+        @for (color of palette; track color.index) {
+        <button
+          #option
+          type="button"
+          role="radio"
+          class="option"
+          [class.option--current]="color.index === value()"
+          [attr.aria-checked]="color.index === value()"
+          [attr.tabindex]="color.index === tabStopIndex() ? 0 : -1"
+          (click)="choose(color.index, dialog)"
+          (keydown)="onKeydown($event, color.index)"
+        >
+          <lib-c64-color-swatch [colorIndex]="color.index" [decorative]="true" />
+          <span class="option-name">{{ color.name }}</span>
+          @if (color.index === value()) {
+          <mat-icon class="option-check" aria-hidden="true">check</mat-icon>
+          }
+        </button>
+        }
+      </div>
+    </lib-compact-card-layout>
+  </div>
+</lib-dropdown-dialog>

@@ -57,6 +57,12 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('@teensyrom-nx/features/settings').then((m) => m.SettingsViewComponent),
       },
+      {
+        path: 'themes',
+        data: { title: 'Theme' },
+        loadComponent: () =>
+          import('@teensyrom-nx/features/theme').then((m) => m.ThemeViewComponent),
+      },
     ],
   },
 ];

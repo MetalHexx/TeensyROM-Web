@@ -1,0 +1,8 @@
+{
+  "id": "cga",
+  "name": "CGA",
+  "sortOrder": 4,
+  "parts": {
+    "device": { "background": 0, "border": 4, "banner": 3, "time": 15, "option": 3, "sources": 3, "name": 1 }
+  }
+}

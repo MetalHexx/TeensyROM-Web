@@ -1,0 +1,18 @@
+{
+  "name": "features-theme",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "/libs/features/theme/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:features", "type:feature", "feature:theme"],
+  "implicitDependencies": [],
+  "targets": {
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{projectRoot}/coverage"]
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

@@ -128,6 +128,25 @@ describe('VideoStreamComponent', () => {
     expect(videoElement.hasAttribute('playsinline')).toBe(true);
   });
 
+  it('leaves the browser overlays alone by default', () => {
+    fixture.detectChanges();
+
+    const videoElement = fixture.nativeElement.querySelector('video') as HTMLVideoElement;
+    expect(videoElement.hasAttribute('disablepictureinpicture')).toBe(false);
+    expect(videoElement.hasAttribute('disableremoteplayback')).toBe(false);
+    expect(videoElement.classList.contains('video-element--inert')).toBe(false);
+  });
+
+  it('disables the browser overlays and pointer events when disableNativeOverlays is true', () => {
+    componentRef.setInput('disableNativeOverlays', true);
+    fixture.detectChanges();
+
+    const videoElement = fixture.nativeElement.querySelector('video') as HTMLVideoElement;
+    expect(videoElement.hasAttribute('disablepictureinpicture')).toBe(true);
+    expect(videoElement.hasAttribute('disableremoteplayback')).toBe(true);
+    expect(videoElement.classList.contains('video-element--inert')).toBe(true);
+  });
+
   it('should have accessibility attributes on video element', () => {
     fixture.detectChanges();
 

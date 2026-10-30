@@ -1,0 +1,32 @@
+:host {
+  display: block;
+}
+
+.apply-target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.control-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.no-device {
+  display: block;
+  margin-bottom: var(--spacing-md);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.save-wrapper {
+  display: inline-flex;
+}

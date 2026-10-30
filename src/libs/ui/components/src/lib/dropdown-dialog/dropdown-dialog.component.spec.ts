@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { OverlayModule } from '@angular/cdk/overlay';
@@ -36,6 +36,24 @@ class TestWrapperComponent {}
   `
 })
 class TestMultipleInstancesComponent {}
+
+@Component({
+  selector: 'lib-test-focus-host',
+  standalone: true,
+  imports: [DropdownDialogComponent],
+  template: `
+    <lib-dropdown-dialog #dialog (closed)="closedCount = closedCount + 1">
+      <button class="trigger-button" (click)="dialog.open()">Open</button>
+      <div dialog-content>
+        <button class="first-inside">First</button>
+        <button class="second-inside">Second</button>
+      </div>
+    </lib-dropdown-dialog>
+  `
+})
+class FocusHostComponent {
+  closedCount = 0;
+}
 
 describe('DropdownDialogComponent', () => {
   let component: DropdownDialogComponent;
@@ -166,5 +184,76 @@ describe('DropdownDialogComponent', () => {
       expect(component.isOpen()).toBe(false);
     });
   });
-});
 
+  describe('Keyboard and focus', () => {
+    let host: ComponentFixture<FocusHostComponent>;
+    let trigger: HTMLButtonElement;
+
+    beforeEach(async () => {
+      // jsdom has no layout, so CDK's focus trap sees every element as hidden and skips it.
+      vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+      await TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [FocusHostComponent],
+        providers: [provideNoopAnimations()]
+      }).compileComponents();
+      host = TestBed.createComponent(FocusHostComponent);
+      document.body.appendChild(host.nativeElement);
+      host.detectChanges();
+      trigger = host.nativeElement.querySelector('.trigger-button');
+      trigger.focus();
+    });
+
+    function pressEscape(): void {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    }
+
+    it('moves focus into the popup on open', async () => {
+      trigger.click();
+      await vi.waitFor(() => {
+        expect(document.activeElement?.classList.contains('first-inside')).toBe(true);
+      });
+    });
+
+    it('closes on Escape, emits closed once, and returns focus to the opener', async () => {
+      trigger.click();
+      await vi.waitFor(() => {
+        expect(document.activeElement).not.toBe(trigger);
+      });
+
+      pressEscape();
+
+      expect(host.componentInstance.closedCount).toBe(1);
+      expect(document.querySelector('.first-inside')).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('wraps focus from the trap end anchor back to the first tabbable inside the popup', async () => {
+      trigger.click();
+      await vi.waitFor(() => {
+        expect(document.activeElement?.classList.contains('first-inside')).toBe(true);
+      });
+
+      const anchors = document.querySelectorAll<HTMLElement>('.cdk-focus-trap-anchor');
+      (document.querySelector('.second-inside') as HTMLElement).focus();
+      anchors[anchors.length - 1].focus();
+
+      expect(document.activeElement?.classList.contains('first-inside')).toBe(true);
+    });
+
+    it('does not emit closed again when close() is called after it already closed', () => {
+      trigger.click();
+      pressEscape();
+      host.debugElement.children[0].componentInstance.close();
+
+      expect(host.componentInstance.closedCount).toBe(1);
+    });
+
+    afterEach(() => {
+      host.nativeElement.remove();
+      vi.restoreAllMocks();
+    });
+  });
+});

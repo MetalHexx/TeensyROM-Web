@@ -39,3 +39,6 @@ export * from './watch-folder.contract';
 
 // Device busy contracts
 export * from './device-busy.error';
+
+// Color theme contracts
+export * from './color-theme.contract';

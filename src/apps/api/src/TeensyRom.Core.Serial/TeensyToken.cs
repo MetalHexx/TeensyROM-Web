@@ -13,6 +13,7 @@ namespace TeensyRom.Core.Serial
         public static readonly TeensyToken EndDirectoryList = new(0xA5A5, nameof(EndDirectoryList));
         public static readonly TeensyToken LaunchFile = new(0x6444, nameof(LaunchFile));
         public static readonly TeensyToken PlaySubtune = new(0x6488, nameof(PlaySubtune));
+        public static readonly TeensyToken SetColor = new(0x6422, nameof(SetColor));
         public static readonly TeensyToken SendFile = new(0x64BB, nameof(SendFile));
         public static readonly TeensyToken CopyFile = new(0x64FF, nameof(CopyFile));
         public static readonly TeensyToken GetFile = new(0x64B0, nameof(GetFile));

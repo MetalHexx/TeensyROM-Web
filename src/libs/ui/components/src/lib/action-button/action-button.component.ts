@@ -75,6 +75,11 @@ export class ActionButtonComponent {
   fullWidth = input<boolean>(true);
   /** Accessible label override. Defaults to `label()` when not provided. */
   ariaLabel = input<string>();
+  /**
+   * Whether the label carries a native `title` attribute (the browser's own hover tooltip).
+   * Turn off where a `libTooltip` or other custom tooltip already covers the button. Defaults to `true`.
+   */
+  showNativeTitle = input<boolean>(true);
   /** Optional tooltip shown on hover/focus. See {@link TooltipDirective} for `TooltipConfig` shape. */
   tooltip = input<TooltipConfig | undefined>();
 
