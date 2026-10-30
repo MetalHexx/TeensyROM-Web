@@ -40,6 +40,7 @@ import { MixerService } from './mixer.service';
 import { LIVE_PAINT_CLOCK } from './live-paint-clock';
 import { PlayheadPainter } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
+import { SidWaveFeed } from './sid-wave-feed';
 import { TuneLoader } from './tune-loader';
 import { DjStore, HOME_DECK_PANEL, type DeckHolding, type DeckMixerSettings } from './dj-store';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
@@ -1556,6 +1557,7 @@ describe('DeckService', () => {
     let nextFrameId: number;
     let paintSpy: MockInstance<SidPanelPainter['paint']>;
     let playheadSpy: MockInstance<PlayheadPainter['paint']>;
+    let waveSpy: MockInstance<SidWaveFeed['paint']>;
     let positionSpy: MockInstance<DeckRuntime['position']>;
     let hidden = false;
 
@@ -1614,11 +1616,13 @@ describe('DeckService', () => {
 
       paintSpy = vi.spyOn(TestBed.inject(SidPanelPainter), 'paint');
       playheadSpy = vi.spyOn(TestBed.inject(PlayheadPainter), 'paint');
+      waveSpy = vi.spyOn(TestBed.inject(SidWaveFeed), 'paint');
       positionSpy = vi.spyOn(runtime, 'position');
       await loadAndWait('A', register(makeFixture()));
       TestBed.flushEffects();
       paintSpy.mockClear();
       playheadSpy.mockClear();
+      waveSpy.mockClear();
       setPosition(5);
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     });
@@ -1642,6 +1646,32 @@ describe('DeckService', () => {
       setPosition(6);
       runFrame(4);
       expect(paintsOfA()).toBe(2);
+    });
+
+    it('feeds the waveforms on every due tick of a moving deck, even when the position did not move', () => {
+      const wavesOfA = (): number => waveSpy.mock.calls.filter(([slot]) => slot === 'A').length;
+
+      runFrame(0);
+      wake();
+      runFrame(2);
+      wake();
+      runFrame(4);
+
+      expect(paintsOfA()).toBe(1);
+      expect(wavesOfA()).toBe(3);
+    });
+
+    it('does not feed the waveforms of a deck that is neither playing nor in varispeed', async () => {
+      await service.togglePlayPause('A');
+      TestBed.flushEffects();
+      runFrame(0);
+      waveSpy.mockClear();
+
+      setPosition(9);
+      wake();
+      runFrame(2);
+
+      expect(waveSpy).not.toHaveBeenCalled();
     });
 
     it('sleeps between the frames it paints on rather than asking for every display frame', () => {

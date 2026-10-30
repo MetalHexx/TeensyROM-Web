@@ -9,6 +9,7 @@ import {
   playCallIntervalUs,
 } from '@sidablist/core';
 import type {
+  DeliveryBatch,
   SidPlayer,
   PlayerSnapshot,
   Frames,
@@ -238,6 +239,17 @@ export class DeckRuntime {
   /** The registers as written and as sent, into caller-owned buffers — allocates nothing. */
   readRegisters(slot: Slot, written: Uint8Array, sent: Uint8Array): void {
     this.requireSlot(slot).player.readRegisters(written, sent);
+  }
+
+  /** Asks this slot's player to keep up to `capacity` delivery entries between drains; 0 turns the
+   *  history off. */
+  keepDeliveries(slot: Slot, capacity: number): void {
+    this.requireSlot(slot).player.keepDeliveries(capacity);
+  }
+
+  /** Moves the delivery entries kept since the last drain into the caller-owned batch. */
+  drainDeliveries(slot: Slot, into: DeliveryBatch): void {
+    this.requireSlot(slot).player.drainDeliveries(into);
   }
 
   /** Sets this slot's tempo multiplier (1 = the tune's own speed). */
