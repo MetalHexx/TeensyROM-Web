@@ -4,12 +4,13 @@ using System.Text.RegularExpressions;
 namespace TeensyRom.Core.Themes;
 
 /// <summary>
-/// Where theme files live under the engine's home. Shipped themes sit in a folder the asset sync replaces on every
-/// version change; custom themes and device records sit under System, which the sync never touches.
+/// Where theme files live. Shipped themes sit in the Assets folder beside the program, relative to the program folder;
+/// custom themes and device records sit under System in the engine's home (the asset sync never touches System).
 /// </summary>
 public static class ThemePaths
 {
     public const string Extension = ".json";
+    /// <summary>Relative to the folder holding the program.</summary>
     public static readonly string ShippedFolder = Path.Combine("Assets", "Themes");
     public static readonly string CustomFolder = Path.Combine("Assets", "System", "Themes", "Custom");
     public static readonly string DeviceRecordsFile = Path.Combine("Assets", "System", "Themes", "device-records.json");

@@ -22,7 +22,9 @@ public class ThemeStoreTests : IDisposable
     private readonly ILoggingService _log = Substitute.For<ILoggingService>();
     private readonly string _dataPath = Assembly.GetExecutingAssembly().GetDataPath();
 
-    private string ShippedDir => Path.Combine(_dataPath, ThemePaths.ShippedFolder);
+    private string HomeAssetsDir => Path.Combine(_dataPath, "Assets");
+    private string HomeShippedDir => Path.Combine(_dataPath, ThemePaths.ShippedFolder);
+    private string PackageShippedDir => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), ThemePaths.ShippedFolder);
     private string CustomDir => Path.Combine(_dataPath, ThemePaths.CustomFolder);
     private string RecordsFile => Path.Combine(_dataPath, ThemePaths.DeviceRecordsFile);
     private string SystemThemesDir => Path.Combine(_dataPath, "Assets", "System", "Themes");
@@ -30,7 +32,7 @@ public class ThemeStoreTests : IDisposable
     public ThemeStoreTests()
     {
         DeleteFolders();
-        SeedShipped();
+        Directory.Exists(PackageShippedDir).Should().BeTrue($"the shipped theme files must be copied to '{PackageShippedDir}' by the Core project");
     }
 
     public void Dispose()
@@ -40,20 +42,8 @@ public class ThemeStoreTests : IDisposable
 
     private void DeleteFolders()
     {
-        if (Directory.Exists(ShippedDir)) Directory.Delete(ShippedDir, recursive: true);
+        if (Directory.Exists(HomeShippedDir)) Directory.Delete(HomeShippedDir, recursive: true);
         if (Directory.Exists(SystemThemesDir)) Directory.Delete(SystemThemesDir, recursive: true);
-    }
-
-    private void SeedShipped()
-    {
-        var source = Path.Combine(AppContext.BaseDirectory, "Assets", "Themes");
-        Directory.Exists(source).Should().BeTrue($"the shipped theme files must be copied to '{source}' by the Core project");
-
-        Directory.CreateDirectory(ShippedDir);
-        foreach (var file in Directory.GetFiles(source, "*.json"))
-        {
-            File.Copy(file, Path.Combine(ShippedDir, Path.GetFileName(file)));
-        }
     }
 
     private ThemeStore NewStore() => new(_log);
@@ -88,13 +78,35 @@ public class ThemeStoreTests : IDisposable
     }
 
     [Fact]
-    public void ListThemes_WithNoShippedFolder_ReturnsCustomOnly()
+    public void ListThemes_WhenTheHomeVersionMarkerAlreadyMatches_StillListsTheShippedThemes()
     {
-        var store = NewStore();
-        store.CreateCustom("Mine", Colors());
-        Directory.Delete(ShippedDir, recursive: true);
+        const string version = "1.0.0-test";
+        var marker = Path.Combine(HomeAssetsDir, TeensyRomHome.PackageVersionFileName);
+        Directory.CreateDirectory(HomeAssetsDir);
+        File.WriteAllText(marker, version);
+        try
+        {
+            PackageAssetSync.Sync(Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "Assets"), HomeAssetsDir, version);
 
-        store.ListThemes().Select(t => t.Id).Should().Equal("mine");
+            Directory.Exists(HomeShippedDir).Should().BeFalse("a matching marker means the sync copied nothing into the home");
+            var themes = NewStore().ListThemes();
+
+            themes.Select(t => t.Id).Should().Equal(ShippedIds);
+            themes.Should().OnlyContain(t => t.Kind == ThemeKind.Shipped);
+        }
+        finally
+        {
+            File.Delete(marker);
+        }
+    }
+
+    [Fact]
+    public void ListThemes_IgnoresShippedLookalikesInTheHome()
+    {
+        Directory.CreateDirectory(HomeShippedDir);
+        File.Copy(Path.Combine(PackageShippedDir, "cga.json"), Path.Combine(HomeShippedDir, "cga-copy.json"));
+
+        NewStore().ListThemes().Select(t => t.Id).Should().Equal(ShippedIds);
     }
 
     [Fact]
@@ -198,7 +210,7 @@ public class ThemeStoreTests : IDisposable
 
         store.UpdateCustom("tr-default", "Edited", Colors()).Status.Should().Be(ThemeSaveStatus.ShippedReadOnly);
         store.DeleteCustom("tr-default").Should().Be(ThemeDeleteStatus.ShippedReadOnly);
-        File.Exists(Path.Combine(ShippedDir, "tr-default.json")).Should().BeTrue();
+        File.Exists(Path.Combine(PackageShippedDir, "tr-default.json")).Should().BeTrue();
     }
 
     [Fact]

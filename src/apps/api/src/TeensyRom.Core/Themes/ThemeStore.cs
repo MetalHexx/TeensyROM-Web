@@ -6,7 +6,8 @@ using TeensyRom.Core.Logging;
 namespace TeensyRom.Core.Themes;
 
 /// <summary>
-/// Reads the shipped themes from the package assets, keeps custom themes one JSON file each under System, and keeps
+/// Reads the shipped themes from the Assets folder beside the program (read-only, never copied into the home, so they
+/// are present whatever version marker the home holds), keeps custom themes one JSON file each under System, and keeps
 /// the colors last applied to each device in one records file. Every public method runs under one lock, and a write
 /// goes to a temp file that then replaces the target, so a failed write keeps the old file.
 /// A file that cannot be read, holds invalid colors, or whose stored id does not match its name is warned about, left in place and skipped.
@@ -16,7 +17,7 @@ public class ThemeStore(ILoggingService log) : IThemeStore
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private static string DataPath => Assembly.GetExecutingAssembly().GetDataPath();
-    private static string ShippedPath => Path.Combine(DataPath, ThemePaths.ShippedFolder);
+    private static string ShippedPath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), ThemePaths.ShippedFolder);
     private static string CustomPath => Path.Combine(DataPath, ThemePaths.CustomFolder);
     private static string DeviceRecordsPath => Path.Combine(DataPath, ThemePaths.DeviceRecordsFile);
 

@@ -146,7 +146,7 @@ describe('ThemeActionsComponent', () => {
         .componentInstance as SegmentedControlComponent;
       expect(chooser.selectedId()).toBe(APPLY_TO_ALL_DEVICES);
       expect(chooser.options().map((o) => o.label)).toEqual([
-        'All connected devices',
+        'All Devices',
         'Bench',
         'Desk',
       ]);
@@ -174,7 +174,7 @@ describe('ThemeActionsComponent', () => {
 
       const chooser = fixture.debugElement.query(By.directive(SegmentedControlComponent))
         .componentInstance as SegmentedControlComponent;
-      expect(chooser.options().map((o) => o.label)).toEqual(['All connected devices', 'd1', 'Desk']);
+      expect(chooser.options().map((o) => o.label)).toEqual(['All Devices', 'd1', 'Desk']);
 
       const { setInput } = openApply();
       expect(setInput).toHaveBeenCalledWith(

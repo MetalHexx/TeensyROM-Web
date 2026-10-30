@@ -62,7 +62,7 @@ export class ThemeActionsComponent {
     return theme ? `${theme.name} copy`.slice(0, MAX_THEME_NAME_LENGTH) : '';
   });
   protected readonly targetOptions = computed<SegmentedControlOption[]>(() => [
-    { id: APPLY_TO_ALL_DEVICES, label: 'All connected devices' },
+    { id: APPLY_TO_ALL_DEVICES, label: 'All Devices' },
     ...this.store.connectedDevices().map((d) => ({ id: d.deviceId, label: deviceLabel(d) })),
   ]);
   protected readonly themeNames = computed(() => this.store.themes().map((t) => t.name));
