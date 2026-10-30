@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Wraps the CI unit-test Nx invocation with a wall-clock budget.
 //
-// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 310] -- <nx args...>
+// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 400] -- <nx args...>
 //
 // Clears .test-timings/, runs `pnpm exec nx <nx args...>`, measures the
 // wall-clock time of that run only (not this script's setup/teardown),
@@ -24,7 +24,13 @@ import path from 'node:path';
 // 222-239s across the ASID-DJ-3/4/5 and CONNECTION-2/4 branches, then three
 // on ASID-DJ-7 at 229s, 253s and 257s). Same rule, re-applied to the worst
 // measured value (256.7s): plus 20% headroom is 308s, rounded up: 310s.
-export const DEFAULT_BUDGET_SECONDS = 310;
+//
+// The suite has grown and the 310s bar now fails fully green runs too: the
+// same code has landed at 224.8s and 315.5s on ASID-DJ-15, and THEMING-1
+// failed at 325.5s and 328.5s before passing at 243.8s and 259.5s. Same rule,
+// re-applied to the worst measured value (328.5s): plus 20% headroom is
+// 394.2s, rounded up: 400s.
+export const DEFAULT_BUDGET_SECONDS = 400;
 export const TIMINGS_DIR = '.test-timings';
 
 /**
