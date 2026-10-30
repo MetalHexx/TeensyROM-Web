@@ -27,7 +27,9 @@
     </div>
     } @for (group of groups(); track group.owner) {
     <section class="group">
-      <h3 class="group-title">{{ group.heading }}</h3>
+      <h3 class="group-title" #groupTitle tabindex="-1" [id]="groupTitleId(group.owner)">
+        {{ group.heading }}
+      </h3>
       @if (group.rows.length > 0) {
       <div class="group-rows">
         @for (row of group.rows; track row.mapping.id) {

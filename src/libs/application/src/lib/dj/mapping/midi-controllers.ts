@@ -18,7 +18,7 @@ import {
   type MidiInputOpenResult,
   type MidiInputPort,
 } from '../ports';
-import type { KnownController } from './mapping.models';
+import { controlKey, sourceKey, type ControlMapping, type KnownController } from './mapping.models';
 import { MidiMappingEngine } from './midi-mapping-engine';
 import { MidiMappings } from './midi-mappings';
 import { MidiMappingStore, type ControllerStatus } from './midi-mapping-store';
@@ -63,11 +63,88 @@ interface Resolution {
   readonly unmatched: boolean;
 }
 
+/** The controllers and mappings once duplicate controllers are merged, and the mappings that
+ *  merge dropped. */
+interface Repair {
+  readonly controllers: readonly KnownController[];
+  readonly mappings: readonly ControlMapping[];
+  readonly merged: number;
+  readonly dropped: readonly ControlMapping[];
+}
+
+/**
+ * Merges the controllers that share a name when at most one connected controller port carries
+ * it; two or more such ports are separate devices and are left alone. The kept controller is the
+ * one on that port, else the first saved, and it listens when any merged one did. Every mapping is
+ * moved onto the kept controller, and only a mapping whose source then repeats an earlier one is
+ * dropped. Returns `null` when nothing merged.
+ */
+function mergeDuplicateControllers(
+  controllers: readonly KnownController[],
+  mappings: readonly ControlMapping[],
+  controllerPorts: readonly MidiInputPort[]
+): Repair | null {
+  const byName = new Map<string, KnownController[]>();
+  for (const controller of controllers) {
+    byName.set(controller.name, [...(byName.get(controller.name) ?? []), controller]);
+  }
+
+  const keptFor = new Map<string, string>();
+  const merged = new Map<string, KnownController>();
+  for (const [name, group] of byName) {
+    const carriers = controllerPorts.filter((port) => controllerName(port.name) === name);
+    if (group.length < 2 || carriers.length > 1) {
+      continue;
+    }
+    const kept =
+      group.find((controller) => carriers.some((port) => port.id === controller.lastPortId)) ??
+      group[0];
+    merged.set(kept.id, { ...kept, listening: group.some((controller) => controller.listening) });
+    for (const controller of group) {
+      if (controller !== kept) {
+        keptFor.set(controller.id, kept.id);
+      }
+    }
+  }
+  if (keptFor.size === 0) {
+    return null;
+  }
+
+  const seen = new Set<string>();
+  const moved: ControlMapping[] = [];
+  const dropped: ControlMapping[] = [];
+  for (const mapping of mappings) {
+    const controllerId = keptFor.get(mapping.source.controllerId);
+    const rewritten: ControlMapping =
+      controllerId === undefined
+        ? mapping
+        : { ...mapping, source: { ...mapping.source, controllerId } };
+    const key = sourceKey(rewritten.source);
+    if (seen.has(key)) {
+      dropped.push(rewritten);
+    } else {
+      seen.add(key);
+      moved.push(rewritten);
+    }
+  }
+
+  return {
+    controllers: controllers
+      .filter((controller) => !keptFor.has(controller.id))
+      .map((controller) => merged.get(controller.id) ?? controller),
+    mappings: moved,
+    merged: keptFor.size,
+    dropped,
+  };
+}
+
 /**
  * Owns the controllers' input ports, their runtime state and the alerts about them.
  *
- * A saved controller is re-found by its last port id, then by a unique port name. The ports held
- * open follow one policy: only controllers that are listening and have mappings, except while
+ * A controller's port name is its identity. A saved controller is found again on the connected
+ * input that carries its name: its last port id first, otherwise the one unclaimed input with the
+ * name. A port id alone never claims a port, since the browser reshuffles them. Controllers saved
+ * twice under one name are merged once per session. The ports held open follow one policy: only controllers that are listening and have mappings, except while
  * mapping mode is on, when every input that is not a cartridge opens so learn can hear it. A
  * controller that is held by another application, missing or ambiguous keeps its mappings and
  * raises one alert per occurrence. Leaving `listening` lets go of any hold the controller drove.
@@ -105,6 +182,7 @@ export class MidiControllers {
   /** The ports this class has opened and not yet released. */
   private readonly held = new Set<string>();
   private effectInstalled = false;
+  private repaired = false;
   private draining: Promise<void> | null = null;
   private rerun = false;
   /** Counts policy requests; a run whose count has moved on by the time its opens settle has
@@ -158,14 +236,18 @@ export class MidiControllers {
     this.persistence.scheduleSave();
   }
 
-  /** Chooses the input a controller listens to, which brings back every mapping on it. */
+  /** Chooses the input a controller listens to, which brings back every mapping on it. The
+   *  operator is naming the device, so the controller takes the input's name and is found on it by
+   *  that name from then on. An input that is not listed is ignored. */
   pointAt(controllerId: string, portId: string): void {
     const controller = this.known(controllerId);
-    if (controller === null) {
+    const port = this.midiInput.inputs().find((input) => input.id === portId);
+    if (controller === null || port === undefined) {
       return;
     }
-    if (controller.lastPortId !== portId) {
-      this.store.upsertController({ controller: { ...controller, lastPortId: portId } });
+    const name = controllerName(port.name);
+    if (controller.lastPortId !== portId || controller.name !== name) {
+      this.store.upsertController({ controller: { ...controller, lastPortId: portId, name } });
     }
     this.persistence.scheduleSave();
   }
@@ -185,27 +267,30 @@ export class MidiControllers {
 
   /**
    * The controller behind an input port, made if it is new. A controller already resolved to the
-   * port is returned; otherwise a missing or ambiguous one with the same name is pointed at the
-   * port; otherwise a new listening controller is created.
+   * port is returned; otherwise the known controller with the same name, in any status, that is
+   * not on a different connected port is pointed at the port; otherwise a new listening
+   * controller is created.
    */
   ensureController(portId: string, portName: string): string {
     const name = controllerName(portName);
-    const controllers = this.store.controllers();
     const status = this.store.controllerStatus();
 
-    let id =
-      this.controllerForPort(portId) ??
-      controllers.find((controller) => controller.lastPortId === portId)?.id ??
-      null;
+    let id = this.controllerForPort(portId);
     if (id === null) {
-      const unresolved = controllers.find(
-        (controller) =>
-          controller.name === name &&
-          (status[controller.id] === 'missing' || status[controller.id] === 'unmatched')
+      const ports = this.store.controllerPorts();
+      const connectedIds = new Set(
+        this.midiInput
+          .inputs()
+          .filter((port) => port.connected)
+          .map((port) => port.id)
       );
-      if (unresolved !== undefined) {
-        id = unresolved.id;
-        this.store.upsertController({ controller: { ...unresolved, lastPortId: portId } });
+      const sameName = this.store.controllers().find((controller) => {
+        const resolved = ports[controller.id] ?? null;
+        return controller.name === name && (resolved === null || !connectedIds.has(resolved));
+      });
+      if (sameName !== undefined) {
+        id = sameName.id;
+        this.store.upsertController({ controller: { ...sameName, lastPortId: portId } });
       } else {
         id = crypto.randomUUID();
         this.store.upsertController({
@@ -271,6 +356,10 @@ export class MidiControllers {
     }
     const generation = this.generation;
     const connected = this.midiInput.inputs().filter((port) => port.connected);
+    if (!this.repaired) {
+      this.repairDuplicateControllers(connected.filter(isControllerPort));
+      this.repaired = true;
+    }
     const controllers = this.store.controllers();
 
     const resolutions = this.resolvePorts(controllers, connected);
@@ -286,28 +375,53 @@ export class MidiControllers {
     this.updateStatuses(controllers, resolutions, opened);
   }
 
-  /** Finds each controller's connected input: its last port id first, then the single unclaimed
-   *  input carrying its name. */
+  /** Merges the controllers saved twice under one name, saves the merged set and logs it. Runs
+   *  before the policy reads the controllers, so every later step sees the merged list. */
+  private repairDuplicateControllers(controllerPorts: readonly MidiInputPort[]): void {
+    const repair = mergeDuplicateControllers(
+      this.store.controllers(),
+      this.store.mappings(),
+      controllerPorts
+    );
+    if (repair === null) {
+      return;
+    }
+    for (const { id, control } of repair.dropped) {
+      logWarn(
+        `MidiControllers: dropped mapping ${id} on ${controlKey(control)}, a repeated source.`
+      );
+    }
+    this.store.repairControllers({ controllers: repair.controllers, mappings: repair.mappings });
+    this.persistence.scheduleSave();
+    logInfo(LogType.Midi, `MIDI controllers: merged ${repair.merged} duplicate controllers`);
+  }
+
+  /** Finds each controller's connected input, which must carry its name: its last port id first,
+   *  then the single unclaimed input carrying the name. */
   private resolvePorts(
     controllers: readonly KnownController[],
     connected: readonly MidiInputPort[]
   ): Map<string, Resolution> {
     const resolutions = new Map<string, Resolution>();
     const claimed = new Set<string>();
-    const connectedIds = new Set(connected.map((port) => port.id));
+    const candidates = connected.filter(isControllerPort);
 
     for (const controller of controllers) {
-      const portId = controller.lastPortId;
-      if (portId !== null && connectedIds.has(portId) && !claimed.has(portId)) {
-        claimed.add(portId);
-        resolutions.set(controller.id, { portId, unmatched: false });
+      const port = candidates.find((candidate) => candidate.id === controller.lastPortId);
+      if (
+        port !== undefined &&
+        !claimed.has(port.id) &&
+        controllerName(port.name) === controller.name
+      ) {
+        claimed.add(port.id);
+        resolutions.set(controller.id, { portId: port.id, unmatched: false });
       }
     }
     for (const controller of controllers) {
       if (resolutions.has(controller.id)) {
         continue;
       }
-      const matches = connected.filter(
+      const matches = candidates.filter(
         (port) => !claimed.has(port.id) && controllerName(port.name) === controller.name
       );
       if (matches.length === 1) {

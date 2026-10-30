@@ -17,14 +17,6 @@
         [ariaExpanded]="model().expanded"
         (buttonClick)="editToggle.emit()"
       />
-      @if (!model().expanded) {
-      <lib-icon-button
-        icon="delete"
-        size="small"
-        [ariaLabel]="model().deleteAccessibleName"
-        (buttonClick)="deleteBinding.emit()"
-      />
-      }
     </span>
   </div>
 
@@ -101,15 +93,25 @@
     } }
 
     <div class="edit-row edit-actions">
-      <button type="button" class="pill-button" (click)="relearn.emit()">Re-learn source</button>
-      <button
-        type="button"
-        class="pill-button pill-button--danger"
-        [attr.aria-label]="model().deleteAccessibleName"
-        (click)="deleteBinding.emit()"
-      >
-        Delete
-      </button>
+      <lib-action-button
+        icon="sensors"
+        label="Re-learn source"
+        variant="stroked"
+        color="normal"
+        [fullWidth]="false"
+        (buttonClick)="relearn.emit()"
+      />
+      <lib-action-button
+        icon="delete"
+        label="Delete"
+        variant="stroked"
+        color="error"
+        [fullWidth]="false"
+        [ariaLabel]="model().deleteAccessibleName"
+        (pointerdown)="onDeletePointerDown()"
+        (keydown)="onDeleteKeyDown()"
+        (buttonClick)="onDeleteClick()"
+      />
     </div>
   </div>
   }

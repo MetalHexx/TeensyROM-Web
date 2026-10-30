@@ -60,6 +60,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -81,17 +82,21 @@ describe('CrtStorageService - Custom Preset Operations', () => {
       expect(new Date(stored[0].createdAt)).toBeInstanceOf(Date);
     });
 
-    it('should update existing preset if name matches (overwrite behavior)', async () => {
+    it('should update existing preset if name matches (overwrite behavior)', () => {
       const initialSettings = { ...mockSettings, brightness: 0.5 };
       const updatedSettings = { ...mockSettings, brightness: 0.9 };
+
+      // A real 1ms wait can fire inside the same wall-clock millisecond on a loaded runner,
+      // so the clock is pinned and moved forward explicitly.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
 
       service.saveCustomPreset('Test', initialSettings);
       const firstData = storage.get('teensyrom_crt_custom_presets');
       const firstTimestamp = JSON.parse(firstData as string)[0].createdAt;
 
-      // Wait 1ms to ensure timestamp changes
-      await new Promise(resolve => setTimeout(resolve, 1));
-      
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.001Z'));
+
       service.saveCustomPreset('Test', updatedSettings);
 
       const storedData = storage.get('teensyrom_crt_custom_presets');

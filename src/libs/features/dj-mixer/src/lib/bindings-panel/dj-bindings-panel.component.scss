@@ -59,6 +59,11 @@
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   line-height: 24px;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
 }
 
 .group-empty {

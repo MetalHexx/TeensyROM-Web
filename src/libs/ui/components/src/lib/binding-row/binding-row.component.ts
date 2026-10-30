@@ -3,12 +3,15 @@ import {
   Component,
   computed,
   effect,
+  ElementRef,
   input,
   output,
   signal,
   untracked,
+  viewChild,
   type WritableSignal,
 } from '@angular/core';
+import { ActionButtonComponent } from '../action-button/action-button.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 import {
   SegmentedControlComponent,
@@ -62,23 +65,29 @@ export interface BindingRowModel {
   readonly statusText: string | null;
   /** Accessible name for the edit toggle, e.g. 'Edit Speed binding'. */
   readonly editAccessibleName: string;
-  /** Accessible name for the delete controls, e.g. 'Delete Speed binding'. */
+  /** Accessible name for the Delete button in the open row, e.g. 'Delete Speed binding'. */
   readonly deleteAccessibleName: string;
 }
 
 /** Source of the per-instance ids that tie each amount input to its label and error. */
 let nextRowId = 0;
 
+/** How long after a row opens a pointer press on its Delete button is ignored, so the click that
+ *  opened the row (or a quick follow-up at the same spot) cannot delete it. */
+export const DELETE_ARM_MS = 600;
+
 /**
  * One MIDI binding in a list: what it drives, where it listens and how it behaves. Collapsed, it
- * is two lines — the control's name, a style chip and the edit and delete buttons, then the source.
- * Expanded in place, it frames itself and offers the style (or Action), the trigger where the
- * style has one, the amount (and a second amount) where the style takes them, and Re-learn source
- * and Delete.
+ * is two lines — the control's name, a style chip and the edit button, then the source. Expanded
+ * in place, it frames itself and offers the style (or Action), the trigger where the style has
+ * one, the amount (and a second amount) where the style takes them, and Re-learn source and
+ * Delete. The edit button stays at the same place in both states.
  *
  * Purely presentational — the caller owns the model and the `expanded` flag, and updates them from
  * the outputs. Each amount is a native number input that emits on `change`, and only for a finite
- * value within its `min` and `max`; anything else shows an inline error and emits nothing.
+ * value within its `min` and `max`; anything else shows an inline error and emits nothing. A
+ * pointer press on Delete within {@link DELETE_ARM_MS} of the row opening is ignored; keyboard
+ * activation always deletes.
  *
  * @example
  * ```html
@@ -96,7 +105,7 @@ let nextRowId = 0;
  */
 @Component({
   selector: 'lib-binding-row',
-  imports: [IconButtonComponent, SegmentedControlComponent],
+  imports: [ActionButtonComponent, IconButtonComponent, SegmentedControlComponent],
   templateUrl: './binding-row.component.html',
   styleUrl: './binding-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -116,7 +125,7 @@ export class BindingRowComponent {
   readonly secondAmountChange = output<number>();
   /** Emits when Re-learn source is pressed. */
   readonly relearn = output<void>();
-  /** Emits when either delete control is pressed. */
+  /** Emits when Delete in the open row is activated. */
   readonly deleteBinding = output<void>();
 
   /** Unique id tying the amount input to its label and error. */
@@ -135,9 +144,21 @@ export class BindingRowComponent {
   /** The current second amount's value, or `null` for a style without one. */
   private readonly secondAmountValue = computed(() => this.model().secondAmount?.value ?? null);
 
+  private readonly editButton = viewChild(IconButtonComponent, { read: ElementRef });
+  /** When the row last became expanded, from `performance.now()`. */
+  private expandedAt = 0;
+  /** Whether the Delete activation in flight began with a pointer press. */
+  private deletePointerPress = false;
+
   /** Drops a rejected entry — which only means something while the row stays as it was — when the
-   *  row collapses or the caller accepts a new value for that field. */
+   *  row collapses or the caller accepts a new value for that field, and stamps the moment the row
+   *  opens for the Delete guard. */
   constructor() {
+    effect(() => {
+      if (this.expanded()) {
+        this.expandedAt = performance.now();
+      }
+    });
     effect(() => {
       this.expanded();
       this.amountValue();
@@ -148,6 +169,30 @@ export class BindingRowComponent {
       this.secondAmountValue();
       untracked(() => this.secondAmountError.set(null));
     });
+  }
+
+  /** Moves keyboard focus to the edit button. */
+  focusEdit(): void {
+    this.editButton()?.nativeElement.querySelector('button')?.focus();
+  }
+
+  protected onDeletePointerDown(): void {
+    this.deletePointerPress = true;
+  }
+
+  protected onDeleteKeyDown(): void {
+    this.deletePointerPress = false;
+  }
+
+  /** Emits `deleteBinding`, unless a pointer press lands within {@link DELETE_ARM_MS} of the row
+   *  opening. */
+  protected onDeleteClick(): void {
+    const byPointer = this.deletePointerPress;
+    this.deletePointerPress = false;
+    if (byPointer && performance.now() - this.expandedAt < DELETE_ARM_MS) {
+      return;
+    }
+    this.deleteBinding.emit();
   }
 
   /** Emits the entered amount when it is valid; otherwise shows the inline error. */

@@ -59,10 +59,16 @@ export interface MidiSettingsRecord {
   readonly deckBindings: readonly DeckDeviceBindingRecord[];
 }
 
+/** How a save is sent. `keepalive` asks the transport to complete the request even as the page
+ *  unloads. */
+export interface MidiSettingsSaveOptions {
+  readonly keepalive?: boolean;
+}
+
 /** Persists the MIDI settings set server-side so it survives a cleared browser. */
 export interface IMidiSettingsRepository {
   load(): Promise<MidiSettingsRecord>;
-  save(settings: MidiSettingsRecord): Promise<void>;
+  save(settings: MidiSettingsRecord, options?: MidiSettingsSaveOptions): Promise<void>;
 }
 
 export const MIDI_SETTINGS_REPOSITORY = new InjectionToken<IMidiSettingsRepository>(
