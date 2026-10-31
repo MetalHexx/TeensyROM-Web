@@ -23,6 +23,7 @@ import {
   MixerService,
   PlayheadPainter,
   SidPanelPainter,
+  SidWaveFeed,
   StorageStore,
   controlKey,
   type ControlIdentity,
@@ -39,7 +40,7 @@ import {
   ScalingCompactCardComponent,
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
-import { FoldHandleComponent } from '@teensyrom-nx/ui/components/dj';
+import { FoldHandleComponent, VoiceWaveRenderer } from '@teensyrom-nx/ui/components/dj';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
 import { anchorFor } from '../mapping/control-anchors';
@@ -267,6 +268,14 @@ function createSidPanelPainterStub() {
   return { attach: vi.fn(() => () => undefined) };
 }
 
+function createSidWaveFeedStub() {
+  return { attach: vi.fn(() => () => undefined) };
+}
+
+function createVoiceWaveRendererStub() {
+  return { register: vi.fn(() => ({ setOverride: vi.fn(), release: vi.fn() })) };
+}
+
 function createPlayheadPainterStub() {
   return { attach: vi.fn(() => () => undefined), pin: vi.fn() };
 }
@@ -358,6 +367,8 @@ function render(
       { provide: AsidPlayerLauncher, useValue: launcher },
       { provide: MixerService, useValue: createMixerServiceStub() },
       { provide: SidPanelPainter, useValue: createSidPanelPainterStub() },
+      { provide: SidWaveFeed, useValue: createSidWaveFeedStub() },
+      { provide: VoiceWaveRenderer, useValue: createVoiceWaveRendererStub() },
       { provide: PlayheadPainter, useValue: createPlayheadPainterStub() },
       { provide: MappableControls, useValue: midi.controls },
       { provide: MidiControllers, useValue: midi.controllers },

@@ -16,8 +16,10 @@ import {
   MixerService,
   PANEL_RANGES,
   SidPanelPainter,
+  SidWaveFeed,
   type DeckPanelState,
   type DeckPanelTargets,
+  type DeckWaveTarget,
   type FilterKnob,
   type KeyDisplayFormat,
   type PanelFilterMode,
@@ -38,17 +40,18 @@ import {
   ScalingContainerComponent,
   SegmentedControlComponent,
   SidFilterSectionComponent,
-  SidVoiceStripComponent,
   SynthPanelComponent,
   type PanelKnobModel,
   type SegmentedControlOption,
   type SidFilterSectionModel,
-  type SidVoiceStripModel,
 } from '@teensyrom-nx/ui/components';
 import {
   DeckSettingsSignComponent,
   KeyMatchLightComponent,
+  SidVoiceStripComponent,
+  VoiceWaveRenderer,
   type DeckSettingsSignModel,
+  type SidVoiceStripModel,
 } from '@teensyrom-nx/ui/components/dj';
 import type { DeckRef } from '../deck-ref';
 import { settingsSignModel } from '../settings-sign-model';
@@ -141,6 +144,7 @@ function buildDeckPanel(
             filter: { locked: voice.filterLock !== null, accessibleName: `${prefix} filter` },
           },
           disabled,
+          wave: { bank: deck.slot, voice: i as 0 | 1 | 2 },
         },
       };
     }),
@@ -171,7 +175,8 @@ function buildDeckPanel(
  * with the bindings, browser and ASID launch buttons and the Camelot / Note switch at the
  * faceplate's centre. It builds each
  * control's model from `DjStore`, sends what the hand did to `MixerService`, and hands every
- * control's live indicators to `SidPanelPainter`.
+ * control's live indicators to `SidPanelPainter`. Each deck's three voice strips host a waveform
+ * window, and the panel attaches the deck's wave feed to the shared renderer while it is alive.
  */
 @Component({
   selector: 'lib-dj-sid-panel',
@@ -197,6 +202,8 @@ export class DjSidPanelComponent {
   private readonly store = inject(DjStore);
   private readonly mixer = inject(MixerService);
   private readonly painter = inject(SidPanelPainter);
+  private readonly waveFeed = inject(SidWaveFeed);
+  private readonly waveRenderer = inject(VoiceWaveRenderer);
 
   readonly decks = input.required<readonly DeckRef[]>();
 
@@ -262,6 +269,7 @@ export class DjSidPanelComponent {
           filterModes: filter.modes,
         };
         detaches.push(this.painter.attach(slot, targets));
+        detaches.push(this.waveFeed.attach(slot, this.waveTarget(slot)));
       });
     });
 
@@ -309,5 +317,19 @@ export class DjSidPanelComponent {
     if (isKeyDisplayFormat(id)) {
       this.mixer.setKeyDisplayFormat(id);
     }
+  }
+
+  /** The deck's wave target: the shared renderer's feed, state and stats, addressed by the deck's slot. */
+  private waveTarget(slot: Slot): DeckWaveTarget {
+    const renderer = this.waveRenderer;
+    return {
+      acquire: () => renderer.acquireFeed(slot),
+      submit: () => renderer.submitFeed(slot),
+      discard: () => renderer.discardFeed(slot),
+      setState: (state) => renderer.setBankState(slot, state),
+      isFailed: () => renderer.failed,
+      setSuppressed: (on) => renderer.setSuppressed(on),
+      readStats: () => renderer.readStats(),
+    };
   }
 }

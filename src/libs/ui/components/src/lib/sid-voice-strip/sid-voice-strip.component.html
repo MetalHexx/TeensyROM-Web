@@ -1,5 +1,9 @@
 <lib-panel-section [title]="model().title">
   <div class="strip">
+    @if (model().wave; as wave) {
+      <lib-voice-wave data-control="wave" [bank]="wave.bank" [voice]="wave.voice" />
+    }
+
     <div class="waveforms">
       @for (kind of waveforms; track kind) {
         <lib-waveform-button

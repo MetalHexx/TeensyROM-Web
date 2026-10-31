@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import {
   DjStore,
@@ -7,9 +8,12 @@ import {
   HOME_DECK_PANEL,
   MixerService,
   SidPanelPainter,
+  SidWaveFeed,
   type DeckPanelTargets,
+  type DeckWaveTarget,
   type Slot,
 } from '@teensyrom-nx/application';
+import { VoiceWaveComponent, VoiceWaveRenderer } from '@teensyrom-nx/ui/components/dj';
 import { DjSidPanelComponent } from './dj-sid-panel.component';
 import type { DeckRef } from '../deck-ref';
 
@@ -32,12 +36,30 @@ function createMixerServiceStub() {
   };
 }
 
+function createWaveRendererStub() {
+  return {
+    register: vi.fn(() => ({ setOverride: vi.fn(), release: vi.fn() })),
+    acquireFeed: vi.fn(() => null),
+    submitFeed: vi.fn(),
+    discardFeed: vi.fn(),
+    setBankState: vi.fn(),
+    setSuppressed: vi.fn(),
+    readStats: vi.fn(() => Promise.resolve({})),
+    failed: false,
+  };
+}
+
 function render(decks: readonly DeckRef[] = [DECK_A, DECK_B]) {
   const mixer = createMixerServiceStub();
   const detach = vi.fn();
   const painter = {
     attach: vi.fn<(slot: Slot, targets: DeckPanelTargets) => () => void>(() => detach),
   };
+  const detachWave = vi.fn();
+  const waveFeed = {
+    attach: vi.fn<(slot: Slot, target: DeckWaveTarget) => () => void>(() => detachWave),
+  };
+  const waveRenderer = createWaveRendererStub();
 
   TestBed.configureTestingModule({
     imports: [DjSidPanelComponent],
@@ -45,6 +67,8 @@ function render(decks: readonly DeckRef[] = [DECK_A, DECK_B]) {
       provideNoopAnimations(),
       { provide: MixerService, useValue: mixer },
       { provide: SidPanelPainter, useValue: painter },
+      { provide: SidWaveFeed, useValue: waveFeed },
+      { provide: VoiceWaveRenderer, useValue: waveRenderer },
     ],
   });
 
@@ -53,7 +77,7 @@ function render(decks: readonly DeckRef[] = [DECK_A, DECK_B]) {
     TestBed.createComponent(DjSidPanelComponent);
   fixture.componentRef.setInput('decks', decks);
   fixture.detectChanges();
-  return { fixture, store, mixer, painter, detach };
+  return { fixture, store, mixer, painter, detach, waveFeed, detachWave, waveRenderer };
 }
 
 /** Puts a settled, shapeable tune on the deck, so its panel controls are live. */
@@ -559,6 +583,74 @@ describe('DjSidPanelComponent', () => {
       fixture.destroy();
 
       expect(detach).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('the waveform windows', () => {
+    it('gives each deck three windows keyed by the deck slot and the voice', () => {
+      const { fixture } = render();
+      const windows = Array.from(
+        fixture.debugElement.queryAll(By.directive(VoiceWaveComponent))
+      ).map((w) => {
+        const c = w.componentInstance as VoiceWaveComponent;
+        return [c.bank(), c.voice()];
+      });
+
+      expect(windows).toEqual([
+        ['A', 0],
+        ['A', 1],
+        ['A', 2],
+        ['B', 0],
+        ['B', 1],
+        ['B', 2],
+      ]);
+    });
+
+    it('attaches one wave target per deck, after the painter targets', () => {
+      const { painter, waveFeed } = render();
+
+      expect(waveFeed.attach.mock.calls.map(([slot]) => slot)).toEqual(['A', 'B']);
+      expect(painter.attach.mock.invocationCallOrder[0]).toBeLessThan(
+        waveFeed.attach.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('attaches only the decks it is given', () => {
+      const { waveFeed } = render([DECK_B]);
+
+      expect(waveFeed.attach.mock.calls.map(([slot]) => slot)).toEqual(['B']);
+    });
+
+    it("forwards a target's calls to the renderer under the deck's slot", async () => {
+      const { waveFeed, waveRenderer } = render();
+      const [, target] = waveFeed.attach.mock.calls[1];
+
+      target.acquire();
+      target.submit();
+      target.discard();
+      target.setState('held');
+      target.setSuppressed(true);
+      await target.readStats();
+
+      expect(waveRenderer.acquireFeed).toHaveBeenCalledWith('B');
+      expect(waveRenderer.submitFeed).toHaveBeenCalledWith('B');
+      expect(waveRenderer.discardFeed).toHaveBeenCalledWith('B');
+      expect(waveRenderer.setBankState).toHaveBeenCalledWith('B', 'held');
+      expect(waveRenderer.setSuppressed).toHaveBeenCalledWith(true);
+      expect(waveRenderer.readStats).toHaveBeenCalled();
+      expect(target.isFailed()).toBe(false);
+      waveRenderer.failed = true;
+      expect(target.isFailed()).toBe(true);
+    });
+
+    it('detaches every deck on destroy, and not before', () => {
+      const { fixture, detachWave } = render();
+      fixture.detectChanges();
+      expect(detachWave).not.toHaveBeenCalled();
+
+      fixture.destroy();
+
+      expect(detachWave).toHaveBeenCalledTimes(2);
     });
   });
 });
