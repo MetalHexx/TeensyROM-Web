@@ -252,6 +252,7 @@ internal static class CliHost
         services.AddSingleton<IPlayerService, PlayerService>();
         services.AddSingleton<ITransferService, TransferService>();
         services.AddSingleton<IWatchFolderService, WatchFolderService>();
+        services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<UploadRunner>();
         services.AddSingleton<DownloadRunner>();
         services.AddSingleton<ITypeResolver, TypeResolver>();
