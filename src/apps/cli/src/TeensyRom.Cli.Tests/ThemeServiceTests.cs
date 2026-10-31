@@ -93,6 +93,31 @@ public class ThemeServiceTests
     }
 
     [Fact]
+    public async Task FindByName_MatchesIgnoringCaseAndSpaces_AndIsNullWhenNothingIsNamedThat()
+    {
+        ApiHasThemes(Theme("custom-1", "Night Owl"));
+
+        (await _sut.FindByNameAsync("  night OWL ", default))!.Id.Should().Be("custom-1");
+        (await _sut.FindByNameAsync("custom-1", default)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Apply_WhenCancelled_PropagatesInsteadOfReportingTheDevicesAsFailed()
+    {
+        using var cts = new CancellationTokenSource();
+        _api.ApplyDeviceThemeAsync("a", Arg.Any<ApplyDeviceThemeBody>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            cts.Cancel();
+            return Task.FromException<ApplyDeviceThemeResponse>(new OperationCanceledException(cts.Token));
+        });
+
+        var apply = () => _sut.ApplyAsync([Device("a"), Device("b")], new ThemeApplyRequest(new ThemeColors(0, 0, 0, 0, 0, 0, 0), null, NoOverrides), cts.Token);
+
+        await apply.Should().ThrowAsync<TeensyApiException>();
+        await _api.DidNotReceive().ApplyDeviceThemeAsync("b", Arg.Any<ApplyDeviceThemeBody>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Apply_WithoutColors_StartsFromEachDevicesRecordAndChangesOnlyTheOverriddenSlots()
     {
         DeviceRecordIs("a", new ThemeColors(0, 1, 2, 3, 4, 5, 6), "tr-default");

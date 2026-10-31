@@ -16,17 +16,10 @@ internal sealed class ThemeService(ITeensyRomApiClient api) : IThemeService
 
         if (themes.FirstOrDefault(theme => theme.Id == nameOrId) is { } byId) return byId;
 
-        var wanted = nameOrId.Trim();
-        var named = themes.Where(theme => theme.Name.Trim().Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
-
-        return named.Count switch
-        {
-            0 => throw new CliException(CliExitCode.NotFound, $"No theme matches '{nameOrId}'."),
-            1 => named[0],
-            _ => throw new CliException(CliExitCode.Usage,
-                $"More than one theme is named '{nameOrId}'. Choose one by id: {string.Join(", ", named.Select(theme => theme.Id))}.")
-        };
+        return NamedIn(themes, nameOrId) ?? throw new CliException(CliExitCode.NotFound, $"No theme matches '{nameOrId}'.");
     }
+
+    public async Task<ThemeDto?> FindByNameAsync(string name, CancellationToken ct) => NamedIn(await ListAsync(ct), name);
 
     public async Task<DeviceThemeRecordDto> GetDeviceRecordAsync(string deviceId, CancellationToken ct) =>
         (await ApiErrors.Call(() => api.GetDeviceThemeAsync(deviceId, ct))).Record;
@@ -51,6 +44,20 @@ internal sealed class ThemeService(ITeensyRomApiClient api) : IThemeService
     public async Task DeleteAsync(string themeId, CancellationToken ct) =>
         await ApiErrors.Call(() => api.DeleteThemeAsync(themeId, ct));
 
+    private static ThemeDto? NamedIn(IReadOnlyList<ThemeDto> themes, string name)
+    {
+        var wanted = name.Trim();
+        var named = themes.Where(theme => theme.Name.Trim().Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        return named.Count switch
+        {
+            0 => null,
+            1 => named[0],
+            _ => throw new CliException(CliExitCode.Usage,
+                $"More than one theme is named '{name}'. Choose one by id: {string.Join(", ", named.Select(theme => theme.Id))}.")
+        };
+    }
+
     private async Task<ThemeApplyOutcome> ApplyToAsync(DeviceSummary device, ThemeApplyRequest request, CancellationToken ct)
     {
         ThemeColors? sent = null;
@@ -74,7 +81,7 @@ internal sealed class ThemeService(ITeensyRomApiClient api) : IThemeService
 
             return new ThemeApplyOutcome(device, ThemeApplyStatus.Applied, sent, applied.Record.IsRecorded, null);
         }
-        catch (TeensyApiException failure)
+        catch (TeensyApiException failure) when (!ct.IsCancellationRequested)
         {
             return new ThemeApplyOutcome(device, failure.IsDeviceBusy ? ThemeApplyStatus.Busy : ThemeApplyStatus.Failed, sent, false, failure.Message);
         }

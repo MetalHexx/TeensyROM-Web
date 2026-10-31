@@ -103,9 +103,9 @@ internal static class CliHost
         [
             PublicVerb.Of<ThemeListCommand, ThemeListSettings>("list", "List the shipped and custom themes with their seven menu colors. Needs no device.", ["theme", "list"]),
             PublicVerb.Of<ThemeShowCommand, ThemeShowSettings>("show", "Show the colors each TeensyROM tr-web knows was last given, and the theme they came from while they still match it. Name one with --device.", ["theme", "show"]),
-            PublicVerb.Of<ThemeApplyCommand, ThemeApplySettings>("apply", "Apply a theme and/or single colors (--background, --border, --banner, --time, --keys, --sources, --names; a C64 color by name or 0-15) to every online TeensyROM unless --device names one. It resets each C64, ending whatever it is running.", ["theme", "apply", "The Blues"]),
-            PublicVerb.Of<ThemeSaveCommand, ThemeSaveSettings>("save", "Save a custom theme from a base theme, or from a TeensyROM's current colors when none is named, with any color flags laid over it. --overwrite replaces a custom theme of the same name. Needs no device when a base theme is named.", ["theme", "save", "Late night", "C64 Mono", "--border", "blue"]),
-            PublicVerb.Of<ThemeDeleteCommand, ThemeDeleteSettings>("delete", "Delete a custom theme; shipped themes can't be deleted. Asks first unless --yes, which is required without a terminal. Needs no device.", ["theme", "delete", "Late night"])
+            PublicVerb.Of<ThemeApplyCommand, ThemeApplySettings>("apply", "Apply a theme and/or single colors (--background, --border, --banner, --time, --keys, --sources, --names; a C64 color by name or 0-15) to every online TeensyROM unless --device names one. It resets each C64, ending whatever it is running.", ["theme", "apply", "the-blues"]),
+            PublicVerb.Of<ThemeSaveCommand, ThemeSaveSettings>("save", "Save a custom theme from a base theme, or from a TeensyROM's current colors when none is named, with any color flags laid over it. --overwrite replaces a custom theme of the same name. Needs no device when a base theme is named.", ["theme", "save", "Night", "c64-mono", "--border", "blue"]),
+            PublicVerb.Of<ThemeDeleteCommand, ThemeDeleteSettings>("delete", "Delete a custom theme; shipped themes can't be deleted. Asks first unless --yes, which is required without a terminal. Needs no device.", ["theme", "delete", "Night"])
         ]),
         new("file", "Browse, search and launch the files on a TeensyROM's storage.",
         [

@@ -31,10 +31,17 @@ internal interface IThemeService
     /// <exception cref="Errors.CliException"><see cref="Errors.CliExitCode.NotFound"/> when nothing matches; <see cref="Errors.CliExitCode.Usage"/> naming the ids when two names match.</exception>
     Task<ThemeDto> FindAsync(string nameOrId, CancellationToken ct);
 
+    /// <summary>Finds a theme by name ignoring case after trimming, the rule tr-web enforces for unique names; null when none has that name.</summary>
+    /// <exception cref="Errors.CliException"><see cref="Errors.CliExitCode.Usage"/> naming the ids when two names match.</exception>
+    Task<ThemeDto?> FindByNameAsync(string name, CancellationToken ct);
+
     /// <summary>The colors tr-web last applied to the device; the factory colors when it has no record.</summary>
     Task<DeviceThemeRecordDto> GetDeviceRecordAsync(string deviceId, CancellationToken ct);
 
-    /// <summary>Applies to each device in turn, in the order given; one device's failure never stops the next.</summary>
+    /// <summary>
+    /// Applies to each device in turn, in the order given; one device's failure never stops the next.
+    /// Cancelling <paramref name="ct"/> propagates instead of being reported as a device's failure.
+    /// </summary>
     Task<IReadOnlyList<ThemeApplyOutcome>> ApplyAsync(IReadOnlyList<DeviceSummary> devices, ThemeApplyRequest request, CancellationToken ct);
 
     Task<ThemeDto> CreateAsync(string name, ThemeColors colors, CancellationToken ct);

@@ -82,6 +82,8 @@ public sealed class ThemeCommandTests : IDisposable
     private void ThemesAre(params ThemeDto[] themes)
     {
         _themes.ListAsync(Arg.Any<CancellationToken>()).Returns(themes);
+        _themes.FindByNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
+            themes.FirstOrDefault(t => t.Name.Trim().Equals(call.Arg<string>().Trim(), StringComparison.OrdinalIgnoreCase)));
         _themes.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             var wanted = call.Arg<string>().Trim();

@@ -116,7 +116,7 @@ internal sealed class ThemeSaveCommand(ICliOutput output, IEngineControl engine,
     {
         var colors = (await BaseColorsAsync(settings, ct)).With(settings.Overrides());
         var name = settings.Name.Trim();
-        var existing = (await themes.ListAsync(ct)).FirstOrDefault(theme => theme.Name.Trim().Equals(name, StringComparison.OrdinalIgnoreCase));
+        var existing = await themes.FindByNameAsync(name, ct);
 
         if (existing?.Kind == ThemeKind.Shipped)
         {
