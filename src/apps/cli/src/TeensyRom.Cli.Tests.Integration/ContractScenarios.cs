@@ -38,6 +38,7 @@ public sealed class ContractScenarios(SharedApiFixture api)
     [InlineData("engine", "status")]
     [InlineData("settings", "show")]
     [InlineData("device", "list")]
+    [InlineData("theme", "list")]
     public async Task JsonOutput_ParsesAsOneDocument_WithNothingElseOnStdout(params string[] command)
     {
         using var cli = new CliHarness();
