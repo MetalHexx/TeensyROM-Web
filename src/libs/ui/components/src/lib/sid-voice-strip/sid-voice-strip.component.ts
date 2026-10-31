@@ -11,6 +11,7 @@ import { PanelSectionComponent } from '../panel-section/panel-section.component'
 import { RotaryKnobComponent } from '../rotary-knob/rotary-knob.component';
 import type { LiveLevelIndicator, LiveLightIndicator } from '../shared/live-indicator';
 import type { PanelKnobModel } from '../shared/panel-knob.types';
+import { VoiceWaveComponent } from '../voice-wave/voice-wave.component';
 import { WaveformButtonComponent, WaveformKind } from '../waveform-button/waveform-button.component';
 
 export type SidVoiceKnob =
@@ -36,6 +37,8 @@ export interface SidVoiceStripModel {
     Record<SidVoiceSwitch, { readonly locked: boolean; readonly accessibleName: string }>
   >;
   readonly disabled: boolean;
+  /** The fed bank and voice the strip's waveform window shows; without it the strip has no window. */
+  readonly wave?: { readonly bank: string; readonly voice: 0 | 1 | 2 };
 }
 
 /** The strip's live indicators, in the order a painter addresses them. */
@@ -62,8 +65,8 @@ export interface SidVoiceStripLiveTargets {
 const WAVEFORMS: readonly WaveformKind[] = ['triangle', 'sawtooth', 'pulse', 'noise'];
 
 /**
- * One SID voice's panel strip: four waveform buttons, Coarse and Fine, pulse width, A/D/S/R and the
- * Ring/Sync/Filt switches, composed from the shared knob and the panel parts. It holds no state:
+ * One SID voice's panel strip: an optional waveform window (when the model carries `wave`), four
+ * waveform buttons, Coarse and Fine, pulse width, A/D/S/R and the Ring/Sync/Filt switches, composed from the shared knob and the panel parts. It holds no state:
  * the application feeds it a `model` and reacts to what the hand did through `knobChange`,
  * `waveformPress` and `switchPress`. A painter sets the live indicators through the instances
  * `liveTargets()` returns. The feature sets `data-voice` on the strip's host.
@@ -81,7 +84,13 @@ const WAVEFORMS: readonly WaveformKind[] = ['triangle', 'sawtooth', 'pulse', 'no
  */
 @Component({
   selector: 'lib-sid-voice-strip',
-  imports: [PanelSectionComponent, WaveformButtonComponent, RotaryKnobComponent, LedSwitchComponent],
+  imports: [
+    PanelSectionComponent,
+    VoiceWaveComponent,
+    WaveformButtonComponent,
+    RotaryKnobComponent,
+    LedSwitchComponent,
+  ],
   templateUrl: './sid-voice-strip.component.html',
   styleUrl: './sid-voice-strip.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

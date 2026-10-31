@@ -69,6 +69,11 @@ html {
   --synth-display-border: #2b242e;
   --synth-display-text: #e8dfec;
   --synth-display-dim: #6e6573;
+  // Voice wave traces: one token per voice. The dark-mode block is the same element, so these follow
+  // its --color-directory with no redeclaration.
+  --synth-wave-1: var(--color-primary-bright);
+  --synth-wave-2: var(--color-highlight);
+  --synth-wave-3: var(--color-directory);
 
   // Design Tokens - Spacing (4px grid)
   --spacing-xs: 0.25rem; // 4px

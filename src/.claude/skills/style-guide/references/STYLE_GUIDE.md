@@ -58,6 +58,7 @@ Defined in both theme blocks of `styles.scss` for the SID synth panel and its pa
 - `--synth-knob-skirt`, `--synth-knob-skirt-border`, `--synth-knob-cap`, `--synth-knob-track`, `--synth-pointer`: parts of the panel rotary knob
 - `--synth-panic-face-top`, `--synth-panic-face-bottom`, `--synth-panic-text`: the panic button's magenta-tinted face and text
 - `--synth-display-face`, `--synth-display-border`, `--synth-display-text`, `--synth-display-dim`: the recessed readout face, its hairline border, its text and its dimmed text. Apply them together with `@include styles.synth-display;` (from `theme/mixins`), which adds the inset shadow and mono text. Colour state lights on a display with `--color-highlight`, `--color-primary-bright`, `--color-success`, `--color-directory` and `--color-error`.
+- `--synth-wave-1`, `--synth-wave-2`, `--synth-wave-3`: the neon trace colours of the voice-wave windows (`lib-voice-wave`) for SID voices 1 to 3. They alias `--color-primary-bright`, `--color-highlight` and `--color-directory`, so they follow the theme (including the dark-mode `--color-directory`) without a dark-mode redeclaration. The wave window's glass reads `--synth-display-face` and `--synth-display-border`.
 
 ---
 

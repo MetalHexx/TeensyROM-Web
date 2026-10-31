@@ -28,6 +28,8 @@ export * from './lib/dj/asid-player-launcher';
 export * from './lib/dj/deck-memory-keeper';
 export * from './lib/dj/sid-panel-painter';
 export * from './lib/dj/sid-panel-targets';
+export * from './lib/dj/sid-wave-feed';
+export * from './lib/dj/wave-feed-targets';
 export * from './lib/dj/live-paint-clock';
 export * from './lib/dj/playhead-painter';
 export * from './lib/dj/playhead-targets';

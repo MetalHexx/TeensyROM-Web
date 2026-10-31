@@ -15,7 +15,10 @@ export interface BenchDeck {
 const HELP = `djBench — deck timing bench (dev builds only)
   djBench.report()               timing per playing deck since the last reset
   djBench.reset()                clears the probes and long-task count (clock and player stats reset on play)
-  djBench.lookahead(ms)          sets both decks' schedule-ahead (the sink caps it at 40 ms)`;
+  djBench.lookahead(ms)          sets both decks' schedule-ahead (the sink caps it at 40 ms)
+  djBench.waves(false|true)      the whole waveform feature off (the baseline) or on, with the hand-off timed
+  djBench.history(on)            only the engine's delivery history, on both decks (64) or off; use with waves(false)
+  djBench.waveReport()           Promise: feed counters (paints, entries, dropped, pool misses, hand-off ms) and the worker's draws`;
 
 /**
  * Puts `djBench` on the window: a console handle onto each deck's delivery probe, player stats and

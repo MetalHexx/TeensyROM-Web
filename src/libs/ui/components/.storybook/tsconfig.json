@@ -12,6 +12,7 @@
     "../src/**/*.stories.jsx",
     "../src/**/*.stories.tsx",
     "../src/**/*.stories.mdx",
+    "../src/**/*.worker.ts",
     "*.js",
     "*.ts"
   ]

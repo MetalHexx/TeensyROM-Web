@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   SidVoiceKnob,
@@ -7,6 +8,8 @@ import {
   SidVoiceSwitch,
 } from './sid-voice-strip.component';
 import { WaveformKind } from '../waveform-button/waveform-button.component';
+import { VoiceWaveComponent } from '../voice-wave/voice-wave.component';
+import { VoiceWaveRenderer } from '../voice-wave/voice-wave-renderer';
 
 const KNOBS: readonly SidVoiceKnob[] = [
   'coarse',
@@ -68,7 +71,15 @@ describe('SidVoiceStripComponent', () => {
   const control = (id: string) => host.querySelector(`[data-control="${id}"]`) as HTMLElement;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [SidVoiceStripComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [SidVoiceStripComponent],
+      providers: [
+        {
+          provide: VoiceWaveRenderer,
+          useValue: { register: () => ({ setOverride: vi.fn(), release: vi.fn() }) },
+        },
+      ],
+    }).compileComponents();
     fixture = TestBed.createComponent(SidVoiceStripComponent);
     component = fixture.componentInstance;
     host = fixture.nativeElement;
@@ -224,5 +235,26 @@ describe('SidVoiceStripComponent', () => {
     for (const el of focusables) {
       expect(el.tabIndex).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  describe('waveform window', () => {
+    it('renders none when the model carries no wave', () => {
+      expect(host.querySelector('lib-voice-wave')).toBeNull();
+    });
+
+    it('renders one window with the bank and voice from the model, above the waveform buttons', () => {
+      render(makeModel({ wave: { bank: 'B', voice: 2 } }));
+
+      const windows = host.querySelectorAll('lib-voice-wave');
+      expect(windows.length).toBe(1);
+      const win = windows[0] as HTMLElement;
+      expect(win.getAttribute('data-control')).toBe('wave');
+      const instance = fixture.debugElement.query(By.directive(VoiceWaveComponent))
+        .componentInstance as VoiceWaveComponent;
+      expect(instance.bank()).toBe('B');
+      expect(instance.voice()).toBe(2);
+      const buttons = host.querySelector('.waveforms') as HTMLElement;
+      expect(win.compareDocumentPosition(buttons) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 });

@@ -163,6 +163,12 @@ export const SwitchLocked: Story = {
   render,
 };
 
+/** The strip with its waveform window across the top, as the DJ view hosts it. */
+export const WithWaveWindow: Story = {
+  args: { model: { ...atRest(), wave: { bank: 'A', voice: 0 } } },
+  render,
+};
+
 export const Disabled: Story = { args: { model: { ...atRest(), disabled: true } }, render };
 
 export const Live: Story = {

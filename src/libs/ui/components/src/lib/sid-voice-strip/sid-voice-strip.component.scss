@@ -16,6 +16,10 @@ lib-panel-section {
   min-width: 0;
 }
 
+lib-voice-wave {
+  align-self: stretch;
+}
+
 .waveforms {
   display: grid;
   grid-template-columns: repeat(2, 32px);

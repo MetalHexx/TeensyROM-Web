@@ -88,6 +88,8 @@ djBench.lookahead(ms)  // both decks' schedule-ahead now (sink caps it at 40 ms)
 djBench.help()
 ```
 
+(`waves`, `history` and `waveReport` also live on `djBench`; see *Voice waves A/B*.)
+
 Reading `report()` per deck:
 
 | Field | Meaning |
@@ -166,7 +168,51 @@ InSID3 Out's voice 3 hard restart (gate off 4 calls → test+gate 2 calls → **
 `$F810` → pulse) is a 10 ms event whose sound depends on lasting exactly one play call — the shape
 of tune most sensitive to timing.
 
+## Voice waves A/B (`ASID-DJ-17`)
+
+Proves the per-deck voice-wave windows (three voices a deck, drawn by one worker) cost the playback
+nothing: every reading with the waves on falls within the baseline's own run-to-run spread. Dev builds
+only; none of this is a user setting.
+
+```
+djBench.waves(false|true)  // whole feature off (the baseline) or on: windows hidden, history off, feed idle, worker told to suppress; on also times the hand-off
+djBench.history(on)        // only the engine's delivery history on both decks (64 entries) or off; use with waves(false)
+djBench.waveReport()       // Promise: feed counters (paints, entries, dropped, poolMisses, handOffMeanMs/MaxMs) + the worker's (draws, skipped, mean/max draw ms)
+```
+
+1. **Conditions** (as the performance log requires): same display, DevTools closed, no extensions on
+   the tab, a fresh page, both decks at 1.00x (`djBench.report()` `intervalMs`), both cartridges
+   connected for the listening part. Say how old the page was.
+2. **Baseline, then waves on.** Loop playing: `djBench.waves(false)`, `djBench.reset()`, wait ~10 s,
+   `djBench.report()`. Repeat **at least three times** to find the run-to-run spread. Then the same
+   with `djBench.waves(true)`, at 1x and 1.5x and with one and two decks playing, on the same loop.
+   Read `spacing.onGridPct`, `spacing.collapsedPct`, `lagMs` p99, `player.lateFrames`, and the painting
+   frame times (`scripts/probes/frame-timer.js`). Pass: each reading with the waves on lies within the baseline's spread.
+3. **Garbage.** Record a trace with the waves off and on and read both with `trace-compare.mjs` and
+   `trace-long.mjs` (GC and long tasks): the garbage rate with the waves on is no higher. This also
+   confirms the pooled, transferred buffers. Open `chrome://inspect/#workers`: exactly one worker
+   serves all six windows.
+4. **Pops.** `send-capture.js` and `send-analysis.js` (`scripts/probes/`) over the same material with the
+   waves off and on (the pop-marker run in Step 2): the count of marked pops with the waves on is no higher.
+5. **The engine's own cost.** Offline: `node --expose-gc --max-semi-space-size=512 scripts/alloc-probe.mjs <file.sid>`
+   prints `player tick + FakeSink` beside `... + history` and `... + drain every 2nd tick`; compare
+   B/frame and ms/frame. Live: `djBench.waves(false)`, then `djBench.history(true)` against
+   `djBench.history(false)`, each with `reset()`, ~10 s and `report()`.
+6. **The hand-off alone.** With the waves on, after ~10 s: `await djBench.waveReport()`;
+   `handOffMeanMs` and `handOffMaxMs` are the main-thread cost of one paint's drain, decode and post.
+7. **Listening and look.** The operator listens (drum-heavy, arpeggio-heavy and sustained tunes) and
+   judges the picture: "smooth", "no flicker". Cadence is the constant `WAVE_DRAW_INTERVAL_MS`,
+   plus the glow. The build has no delay, so a picture that looks early against the sound is a
+   follow-up, not a defect of this pass. Record the verdict in the operator's words in the performance
+   log (Performance log and Decisions), and discharge the hand-off's standing assumption in the
+   portfolio with the measured number.
+
+These measurements are for this iteration. Do not re-run them to "disprove" anything in the Ruled
+out list below; each entry there stands on its own measurement.
+
 ## Ruled out (measured — do not re-test without a new reason)
+
+The *Voice waves A/B* measurements are not evidence against this list; do not re-run them to overturn it.
 
 - GC (one 2.4 ms scavenge in 12 s once the per-frame store write was gone); `performance.memory`
   sampling is too noisy below ~5 MB/s — use a trace.

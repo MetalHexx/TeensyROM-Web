@@ -13,6 +13,7 @@ import { LIVE_PAINT_CLOCK } from './live-paint-clock';
 import { LivePaintPacer } from './live-paint-pacer';
 import { PlayheadPainter, scrubPercent } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
+import { SidWaveFeed } from './sid-wave-feed';
 import { RowUnavailableError, TuneLoader, type LoadPhase } from './tune-loader';
 import {
   DjStore,
@@ -95,6 +96,7 @@ export class DeckService {
   private readonly mixerApplier = inject(MixerApplier);
   private readonly panelPainter = inject(SidPanelPainter);
   private readonly playheadPainter = inject(PlayheadPainter);
+  private readonly waveFeed = inject(SidWaveFeed);
   private readonly zone = inject(NgZone);
   private readonly clock = inject(LIVE_PAINT_CLOCK);
 
@@ -919,7 +921,8 @@ export class DeckService {
    *  or the engine is in varispeed (a hand moves the playhead of a paused deck), and paused while
    *  the document is hidden — the POC's `animationFrameSignal` bridge rule. On the frames
    *  `LivePaintPacer` picks, about 30 a second whatever the display's refresh rate, it paints each
-   *  such deck's playhead readouts and SID panel when its polled frame actually moved. It never
+   *  such deck's playhead readouts and SID panel when its polled frame actually moved, and feeds its
+   *  waveform renderer on every one of them, moved or not. It never
    *  writes the store: a store write per frame meant a change-detection pass per frame, and the
    *  garbage behind it, on the main thread the decks' frame clocks share; the store's playhead is
    *  sampled only by the explicit calls each command makes.
@@ -949,6 +952,9 @@ export class DeckService {
       if (!moving(slot)) {
         return;
       }
+      // Before the unchanged-position return: a record held still under a hand keeps delivering
+      // frames though the playhead does not move, and the waveforms must go flat rather than freeze.
+      this.waveFeed.paint(slot);
       const position = this.runtime.position(slot);
       if (position === painted[slot]) {
         return;
