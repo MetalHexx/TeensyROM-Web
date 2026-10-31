@@ -577,4 +577,26 @@ public sealed class HardwareScenarios(SharedApiFixture api)
         exitCode.Should().Be(0, cli.Error);
         JsonDocument.Parse(cli.Output).RootElement.GetProperty("path").GetString().Should().Be(path);
     }
+
+    /// <summary>Applies TR Default to the bench device (its C64 resets), then reads back that tr-web recorded it.</summary>
+    [SkippableFact]
+    public async Task ThemeApply_SendsTRDefaultToTheBenchDevice_AndTrWebRecordsIt()
+    {
+        Skip.If(api.OnlineDevices.Count == 0, "no TeensyROM is online in the test API");
+        var device = api.OnlineDevices[0];
+        using var apply = new CliHarness();
+        using var show = new CliHarness();
+
+        var applyExit = await apply.RunAsync("theme", "apply", "TR Default", "--device", device.DeviceId, "--json");
+
+        applyExit.Should().Be(0, apply.Error);
+        var applied = JsonDocument.Parse(apply.Output).RootElement.GetProperty("devices")[0];
+        applied.GetProperty("deviceId").GetString().Should().Be(device.DeviceId);
+        applied.GetProperty("status").GetString().Should().Be("applied");
+
+        var showExit = await show.RunAsync("theme", "show", "--device", device.DeviceId, "--json");
+
+        showExit.Should().Be(0, show.Error);
+        JsonDocument.Parse(show.Output).RootElement[0].GetProperty("recorded").GetBoolean().Should().BeTrue();
+    }
 }
