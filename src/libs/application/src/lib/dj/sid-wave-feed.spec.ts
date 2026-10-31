@@ -1,5 +1,6 @@
+import { isDevMode } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SID_REGISTER_COUNT } from '@sidablist/core';
 import type { DeliveryBatch } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
@@ -9,6 +10,11 @@ import { SidWaveFeed } from './sid-wave-feed';
 import type { Slot } from './slot';
 import { WAVE_HISTORY_CAPACITY } from './wave-feed-targets';
 import type { DeckWaveTarget, WaveDeckState, WaveFeedWriter, WaveVoiceFields } from './wave-feed-targets';
+
+vi.mock('@angular/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@angular/core')>();
+  return { ...actual, isDevMode: vi.fn(() => true) };
+});
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -431,6 +437,101 @@ describe('SidWaveFeed', () => {
 
       expect(calls.filter((call) => call.kind === 'begin')).toEqual([{ kind: 'begin', timeMs: 5 }]);
       expect(submit).toHaveBeenCalled();
+    });
+  });
+
+  describe('the bench commands', () => {
+    interface Bench {
+      waves(on: boolean): boolean;
+      history(on: boolean): boolean;
+      waveReport(): Promise<Record<string, number>>;
+    }
+
+    function benchFeed(): { bench: Bench | undefined; feed: SidWaveFeed } {
+      const handle: Record<string, unknown> = {};
+      (globalThis as { djBench?: unknown }).djBench = handle;
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [{ provide: DeckRuntime, useValue: { keepDeliveries, drainDeliveries } }],
+      });
+      const created = TestBed.inject(SidWaveFeed);
+      TestBed.flushEffects();
+      return { bench: handle['waves'] ? (handle as unknown as Bench) : undefined, feed: created };
+    }
+
+    afterEach(() => {
+      delete (globalThis as { djBench?: unknown }).djBench;
+      vi.mocked(isDevMode).mockReturnValue(true);
+    });
+
+    it('stops the feed and tells the worker to suppress on waves(false), and restores both on waves(true)', () => {
+      const { bench, feed: benchedFeed } = benchFeed();
+      const detail = recordingTarget();
+      benchedFeed.attach('A', detail);
+      keepDeliveries.mockClear();
+
+      bench?.waves(false);
+      expect(detail.setSuppressed).toHaveBeenLastCalledWith(true);
+      expect(keepDeliveries).toHaveBeenLastCalledWith('A', 0);
+      drain({ entries: [{ timeMs: 1 }] });
+      benchedFeed.paint('A');
+      expect(submit).not.toHaveBeenCalled();
+
+      bench?.waves(true);
+      expect(detail.setSuppressed).toHaveBeenLastCalledWith(false);
+      expect(keepDeliveries).toHaveBeenLastCalledWith('A', WAVE_HISTORY_CAPACITY);
+      benchedFeed.paint('A');
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(benchedFeed.stats()['handOffMaxMs']).toBeGreaterThanOrEqual(0);
+    });
+
+    it('switches only the engine history on history(on), for each slot that is built', () => {
+      const { bench, feed: benchedFeed } = benchFeed();
+      const detail = recordingTarget();
+      benchedFeed.attach('A', detail);
+      keepDeliveries.mockClear();
+      keepDeliveries.mockImplementation((slot: Slot) => {
+        if (slot === 'B') {
+          throw new Error('DeckRuntime: slot B has not been built');
+        }
+      });
+
+      bench?.history(true);
+      expect(keepDeliveries).toHaveBeenCalledWith('A', WAVE_HISTORY_CAPACITY);
+      expect(keepDeliveries).toHaveBeenCalledWith('B', WAVE_HISTORY_CAPACITY);
+
+      bench?.history(false);
+      expect(keepDeliveries).toHaveBeenLastCalledWith('B', 0);
+      expect(keepDeliveries).toHaveBeenCalledWith('A', 0);
+      expect(detail.setSuppressed).not.toHaveBeenCalled();
+    });
+
+    it('merges the feed counters with the first attached target\'s own on waveReport()', async () => {
+      const { bench, feed: benchedFeed } = benchFeed();
+      const detail = { ...recordingTarget(), readStats: () => Promise.resolve({ draws: 7, skipped: 2 }) };
+      benchedFeed.attach('B', detail);
+      drain({ entries: [{ timeMs: 1 }, { timeMs: 2 }] });
+      benchedFeed.paint('B');
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+      const report = await bench?.waveReport();
+      log.mockRestore();
+
+      expect(report).toMatchObject({ paints: 1, entries: 2, draws: 7, skipped: 2 });
+    });
+
+    it('installs nothing outside a dev build, or when there is no bench handle', () => {
+      vi.mocked(isDevMode).mockReturnValue(false);
+      expect(benchFeed().bench).toBeUndefined();
+
+      vi.mocked(isDevMode).mockReturnValue(true);
+      delete (globalThis as { djBench?: unknown }).djBench;
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [{ provide: DeckRuntime, useValue: { keepDeliveries, drainDeliveries } }],
+      });
+      expect(() => TestBed.inject(SidWaveFeed)).not.toThrow();
+      expect((globalThis as { djBench?: unknown }).djBench).toBeUndefined();
     });
   });
 });

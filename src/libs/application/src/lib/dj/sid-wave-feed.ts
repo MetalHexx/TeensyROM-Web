@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, isDevMode, untracked } from '@angular/core';
 import { SID_REGISTER_COUNT, VOICE_COUNT, createDeliveryBatch, readSidField } from '@sidablist/core';
 import type { DeliveryBatch, SidField } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
@@ -105,6 +105,9 @@ export class SidWaveFeed {
           this.paint(slot);
         });
       });
+    }
+    if (isDevMode()) {
+      this.installBenchCommands();
     }
   }
 
@@ -229,6 +232,38 @@ export class SidWaveFeed {
       poolMisses: this.poolMisses,
       handOffMeanMs: this.handOffs === 0 ? 0 : this.handOffTotalMs / this.handOffs,
       handOffMaxMs: this.handOffMaxMs,
+    };
+  }
+
+  /** Dev builds only: adds the wave commands to the `djBench` handle the runtime installed. The
+   *  feed is created after the runtime, so the handle exists by now; without it (a production
+   *  build, or a runtime that never installed one) nothing is added. */
+  private installBenchCommands(): void {
+    const bench = (globalThis as { djBench?: Record<string, unknown> }).djBench;
+    if (!bench) {
+      return;
+    }
+    bench['waves'] = (on: boolean): boolean => {
+      this.setSuppressed(!on);
+      this.setMeasuring(on);
+      return on;
+    };
+    bench['history'] = (on: boolean): boolean => {
+      for (const slot of DECK_SLOTS) {
+        try {
+          this.runtime.keepDeliveries(slot, on ? WAVE_HISTORY_CAPACITY : 0);
+        } catch {
+          // A slot that is not built has no history to switch.
+        }
+      }
+      return on;
+    };
+    bench['waveReport'] = async (): Promise<Record<string, number>> => {
+      const target = DECK_SLOTS.map((slot) => this.slots[slot].target).find((attached) => attached !== null);
+      const result = { ...this.stats(), ...(target ? await target.readStats() : {}) };
+      // eslint-disable-next-line no-console -- the bench is a console tool; printing is its output
+      console.log(JSON.stringify(result, null, 2));
+      return result;
     };
   }
 

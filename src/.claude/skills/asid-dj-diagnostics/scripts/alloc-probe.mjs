@@ -56,3 +56,32 @@ measure('player tick + FakeSink', () => {
   void player.play();
   return { clock, player, sink };
 }, ({ clock }) => clock.tick(performance.now() - 1));
+
+// The engine's delivery history (what the voice waves read), on the same player. Compare both lines
+// with the one above: the first is the cost of keeping the history, the second adds a drain every
+// second tick into one reused batch, as a 30 Hz paint does.
+const HISTORY_CAPACITY = 64;
+measure('player tick + FakeSink + history', () => {
+  const clock = new core.FakeClock();
+  const sink = new core.FakeSink();
+  const player = core.createSidPlayer({ sink, clock, replayRunner: stubRunner });
+  player.loadTune(file);
+  player.selectSubtune(sub);
+  player.keepDeliveries(HISTORY_CAPACITY);
+  void player.play();
+  return { clock, player };
+}, ({ clock }) => clock.tick(performance.now() - 1));
+
+measure('  ... + drain every 2nd tick', () => {
+  const clock = new core.FakeClock();
+  const sink = new core.FakeSink();
+  const player = core.createSidPlayer({ sink, clock, replayRunner: stubRunner });
+  player.loadTune(file);
+  player.selectSubtune(sub);
+  player.keepDeliveries(HISTORY_CAPACITY);
+  void player.play();
+  return { clock, player, batch: core.createDeliveryBatch(HISTORY_CAPACITY) };
+}, ({ clock, player, batch }, i) => {
+  clock.tick(performance.now() - 1);
+  if (i % 2 === 1) player.drainDeliveries(batch);
+});
