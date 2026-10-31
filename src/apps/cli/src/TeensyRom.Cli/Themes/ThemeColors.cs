@@ -71,8 +71,19 @@ internal sealed record ThemeColors(int Background, int Border, int Banner, int T
     public ThemeColors With(IReadOnlyDictionary<ThemeSlot, int> overrides) =>
         overrides.Aggregate(this, (colors, change) => colors.With(change.Key, change.Value));
 
+    /// <summary>The id of the shipped theme tr-web answers with for a device that has no record.</summary>
+    public const string FactoryThemeId = "tr-default";
+
     public static ThemeColors From(DeviceThemePartDto colors) =>
         new(colors.Background, colors.Border, colors.Banner, colors.Time, colors.Option, colors.Sources, colors.Name);
+
+    /// <summary>The listed theme the record names, only while that theme still has the colors the device was given; otherwise null.</summary>
+    public static ThemeDto? MatchingTheme(DeviceThemeRecordDto record, IEnumerable<ThemeDto> themes)
+    {
+        var colors = From(record.Colors);
+
+        return themes.FirstOrDefault(theme => theme.Id == record.ThemeId && From(theme.Parts.Device) == colors);
+    }
 
     public DeviceThemePartDto ToDto() => new()
     {

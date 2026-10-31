@@ -12,7 +12,7 @@ Offer theming only when `init`'s `capabilities` lists `theme apply`.
 
 `trom theme show [--device <name>] --json` returns one entry per device, with `deviceId`, `deviceName`, `online`, `recorded`, `themeId`, `themeName`, `appliedAt` and `colors`. `themeId` and `themeName` are set only while the colors still match that theme.
 
-`recorded` false means the engine has no record for the device, so the colors shown are the factory ones. A TeensyROM can't report its colors, so a change made on the C64's own menu is not seen.
+`recorded` false means the engine has no record for the device, so the colors shown are the factory ones (the engine then reports the factory theme's id, and plain and human output say "no record"). A TeensyROM can't report its colors, so a change made on the C64's own menu is not seen.
 
 ## Colors
 
@@ -39,6 +39,8 @@ A notice on stderr means the colors reached the C64 but were not recorded, so `t
 Names are 1 to 24 characters. `--overwrite` replaces an existing custom theme with that name. Shipped themes can't be saved over.
 
 `trom theme delete "<name>" --yes --json` deletes a custom theme, and only after the user confirms. Shipped themes can't be deleted. Devices that were given the theme keep their colors.
+
+`save` returns `{overwritten, theme}`, with `theme` shaped like a `theme list` entry. `delete` returns `{id, name}`.
 
 Both `save` and `delete` exit 2 when refused for those reasons, and 5 when the theme isn't there.
 

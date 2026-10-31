@@ -534,10 +534,10 @@ public sealed class ThemeCommandTests : IDisposable
     [Fact]
     public async Task Show_Plain_NamesTheThemeOrCustomColors_AndTheFactoryRecord()
     {
-        ThemesAre(Shipped("blues", "The Blues", Blues));
+        ThemesAre(Shipped("blues", "The Blues", Blues), Shipped(ThemeColors.FactoryThemeId, "TR Default", Mono));
         RecordIs(Alpha, Blues, "blues");
-        RecordIs(Beta, Mono, null);
-        RecordIs(Gamma, Blues, null, recorded: false);
+        RecordIs(Beta, Mono.With(ThemeSlot.Border, 2), null);
+        RecordIs(Gamma, Mono, ThemeColors.FactoryThemeId, recorded: false);
         var host = NewHost(false, Alpha, Beta, Gamma);
 
         await host.RunAsync("theme", "show");
@@ -545,6 +545,19 @@ public sealed class ThemeCommandTests : IDisposable
         host.Consoles.StdOut.Should().Contain("Alpha: The Blues")
             .And.Contain("Beta: custom colors")
             .And.Contain("Gamma: TR Default (factory, no record)");
+    }
+
+    [Fact]
+    public async Task Show_Human_SaysADeviceWithNoRecordHasNone_WhenTheEngineAnswersWithTheFactoryTheme()
+    {
+        ThemesAre(Shipped(ThemeColors.FactoryThemeId, "TR Default", Mono));
+        RecordIs(Gamma, Mono, ThemeColors.FactoryThemeId, recorded: false);
+        var host = NewHost(true, Gamma);
+
+        var exitCode = await host.RunAsync("theme", "show");
+
+        exitCode.Should().Be(0, host.Consoles.StdErr);
+        host.Consoles.StdOut.Should().Contain("no record");
     }
 
     [Fact]

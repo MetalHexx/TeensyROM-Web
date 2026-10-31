@@ -62,9 +62,7 @@ internal static class ThemeOutput
     public static DeviceThemeJson ToJson(DeviceSummary device, DeviceThemeRecordDto record, IEnumerable<ThemeDto> themes)
     {
         var colors = ThemeColors.From(record.Colors);
-        var named = record.ThemeId is null ? null : themes.FirstOrDefault(theme => theme.Id == record.ThemeId);
-
-        if (named is not null && ThemeColors.From(named.Parts.Device) != colors) named = null;
+        var named = ThemeColors.MatchingTheme(record, themes);
 
         return new DeviceThemeJson(device.Id, device.Name, device.IsOnline, record.IsRecorded, named?.Id, named?.Name, record.AppliedAt, ToJson(colors));
     }
@@ -104,7 +102,7 @@ internal static class ThemeOutput
                 output.Json(devices);
                 break;
             case OutputMode.Plain:
-                output.Lines(devices.Select(device => $"{device.DeviceName}: {(device.ThemeName ?? (device.Recorded ? "custom colors" : FactoryLabel))}"));
+                output.Lines(devices.Select(device => $"{device.DeviceName}: {ThemeLabel(device, "custom colors")}"));
                 break;
             default:
                 if (devices.Count == 0)
@@ -115,7 +113,7 @@ internal static class ThemeOutput
                 output.Out.Write(Table(
                     ["Device", "Theme", "Applied"],
                     devices.Select(device => (IReadOnlyList<string>)
-                        [device.DeviceName, device.ThemeName ?? (device.Recorded ? "Custom colors" : FactoryLabel), device.AppliedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-"]),
+                        [device.DeviceName, ThemeLabel(device, "Custom colors"), device.AppliedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-"]),
                     devices.Select(device => device.Colors)));
                 break;
         }
@@ -149,6 +147,10 @@ internal static class ThemeOutput
         fields.AddRange(Slots(theme.Colors).Select(slot => (ThemeSlots.Label(slot.Slot), slot.Color.Name)));
         output.Fields(fields);
     }
+
+    /// <summary>Without a record the device only shows tr-web's factory fallback, so that is said before any theme name.</summary>
+    private static string ThemeLabel(DeviceThemeJson device, string customLabel) =>
+        !device.Recorded ? FactoryLabel : device.ThemeName ?? customLabel;
 
     private static ThemeColorJson Color(int index) => new(index, C64Palette.Get(index).Name);
 

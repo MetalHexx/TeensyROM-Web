@@ -21,7 +21,6 @@ internal class ThemeScreenCommand(IThemeService themes, IDeviceService devices) 
     private const string LeaveTheme = "Leave Theme";
     private const string Back = "Back";
     private const string KeepCurrent = "Keep current";
-    private const string FactoryThemeId = "tr-default";
 
     /// <summary>What the screen shows and edits during one visit; each visit starts from a new one.</summary>
     private sealed class ScreenState(ThemeColors rows, ThemeDto? source)
@@ -88,13 +87,11 @@ internal class ThemeScreenCommand(IThemeService themes, IDeviceService devices) 
         if (online is not null)
         {
             var record = await themes.GetDeviceRecordAsync(online.Id, CancellationToken.None);
-            var colors = ThemeColors.From(record.Colors);
-            var source = listed.FirstOrDefault(theme => theme.Id == record.ThemeId && ThemeColors.From(theme.Parts.Device) == colors);
 
-            return new ScreenState(colors, source);
+            return new ScreenState(ThemeColors.From(record.Colors), ThemeColors.MatchingTheme(record, listed));
         }
 
-        var fallback = listed.FirstOrDefault(theme => theme.Id == FactoryThemeId) ?? listed.FirstOrDefault();
+        var fallback = listed.FirstOrDefault(theme => theme.Id == ThemeColors.FactoryThemeId) ?? listed.FirstOrDefault();
 
         if (fallback is null)
         {
