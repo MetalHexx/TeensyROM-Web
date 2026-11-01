@@ -11,12 +11,7 @@ import {
   REGISTER_RECORDER_FACTORY,
   MIDI_ACCESS,
 } from './ports';
-import type {
-  IMidiAccess,
-  MidiAccessState,
-  MidiPermission,
-  MidiPortOption,
-} from './ports/midi-access';
+import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { Slot } from './slot';
 
 const fakeReplayRunner: ReplayRunner = {
@@ -78,17 +73,14 @@ describe('DeckSpeed', () => {
       expect(tempo('A')).toBe(0.5);
     });
 
-    it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
-      'ignores %s',
-      (value) => {
-        speed.setFader('A', 1.25);
+    it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])('ignores %s', (value) => {
+      speed.setFader('A', 1.25);
 
-        speed.setFader('A', value);
+      speed.setFader('A', value);
 
-        expect(tempo('A')).toBe(1.25);
-        expect(speed.faderValue('A')).toBe(1.25);
-      }
-    );
+      expect(tempo('A')).toBe(1.25);
+      expect(speed.faderValue('A')).toBe(1.25);
+    });
   });
 
   describe('turn', () => {
@@ -165,6 +157,17 @@ describe('DeckSpeed', () => {
 
       speed.setFader('A', 0.8);
       expect(tempo('A')).toBe(0.8);
+
+      speed.jump('A', 'down');
+      expect(tempo('A')).toBe(1.2);
+    });
+
+    it('puts the fader at home without closing an open excursion', () => {
+      speed.setFader('A', 1.2);
+      speed.jump('A', 'up');
+
+      speed.setFader('A', 1);
+      expect(tempo('A')).toBe(1);
 
       speed.jump('A', 'down');
       expect(tempo('A')).toBe(1.2);

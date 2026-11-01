@@ -284,15 +284,15 @@ export class MidiMappingEngine {
     raw: number,
     timeStampMs: number
   ): void {
+    const ticks = relativeTicks(kind, raw);
+    if (ticks === 0) {
+      return;
+    }
     let gapMs: number | null = null;
     if (control.slowTurnFloor !== undefined) {
       const last = this.lastTickMs.get(mappingId);
       gapMs = last === undefined ? null : timeStampMs - last;
       this.lastTickMs.set(mappingId, timeStampMs);
-    }
-    const ticks = relativeTicks(kind, raw);
-    if (ticks === 0) {
-      return;
     }
     if (control.wholeSteps) {
       this.moveWholeSteps(control, ticks);

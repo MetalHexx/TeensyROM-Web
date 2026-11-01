@@ -5,8 +5,16 @@ const FULL = 0.01;
 
 describe('slowTurnStep', () => {
   it('Should take the full step at or under the fast gap', () => {
-    expect(slowTurnStep(FULL, SLOW_TURN_FLOOR, SLOW_TURN_FAST_MS)).toBeCloseTo(FULL, 12);
-    expect(slowTurnStep(FULL, SLOW_TURN_FLOOR, 0)).toBeCloseTo(FULL, 12);
+    expect(slowTurnStep(FULL, SLOW_TURN_FLOOR, SLOW_TURN_FAST_MS)).toBe(FULL);
+    expect(slowTurnStep(FULL, SLOW_TURN_FLOOR, 0)).toBe(FULL);
+  });
+
+  it('Should return the sensitivity exactly for any sensitivity, never above it', () => {
+    for (let k = 1; k <= 1000; k++) {
+      const full = k / 1000;
+      expect(slowTurnStep(full, SLOW_TURN_FLOOR, 0)).toBeLessThanOrEqual(full);
+      expect(slowTurnStep(full, SLOW_TURN_FLOOR, 0)).toBe(full);
+    }
   });
 
   it('Should take the floor at or over the slow gap, and for a lone click', () => {
@@ -31,7 +39,7 @@ describe('slowTurnStep', () => {
     for (let gap = SLOW_TURN_SLOW_MS - 10; gap >= SLOW_TURN_FAST_MS; gap -= 10) {
       const step = slowTurnStep(FULL, SLOW_TURN_FLOOR, gap);
       expect(step).toBeGreaterThan(previous);
-      expect(step).toBeLessThanOrEqual(FULL + 1e-12);
+      expect(step).toBeLessThanOrEqual(FULL);
       previous = step;
     }
   });

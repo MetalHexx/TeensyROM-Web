@@ -991,6 +991,16 @@ describe('DeckService', () => {
         expect(store.deck('A')().speed).toBe(0.5);
       });
 
+      it('the speed wheel moves the tempo by the slow-turn rule and the store follows', async () => {
+        await loadAndWait('A', register(makeFixture()));
+
+        service.turnSpeed('A', 1, 1000);
+        service.turnSpeed('A', 1, 1020);
+
+        expect(runtime.snapshot('A').tempo.multiplier).toBeCloseTo(1.0101, 10);
+        expect(store.deck('A')().speed).toBeCloseTo(1.0101, 10);
+      });
+
       it('jumps follow the excursion rules out to 0.3x-1.7x, and Home with none open returns to 1.0x', async () => {
         await loadAndWait('A', register(makeFixture()));
 
@@ -1215,6 +1225,7 @@ describe('DeckService', () => {
     describe('command gating', () => {
       const commands: readonly [string, (target: DeckService) => void][] = [
         ['setSpeed', (target) => target.setSpeed('A', 1.3)],
+        ['turnSpeed', (target) => target.turnSpeed('A', 1, 1000)],
         ['jumpSpeed', (target) => target.jumpSpeed('A', 'up')],
         ['setNudge', (target) => target.setNudge('A', 'up', true)],
         ['setVoiceMuted', (target) => target.setVoiceMuted('A', 0, true)],

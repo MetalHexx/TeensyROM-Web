@@ -22,5 +22,8 @@ export function slowTurnStep(fullStep: number, floor: number, gapMs: number | nu
     1,
     Math.max(0, (SLOW_TURN_SLOW_MS - gapMs) / (SLOW_TURN_SLOW_MS - SLOW_TURN_FAST_MS))
   );
-  return floor * (fullStep / floor) ** t;
+  if (t === 1) {
+    return fullStep;
+  }
+  return Math.min(fullStep, floor * (fullStep / floor) ** t);
 }

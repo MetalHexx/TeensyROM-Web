@@ -95,11 +95,7 @@ describe('DeckChannelStripComponent', () => {
 
   it('renders the settings sign at the top of the voice section, above V1', () => {
     setModel({
-      settingsSign: {
-        text: 'Item 2',
-        own: true,
-        accessibleName: 'Settings in play deck A: Item 2',
-      },
+      settingsSign: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' },
     });
     const voices = q('section.voices');
     const sign = voices.querySelector('lib-deck-settings-sign') as HTMLElement;

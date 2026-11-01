@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
+/** A pause this long between wheel events ends the gesture; a partial click does not outlast it. */
+const WHEEL_IDLE_MS = 250;
+
 /**
  * A vertical fader drawn as hardware: a dark slot, tick marks, an optional magenta home line and a
  * cap with a white line. It is still a native range input — drag and the arrow keys work as on
@@ -55,8 +58,9 @@ export class SynthFaderComponent {
    *  page does not scroll while the fader is enabled; nothing is emitted while disabled. */
   readonly wheelTurn = output<{ clicks: number; timeStampMs: number }>();
 
-  /** Wheel delta not yet worth a whole click, carried between events. */
+  /** Wheel delta not yet worth a whole click, carried between events of one gesture. */
   private wheelRemainder = 0;
+  private lastWheelMs: number | null = null;
 
   /** The home line's position along the travel, 0 (bottom) to 1 (top), clamped; `null` for none. */
   protected readonly homeFraction = computed<number | null>(() => {
@@ -68,12 +72,22 @@ export class SynthFaderComponent {
     return Math.min(1, Math.max(0, (home - this.min()) / span));
   });
 
-  /** Turns the wheel's delta into whole clicks: 100 px, 3 lines or one page each, remainders kept. */
+  /** Turns the wheel's delta into whole clicks: 100 px, 3 lines or one page each. A remainder is
+   *  kept only within one gesture: it is dropped after a pause or a change of direction. */
   protected onWheel(event: WheelEvent): void {
     if (this.disabled()) {
+      this.wheelRemainder = 0;
+      this.lastWheelMs = null;
       return;
     }
     event.preventDefault();
+    const idle = this.lastWheelMs === null || event.timeStamp - this.lastWheelMs > WHEEL_IDLE_MS;
+    const reversed =
+      this.wheelRemainder !== 0 && Math.sign(-event.deltaY) !== Math.sign(this.wheelRemainder);
+    if (idle || reversed) {
+      this.wheelRemainder = 0;
+    }
+    this.lastWheelMs = event.timeStamp;
     const perClick = event.deltaMode === 1 ? 3 : event.deltaMode === 2 ? 1 : 100;
     this.wheelRemainder += -event.deltaY / perClick;
     const clicks = Math.trunc(this.wheelRemainder);

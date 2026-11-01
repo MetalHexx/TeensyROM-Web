@@ -80,6 +80,17 @@ describe('SynthFaderComponent', () => {
       expect(wheels.map((w) => w.clicks)).toEqual([1, 1]);
     });
 
+    it('drops a partial click after a pause or a change of direction', () => {
+      wheel(-60, 0, 1000);
+      wheel(-60, 0, 1500);
+      expect(wheels).toEqual([]);
+
+      wheel(-80, 0, 2000);
+      wheel(10, 0, 2010);
+      wheel(-40, 0, 2020);
+      expect(wheels).toEqual([]);
+    });
+
     it('emits several clicks for a large delta and keeps the remainder', () => {
       wheel(-250);
       wheel(-50);

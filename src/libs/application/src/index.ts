@@ -39,7 +39,6 @@ export * from './lib/dj/mixer/panel-ranges';
 export * from './lib/dj/mixer/pitch';
 export * from './lib/dj/mixer/speed-range';
 export * from './lib/dj/mixer/speed-readout';
-export * from './lib/dj/mixer/slow-turn';
 export * from './lib/dj/mapping';
 
 // Player state management

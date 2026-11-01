@@ -308,29 +308,31 @@ describe('MidiMappingEngine', () => {
   describe('relative', () => {
     it('relative-offset moves by (raw − 64) ticks of the amount, either way', () => {
       map(ccSource(10), SPEED_A, style('relative-offset', 0.05));
-      h.engine.handle(cc(10, 64));
+      h.engine.handle(cc(10, 65));
+      const base = speed();
 
       h.engine.handle(cc(10, 66));
-      expect(speed()).toBeCloseTo(1.1, 10);
+      expect(speed()).toBeCloseTo(base + 0.1, 10);
 
       h.engine.handle(cc(10, 63));
-      expect(speed()).toBeCloseTo(1.05, 10);
+      expect(speed()).toBeCloseTo(base + 0.05, 10);
     });
 
     it('relative-signed counts up from 0 and down from 127', () => {
       map(ccSource(10), SPEED_A, style('relative-signed', 0.05));
-      h.engine.handle(cc(10, 0));
+      h.engine.handle(cc(10, 1));
+      const base = speed();
 
       h.engine.handle(cc(10, 2));
-      expect(speed()).toBeCloseTo(1.1, 10);
+      expect(speed()).toBeCloseTo(base + 0.1, 10);
 
       h.engine.handle(cc(10, 126));
-      expect(speed()).toBeCloseTo(1, 10);
+      expect(speed()).toBeCloseTo(base, 10);
     });
 
     it('stops at the ends of the range', () => {
       map(ccSource(10), SPEED_A, style('relative-offset', 0.5));
-      h.engine.handle(cc(10, 64));
+      h.engine.handle(cc(10, 65));
 
       h.engine.handle(cc(10, 127));
       expect(speed()).toBe(1.5);
@@ -437,6 +439,16 @@ describe('MidiMappingEngine', () => {
         const moved = speed() - before;
         expect(moved).toBeGreaterThan(0.0001);
         expect(moved).toBeLessThan(0.01);
+      });
+
+      it('does not take a neutral message for a click', () => {
+        h.engine.handle(tick(65, 1000));
+        h.engine.handle(tick(64, 1390));
+        const before = speed();
+
+        h.engine.handle(tick(65, 1400));
+
+        expect(speed() - before).toBeCloseTo(0.0001, 10);
       });
 
       it('reads the first click after releaseMapping as a lone click', () => {
