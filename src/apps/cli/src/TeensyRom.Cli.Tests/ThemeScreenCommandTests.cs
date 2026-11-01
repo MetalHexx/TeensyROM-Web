@@ -188,6 +188,17 @@ public sealed class ThemeScreenCommandTests : IDisposable
         await NothingWasSent();
     }
 
+    [Fact]
+    public async Task SwitchingTheme_ToACustomThemeNamedLikeTheKeepCurrentEntry_SwitchesToIt()
+    {
+        HasThemes(Default, MonoTheme, Theme("odd-id", "Keep current", ThemeKind.Custom, Warm));
+        _keys.Pick(Switch).Pick(2).Pick(LeaveCustom);
+
+        await Run();
+
+        Screen.Should().Contain("Theme: Keep current  (custom)");
+    }
+
     // ---- apply -------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -229,6 +240,22 @@ public sealed class ThemeScreenCommandTests : IDisposable
 
         await _themes.Received(1).ApplyAsync(
             Arg.Is<IReadOnlyList<DeviceSummary>>(targets => targets.Count == 1 && targets[0] == Beta),
+            Arg.Any<ThemeApplyRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Apply_WithADeviceNamedLikeTheAllEntry_TargetsOnlyThatDevice()
+    {
+        var lookalike = Beta with { Name = "All online devices (2)" };
+
+        HasDevices(Alpha, lookalike);
+        _keys.Pick(Apply).Pick(2).Pick(LeaveShipped);
+
+        await Run();
+
+        await _themes.Received(1).ApplyAsync(
+            Arg.Is<IReadOnlyList<DeviceSummary>>(targets => targets.Count == 1 && targets[0] == lookalike),
             Arg.Any<ThemeApplyRequest>(),
             Arg.Any<CancellationToken>());
     }

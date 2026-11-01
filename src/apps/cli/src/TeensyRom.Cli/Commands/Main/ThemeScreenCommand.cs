@@ -158,11 +158,10 @@ internal class ThemeScreenCommand(IThemeService themes, IDeviceService devices) 
     private async Task SwitchThemeAsync(ScreenState state)
     {
         var listed = await themes.ListAsync(CancellationToken.None);
-        var picked = PromptHelper.FilePrompt("Switch to", [.. listed.Select(theme => theme.Name), KeepCurrent]);
+        var choices = listed.Select(candidate => (candidate.Name, (ThemeDto?)candidate)).Append((KeepCurrent, null)).ToList();
+        var theme = PromptHelper.FilePrompt("Switch to", choices);
 
-        if (picked == KeepCurrent) return;
-
-        var theme = listed.First(candidate => candidate.Name == picked);
+        if (theme is null) return;
 
         state.Source = theme;
         state.Rows = ThemeColors.From(theme.Parts.Device);
@@ -204,11 +203,13 @@ internal class ThemeScreenCommand(IThemeService themes, IDeviceService devices) 
 
     private static IReadOnlyList<DeviceSummary> PickTargets(IReadOnlyList<DeviceSummary> online)
     {
-        var all = $"All online devices ({online.Count})";
-        var labels = online.ToDictionary(device => online.Count(other => other.Name == device.Name) > 1 ? $"{device.Name} ({device.Id})" : device.Name);
-        var picked = PromptHelper.FilePrompt("Apply to", [all, .. labels.Keys]);
+        var choices = new List<(string Label, IReadOnlyList<DeviceSummary> Targets)> { ($"All online devices ({online.Count})", online) };
 
-        return picked == all ? online : [labels[picked]];
+        choices.AddRange(online.Select(device => (
+            online.Count(other => other.Name == device.Name) > 1 ? $"{device.Name} ({device.Id})" : device.Name,
+            (IReadOnlyList<DeviceSummary>)[device])));
+
+        return PromptHelper.FilePrompt("Apply to", choices);
     }
 
     private async Task SaveAsync(ScreenState state)

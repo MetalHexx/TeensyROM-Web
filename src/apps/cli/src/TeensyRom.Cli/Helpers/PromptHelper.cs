@@ -118,23 +118,33 @@ namespace TeensyRom.Cli.Helpers
         /// <param name="choices">The choices to show the user</param>
         /// <param name="theme">Allows an override of the default theme for special cases</param>
         /// <returns>Selected choice</returns>
-        public static string FilePrompt(string message, List<string> choices)
+        public static string FilePrompt(string message, List<string> choices) =>
+            FilePrompt(message, choices.Select(choice => (choice, choice)).ToList());
+
+        /// <summary>
+        /// Renders a choice prompt whose choices each carry the value they stand for, and returns the value of the one
+        /// picked. Two choices that read alike, or one that reads like a menu action, can never be mistaken for each other.
+        /// </summary>
+        /// <param name="message">The message to display</param>
+        /// <param name="choices">The text to show for each choice, and what picking it returns</param>
+        /// <returns>The value of the selected choice</returns>
+        public static T FilePrompt<T>(string message, IReadOnlyList<(string Label, T Value)> choices)
         {
             var theme = RadHelper.Theme;
 
-            var sanitizedChoices = choices.Select(c => Markup.Escape(c.Normalize(NormalizationForm.FormC))).ToList();
+            var labels = choices.Select(choice => Markup.Escape(choice.Label.Normalize(NormalizationForm.FormC))).ToList();
 
-            var selection = AnsiConsole.Prompt
+            var picked = AnsiConsole.Prompt
             (
-                new SelectionPrompt<string>()
+                new SelectionPrompt<int>()
                     .Title($"[{theme.Primary}]{Markup.Escape(message)}: [/]")
                     .HighlightStyle(theme.Secondary.ToString())
-                    .AddChoices(sanitizedChoices)
+                    .AddChoices(Enumerable.Range(0, choices.Count))
+                    .UseConverter(index => labels[index])
             );
-            AnsiConsole.MarkupLine($"[{theme.Primary}]{Markup.Escape(message)}: [/][{theme.Secondary}]{Markup.Escape(selection)}[/]");
+            AnsiConsole.MarkupLine($"[{theme.Primary}]{Markup.Escape(message)}: [/][{theme.Secondary}]{labels[picked]}[/]");
 
-
-            return choices.First(original => Markup.Escape(original.Normalize(NormalizationForm.FormC)) == selection);
+            return choices[picked].Value;
         }
     }
 }
