@@ -391,9 +391,17 @@ export class MappableControls {
         () => lengthLadder(deck().beatGrid?.beatFrames ?? 0).length,
         () => this.lengthIndex(slot),
         (index) => {
-          const direction = Math.sign(index - this.lengthIndex(slot));
-          if (direction !== 0) {
-            decks.resizeMarker(slot, direction > 0 ? 'double' : 'halve');
+          // One halving or doubling per click, so a message carrying several ticks resizes that
+          // many times. An off-ladder length reads half a place from its sizes, and a move the
+          // engine clamped at an end can end on a half place too, so a part place is one click.
+          const places = index - this.lengthIndex(slot);
+          const clicks = Math.ceil(Math.abs(places));
+          for (let click = 0; click < clicks; click++) {
+            const before = this.selectedMarker(slot);
+            decks.resizeMarker(slot, places > 0 ? 'double' : 'halve');
+            if (this.selectedMarker(slot) === before) {
+              break; // refused or already at the end: the rest would be refused too
+            }
           }
         }
       ),
@@ -446,8 +454,7 @@ export class MappableControls {
    *  the bottom below the shortest size, and the 4-beat size for a cue. */
   private lengthIndex(slot: Slot): number {
     const grid = this.djStore.decks()[slot].beatGrid;
-    const { markers, selectedId } = this.djStore.loops()[slot];
-    const marker = markers.find((candidate) => candidate.id === selectedId);
+    const marker = this.selectedMarker(slot);
     const ladder = grid === null ? [] : lengthLadder(grid.beatFrames);
     if (marker === undefined || ladder.length === 0) {
       return 0;
@@ -468,6 +475,12 @@ export class MappableControls {
       return above;
     }
     return above - 0.5;
+  }
+
+  /** The deck's selected marker, or undefined with none selected. */
+  private selectedMarker(slot: Slot) {
+    const { markers, selectedId } = this.djStore.loops()[slot];
+    return markers.find((candidate) => candidate.id === selectedId);
   }
 
   /** The set's table: the Select knob and a Load button per deck. Select steps over real rows

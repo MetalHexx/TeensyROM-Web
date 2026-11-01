@@ -451,6 +451,57 @@ describe('MappableControls', () => {
 
         expect(resize).not.toHaveBeenCalled();
       });
+
+      describe('a message carrying several ticks', () => {
+        /** A resize that lands, so each click changes the marker: double or halve its length. */
+        function landingResize() {
+          return vi.spyOn(h.deckService, 'resizeMarker').mockImplementation((_slot, direction) => {
+            const marker = h.djStore.loops().A.markers[0];
+            const frames = (marker.end?.frame ?? 0) - marker.start.frame;
+            seedMarker(direction === 'double' ? frames * 2 : frames / 2);
+          });
+        }
+        const endFrame = () => h.djStore.loops().A.markers[0].end?.frame;
+
+        it('halves or doubles once per tick', () => {
+          const resize = landingResize();
+          seedMarker(96);
+
+          length().set(9);
+          expect(endFrame()).toBe(240 + 768);
+
+          length().set(7);
+          expect(endFrame()).toBe(240 + 192);
+          expect(resize.mock.calls.map(([, direction]) => direction)).toEqual([
+            'double',
+            'double',
+            'double',
+            'halve',
+            'halve',
+          ]);
+        });
+
+        it('takes a half place, off the ladder or clamped at an end, as one click', () => {
+          const resize = landingResize();
+          seedMarker(100); // 6.5
+          length().set(8.5);
+          expect(resize).toHaveBeenCalledTimes(2);
+
+          resize.mockClear();
+          seedMarker(1000); // 9.5: a turn of five clamps to 11, a place and a half
+          length().set(11);
+          expect(resize).toHaveBeenCalledTimes(2);
+        });
+
+        it('stops after a resize that changes nothing', () => {
+          const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
+          seedMarker(96);
+
+          length().set(9);
+
+          expect(resize).toHaveBeenCalledTimes(1);
+        });
+      });
     });
 
     describe('loop-move-step', () => {
