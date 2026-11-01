@@ -46,7 +46,7 @@ Download the package for your platform from the [releases page](https://github.c
 
 ### DJ Mixer
 
-<img width="1568" height="741" alt="DJ Mixer with a tune loaded on each deck" src=".github/images/dj-mixer.jpg" />
+<img width="2500" height="1237" alt="DJ Mixer with a tune loaded on each deck" src=".github/images/dj-mixer.png" />
 
 Two decks of SID music, played live through real C64s. Every note is made by the SID chip itself, and none by an emulator.
 
