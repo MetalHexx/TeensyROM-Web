@@ -19,7 +19,7 @@ import {
 } from './dj-store';
 import { MixerApplier } from './mixer-applier';
 import type { MoveStepBeats } from './grid/beat-math';
-import { resolvedFrame } from './loops/loop-marker-math';
+import { oneSecondFrames, resolvedFrame } from './loops/loop-marker-math';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { engineSettingsOf } from './mixer/engine-settings';
 import { MARKER_NAME_MAX_LENGTH, MAX_MARKERS_PER_SUBTUNE } from './sets/set-limits';
@@ -1200,6 +1200,71 @@ describe('DeckLoops', () => {
         loops.setMoveStep('A', 3 as MoveStepBeats);
 
         expect(store.decks().A.moveStepBeats).toBe(1);
+        expect(refusals()).toHaveLength(1);
+      });
+    });
+
+    describe('moving by a frame', () => {
+      beforeEach(() => {
+        loops.setMoveStep('A', 'frame');
+      });
+
+      it('shifts a loop a frame at a time by its nudges, keeping its beats, its length and the grid', async () => {
+        loops.select('A', 'loop');
+
+        loops.moveLoop('A', 1);
+        loops.moveLoop('A', 1);
+        loops.moveLoop('A', -1);
+
+        expect(markerOf('loop')?.start).toEqual({ frame: 240, offsetFrames: 1 });
+        expect(markerOf('loop')?.end).toEqual({ frame: 336, offsetFrames: 1 });
+        expect(store.decks().A.beatGrid).toEqual(GRID);
+        expect(await savedSpans()).toContainEqual(['loop', 241, 337]);
+      });
+
+      it('moves a cue alone, with or without a grid', () => {
+        setGrid(null);
+
+        loops.moveLoop('A', -1);
+
+        expect(markerOf('cue')?.start).toEqual({ frame: 100, offsetFrames: -1 });
+        expect(markerOf('cue')?.end).toBeNull();
+      });
+
+      it('goes back onto a beat at the first beat-step move', () => {
+        loops.select('A', 'loop');
+        loops.moveLoop('A', 1);
+
+        loops.setMoveStep('A', 1);
+        loops.moveLoop('A', 1);
+
+        expect(markerOf('loop')?.start).toEqual({ frame: 264, offsetFrames: 0 });
+        expect(spanOf('loop')).toEqual([264, 360]);
+      });
+
+      it('stops a second off the beat, as the nudge strips do', () => {
+        loops.select('A', 'loop');
+        const second = oneSecondFrames(store.decks().A.playCallIntervalUs);
+        expect(second).toBeGreaterThan(0);
+
+        for (let press = 0; press <= second; press++) {
+          loops.moveLoop('A', -1);
+        }
+
+        expect(markerOf('loop')?.start).toEqual({ frame: 240, offsetFrames: -second });
+        expect(markerOf('loop')?.end).toEqual({ frame: 336, offsetFrames: -second });
+        expect(refusals()).toHaveLength(1);
+      });
+
+      it('moves one edge by its nudge, and refuses an edge that would meet the other', () => {
+        loops.select('A', 'tiny');
+
+        loops.moveEdge('A', 'end', -1);
+        loops.moveEdge('A', 'start', 1);
+        loops.moveEdge('A', 'start', 1);
+
+        expect(markerOf('tiny')?.start).toEqual({ frame: 240, offsetFrames: 1 });
+        expect(markerOf('tiny')?.end).toEqual({ frame: 243, offsetFrames: -1 });
         expect(refusals()).toHaveLength(1);
       });
     });

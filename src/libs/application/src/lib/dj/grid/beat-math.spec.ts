@@ -9,6 +9,7 @@ import {
   inGridSpan,
   lengthLadder,
   MOVE_STEPS,
+  moveStepLabel,
   nearestBeat,
   nextBeat,
   onBeat,
@@ -158,6 +159,18 @@ describe('beatsLabel', () => {
   });
 });
 
+describe('the Move steps', () => {
+  it('offer one frame first, then one beat to sixteen', () => {
+    expect(MOVE_STEPS).toEqual(['frame', 1, 2, 4, 8, 16]);
+  });
+
+  it('write the frame step as a frame and the rest as beats', () => {
+    expect(moveStepLabel('frame')).toBe('1 FRAME');
+    expect(moveStepLabel(1)).toBe('1 BEAT');
+    expect(moveStepLabel(16)).toBe('16 BEATS');
+  });
+});
+
 describe('nextBeat', () => {
   it('steps to the beat strictly beyond the frame, from a beat or between two', () => {
     expect(nextBeat(grid(), 35, 1)).toBe(60);
@@ -200,11 +213,5 @@ describe('beatsInReach', () => {
   it('leaves out beats outside the span and before 0', () => {
     expect(beatsInReach(grid({ startFrame: 0, endFrame: 50 }), 40, 30)).toEqual([-30, -5]);
     expect(beatsInReach(grid({ beatOneFrame: 5 }), 10, 20)).toEqual([-5, 20]);
-  });
-});
-
-describe('MOVE_STEPS', () => {
-  it('runs from one beat to sixteen', () => {
-    expect(MOVE_STEPS).toEqual([1, 2, 4, 8, 16]);
   });
 });

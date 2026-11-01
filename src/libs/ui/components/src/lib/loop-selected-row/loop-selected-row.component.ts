@@ -16,9 +16,9 @@ export interface LoopLengthOptionModel {
   readonly selected: boolean;
 }
 
-/** One distance the Move step picker offers. */
+/** One distance the Move step picker offers: beats, or `'frame'` for one play call. */
 export interface LoopMoveStepOptionModel {
-  readonly beats: 1 | 2 | 4 | 8 | 16;
+  readonly beats: 'frame' | 1 | 2 | 4 | 8 | 16;
   readonly label: string;
   readonly selected: boolean;
 }
@@ -202,8 +202,8 @@ export class LoopSelectedRowComponent {
   readonly moveEarlier = output<void>();
   /** Emits when the Move later key is pressed. */
   readonly moveLater = output<void>();
-  /** Emits the picked Move step in beats. */
-  readonly pickMoveStep = output<1 | 2 | 4 | 8 | 16>();
+  /** Emits the picked Move step: beats, or `'frame'`. */
+  readonly pickMoveStep = output<LoopMoveStepOptionModel['beats']>();
   /** Emits when Clear End is pressed. */
   readonly clearEnd = output<void>();
   /** Emits when Delete is pressed. */

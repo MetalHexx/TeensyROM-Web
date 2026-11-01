@@ -31,6 +31,7 @@ import {
   nearestBeat,
   nextBeat,
   onBeat,
+  type MoveStep,
   type MoveStepBeats,
 } from './grid/beat-math';
 import { engineSettingsOf } from './mixer/engine-settings';
@@ -620,15 +621,21 @@ export class DeckLoops {
   /**
    * Shifts the selected marker, start and end together, by the deck's Move step in `direction`,
    * keeping its length; a cue moves alone. A start off the beats lands first on the next beat that
-   * way, the end following at the same length. A no-op, logged, off the grid.
+   * way, the end following at the same length. A no-op, logged, off the grid. On the frame step,
+   * both edges' nudges move by one frame instead, grid or none (`shiftByFrame`).
    */
   moveLoop(slot: Slot, direction: -1 | 1): void {
     const marker = this.selectedMarker(slot, 'moveLoop');
     if (marker === null) {
       return;
     }
+    const step = this.store.decks()[slot].moveStepBeats;
+    if (step === 'frame') {
+      this.shiftByFrame(slot, marker, direction);
+      return;
+    }
     const from = resolvedFrame(marker.start);
-    const to = this.beatStep(slot, from, direction, 'moveLoop');
+    const to = this.beatStep(slot, from, step, direction, 'moveLoop');
     if (to === null) {
       return;
     }
@@ -638,7 +645,8 @@ export class DeckLoops {
 
   /** Moves one edge of the selected marker by the deck's Move step in `direction`. An edge off the
    *  beats lands first on the next beat that way. A no-op, logged, off the grid; refused for the
-   *  end of a cue. */
+   *  end of a cue. On the frame step, the edge's nudge moves by one frame instead
+   *  (`nudgedByFrame`). */
   moveEdge(slot: Slot, boundary: LoopBoundaryName, direction: -1 | 1): void {
     const marker = this.selectedMarker(slot, 'moveEdge');
     if (marker === null) {
@@ -648,11 +656,17 @@ export class DeckLoops {
     if (edge === null) {
       return;
     }
-    const to = this.beatStep(slot, resolvedFrame(edge), direction, 'moveEdge');
-    if (to === null) {
+    const step = this.store.decks()[slot].moveStepBeats;
+    let moved: DeckLoopBoundary | null;
+    if (step === 'frame') {
+      moved = this.nudgedByFrame(slot, marker, boundary, edge, direction);
+    } else {
+      const to = this.beatStep(slot, resolvedFrame(edge), step, direction, 'moveEdge');
+      moved = to === null ? null : this.boundaryAt(to);
+    }
+    if (moved === null) {
       return;
     }
-    const moved = this.boundaryAt(to);
     this.place(
       slot,
       'moveEdge',
@@ -662,14 +676,15 @@ export class DeckLoops {
     );
   }
 
-  /** Sets how many beats the deck's Move controls shift a loop or an edge by. Kept across loads. */
-  setMoveStep(slot: Slot, beats: MoveStepBeats): void {
-    if (!MOVE_STEPS.includes(beats)) {
-      this.refuse(slot, 'setMoveStep', `has no Move step of ${beats} beats`);
+  /** Sets how far the deck's Move controls shift a loop or an edge: beats, or one frame. Kept across
+   *  loads. */
+  setMoveStep(slot: Slot, step: MoveStep): void {
+    if (!MOVE_STEPS.includes(step)) {
+      this.refuse(slot, 'setMoveStep', `has no Move step of ${step}`);
       return;
     }
-    if (this.store.decks()[slot].moveStepBeats !== beats) {
-      this.store.setDeckMoveStep({ slot, moveStepBeats: beats });
+    if (this.store.decks()[slot].moveStepBeats !== step) {
+      this.store.setDeckMoveStep({ slot, moveStepBeats: step });
     }
   }
 
@@ -1479,10 +1494,58 @@ export class DeckLoops {
     return grid;
   }
 
-  /** Where a Move in `direction` takes the edge at `frame`: the Move step on from the beat it is
-   *  on, else the next beat that way. Null, with a warning, when there is no such beat in the grid's
-   *  span. */
-  private beatStep(slot: Slot, frame: number, direction: -1 | 1, command: string): number | null {
+  /**
+   * The frame step's whole-marker move: both edges' nudges change by one frame in `direction`, so
+   * the length holds exactly and each edge keeps the beat it is on; the grid is not read or moved.
+   * Refused when either nudge would pass the strips' one second; `place` refuses an edge past the
+   * tune's ends.
+   */
+  private shiftByFrame(slot: Slot, marker: DeckLoopMarker, direction: -1 | 1): void {
+    const second = this.oneSecond(slot);
+    const shifted = (boundary: DeckLoopBoundary): DeckLoopBoundary => ({
+      ...boundary,
+      offsetFrames: boundary.offsetFrames + direction,
+    });
+    const start = shifted(marker.start);
+    const end = marker.end === null ? null : shifted(marker.end);
+    const tooFar = [start, end].some(
+      (boundary) => boundary !== null && Math.abs(boundary.offsetFrames) > second
+    );
+    if (tooFar) {
+      this.refuse(slot, 'moveLoop', 'would nudge an edge more than a second off its beat');
+      return;
+    }
+    this.place(slot, 'moveLoop', marker, start, end);
+  }
+
+  /** The frame step's edge move: that edge's nudge one frame on in `direction`, inside the limits
+   *  the nudge strips keep (`nudgeLimits`). Null, refused, past them. */
+  private nudgedByFrame(
+    slot: Slot,
+    marker: DeckLoopMarker,
+    boundary: LoopBoundaryName,
+    edge: DeckLoopBoundary,
+    direction: -1 | 1
+  ): DeckLoopBoundary | null {
+    const { min, max } = nudgeLimits(marker, boundary, this.oneSecond(slot));
+    const offsetFrames = edge.offsetFrames + direction;
+    if (offsetFrames < min || offsetFrames > max) {
+      this.refuse(slot, 'moveEdge', 'would nudge the edge past its limit');
+      return null;
+    }
+    return { ...edge, offsetFrames };
+  }
+
+  /** Where a Move of `beats` in `direction` takes the edge at `frame`: that many beats on from the
+   *  beat it is on, else the next beat that way. Null, with a warning, when there is no such beat in
+   *  the grid's span. */
+  private beatStep(
+    slot: Slot,
+    frame: number,
+    beats: MoveStepBeats,
+    direction: -1 | 1,
+    command: string
+  ): number | null {
     const grid = this.gridAt(slot, frame, command);
     if (grid === null) {
       return null;
@@ -1490,7 +1553,7 @@ export class DeckLoops {
     const beat = nearestBeat(grid, frame);
     const target =
       beat !== null && onBeat(grid, frame)
-        ? beat + direction * this.store.decks()[slot].moveStepBeats * grid.beatFrames
+        ? beat + direction * beats * grid.beatFrames
         : nextBeat(grid, frame, direction);
     const rounded = target === null ? null : Math.round(target);
     if (rounded === null || !inGridSpan(grid, rounded)) {

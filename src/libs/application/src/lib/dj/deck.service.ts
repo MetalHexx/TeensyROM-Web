@@ -28,7 +28,7 @@ import { DjSets } from './sets/dj-sets';
 import { decodeRowHost } from './sets/row-host';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
-import type { MoveStepBeats } from './grid/beat-math';
+import type { MoveStep } from './grid/beat-math';
 import type { LoopBoundaryName } from './selectors/loops-summary';
 
 /** `error instanceof Error ? error.message : String(error)` — a local helper, not core's
@@ -512,10 +512,10 @@ export class DeckService {
     }
   }
 
-  /** Sets how many beats the deck's Move controls shift a loop or an edge by. */
-  setMoveStep(slot: Slot, beats: MoveStepBeats): void {
+  /** Sets how far the deck's Move controls shift a loop or an edge: beats, or one frame. */
+  setMoveStep(slot: Slot, step: MoveStep): void {
     if (this.canShape(slot, 'setMoveStep')) {
-      this.loops.setMoveStep(slot, beats);
+      this.loops.setMoveStep(slot, step);
     }
   }
 

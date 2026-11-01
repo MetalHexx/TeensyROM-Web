@@ -3,6 +3,7 @@ import {
   LoopSelectedRowComponent,
   type LoopBoundaryNudge,
   type LoopEdgeMove,
+  type LoopMoveStepOptionModel,
   type LoopSelectedRowModel,
 } from '../loop-selected-row/loop-selected-row.component';
 import { LoopTileGridComponent } from '../loop-tile-grid/loop-tile-grid.component';
@@ -103,8 +104,8 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly moveEarlier = output<void>();
   /** Emits when the selected row's Move later key is pressed. */
   readonly moveLater = output<void>();
-  /** Emits the step picked in the selected row's Move step picker, in beats. */
-  readonly pickMoveStep = output<1 | 2 | 4 | 8 | 16>();
+  /** Emits the step picked in the selected row's Move step picker: beats, or `'frame'`. */
+  readonly pickMoveStep = output<LoopMoveStepOptionModel['beats']>();
   /** Emits when the selected row's Clear End key is pressed. */
   readonly clearEnd = output<void>();
   /** Emits when the selected row's Delete key is pressed. */

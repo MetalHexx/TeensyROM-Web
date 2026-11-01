@@ -4,7 +4,7 @@ import { withDjActions } from './actions';
 import { withDjSelectors } from './selectors';
 import type { Slot } from './slot';
 import type { DjFileKey } from './dj-file-key.util';
-import type { MoveStepBeats } from './grid/beat-math';
+import type { MoveStep } from './grid/beat-math';
 import type { MidiAccessState, MidiPortOption } from './ports/midi-access';
 import type { SetSummary, TuneReference, TuneSet } from '@sidablist/tunes';
 
@@ -151,8 +151,9 @@ export interface DeckState {
   detectedKey: DeckDetectedKey | null;
   /** The grid the deck plays to, or null when the tune has none. */
   beatGrid: DeckBeatGrid | null;
-  /** How far the Move controls shift a loop or an edge, in beats. Kept across loads. */
-  moveStepBeats: MoveStepBeats;
+  /** How far the Move controls shift a loop or an edge: a whole number of beats, or `'frame'` for
+   *  one play call by the edges' nudges. Kept across loads. */
+  moveStepBeats: MoveStep;
   /** True from the first tap of a sequence until the taps stop. */
   tapping: boolean;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which

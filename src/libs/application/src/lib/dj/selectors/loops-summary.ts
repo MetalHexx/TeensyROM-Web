@@ -20,8 +20,9 @@ import {
   inGridSpan,
   lengthLadder,
   MOVE_STEPS,
+  moveStepLabel,
   onBeat,
-  type MoveStepBeats,
+  type MoveStep,
 } from '../grid/beat-math';
 import { isShapeable } from './mixer';
 import { formatElapsed, formatSeconds } from './transport-time';
@@ -64,9 +65,9 @@ export interface LoopLengthOption {
   readonly selected: boolean;
 }
 
-/** One distance the Move step picker offers. */
+/** One distance the Move step picker offers: beats, or `'frame'` for one play call. */
 export interface LoopMoveStepOption {
-  readonly beats: MoveStepBeats;
+  readonly beats: MoveStep;
   readonly label: string;
   readonly selected: boolean;
 }
@@ -226,11 +227,11 @@ export function loopsSummary(store: WritableStore<DjState>) {
           hasTune: loaded !== null,
           canAdd: isShapeable({ loaded, switching: deck.switching(), status: deck.status() }),
           canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
-          moveStepText: beatsLabel(moveStep),
-          moveStepOptions: MOVE_STEPS.map((beats) => ({
-            beats,
-            label: beatsLabel(beats),
-            selected: beats === moveStep,
+          moveStepText: moveStepLabel(moveStep),
+          moveStepOptions: MOVE_STEPS.map((step) => ({
+            beats: step,
+            label: moveStepLabel(step),
+            selected: step === moveStep,
           })),
           items,
           selected,

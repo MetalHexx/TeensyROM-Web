@@ -456,24 +456,26 @@ describe('MappableControls', () => {
     describe('loop-move-step', () => {
       const step = () => pick('A', 'loop-move-step', 'value');
 
-      it('counts the five steps and reads the deck step', () => {
-        expect(step().max).toBe(4);
-        expect(step().read()).toBe(0);
+      it('counts the six steps, the frame first, and reads the deck step', () => {
+        expect(step().max).toBe(5);
+        expect(step().read()).toBe(1);
 
         h.makeShapeable('A');
         h.deckService.setMoveStep('A', 8);
 
-        expect(step().read()).toBe(3);
+        expect(step().read()).toBe(4);
         expect(step().wholeSteps).toBe(true);
       });
 
       it('sets the step an index names through the deck service', () => {
         h.makeShapeable('A');
 
-        step().set(2);
-
+        step().set(3);
         expect(h.djStore.deck('A')().moveStepBeats).toBe(4);
         expect(h.djStore.deck('B')().moveStepBeats).toBe(1);
+
+        step().set(0);
+        expect(h.djStore.deck('A')().moveStepBeats).toBe('frame');
       });
     });
 

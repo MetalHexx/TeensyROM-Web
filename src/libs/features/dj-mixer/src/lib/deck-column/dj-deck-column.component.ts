@@ -43,7 +43,7 @@ import {
   type LoopBoundaryName,
   type LoopBoundarySummary,
   type LoopItemSummary,
-  type MoveStepBeats,
+  type MoveStep,
   type LoopMoveStepOption,
   type LoopSelectionSummary,
   cartridgeOptions,
@@ -563,8 +563,8 @@ export class DjDeckColumnComponent {
     this.deckService.moveMarker(this.deck().slot, 1);
   }
 
-  onPickMoveStep(beats: MoveStepBeats): void {
-    this.deckService.setMoveStep(this.deck().slot, beats);
+  onPickMoveStep(step: MoveStep): void {
+    this.deckService.setMoveStep(this.deck().slot, step);
   }
 
   onClearEnd(): void {

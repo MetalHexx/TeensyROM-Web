@@ -165,7 +165,20 @@ export function beatsInReach(
   return offsets;
 }
 
-/** The distances, in beats, the Move controls can shift a loop or an edge by. */
+/** The whole-beat distances the Move controls can shift a loop or an edge by. */
 export type MoveStepBeats = 1 | 2 | 4 | 8 | 16;
 
-export const MOVE_STEPS: readonly MoveStepBeats[] = [1, 2, 4, 8, 16];
+/**
+ * A Move step: a whole number of beats, or `'frame'`, one play call. A frame step moves an edge by
+ * its nudge rather than its beat, so the edge keeps the beat it sits on and the grid never moves. It
+ * is a bench experiment (2026-11-01) for setting a very short loop onto a transient.
+ */
+export type MoveStep = 'frame' | MoveStepBeats;
+
+/** The steps the Move picker offers, shortest first. */
+export const MOVE_STEPS: readonly MoveStep[] = ['frame', 1, 2, 4, 8, 16];
+
+/** A Move step as the screen writes it: `1 FRAME`, `1 BEAT`, `4 BEATS`. */
+export function moveStepLabel(step: MoveStep): string {
+  return step === 'frame' ? '1 FRAME' : beatsLabel(step);
+}

@@ -260,7 +260,7 @@ describe('LoopSelectedRowComponent', () => {
     });
 
     it('opens the Move step picker and emits the picked beats', () => {
-      const picked: number[] = [];
+      const picked: (number | 'frame')[] = [];
       fixture.componentInstance.pickMoveStep.subscribe((beats) => picked.push(beats));
       openPicker('loop-move-step');
       menuItems().find((item) => item.textContent?.includes('4 BEATS'))?.click();

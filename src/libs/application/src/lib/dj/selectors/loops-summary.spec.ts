@@ -86,6 +86,7 @@ describe('loopsSummary', () => {
       canStop: false,
       moveStepText: '1 BEAT',
       moveStepOptions: [
+        { beats: 'frame', label: '1 FRAME', selected: false },
         { beats: 1, label: '1 BEAT', selected: true },
         { beats: 2, label: '2 BEATS', selected: false },
         { beats: 4, label: '4 BEATS', selected: false },
@@ -107,6 +108,9 @@ describe('loopsSummary', () => {
       { beats: 8, label: '8 BEATS', selected: true },
     ]);
     expect(summary.selected).toBeNull();
+
+    store.setDeckMoveStep({ slot: 'A', moveStepBeats: 'frame' });
+    expect(store.loopsSummary('A')().moveStepText).toBe('1 FRAME');
   });
 
   it.each([
