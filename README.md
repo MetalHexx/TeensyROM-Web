@@ -33,7 +33,7 @@ Your TeensyROM companion in Claude Code: ask it to play, run timed sets, tour yo
     <td align="center" width="50%" valign="top">
       <a href="docs/trom-api.md"><img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="320"></a><br>
       <b><a href="docs/trom-api.md">Trom API</a></b><br>
-      The REST API behind it all, for custom clients and automation, with its own documentation page.
+      Control your cart from your own scripts and tools: launch files, search your library, copy files over and set themes. It's the same server Trom UI and Trom Terminal use.
     </td>
   </tr>
 </table>
