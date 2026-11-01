@@ -1,13 +1,13 @@
 ---
 name: release-local
-description: Create a local test release of TeensyROM Web for quick validation before official release
+description: Create a local test release of TeensyROM Suite for quick validation before official release
 user-invocable: true
 disable-model-invocation: true
 ---
 
 # Local Test Release
 
-This skill creates a **local test release** of TeensyROM Web without version bumping, git tagging, or triggering CI/CD. Use this for quick validation and testing before creating an official GitHub release.
+This skill creates a **local test release** of TeensyROM Suite without version bumping, git tagging, or triggering CI/CD. Use this for quick validation and testing before creating an official GitHub release.
 
 ## When to Use This
 
@@ -329,13 +329,13 @@ Packaging zips/tars the whole `publish/<rid>/` folder, so `cli/` rides along wit
 **Windows (.zip):**
 ```powershell
 cd publish/win-x64
-Compress-Archive -Path * -DestinationPath ../TeensyROM-Web-local-win-x64.zip
+Compress-Archive -Path * -DestinationPath ../TeensyROM-Suite-local-win-x64.zip
 ```
 
 **macOS/Linux (.tar.gz):**
 ```bash
 cd publish/osx-x64
-tar -czvf ../TeensyROM-Web-local-osx-x64.tar.gz .
+tar -czvf ../TeensyROM-Suite-local-osx-x64.tar.gz .
 ```
 
 ## Next Steps

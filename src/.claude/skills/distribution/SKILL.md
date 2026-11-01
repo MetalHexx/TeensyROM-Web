@@ -1,11 +1,11 @@
 ---
 name: distribution
-description: 'Distribution and release pipeline reference for TeensyROM Web. Use for questions about the build/release architecture (single-executable design, build pipeline stages), the package layout (engine plus the CLI in `cli/`) and the shared `~/.teensyrom` home, the automated GitHub Actions release workflow and its troubleshooting, Homebrew formula structure and distribution (two commands), artifact sizes/contents, code signing and other security considerations, or the distribution FAQ. NOT for actually running a release or local test build — use the `release` or `release-local` skills for that.'
+description: 'Distribution and release pipeline reference for TeensyROM Suite. Use for questions about the build/release architecture (single-executable design, build pipeline stages), the package layout (engine plus the CLI in `cli/`) and the shared `~/.teensyrom` home, the automated GitHub Actions release workflow and its troubleshooting, Homebrew formula structure and distribution (two commands), artifact sizes/contents, code signing and other security considerations, or the distribution FAQ. NOT for actually running a release or local test build — use the `release` or `release-local` skills for that.'
 ---
 
 # Distribution Skill
 
-Reference for how TeensyROM Web is built, packaged, and released as a self-contained desktop application (bundled .NET 9 Web API engine + Angular frontend, with the CLI alongside) for Windows, macOS, and Linux.
+Reference for how TeensyROM Suite is built, packaged, and released as a self-contained desktop application (bundled .NET 9 Web API engine + Angular frontend, with the CLI alongside) for Windows, macOS, and Linux.
 
 ## When to Use This Skill
 
@@ -13,7 +13,7 @@ Reference for how TeensyROM Web is built, packaged, and released as a self-conta
 - Understanding the package layout (engine at the root, CLI in `cli/`) and where the apps keep their data
 - Understanding the single-executable design (bundled runtime, SPA routing, SignalR hubs, API routes all on one process/port)
 - Questions about the automated release workflow (`.github/workflows/release.yml`): jobs, version/tag requirements, troubleshooting failures
-- Questions about the Homebrew formula (`Formula/teensyrom-web.rb`) structure, dual-architecture support, its two commands (`teensyrom-web`, `trom`) and the conflict with the older CLI formula, or manual formula updates
+- Questions about the Homebrew formula (`Formula/teensyrom-suite.rb`) structure, dual-architecture support, its commands (`trom-suite`, `trom`, and the `teensyrom-web` alias) and the conflict with the older CLI formula, or manual formula updates
 - Questions about artifact details: executable/archive sizes per platform, archive contents, download URLs
 - Security considerations: code signing status, OS permission prompts (SmartScreen/Gatekeeper), serial port permissions, dependency vulnerability monitoring
 - General distribution FAQ (pre-releases, deleting a failed release, overriding version, ports, verbose logging)
@@ -30,9 +30,9 @@ Reference for how TeensyROM Web is built, packaged, and released as a self-conta
 
 **Home**: both apps keep state under `~/.teensyrom` (`api/` for the engine, `cli/` for the CLI); `TEENSYROM_DATA_DIR` moves the whole home. The engine copies the package's seed assets into the home on version change and writes nothing beside the program.
 
-**Homebrew**: the formula installs `teensyrom-web` and, when the package has `cli/`, `trom` (it conflicts with the older `metalhexx/teensyrom-cli/teensyrom-cli` formula). A package without `cli/` keeps the previous single-wrapper install.
+**Homebrew**: the formula installs `trom-suite` (starts Trom API in the foreground), the `teensyrom-web` alias and, when the package has `cli/`, `trom` (it conflicts with the older `metalhexx/teensyrom-cli/teensyrom-cli` formula). A package without `cli/` keeps the previous single-wrapper install.
 
-**Release trigger**: pushing a git tag matching `v{major}.{minor}.{patch}[-{prerelease}]`; the tag version must match `<Version>` in `src/apps/Version.props` (shared by the engine and the CLI); the `trom-agent` plugin's `plugin.json` and its marketplace entry carry the same version, bumped in the same commit. Pre-release tags (e.g. `-alpha.1`) are marked as pre-releases on GitHub and **do** update the Homebrew formula (the `update-formula` job has no `if:`); every release produces all 4 platform artifacts.
+**Release trigger**: pushing a git tag matching `v{major}.{minor}.{patch}[-{prerelease}]`; the tag version must match `<Version>` in `src/apps/Version.props` (shared by the engine and the CLI); the `trom-agent` plugin's `plugin.json` and its `Agent version:` marker (under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md`) carry the same version; the three version locations in this repo are bumped in one commit, and the marketplace copies of `plugin.json` and the marker must match too. Pre-release tags (e.g. `-alpha.1`) are marked as pre-releases on GitHub and **do** update the Homebrew formula (the `update-formula` job has no `if:`); every release produces all 4 platform artifacts.
 
 ## Full Reference
 

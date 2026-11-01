@@ -1,4 +1,4 @@
-# TeensyROM Web Distribution Guide
+# TeensyROM Suite Distribution Guide
 
 **Last Updated**: 2026-10-19  
 **Status**: Production Ready ✅
@@ -7,7 +7,7 @@
 
 ## 📋 Overview
 
-This guide documents the complete distribution process for TeensyROM Web, a self-contained desktop application that bundles the .NET Web API (the engine) and Angular frontend into a single executable for Windows, macOS, and Linux. Every download also carries the TeensyROM command-line tool (the CLI) in a `cli/` subfolder beside the engine.
+This guide documents the complete distribution process for TeensyROM Suite, a self-contained desktop application that bundles the .NET Web API (the engine) and Angular frontend into a single executable for Windows, macOS, and Linux. Every download also carries the TeensyROM command-line tool (the CLI) in a `cli/` subfolder beside the engine.
 
 **Distribution Goals**:
 - Zero dependencies for end users (bundled .NET runtime)
@@ -184,7 +184,7 @@ The formula is updated for **every** tag: the `update-formula` job has no `if:`,
 </PropertyGroup>
 ```
 
-The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `Version.props` (a CLI test fails on drift), and `tr-plugin-marketplace` mirrors it in its copy of `plugin.json` and in the `trom-agent` entry of `.claude-plugin/marketplace.json`.
+The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `Version.props`, and so does the agent version marker, the line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (a CLI test covers the manifest and the marker and fails on drift). `tr-plugin-marketplace` mirrors them in its copy of `plugin.json`, in the `trom-agent` entry of `.claude-plugin/marketplace.json`, and in its copy of the `SKILL.md` marker, which must match too.
 
 **Why no version override?**: The workflow does NOT use `-p:Version=` to override the version in `Version.props`. This ensures:
 - Version displayed in UI matches release tag
@@ -202,7 +202,7 @@ The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agen
 </PropertyGroup>
 ```
 
-**Plugin version** (same value): `"version": "1.2.0"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`; then in `tr-plugin-marketplace` update `plugins/trom-agent/claude/.claude-plugin/plugin.json` and the `trom-agent` entry in `.claude-plugin/marketplace.json`.
+**Plugin version** (same value): `"version": "1.2.0"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the marker line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md`; then in `tr-plugin-marketplace` update `plugins/trom-agent/claude/.claude-plugin/plugin.json`, the `trom-agent` entry in `.claude-plugin/marketplace.json`, and the `Agent version:` marker in `plugins/trom-agent/claude/skills/trom/SKILL.md`. That copy normally arrives by republishing the plugin source, so the marker must match there too.
 
 **Verify frontend displays version**:
 - Version shown in header (from `/api/version` endpoint)
@@ -211,7 +211,7 @@ The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agen
 #### Step 2: Commit and Push
 
 ```bash
-git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md
 git commit -m "chore: bump version to 1.2.0"
 git push origin main
 ```
@@ -250,14 +250,14 @@ git push origin v1.2.0-alpha.1
 1. Go to **Releases** page
 2. Find release tagged `v1.2.0`
 3. Verify 4 artifacts attached (each holds the engine at its root and the CLI in `cli/`):
-   - `TeensyROM-Web-1.2.0-win-x64.zip`
-   - `TeensyROM-Web-1.2.0-osx-x64.tar.gz`
-   - `TeensyROM-Web-1.2.0-osx-arm64.tar.gz`
-   - `TeensyROM-Web-1.2.0-linux-x64.tar.gz`
+   - `TeensyROM-Suite-1.2.0-win-x64.zip`
+   - `TeensyROM-Suite-1.2.0-osx-x64.tar.gz`
+   - `TeensyROM-Suite-1.2.0-osx-arm64.tar.gz`
+   - `TeensyROM-Suite-1.2.0-linux-x64.tar.gz`
 4. Check pre-release checkbox (should be unchecked for stable)
 
 **Homebrew Formula** (every release, pre-releases included):
-1. Check `Formula/teensyrom-web.rb` in repository
+1. Check `Formula/teensyrom-suite.rb` in repository
 2. Verify version updated: `version "1.2.0"`
 3. Verify SHA256 checksums updated (not PLACEHOLDER)
 4. Check commit message: `chore: update Homebrew formula for v1.2.0`
@@ -265,7 +265,7 @@ git push origin v1.2.0-alpha.1
 **Formula updates**:
 - `on_arm do` block: `sha256` updated with ARM64 tar.gz checksum
 - `on_intel do` block: `sha256` updated with x64 tar.gz checksum
-- URLs point to new version: `.../TeensyROM-Web-1.2.0-osx-arm64.tar.gz`
+- URLs point to new version: `.../TeensyROM-Suite-1.2.0-osx-arm64.tar.gz`
 
 ### Troubleshooting Workflow Failures
 
@@ -307,7 +307,7 @@ dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
 - Verify macOS artifacts are created (check build logs)
 
 **SHA256 calculation errors**:
-- Check artifact names match pattern: `TeensyROM-Web-{version}-osx-{arch}.tar.gz`
+- Check artifact names match pattern: `TeensyROM-Suite-{version}-osx-{arch}.tar.gz`
 - Verify version output from validate job
 
 **Commit errors**:
@@ -338,37 +338,39 @@ dotnet publish apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
 macOS users can install via Homebrew using a self-hosted tap:
 
 ```bash
-brew install MetalHexx/TeensyROM/teensyrom-web
+brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite
+brew install teensyrom-suite
 ```
 
-**Formula location**: `Formula/teensyrom-web.rb` (repository root)
+**Formula location**: `Formula/teensyrom-suite.rb` (repository root)
 
 ### Formula Structure
 
 **Dual architecture support**:
 ```ruby
-class TeensyromWeb < Formula
-  desc "Desktop application for managing TeensyROM devices"
-  homepage "https://github.com/MetalHexx/TeensyROM-Web"
+class TeensyromSuite < Formula
+  desc "TeensyROM Suite: Trom UI, Trom Terminal and Trom API for your TeensyROM"
+  homepage "https://github.com/MetalHexx/TeensyROM-Suite"
   version "1.2.0"
-  
+
   on_arm do
-    url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-arm64.tar.gz"
+    url "https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v#{version}/TeensyROM-Suite-#{version}-osx-arm64.tar.gz"
     sha256 "abc123..."  # Calculated by workflow
   end
-  
+
   on_intel do
-    url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-x64.tar.gz"
+    url "https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v#{version}/TeensyROM-Suite-#{version}-osx-x64.tar.gz"
     sha256 "def456..."  # Calculated by workflow
   end
-  
+
   conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install the TeensyROM CLI"
 
   def install
     libexec.install Dir["*"]
+
     if (libexec/"cli/trom").exist?
-      # Combined package: engine and CLI share the default home, ~/.teensyrom
-      (bin/"teensyrom-web").write <<~EOS
+      # Combined package: the engine and the CLI share the default home, ~/.teensyrom
+      wrapper = <<~EOS
         #!/bin/zsh
         cd "#{libexec}"
         exec "./TeensyRom.Api" "$@"
@@ -379,14 +381,25 @@ class TeensyromWeb < Formula
       EOS
       chmod 0755, bin/"trom"
     else
-      # Older package (no cli/, engine predates ~/.teensyrom): the previous wrapper
-      # (sets TEENSYROM_DATA_DIR to ~/Library/Application Support/TeensyROM-Web)
+      # Older package (no cli/): the previous wrapper, which sets TEENSYROM_DATA_DIR
+      wrapper = <<~EOS
+        #!/bin/zsh
+        export TEENSYROM_DATA_DIR="${HOME}/Library/Application Support/TeensyROM-Web"
+        mkdir -p "${TEENSYROM_DATA_DIR}"
+        cd "#{libexec}"
+        exec "./TeensyRom.Api" "$@"
+      EOS
     end
-    chmod 0755, bin/"teensyrom-web"
+
+    # teensyrom-web is kept as an alias so existing habits and scripts keep working
+    %w[trom-suite teensyrom-web].each do |name|
+      (bin/name).write wrapper
+      chmod 0755, bin/name
+    end
   end
-  
+
   test do
-    system "#{bin}/teensyrom-web", "--version"
+    system "#{bin}/trom-suite", "--version"
   end
 end
 ```
@@ -394,12 +407,14 @@ end
 **Install behavior**:
 1. Downloads correct tar.gz for user's architecture (ARM64 or Intel)
 2. Extracts all files to `libexec` (private location): the engine at its root, the CLI in `libexec/cli`
-3. If `libexec/cli/trom` exists (the combined package), creates two wrapper scripts in `bin`: `teensyrom-web` (changes to `libexec`, runs the engine) and `trom` (runs `libexec/cli/trom`). Neither sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
-4. Otherwise (an older package with no `cli/`, such as `1.0.0-alpha.8`, whose engine still writes beside itself), keeps the previous `teensyrom-web` wrapper unchanged, which sets `TEENSYROM_DATA_DIR` to `~/Library/Application Support/TeensyROM-Web`. That `else` branch can be deleted after the first release that contains `cli/`
-5. Sets executable permissions
+3. If `libexec/cli/trom` exists (the combined package), creates `trom` in `bin` (runs `libexec/cli/trom`). Neither wrapper sets `TEENSYROM_DATA_DIR`, so both apps use `~/.teensyrom`
+4. Otherwise (an older package with no `cli/`, such as `1.0.0-alpha.8`, whose engine still writes beside itself), the engine wrapper sets `TEENSYROM_DATA_DIR` to `~/Library/Application Support/TeensyROM-Web`. That `else` branch can be deleted after the first release that contains `cli/`
+5. Writes the engine wrapper into `bin` twice: `trom-suite` (starts Trom API in the foreground) and `teensyrom-web` (an alias kept for existing habits and scripts), then sets executable permissions
 6. `conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli"`: the older CLI formula in the tap `MetalHexx/TeensyROM-CLI` installs a `TeensyRom.Cli` command; the line is kept so the two CLIs are not installed together
 
-**Result**: User can run `teensyrom-web` (and, with the combined package, `trom`) from anywhere
+**Result**: User can run `trom-suite` (and its `teensyrom-web` alias; with the combined package, `trom`) from anywhere
+
+**Upgrade path**: old release downloads keep their `TeensyROM-Web-{version}-…` names. The formula's `url` lines point at those until the first suite release; the `update-formula` job then rewrites the URL prefix to `TeensyROM-Suite-` and the repo to `MetalHexx/TeensyROM-Suite`.
 
 ### Testing Homebrew Install
 
@@ -409,20 +424,20 @@ end
 
 **Add tap** (first time only):
 ```bash
-brew tap MetalHexx/TeensyROM
+brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite
 ```
 
 **Install**:
 ```bash
-brew install teensyrom-web
+brew install teensyrom-suite
 ```
 
 **Verify**:
 ```bash
-teensyrom-web --version
+trom-suite --version
 # Should output: 1.2.0 (or current version)
 
-teensyrom-web
+trom-suite
 # Application should start, console shows: "Now listening on: http://localhost:10213"
 ```
 
@@ -444,21 +459,21 @@ If workflow automation fails, manually update formula:
 
 ```bash
 # Calculate SHA256 for macOS artifacts
-shasum -a 256 TeensyROM-Web-1.2.0-osx-arm64.tar.gz
-shasum -a 256 TeensyROM-Web-1.2.0-osx-x64.tar.gz
+shasum -a 256 TeensyROM-Suite-1.2.0-osx-arm64.tar.gz
+shasum -a 256 TeensyROM-Suite-1.2.0-osx-x64.tar.gz
 
-# Edit Formula/teensyrom-web.rb
+# Edit Formula/teensyrom-suite.rb
 # Update version, ARM64 sha256, x64 sha256
 
 # Commit and push
-git add Formula/teensyrom-web.rb
+git add Formula/teensyrom-suite.rb
 git commit -m "chore: update Homebrew formula for v1.2.0"
 git push origin main
 ```
 
 **Test formula locally**:
 ```bash
-brew install --build-from-source Formula/teensyrom-web.rb
+brew install --build-from-source Formula/teensyrom-suite.rb
 ```
 
 ---
@@ -490,7 +505,7 @@ Approximate sizes for self-contained builds:
 
 ### Archive Contents
 
-**Windows** (`TeensyROM-Web-1.2.0-win-x64.zip`):
+**Windows** (`TeensyROM-Suite-1.2.0-win-x64.zip`):
 ```
 TeensyRom.Api.exe       (Engine, single-file executable)
 appsettings.json        (Runtime configuration)
@@ -503,7 +518,7 @@ cli/
   trom.exe              (CLI, with its own runtime, Fonts/ and dependencies)
 ```
 
-**macOS/Linux** (`TeensyROM-Web-1.2.0-osx-arm64.tar.gz`): the same layout, with `TeensyRom.Api` and `cli/trom` (no `.exe`; both marked executable by the workflow).
+**macOS/Linux** (`TeensyROM-Suite-1.2.0-osx-arm64.tar.gz`): the same layout, with `TeensyRom.Api` and `cli/trom` (no `.exe`; both marked executable by the workflow).
 
 **Note**: `.pdb` files can be removed to reduce size, but they're helpful for debugging crash dumps.
 
@@ -511,15 +526,15 @@ cli/
 
 **GitHub Releases**:
 ```
-https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-win-x64.zip
-https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-x64.tar.gz
-https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-arm64.tar.gz
-https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-linux-x64.tar.gz
+https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-win-x64.zip
+https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-x64.tar.gz
+https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-arm64.tar.gz
+https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-linux-x64.tar.gz
 ```
 
 **Homebrew** (macOS only):
 - Formula automatically fetches correct architecture
-- URLs constructed from version in formula: `"https://github.com/.../v#{version}/TeensyROM-Web-#{version}-osx-arm64.tar.gz"`
+- URLs constructed from version in formula: `"https://github.com/.../v#{version}/TeensyROM-Suite-#{version}-osx-arm64.tar.gz"`
 
 ---
 
@@ -625,14 +640,14 @@ The executable is not code-signed with an Apple Developer ID certificate. Users 
 
 ```bash
 # Download artifacts from GitHub Release
-curl -LO https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-arm64.tar.gz
-curl -LO https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-Web-1.2.0-osx-x64.tar.gz
+curl -LO https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-arm64.tar.gz
+curl -LO https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-x64.tar.gz
 
 # Calculate SHA256
-shasum -a 256 TeensyROM-Web-1.2.0-osx-arm64.tar.gz
-shasum -a 256 TeensyROM-Web-1.2.0-osx-x64.tar.gz
+shasum -a 256 TeensyROM-Suite-1.2.0-osx-arm64.tar.gz
+shasum -a 256 TeensyROM-Suite-1.2.0-osx-x64.tar.gz
 
-# Compare with Formula/teensyrom-web.rb
+# Compare with Formula/teensyrom-suite.rb
 ```
 
 Checksums must match exactly.
@@ -694,8 +709,8 @@ Development mode enables:
    - Linux: .deb and .rpm packages
 
 4. **Chocolatey/Scoop** (Windows package managers)
-   - `choco install teensyrom-web`
-   - `scoop install teensyrom-web`
+   - `choco install teensyrom-suite`
+   - `scoop install teensyrom-suite`
 
 5. **Linux Package Repositories**
    - Ubuntu PPA
@@ -710,9 +725,9 @@ Development mode enables:
 
 ## 📞 Support
 
-**Issues**: [GitHub Issues](https://github.com/MetalHexx/TeensyROM-Web/issues)  
-**Discussions**: [GitHub Discussions](https://github.com/MetalHexx/TeensyROM-Web/discussions)  
-**Wiki**: [Project Wiki](https://github.com/MetalHexx/TeensyROM-Web/wiki)
+**Issues**: [GitHub Issues](https://github.com/MetalHexx/TeensyROM-Suite/issues)  
+**Discussions**: [GitHub Discussions](https://github.com/MetalHexx/TeensyROM-Suite/discussions)  
+**Wiki**: [Project Wiki](https://github.com/MetalHexx/TeensyROM-Suite/wiki)
 
 For distribution-specific issues:
 - Tag with `distribution` label

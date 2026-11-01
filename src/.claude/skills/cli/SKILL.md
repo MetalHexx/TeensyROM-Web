@@ -1,6 +1,6 @@
 ---
 name: cli
-description: 'Routing reference for the TeensyROM CLI (src/apps/cli), the terminal client that ships inside tr-web with the engine. Use when working on, running, testing or packaging the CLI, or when a task mentions TeensyRom.Cli, the engine lifecycle (start, restart, stop), the ~/.teensyrom home, or the CLI API client. NOT for engine internals — use backend-architecture; NOT for building a release — use release or release-local.'
+description: 'Routing reference for the TeensyROM CLI (src/apps/cli), the terminal client that ships inside TeensyROM Suite with Trom API. Use when working on, running, testing or packaging the CLI, or when a task mentions TeensyRom.Cli, the engine lifecycle (start, restart, stop), the ~/.teensyrom home, or the CLI API client. NOT for engine internals — use backend-architecture; NOT for building a release — use release or release-local.'
 ---
 
 # CLI Skill

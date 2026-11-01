@@ -1,13 +1,13 @@
 ---
 name: release
-description: Automate the TeensyROM Web release process with version bumping, tagging, and GitHub Release management
+description: Automate the TeensyROM Suite release process with version bumping, tagging, and GitHub Release management
 user-invocable: true
 disable-model-invocation: true
 ---
 
-# Release TeensyROM Web
+# Release TeensyROM Suite
 
-This skill automates the TeensyROM Web release process by bumping the version, creating a git tag, and managing GitHub releases.
+This skill automates the TeensyROM Suite release process by bumping the version, creating a git tag, and managing GitHub releases.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ Ask the user for the new version number, then update the `<Version>` element in 
 <Version>NEW_VERSION_HERE</Version>
 ```
 
-The `trom-agent` plugin is versioned with the tool suite, so set the same version in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`. In the `tr-plugin-marketplace` repo set it in `plugins/trom-agent/claude/.claude-plugin/plugin.json` and in the `trom-agent` entry of `.claude-plugin/marketplace.json`. A CLI test fails when the plugin manifest in this repo drifts from `Version.props`.
+The `trom-agent` plugin is versioned with the tool suite, so the same version goes in two more places in this repo: `"version"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the line `Agent version: NEW_VERSION_HERE` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (the agent version marker). In the `tr-plugin-marketplace` repo set `plugins/trom-agent/claude/.claude-plugin/plugin.json` and the `trom-agent` entry of `.claude-plugin/marketplace.json`, and set the marker in `plugins/trom-agent/claude/skills/trom/SKILL.md` to match too: that copy normally arrives by republishing the plugin source. A CLI test covers the manifest and the marker and fails when either drifts from `Version.props`.
 
 Example versions:
 - Stable release: `1.0.0`, `1.2.3`, `2.0.0`
@@ -35,7 +35,7 @@ Example versions:
 
 Commit the version bump:
 ```bash
-git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md
 git commit -m "chore: bump version to {version}"
 git push origin main
 ```
@@ -52,10 +52,10 @@ git push origin v{version}
 ### Step 3: Monitor Release Workflow
 
 Inform the user that the release workflow has been triggered and provide them with:
-- GitHub Actions workflow URL: `https://github.com/MetalHexx/TeensyROM-Web/actions`
+- GitHub Actions workflow URL: `https://github.com/MetalHexx/TeensyROM-Suite/actions`
 - Expected completion time: ~15-20 minutes for all 4 platform builds
 
-Tell them: "The release workflow is now running. It will build TeensyROM Web for all 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64) and create a GitHub Release with the artifacts. This typically takes 15-20 minutes. I'll wait for you to confirm when the release has been created."
+Tell them: "The release workflow is now running. It will build TeensyROM Suite for all 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64) and create a GitHub Release with the artifacts. This typically takes 15-20 minutes. I'll wait for you to confirm when the release has been created."
 
 ### Step 4: Update Release Notes
 
@@ -66,7 +66,7 @@ Once the user confirms the release has been created or provides a link to it:
 3. Use `gh release edit v{version} --notes "..."` (or the GitHub MCP tools) to update the release with the provided notes
 
 The release will already have:
-- ✅ Title: `TeensyROM Web v{version}`
+- ✅ Title: `TeensyROM Suite v{version}`
 - ✅ Tag: `v{version}`
 - ✅ Pre-release flag (if version contains `-`)
 - ✅ All 4 platform artifacts attached (each holds the engine at its root and the CLI in `cli/`)
@@ -80,26 +80,26 @@ User: /release
 Agent: What version would you like to release? (e.g., 1.0.0 or 1.0.0-alpha.1)
 User: 1.2.0
 Agent: [Updates src/apps/Version.props, commits, creates tag v1.2.0, pushes]
-Agent: ✅ Version bumped to 1.2.0 and tag v1.2.0 created. The release workflow is now running at https://github.com/MetalHexx/TeensyROM-Web/actions. This will take ~15-20 minutes to complete. Please let me know when the release has been created.
-User: The release is ready at https://github.com/MetalHexx/TeensyROM-Web/releases/tag/v1.2.0
+Agent: ✅ Version bumped to 1.2.0 and tag v1.2.0 created. The release workflow is now running at https://github.com/MetalHexx/TeensyROM-Suite/actions. This will take ~15-20 minutes to complete. Please let me know when the release has been created.
+User: The release is ready at https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
 Agent: Great! What release notes would you like to add? Include what's new, bug fixes, breaking changes, etc.
 User: [Provides release notes]
 Agent: [Updates release with notes]
-Agent: ✅ Release notes updated! Release is now complete: https://github.com/MetalHexx/TeensyROM-Web/releases/tag/v1.2.0
+Agent: ✅ Release notes updated! Release is now complete: https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
 ```
 
 ## Important Notes
 
 - The version in `src/apps/Version.props` MUST match the git tag version (without the `v` prefix)
-- The plugin version (`plugin.json`, and the marketplace entry in `tr-plugin-marketplace`) MUST match `Version.props`
+- The plugin version (`plugin.json`, the agent version marker in `plugins/trom-agent/claude/skills/trom/SKILL.md`, and their marketplace copies in `tr-plugin-marketplace`) MUST match `Version.props`
 - Pre-release versions (containing `-`) are automatically marked as pre-release in GitHub
 - The workflow builds self-contained executables - no .NET SDK required to run them
 - Every artifact includes the CLI in a `cli/` subfolder beside the engine; the CLI finds the engine at `../TeensyRom.Api[.exe]`
 - Artifacts are automatically attached to the release:
-  - `TeensyROM-Web-{version}-win-x64.zip`
-  - `TeensyROM-Web-{version}-osx-x64.tar.gz`
-  - `TeensyROM-Web-{version}-osx-arm64.tar.gz`
-  - `TeensyROM-Web-{version}-linux-x64.tar.gz`
+  - `TeensyROM-Suite-{version}-win-x64.zip`
+  - `TeensyROM-Suite-{version}-osx-x64.tar.gz`
+  - `TeensyROM-Suite-{version}-osx-arm64.tar.gz`
+  - `TeensyROM-Suite-{version}-linux-x64.tar.gz`
 
 ## Error Handling
 
@@ -121,7 +121,7 @@ If you need to retry:
 - Build platforms: win-x64, osx-x64, osx-arm64, linux-x64
 - Build time: ~15-20 minutes (parallel matrix builds)
 - Artifact retention: 5 days in GitHub Actions, permanent in Releases
-- Repository: MetalHexx/TeensyROM-Web
+- Repository: MetalHexx/TeensyROM-Suite
 
 ## Related
 

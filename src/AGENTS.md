@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-Hybrid **.NET 9 Web API + Angular 19 (Nx monorepo)** application for TeensyROM device management and media playback. This directory (`src/`) is the Nx workspace root.
+TeensyROM Suite is a hybrid **.NET 9 Web API + Angular 19 (Nx monorepo)** application for TeensyROM device management and media playback. It ships four apps:
 
-- Frontend app: `apps/teensyrom-ui` (source in `src/`, assets in `public/`). Cypress e2e: `apps/teensyrom-ui-e2e`.
-- Backend solution: `apps/api/TeensyRom.Ui.sln`. API project: `apps/api/src/TeensyRom.Api` (RadEndpoints, MediatR, SignalR), Scalar docs at `/scalar/v1`.
-- CLI: `apps/cli` (own solution `TeensyRom.Cli.sln`; .NET 9 terminal client of the API, shipped with it). Agents: run `trom init` first to orient (engine, web UI, devices, index state, commands); the `cli` skill describes the rest. A source engine is built and run as Release; set `TROM_ENGINE_CONFIGURATION=Debug` to develop against Debug. If `trom init` reports the web UI as not served, `src/apps/api/src/TeensyRom.Api/wwwroot` has no built front end: run `pnpm run build:frontend` from `src/`, then `trom engine stop` and `trom init`.
-- Plugin: `plugins/trom-agent/` is the user-facing Claude Code plugin (the `/trom` companion skill), published to the `tr-plugin-marketplace` repo. Not to be confused with the developer skills in `.claude/skills/`, which are for working on this repo. The plugin is versioned in lockstep with the tools: `plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `apps/Version.props` (a CLI test fails on drift), and so does the marketplace entry in `tr-plugin-marketplace`.
+- **Trom UI**: the Angular web UI, `apps/teensyrom-ui` (source in `src/`, assets in `public/`). Cypress e2e: `apps/teensyrom-ui-e2e`. This directory (`src/`) is the Nx workspace root.
+- **Trom Terminal**: the `trom` command-line client, `apps/cli` (own solution `TeensyRom.Cli.sln`; .NET 9 terminal client of the API, shipped with it). Agents: run `trom init` first to orient (engine, web UI, devices, index state, commands); the `cli` skill describes the rest. A source engine is built and run as Release; set `TROM_ENGINE_CONFIGURATION=Debug` to develop against Debug. If `trom init` reports the web UI as not served, `src/apps/api/src/TeensyRom.Api/wwwroot` has no built front end: run `pnpm run build:frontend` from `src/`, then `trom engine stop` and `trom init`.
+- **Trom Agent**: `plugins/trom-agent/`, the user-facing Claude Code plugin (the `/trom` companion skill), published to the `tr-plugin-marketplace` repo. Not to be confused with the developer skills in `.claude/skills/`, which are for working on this repo. The plugin is versioned in lockstep with the tools: `plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `apps/Version.props`, and so does the agent version marker, the line `Agent version: {version}` under `## Version` in `plugins/trom-agent/claude/skills/trom/SKILL.md`, bumped in the same commit. A CLI test covers the manifest and the marker and fails on drift; the marketplace copies in `tr-plugin-marketplace` must match too.
+- **Trom API**: `apps/api/TeensyRom.Ui.sln`, the .NET 9 Web API: project `apps/api/src/TeensyRom.Api` (RadEndpoints, MediatR, SignalR), Scalar docs at `/scalar/v1`. The `trom-suite` command starts it in the foreground.
 
 ## Architecture
 
