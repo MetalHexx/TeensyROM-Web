@@ -24,7 +24,7 @@ Browse your library from the couch, stream it like a music service, script it, a
 - **Stream it:** shuffle and auto-play games, demos, SIDs and images, hands-free.
 - **Watch it:** see your C64's picture in the browser, with CRT effects.
 - **Mix it:** the [DJ Mixer](docs/dj-mixer.md) turns two C64s into decks you play live, with every note from a real SID chip.
-- **Make it yours:** copy files to your cart, watch folders, and set your C64's menu colors.
+- **Make it yours:** copy files to your cart with drag and drop or watch folders, and set your C64's menu colors.
 
 [Explore Trom UI →](docs/trom-ui.md)
 
