@@ -11,6 +11,7 @@ import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { DeviceStore } from '../device/device-store';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, type MidiState } from './dj-store';
+import { machineClockHz } from './machine-clock';
 import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { DECK_SLOTS, otherSlot, type Slot } from './slot';
 import { MIDI_ACCESS } from './ports';
@@ -46,8 +47,8 @@ export class DeckBindings {
    * Reconciles both slots against what is now enumerated, then installs the effects that keep
    * reconciling as ports and devices come and go. A granted origin whose auto-connect still fails
    * raises an `ALERT_SERVICE` error; `prompt`, `denied` and `unsupported` raise nothing here — the
-   * binding card's own Enable button is the surface for those. Calls only `runtime.setPort` and
-   * `runtime.resync` — never anything that would start a clock.
+   * binding card's own Enable button is the surface for those. Calls only `runtime.setPort`,
+   * `runtime.setTargetClock` and `runtime.resync` — never anything that would start a clock.
    */
   async hydrate(): Promise<void> {
     logInfo(LogType.Start, 'DeckBindings: hydrating deck bindings');
@@ -88,6 +89,7 @@ export class DeckBindings {
     if (id === null) {
       this.midiAccess.release(slot);
       this.runtime.setPort(slot, null);
+      this.runtime.setTargetClock(slot, null);
       this.store.setBinding({
         slot,
         binding: { device: null, portId: null, present: false, error: null },
@@ -157,6 +159,11 @@ export class DeckBindings {
    * wins the claim on it; `runtime.setPort` follows the claim, not the enumeration. An absent slot
    * keeps its device, so the binding survives until the port returns.
    *
+   * The deck's player is told the φ2 of the machine its cartridge sits in, from the video standard
+   * `DeviceStore` reports for the bound device, present or not; an unbound slot, a device
+   * `DeviceStore` does not know and one reporting no standard all name none, which plays a tune's
+   * bytes uncorrected. The player reads the tune's own clock itself.
+   *
    * A present slot adopts the device's current name from `DeviceStore` and schedules a save when
    * it changed. A slot that has just come to a port — the cartridge returned, or was newly chosen —
    * while its deck is playing or paused has the start handshake re-sent: a cartridge that went
@@ -174,7 +181,10 @@ export class DeckBindings {
     }
     this.runtime.setPort(slot, portId);
 
-    const freshName = present && device !== null ? this.knownDevice(device.id)?.name : undefined;
+    const known = device === null ? undefined : this.knownDevice(device.id);
+    this.runtime.setTargetClock(slot, machineClockHz(known?.videoStandard));
+
+    const freshName = present ? known?.name : undefined;
     const renamed = device !== null && freshName !== undefined && freshName !== device.name;
     const nextDevice = renamed ? { id: device.id, name: freshName } : device;
 
@@ -196,7 +206,8 @@ export class DeckBindings {
   /** Installed once, in the injector context — `AudioBootstrapService.init`'s own pattern. One
    *  effect re-runs both slots' reconcile whenever the enumerated ports change, so a reappearing
    *  cartridge re-binds and a vanished one flips to absent; a second does the same when
-   *  `DeviceStore.devices()` changes, so a renamed device's name stays fresh; a third mirrors
+   *  `DeviceStore.devices()` changes, so a renamed device's name and its machine's clock stay
+   *  fresh; a third mirrors
    *  `IMidiAccess`'s own state onto `store.setMidi`. Every store read a reconcile pass makes runs
    *  `untracked` so each effect depends only on its own source — never on the store writes
    *  reconcile itself makes, which would otherwise retrigger it. */

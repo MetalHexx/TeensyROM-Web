@@ -217,6 +217,13 @@ export class DeckRuntime {
     this.requireSlot(slot).player.setRepeatTrack(on);
   }
 
+  /** The φ2 of the machine this slot's cartridge sits in, or `null` when it is not known. The player
+   *  holds it across loads and reads each tune's own clock from its header, so this is called when
+   *  the machine changes, never per tune. */
+  setTargetClock(slot: Slot, targetHz: number | null): void {
+    this.requireSlot(slot).player.setTargetClock(targetHz);
+  }
+
   /** Voice 0…2's pitch multiplier — composes with the clock correction in the library. */
   setVoicePitch(slot: Slot, voice: number, multiplier: number): void {
     this.requireSlot(slot).player.setVoicePitch(voice, multiplier);

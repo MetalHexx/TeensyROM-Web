@@ -444,6 +444,17 @@ describe('DeckRuntime', () => {
       expect(b).not.toHaveBeenCalled();
     });
 
+    it("setTargetClock reaches only the named slot's player, a clock or none", () => {
+      const a = vi.spyOn(playerFor(0), 'setTargetClock');
+      const b = vi.spyOn(playerFor(1), 'setTargetClock');
+
+      runtime.setTargetClock('A', 985248.6);
+      runtime.setTargetClock('A', null);
+
+      expect(a.mock.calls).toEqual([[985248.6], [null]]);
+      expect(b).not.toHaveBeenCalled();
+    });
+
     it('setFieldOffset sets a non-zero offset and clears the field at 0', () => {
       const set = vi.spyOn(playerFor(0), 'setFieldOffset');
       const clear = vi.spyOn(playerFor(0), 'clearFieldOffset');
