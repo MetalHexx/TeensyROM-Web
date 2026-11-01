@@ -2032,7 +2032,9 @@ describe('DeckLoops', () => {
 
         expect(setActiveLoop).not.toHaveBeenCalled();
         expect(engineLoop('A')).toEqual(loopBounds(100, 120));
-        expect(peakBeforeWrap('A')).toBeGreaterThanOrEqual(119);
+        // The old pass runs out to its end. The engine's wrap falls due a frame before it (119), so
+        // the re-entry's gate-off takes the pass's last slot and the last position it shows is 118.
+        expect(peakBeforeWrap('A')).toBeGreaterThanOrEqual(118);
         expect(engineLoop('A')).toEqual(loopBounds(100, 110));
         expect(runtime.position('A')).toBeLessThan(110);
       });
