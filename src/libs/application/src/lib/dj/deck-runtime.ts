@@ -21,6 +21,8 @@ import type {
   VarispeedLoopStart,
   VarispeedRateSource,
 } from '@sidablist/core';
+import { noteStarts } from '@sidablist/analysis';
+import type { NoteStarts } from '@sidablist/analysis';
 import { createAsidSink } from '@sidablist/asid';
 import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
@@ -93,6 +95,8 @@ export class DeckRuntime {
   private readonly chipModels = new Map<Slot, SidModel>();
   /** Bumped by every `load`: a record scan that comes back after a newer load is stale. */
   private readonly loadGenerations = new Map<Slot, number>();
+  /** The note starts of each slot's loaded tune, computed where its register record lands. */
+  private readonly noteStartsBySlot = new Map<Slot, NoteStarts>();
   /** Each slot's delivery probe — dev builds only, read through the console bench. */
   private readonly probes = new Map<Slot, DeliveryProbe>();
 
@@ -175,6 +179,7 @@ export class DeckRuntime {
 
     const generation = (this.loadGenerations.get(slot) ?? 0) + 1;
     this.loadGenerations.set(slot, generation);
+    this.noteStartsBySlot.delete(slot);
     const { basis } = player.getSnapshot();
     const recordFrames =
       Math.max(basis.positionBasisFrames, basis.ceilingFrames) +
@@ -184,6 +189,7 @@ export class DeckRuntime {
       .then((record) => {
         if (record !== null && this.loadGenerations.get(slot) === generation) {
           player.setRegisterRecord(record);
+          this.noteStartsBySlot.set(slot, noteStarts(record));
         }
       })
       .catch((error: unknown) =>
@@ -294,6 +300,11 @@ export class DeckRuntime {
 
   position(slot: Slot): Frames {
     return this.requireSlot(slot).player.getPosition();
+  }
+
+  /** The loaded tune's note starts, or null until its register record has arrived. */
+  noteStarts(slot: Slot): NoteStarts | null {
+    return this.noteStartsBySlot.get(slot) ?? null;
   }
 
   /** Declares the frames this slot may jump to instantly, replacing the previous set; the engine

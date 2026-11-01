@@ -4,6 +4,7 @@ import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { DeckHand } from './deck-hand';
+import { DeckGrid } from './deck-grid';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
@@ -91,6 +92,7 @@ export class DeckService {
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
+  private readonly grid = inject(DeckGrid);
   private readonly sets = inject(DjSets);
   private readonly keeper = inject(DeckMemoryKeeper);
   private readonly mixerApplier = inject(MixerApplier);
@@ -257,6 +259,7 @@ export class DeckService {
     this.runtime.stop(slot);
     this.resetTuneShaping(slot);
     this.loops.detach(slot);
+    this.grid.detach(slot);
     this.sample(slot);
 
     let failure: string | null = null;
@@ -285,6 +288,7 @@ export class DeckService {
       }
 
       this.runtime.load(slot, playable);
+      this.grid.attach(slot, playable.reference.identity, playable.index.beatGrid);
       if (restored !== null) {
         this.applyMutes(slot, restored.mixer.mutes);
       }
@@ -425,6 +429,13 @@ export class DeckService {
     }
     this.runtime.setVoiceHeld(slot, voice, held);
     this.reflectEngineControls(slot);
+  }
+
+  /** One tap of the deck's Tap button: taps in a sequence fit the deck's beat grid. */
+  tap(slot: Slot): void {
+    if (this.canShape(slot, 'tap')) {
+      this.grid.tap(slot);
+    }
   }
 
   /** Marks the playhead as a new cue and selects it. */
@@ -709,6 +720,7 @@ export class DeckService {
     // load still ends at home, and a superseded load can never reset after a newer one has started.
     this.resetTuneShaping(slot);
     this.loops.detach(slot);
+    this.grid.detach(slot);
     this.sample(slot);
 
     let holding: DeckHolding | null = null;
@@ -757,6 +769,7 @@ export class DeckService {
       this.sets.markAvailable(holding.rowId);
 
       this.runtime.load(slot, playable);
+      this.grid.attach(slot, playable.reference.identity, playable.index.beatGrid);
       if (restored !== null) {
         // `loadTune` cleared every latched mute.
         this.applyMutes(slot, restored.mixer.mutes);

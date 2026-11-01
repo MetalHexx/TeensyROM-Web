@@ -1,3 +1,4 @@
+export * from './beat-grids';
 export * from './deck-engine';
 export * from './dj-library-state-repository';
 export * from './midi-access';

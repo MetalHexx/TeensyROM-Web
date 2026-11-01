@@ -7,9 +7,12 @@ import type {
   DjSetDto,
   DjSetRowDto,
   DjSetSummaryDto,
+  DjSubtuneGridDto,
   DjSubtuneMemoryDto,
+  DjTuneGridsDto,
   DjTuneMemoryDto,
 } from '@teensyrom-nx/data-access/api-client';
+import type { StoredBeatGrid, TuneBeatGrids } from '@teensyrom-nx/application';
 import type {
   LoopBoundary,
   LoopMarker,
@@ -71,6 +74,30 @@ export function toDjTuneMemoryDto(memory: TuneMemory): DjTuneMemoryDto {
     subtunes: memory.subtunes.map(toSubtuneMemoryDto),
     updated: memory.updated,
   };
+}
+
+export function toTuneBeatGrids(dto: DjTuneGridsDto): TuneBeatGrids {
+  return {
+    sidHash: dto.sidHash,
+    subtunes: dto.subtunes.map(toStoredBeatGrid),
+    updated: dto.updated,
+  };
+}
+
+export function toDjTuneGridsDto(grids: TuneBeatGrids): DjTuneGridsDto {
+  return {
+    sidHash: grids.sidHash,
+    subtunes: grids.subtunes.map(toDjSubtuneGridDto),
+    updated: grids.updated,
+  };
+}
+
+function toStoredBeatGrid(dto: DjSubtuneGridDto): StoredBeatGrid {
+  return { subtune: dto.subtune, beatFrames: dto.beatFrames, beatOneFrame: dto.beatOneFrame };
+}
+
+function toDjSubtuneGridDto(grid: StoredBeatGrid): DjSubtuneGridDto {
+  return { subtune: grid.subtune, beatFrames: grid.beatFrames, beatOneFrame: grid.beatOneFrame };
 }
 
 function toSetRow(dto: DjSetRowDto): SetRow {

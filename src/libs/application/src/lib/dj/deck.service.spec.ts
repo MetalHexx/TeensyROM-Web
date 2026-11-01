@@ -55,12 +55,14 @@ import {
   MIDI_ACCESS,
   SET_STORE,
   TUNE_INSERTER,
+  BEAT_GRID_STORE,
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
 import { logWarn } from '@teensyrom-nx/utils';
+import { EMPTY_BEAT_GRID_STORE } from './grid/testing/empty-beat-grid-store';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -143,9 +145,8 @@ function indexRecord(identity: TuneIdentity): TuneIndexRecord {
     tuningCents: null,
     keyConfidence: 'none',
     scalePitchClasses: [],
-    dominantIntervalFrames: null,
-    pulseConfidence: 'none',
-    nativeTempo: null,
+    beatGrid: null,
+    beatConfidence: 'none',
     callsPerFrame: 1,
     exactCallsPerFrame: 1,
     timingMode: 'exact',
@@ -315,6 +316,7 @@ describe('DeckService', () => {
         { provide: TUNE_RESOLVER, useValue: { resolve: resolveMock } },
         { provide: SET_STORE, useValue: setStore },
         { provide: TUNE_MEMORY_STORE, useValue: memoryStore },
+        { provide: BEAT_GRID_STORE, useValue: EMPTY_BEAT_GRID_STORE },
         { provide: DJ_LIBRARY_STATE_REPOSITORY, useValue: libraryState },
         { provide: ALERT_SERVICE, useValue: alerts },
         { provide: DeviceStore, useValue: { usableDevices } },

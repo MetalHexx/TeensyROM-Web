@@ -20,6 +20,8 @@ import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
 import { setDeckTiming } from './set-deck-timing';
+import { setDeckBeatGrid } from './set-deck-beat-grid';
+import { setDeckTapping } from './set-deck-tapping';
 import { setDeckLoops } from './set-deck-loops';
 import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
@@ -62,6 +64,8 @@ export function withDjActions() {
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),
       ...setDeckTiming(writableStore),
+      ...setDeckBeatGrid(writableStore),
+      ...setDeckTapping(writableStore),
       ...setDeckLoops(writableStore),
       ...setLoopMarkers(writableStore),
       ...setLoopSelection(writableStore),

@@ -23,6 +23,7 @@ import {
   REPLAY_RUNNER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
+  BEAT_GRID_STORE,
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from '../../ports';
@@ -44,6 +45,7 @@ import { MidiLearn } from '../midi-learn';
 import { MidiMappingEngine } from '../midi-mapping-engine';
 import { MidiMappingStore } from '../midi-mapping-store';
 import { MidiMappings } from '../midi-mappings';
+import { EMPTY_BEAT_GRID_STORE } from '../../grid/testing/empty-beat-grid-store';
 
 export const EMPTY_SETTINGS: MidiSettingsRecord = {
   controllers: [],
@@ -202,6 +204,7 @@ export function setUpMappingHarness(
       { provide: TUNE_RESOLVER, useValue: { resolve } },
       { provide: SET_STORE, useFactory: () => new InMemorySetStore() },
       { provide: TUNE_MEMORY_STORE, useFactory: () => new InMemoryTuneMemoryStore() },
+      { provide: BEAT_GRID_STORE, useValue: EMPTY_BEAT_GRID_STORE },
       {
         provide: DJ_LIBRARY_STATE_REPOSITORY,
         useValue: { load: vi.fn().mockResolvedValue(null), save: vi.fn().mockResolvedValue(undefined) },

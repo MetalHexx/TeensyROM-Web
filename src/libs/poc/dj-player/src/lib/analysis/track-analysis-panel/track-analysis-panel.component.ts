@@ -922,10 +922,22 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
         : pulse.dominantInterval.toLocaleString();
     }
     const record = this.cachedRecord();
-    return record === null || record.dominantIntervalFrames === null
+    return record === null || record.beatGrid === null
       ? '—'
-      : record.dominantIntervalFrames.toLocaleString();
+      : record.beatGrid.beatFrames.toLocaleString();
   });
+
+  /** The cached record's tempo, derived from its beat grid at the player's nominal call interval. */
+  private cachedTempo(multiplier: number): { native: number | null; sounding: number | null } {
+    const record = this.cachedRecord();
+    if (record === null || record.beatGrid === null) return { native: null, sounding: null };
+    return impliedTempo(
+      record.beatGrid.beatFrames,
+      this.view.snapshot().tempo.nominalIntervalUs,
+      record.callsPerFrame,
+      multiplier
+    );
+  }
 
   protected readonly pulseNativeTempoLabel = computed<string>(() => {
     const scan = this.scanOutput();
@@ -940,8 +952,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       );
       return native === null ? '—' : native.toFixed(1);
     }
-    const record = this.cachedRecord();
-    return record === null || record.nativeTempo === null ? '—' : record.nativeTempo.toFixed(1);
+    const { native } = this.cachedTempo(1.0);
+    return native === null ? '—' : native.toFixed(1);
   });
 
   protected readonly pulseSoundingTempoLabel = computed<string>(() => {
@@ -957,10 +969,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       );
       return sounding === null ? '—' : sounding.toFixed(1);
     }
-    const record = this.cachedRecord();
-    return record === null || record.nativeTempo === null
-      ? '—'
-      : (record.nativeTempo * this.view.snapshot().tempo.multiplier).toFixed(1);
+    const { sounding } = this.cachedTempo(this.view.snapshot().tempo.multiplier);
+    return sounding === null ? '—' : sounding.toFixed(1);
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
@@ -969,7 +979,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       return pulse === null ? '—' : pulse.confidence;
     }
     const record = this.cachedRecord();
-    return record === null ? '—' : record.pulseConfidence;
+    return record === null ? '—' : record.beatConfidence;
   });
 
   /** The key a pitched deck is actually sounding in. Reported beside the native key exactly as the

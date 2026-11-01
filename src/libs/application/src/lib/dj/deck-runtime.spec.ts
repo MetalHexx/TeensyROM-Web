@@ -368,6 +368,28 @@ describe('DeckRuntime', () => {
       expect(setRecord).toHaveBeenCalledExactlyOnceWith(current);
     });
 
+    it("keeps the note starts of the slot's record: none until it arrives, and none again on the next load", async () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      expect(runtime.noteStarts('A')).toBeNull();
+
+      recorders[0].answer(0, recordOf(10));
+      await settle();
+      expect(runtime.noteStarts('A')).not.toBeNull();
+
+      runtime.load('A', playableOf(SID_MODEL_8580));
+      expect(runtime.noteStarts('A')).toBeNull();
+    });
+
+    it('ignores the note starts of a record a newer load has overtaken', async () => {
+      runtime.load('A', playableOf(SID_MODEL_6581));
+      runtime.load('A', playableOf(SID_MODEL_8580));
+
+      recorders[0].answer(0, recordOf(10));
+      await settle();
+
+      expect(runtime.noteStarts('A')).toBeNull();
+    });
+
     it('is simply not set when the scan fails, with a null answer or a rejection', async () => {
       runtime.load('A', playableOf(SID_MODEL_6581));
       runtime.load('A', playableOf(SID_MODEL_6581));

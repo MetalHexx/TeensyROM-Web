@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { DjSetDto, DjTuneMemoryDto } from '@teensyrom-nx/data-access/api-client';
+import type { TuneBeatGrids } from '@teensyrom-nx/application';
 import type { TuneMemory, TuneSet } from '@sidablist/tunes';
 import {
   toDjSetDto,
+  toDjTuneGridsDto,
   toDjTuneMemoryDto,
   toSetSummary,
+  toTuneBeatGrids,
   toTuneMemory,
   toTuneSet,
 } from './dj-library.mapper';
@@ -146,6 +149,21 @@ describe('dj library mapper', () => {
 
     expect(toTuneMemory(toDjTuneMemoryDto(memory))).toEqual(memory);
     expect(toTuneMemory({ ...toDjTuneMemoryDto(memory), subtunes: [] } satisfies DjTuneMemoryDto).subtunes).toEqual([]);
+  });
+
+  it('round-trips tune beat grids', () => {
+    const grids: TuneBeatGrids = {
+      sidHash: 'h1',
+      updated: '2026-01-03T00:00:00.000Z',
+      subtunes: [
+        { subtune: 1, beatFrames: 24, beatOneFrame: 6 },
+        { subtune: 2, beatFrames: 25.5, beatOneFrame: 0 },
+      ],
+    };
+
+    expect(toDjTuneGridsDto(grids)).toEqual({ ...grids, subtunes: [...grids.subtunes] });
+    expect(toTuneBeatGrids(toDjTuneGridsDto(grids))).toEqual(grids);
+    expect(toTuneBeatGrids({ ...toDjTuneGridsDto(grids), subtunes: [] }).subtunes).toEqual([]);
   });
 
   it('reads a set summary', () => {

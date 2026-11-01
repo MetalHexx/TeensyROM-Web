@@ -112,6 +112,17 @@ export interface DeckMixerSettings {
   readonly mutes: readonly [boolean, boolean, boolean];
 }
 
+/** The grid a deck plays to: the tune's tapped correction if it has one, else the scan's. */
+export interface DeckBeatGrid {
+  readonly beatFrames: number;
+  readonly beatOneFrame: number;
+  /** 0 from the top. */
+  readonly startFrame: number;
+  /** Exclusive; null runs to the end of the tune. */
+  readonly endFrame: number | null;
+  readonly source: 'scan' | 'tap';
+}
+
 export interface DeckState {
   loaded: TuneReference | null;
   status: DeckStatus;
@@ -137,6 +148,10 @@ export interface DeckState {
   playCallIntervalUs: number | null;
   voices: readonly DeckVoiceState[];
   detectedKey: DeckDetectedKey | null;
+  /** The grid the deck plays to, or null when the tune has none. */
+  beatGrid: DeckBeatGrid | null;
+  /** True from the first tap of a sequence until the taps stop. */
+  tapping: boolean;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
    *  also spans the `await` in a play toggle. */
   switching: boolean;
@@ -303,6 +318,8 @@ const initialDeckState: DeckState = {
     { muted: false, held: false },
   ],
   detectedKey: null,
+  beatGrid: null,
+  tapping: false,
   switching: false,
   handHeld: false,
   varispeed: false,
