@@ -30,9 +30,7 @@ Browse the SD and USB storage of every connected cart, along with your saved set
 
 ## Beat grid and BPM
 
-Each tune gets a beat grid, and each deck shows its BPM under the speed. The BPM follows the speed you are playing at, so you can match two tunes by setting their speeds until the readouts agree.
-
-If a grid is wrong, tap along with the tune for a few beats to set it yourself. Tapping is also how you give a tune with no grid one.
+Each deck shows the BPM of its tune. Match two tunes by setting their speeds until the BPMs agree. Tap along with a tune to set its beat grid yourself.
 
 ## Shape the sound
 
@@ -51,15 +49,13 @@ The settings show the chip's live values as the tune plays, and every voice has 
 Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats.
 
 - **Set:** add a marker at the current position. Give it an end to make it a loop, or leave it as a cue. Stop a running loop at any time.
-- **Start and end:** set a marker's start or end at the current position, anywhere in the tune. Setting the end of a cue makes it a loop.
-- **Length:** halve or double a loop, or pick its size in beats, from a fraction of a beat up to 128. A loop's length reads in beats.
-- **Move:** slide a loop, or just its start or end, earlier or later by 1, 2, 4, 8 or 16 beats, anywhere in the tune. A marker that is off the beat lands on a beat the first time you move it.
-- **Fine tune:** nudge a marker's start or end by up to a second, which can put it off the beat.
+- **Start and end:** set a marker's start or end at the current position.
+- **Length:** halve or double a loop, or set its length in beats, up to 128.
+- **Move:** move a loop, or just its start or end, by 1, 2, 4, 8 or 16 beats.
+- **Fine tune:** nudge a marker's start or end by up to a second.
 - **Name:** rename any marker.
 - **Jump:** jump to a marker, or start it right away.
 - **Own mixer settings:** a marker follows the deck's settings by default. Give it voice, filter and key settings of its own, and the list shows which markers have them.
-
-Changes to a running loop take effect when its current pass ends, so the deck stays on the beat.
 
 ## Sets
 
@@ -90,7 +86,6 @@ The decks play through the ASID player on each cart. Start it on both decks' car
 
 The mixer remembers your work across a refresh of the page:
 
-- A tune's loops, cues and settings are kept per tune.
-- A beat grid you correct by tapping is kept with the tune, and every set that holds the tune uses it.
+- A tune's loops, cues, beat grid and settings are kept per tune.
 - Your sets, and the settings and markers of each tune in them, are kept per set.
 - Your controller mappings and their settings are kept.
