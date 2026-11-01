@@ -6,7 +6,7 @@ Two decks of SID music, played live through real C64s. Every note is made by the
 
 The DJ Mixer is part of Trom UI.
 
-> 🖼️ **Image placeholder:** DJ Mixer with a tune loaded on each deck
+<img width="1568" height="741" alt="DJ Mixer with a tune loaded on each deck" src="../.github/images/dj-mixer.jpg" />
 
 ## What you need
 
