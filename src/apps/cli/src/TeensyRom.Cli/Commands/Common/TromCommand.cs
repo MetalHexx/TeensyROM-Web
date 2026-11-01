@@ -43,7 +43,7 @@ internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engin
 
         if (!ready.Ok)
         {
-            throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "The TeensyROM engine isn't running.");
+            throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "Trom API isn't running.");
         }
     }
 }

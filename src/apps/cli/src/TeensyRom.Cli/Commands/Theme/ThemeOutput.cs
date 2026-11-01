@@ -107,7 +107,7 @@ internal static class ThemeOutput
             default:
                 if (devices.Count == 0)
                 {
-                    output.Notice("tr-web doesn't know any TeensyROM yet.");
+                    output.Notice("Trom API doesn't know any TeensyROM yet.");
                     break;
                 }
                 output.Out.Write(Table(

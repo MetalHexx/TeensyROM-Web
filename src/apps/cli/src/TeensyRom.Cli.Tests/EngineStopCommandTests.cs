@@ -35,7 +35,7 @@ public sealed class EngineStopCommandTests
         var exitCode = await Stop(EngineStopOutcome.Stopped);
 
         exitCode.Should().Be(0);
-        _consoles.StdErr.Should().Contain("TeensyROM engine stopped. The web app it served has stopped too.");
+        _consoles.StdErr.Should().Contain("Trom API stopped. Trom UI, which it served, has stopped too.");
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class EngineStopCommandTests
         var exitCode = await Stop(EngineStopOutcome.NotRunning);
 
         exitCode.Should().Be(0);
-        _consoles.StdErr.Should().Contain("No TeensyROM engine is running.");
+        _consoles.StdErr.Should().Contain("No Trom API is running.");
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class EngineStopCommandTests
         var error = await StopFailing(EngineStopOutcome.Foreign);
 
         error.Code.Should().Be(CliExitCode.Failed);
-        error.Message.Should().Contain("Something other than a TeensyROM engine is using port 10213");
+        error.Message.Should().Contain("Something other than Trom API is using port 10213");
     }
 
     [Fact]

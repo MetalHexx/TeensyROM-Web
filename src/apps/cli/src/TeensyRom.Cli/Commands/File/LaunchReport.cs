@@ -30,7 +30,7 @@ internal sealed class LaunchReport(ICliOutput output)
         LaunchStatus.Launched => null,
         LaunchStatus.Incompatible => new CliException(CliExitCode.Failed, Said(outcome, $"{outcome.Item?.Name ?? "The file"} can't run on the TeensyROM.")),
         LaunchStatus.NotFound => new CliException(CliExitCode.NotFound, Said(outcome, notFoundMessage)),
-        _ => new CliException(CliExitCode.Failed, Said(outcome, "tr-web couldn't launch the file."))
+        _ => new CliException(CliExitCode.Failed, Said(outcome, "Trom API couldn't launch the file."))
     };
 
     private void Show(LaunchOutcome outcome, IFileItem item, TeensyStorageType storageType)

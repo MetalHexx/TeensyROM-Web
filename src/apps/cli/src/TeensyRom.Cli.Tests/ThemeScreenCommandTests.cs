@@ -303,13 +303,13 @@ public sealed class ThemeScreenCommandTests : IDisposable
     [Fact]
     public async Task AnEngineError_IsShown_AndTheScreenReturns()
     {
-        _applyFailure = new TeensyApiException("tr-web could not reach the device.", 502);
+        _applyFailure = new TeensyApiException("Trom API could not reach the device.", 502);
         _keys.Pick(Apply).Pick(LeaveShipped);
 
         var exitCode = await Run();
 
         exitCode.Should().Be(0);
-        Screen.Should().Contain("tr-web could not reach the device.");
+        Screen.Should().Contain("Trom API could not reach the device.");
     }
 
     // ---- save, overwrite, delete -------------------------------------------------------------------------------------

@@ -189,7 +189,7 @@ public sealed class InitCommandTests
 
         await host.RunAsync("init", "--json");
 
-        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("isn't serving the web UI").And.Contain("logs");
+        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("isn't serving Trom UI").And.Contain("logs");
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class InitCommandTests
 
         await host.RunAsync("init");
 
-        host.Consoles.StdOut.Should().Contain("isn't serving the web UI");
+        host.Consoles.StdOut.Should().Contain("isn't serving Trom UI");
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public sealed class InitCommandTests
     {
         using var host = NewHost();
         host.Devices.FindAsync(false, Arg.Any<CancellationToken>())
-            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", 503));
+            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new TeensyApiException("Trom API is busy listing devices — try again in a few seconds.", 503));
 
         var exitCode = await host.RunAsync("init", "--json");
 
@@ -252,7 +252,7 @@ public sealed class InitCommandTests
         var exitCode = await host.RunAsync("init");
 
         exitCode.Should().Be(0);
-        host.Consoles.StdOut.Should().Contain("Engine").And.Contain("Web UI").And.Contain("Bench").And.Contain("Problem").And.Contain("No TeensyROM is online.");
+        host.Consoles.StdOut.Should().Contain("Trom API").And.Contain("Trom UI").And.Contain("Bench").And.Contain("Problem").And.Contain("No TeensyROM is online.");
         await host.Engine.DidNotReceiveWithAnyArgs().StopAsync(default);
     }
 
@@ -264,7 +264,7 @@ public sealed class InitCommandTests
         var exitCode = await host.RunAsync("init");
 
         exitCode.Should().Be(0);
-        host.Consoles.StdOut.Should().Contain("Engine").And.Contain("Web UI").And.Contain("Bench");
+        host.Consoles.StdOut.Should().Contain("Trom API").And.Contain("Trom UI").And.Contain("Bench");
         host.Consoles.StdErr.Should().Contain("No TeensyROM is online.");
     }
 }

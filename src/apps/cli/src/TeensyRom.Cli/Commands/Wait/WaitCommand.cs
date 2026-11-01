@@ -84,7 +84,7 @@ internal sealed class WaitSettings : TromSettings
     [CommandArgument(0, "<DURATION>")]
     public string Duration { get; set; } = "";
 
-    [Description("Hold the countdown while this TeensyROM's song is paused through trom (by name or id). Pauses made in the web app aren't seen.")]
+    [Description("Hold the countdown while this TeensyROM's song is paused through trom (by name or id). Pauses made in Trom UI aren't seen.")]
     [CommandOption("-d|--device <DEVICE>")]
     public string? Device { get; set; }
 

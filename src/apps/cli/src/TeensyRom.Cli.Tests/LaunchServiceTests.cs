@@ -168,7 +168,7 @@ public class LaunchServiceTests
         var act = () => new LaunchService(client, _devices).LaunchFile(TeensyStorageType.SD, Requested());
 
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
-        failure.Message.Should().Contain("tr-web stopped answering");
+        failure.Message.Should().Contain("Trom API stopped answering");
         failure.StatusCode.Should().BeNull();
     }
 

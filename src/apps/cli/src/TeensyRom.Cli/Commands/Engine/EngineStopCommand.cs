@@ -28,18 +28,18 @@ internal sealed class EngineStopCommand(ICliOutput output, IEngineControl engine
         switch (outcome)
         {
             case EngineStopOutcome.Stopped:
-                Output.Notice("TeensyROM engine stopped. The web app it served has stopped too.");
+                Output.Notice("Trom API stopped. Trom UI, which it served, has stopped too.");
                 return 0;
             case EngineStopOutcome.NotRunning:
-                Output.Notice("No TeensyROM engine is running.");
+                Output.Notice("No Trom API is running.");
                 return 0;
             case EngineStopOutcome.NotSupported:
-                throw new CliException(CliExitCode.Failed, "The running TeensyROM engine can't be stopped from the CLI — stop it where it was started.");
+                throw new CliException(CliExitCode.Failed, "The running Trom API can't be stopped from the CLI — stop it where it was started.");
             case EngineStopOutcome.Foreign:
-                throw new CliException(CliExitCode.Failed, $"Something other than a TeensyROM engine is using port {EngineAddress.Port} — free the port and try again.");
+                throw new CliException(CliExitCode.Failed, $"Something other than Trom API is using port {EngineAddress.Port} — free the port and try again.");
             default:
                 throw new CliException(CliExitCode.Failed,
-                    $"The TeensyROM engine didn't stop within {EngineControl.StopTimeout.TotalSeconds:0} seconds. Its logs are in {TeensyRomHome.EngineLogsPath}.");
+                    $"Trom API didn't stop within {EngineControl.StopTimeout.TotalSeconds:0} seconds. Its logs are in {TeensyRomHome.EngineLogsPath}.");
         }
     }
 }

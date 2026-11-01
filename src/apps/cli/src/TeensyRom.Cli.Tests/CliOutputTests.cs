@@ -105,24 +105,24 @@ public class CliOutputTests
         _consoles.Out.EmitAnsiSequences();
         const string url = "http://localhost:10213/";
 
-        Output(outIsTerminal: true).Fields([("Web UI address", url)]);
+        Output(outIsTerminal: true).Fields([("Trom UI address", url)]);
         var human = _consoles.StdOut;
 
         human.Should().Contain(url).And.Contain("\u001b]8;");
 
         var plain = new TestConsoles();
         plain.Out.EmitAnsiSequences();
-        new CliOutput(plain.With(false, false, false)).Fields([("Web UI address", url)]);
+        new CliOutput(plain.With(false, false, false)).Fields([("Trom UI address", url)]);
 
-        plain.StdOut.Should().Contain($"Web UI address: {url}").And.NotContain("\u001b");
+        plain.StdOut.Should().Contain($"Trom UI address: {url}").And.NotContain("\u001b");
     }
 
     [Fact]
     public void Notice_GoesToStderr_NotStdout()
     {
-        Output().Notice("Starting the TeensyROM engine…");
+        Output().Notice("Starting Trom API…");
 
-        _consoles.StdErr.Should().Contain("Starting the TeensyROM engine…");
+        _consoles.StdErr.Should().Contain("Starting Trom API…");
         _consoles.StdOut.Should().BeEmpty();
     }
 
@@ -132,9 +132,9 @@ public class CliOutputTests
         var output = Output(outIsTerminal: true, errIsTerminal: true);
         output.SetRunMode(CliRunMode.Tui);
 
-        output.Notice("Starting the TeensyROM engine…");
+        output.Notice("Starting Trom API…");
 
-        _consoles.StdOut.Should().Contain("Starting the TeensyROM engine…");
+        _consoles.StdOut.Should().Contain("Starting Trom API…");
         _consoles.StdErr.Should().BeEmpty();
     }
 
@@ -152,7 +152,7 @@ public class CliOutputTests
     {
         var output = Output();
         output.UseJson(true);
-        output.Notice("Starting the TeensyROM engine…");
+        output.Notice("Starting Trom API…");
 
         output.Error(new CliException(CliExitCode.NoDevice, "No TeensyROM is online."));
 

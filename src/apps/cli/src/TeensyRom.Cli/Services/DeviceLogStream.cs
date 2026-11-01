@@ -70,7 +70,7 @@ internal sealed class DeviceLogStream(IDeviceService devices, ILoggingService lo
         }
         catch (Exception ex) when (ex is HubException or InvalidOperationException)
         {
-            throw new TeensyApiException($"tr-web wouldn't let this CLI follow its log: {ex.Message}", inner: ex);
+            throw new TeensyApiException($"Trom API wouldn't let this CLI follow its log: {ex.Message}", inner: ex);
         }
     }
 
@@ -129,7 +129,7 @@ internal sealed class DeviceLogStream(IDeviceService devices, ILoggingService lo
             }
             catch (Exception ex)
             {
-                log.InternalError($"Couldn't stop following tr-web's log: {ex.Message}");
+                log.InternalError($"Couldn't stop following Trom API's log: {ex.Message}");
             }
             finally
             {

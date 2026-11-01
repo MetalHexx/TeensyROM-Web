@@ -6,7 +6,7 @@ namespace TeensyRom.Cli.Tests.Integration;
 /// <summary>
 /// The composability contract against the real engine: stdout carries only the result, stderr carries everything
 /// else, <c>--json</c> output and errors parse, and the exit code says what happened. Back-to-back device commands do not
-/// wait: tr-web rate limits only full scans on <c>/api/devices</c>, not plain listings.
+/// wait: Trom API rate limits only full scans on <c>/api/devices</c>, not plain listings.
 /// </summary>
 [Collection(RealApiCollection.Name)]
 public sealed class ContractScenarios(SharedApiFixture api)
@@ -23,10 +23,10 @@ public sealed class ContractScenarios(SharedApiFixture api)
 
             (await cli.RunAsync("device", "list")).Should().Be(0);
 
-            cli.Output.Should().NotContain("\u001b").And.NotContainAny("[bold", "[/]", "Starting the TeensyROM engine");
+            cli.Output.Should().NotContain("\u001b").And.NotContainAny("[bold", "[/]", "Starting Trom API");
             cli.Output.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Should().BeEquivalentTo(api.Devices.Select(device => device.Name), "stdout holds the names and nothing else");
-            cli.Error.Should().Contain("Starting the TeensyROM engine");
+            cli.Error.Should().Contain("Starting Trom API");
         }
         finally
         {
@@ -93,6 +93,8 @@ public sealed class ContractScenarios(SharedApiFixture api)
         exitCode.Should().Be(0);
         using var report = JsonDocument.Parse(cli.Output);
         var root = report.RootElement;
+        root.EnumerateObject().Select(property => property.Name)
+            .Should().BeEquivalentTo(["trom", "engine", "webUi", "devices", "commands", "capabilities", "problems"], "agents read these top-level keys");
         root.GetProperty("engine").GetProperty("running").GetBoolean().Should().BeTrue();
         root.GetProperty("webUi").GetProperty("available").ValueKind.Should().BeOneOf(JsonValueKind.True, JsonValueKind.False);
         root.GetProperty("problems").ValueKind.Should().Be(JsonValueKind.Array);
@@ -123,6 +125,7 @@ public sealed class ContractScenarios(SharedApiFixture api)
         exitCode.Should().Be(4);
         cli.Output.Should().BeEmpty();
         var error = LastLineAsError(cli.Error);
+        error.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(["code", "exitCode", "message"]);
         error.GetProperty("code").GetString().Should().Be("noDevice");
         error.GetProperty("exitCode").GetInt32().Should().Be(4);
     }
@@ -137,6 +140,7 @@ public sealed class ContractScenarios(SharedApiFixture api)
         exitCode.Should().Be(2);
         cli.Output.Should().BeEmpty();
         var error = LastLineAsError(cli.Error);
+        error.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(["code", "exitCode", "message"]);
         error.GetProperty("code").GetString().Should().Be("usage");
         error.GetProperty("exitCode").GetInt32().Should().Be(2);
     }

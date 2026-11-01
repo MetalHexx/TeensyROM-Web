@@ -38,7 +38,7 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices,
 
         if (running.Ok) return true;
 
-        RadHelper.WriteError(running.FailureMessage ?? "The TeensyROM engine isn't running.");
+        RadHelper.WriteError(running.FailureMessage ?? "Trom API isn't running.");
         return false;
     }
 

@@ -14,7 +14,7 @@ namespace TeensyRom.Cli.Commands.Main
         {
             player.StopStream();
 
-            RadHelper.WriteMenu("Port List", "Lists the TeensyROM devices tr-web knows, online and offline.", []);
+            RadHelper.WriteMenu("Port List", "Lists the TeensyROM devices Trom API knows, online and offline.", []);
 
             var found = await devices.GetDevicesAsync();
 

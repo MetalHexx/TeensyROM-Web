@@ -33,7 +33,7 @@ public sealed class CliHostTests : IDisposable
     private void EngineAnswers(bool running = true, string? version = null) =>
         _host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(running
             ? new EngineStatus(true, version ?? "1.0.0", "1.0.0", (version ?? "1.0.0") == "1.0.0", "localhost:10213", null)
-            : new EngineStatus(false, null, "1.0.0", false, "localhost:10213", "No TeensyROM engine is running at localhost:10213 — run `trom device list` to start one."));
+            : new EngineStatus(false, null, "1.0.0", false, "localhost:10213", "No Trom API is running at localhost:10213 — run `trom device list` to start one."));
 
     // ---- help, version and the retired surface --------------------------------------------------------------------
 
@@ -124,7 +124,7 @@ public sealed class CliHostTests : IDisposable
         var exitCode = await _host.RunAsync("engine", "status");
 
         exitCode.Should().Be(0);
-        StdOut.Should().Contain("Status: running").And.Contain("Engine version: 1.0.0");
+        StdOut.Should().Contain("Status: running").And.Contain("Trom API version: 1.0.0");
         await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
         await _host.Engine.DidNotReceiveWithAnyArgs().StopAsync(default);
     }
@@ -220,7 +220,7 @@ public sealed class CliHostTests : IDisposable
         var exitCode = await _host.RunAsync("engine", "stop");
 
         exitCode.Should().Be(0);
-        StdErr.Should().Contain("TeensyROM engine stopped. The web app it served has stopped too.");
+        StdErr.Should().Contain("Trom API stopped. Trom UI, which it served, has stopped too.");
         StdOut.Should().BeEmpty();
     }
 
@@ -342,12 +342,12 @@ public sealed class CliHostTests : IDisposable
     [Fact]
     public async Task DeviceList_WhenNoEngineCanBeStarted_ExitsThree_AndNeverListsDevices()
     {
-        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("The TeensyROM engine didn't start."));
+        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("Trom API didn't start."));
 
         var exitCode = await _host.RunAsync("device", "list");
 
         exitCode.Should().Be((int)CliExitCode.EngineUnavailable);
-        StdErr.Should().Contain("The TeensyROM engine didn't start.");
+        StdErr.Should().Contain("Trom API didn't start.");
         StdOut.Should().BeEmpty();
         await _host.Devices.DidNotReceiveWithAnyArgs().FindAsync(default, default);
     }
@@ -355,7 +355,7 @@ public sealed class CliHostTests : IDisposable
     [Fact]
     public async Task EngineNoticesAndErrors_NeverReachStdout()
     {
-        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("The TeensyROM engine didn't start."));
+        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("Trom API didn't start."));
 
         await _host.RunAsync("device", "list", "--json");
 

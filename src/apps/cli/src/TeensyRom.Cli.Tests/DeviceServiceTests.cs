@@ -65,7 +65,7 @@ public class DeviceServiceTests
         var act = () => _sut.GetDevicesAsync();
 
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
-        failure.Message.Should().Be("tr-web is busy listing devices — try again in a few seconds.");
+        failure.Message.Should().Be("Trom API is busy listing devices — try again in a few seconds.");
         failure.StatusCode.Should().Be(503);
     }
 
@@ -77,7 +77,7 @@ public class DeviceServiceTests
         var act = () => _sut.GetDevicesAsync();
 
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
-        failure.Message.Should().Contain("tr-web stopped answering");
+        failure.Message.Should().Contain("Trom API stopped answering");
         failure.StatusCode.Should().BeNull();
     }
 

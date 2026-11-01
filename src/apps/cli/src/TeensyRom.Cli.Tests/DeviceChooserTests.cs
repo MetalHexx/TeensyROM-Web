@@ -58,7 +58,7 @@ public sealed class DeviceChooserTests : IDisposable
         var error = await Rejected(Chooser(new TestConsoles(), canPrompt: false).ChooseAsync(null, DeviceScope.Known, default));
 
         error.Code.Should().Be(CliExitCode.NoDevice);
-        error.Message.Should().Be("tr-web doesn't know any TeensyROM yet. Connect one, then run `trom device discover`.");
+        error.Message.Should().Be("Trom API doesn't know any TeensyROM yet. Connect one, then run `trom device discover`.");
     }
 
     [Theory]
@@ -233,7 +233,7 @@ public sealed class DeviceChooserTests : IDisposable
     public async Task WhenTrWebIsBusy_TheFailureCarriesItsSentenceThrough()
     {
         _devices.GetDevicesAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", 503)));
+            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("Trom API is busy listing devices — try again in a few seconds.", 503)));
 
         var act = () => Chooser(new TestConsoles(), canPrompt: false).ChooseAsync(null, DeviceScope.Online, default);
 

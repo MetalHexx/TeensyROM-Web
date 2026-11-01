@@ -73,7 +73,7 @@ internal sealed class ThemeApplyCommand(ICliOutput output, IEngineControl engine
 
         foreach (var outcome in outcomes.Where(o => o.Status == ThemeApplyStatus.Applied && !o.IsRecorded))
         {
-            Output.Notice($"{outcome.Device.Name}'s colors reached the C64, but tr-web couldn't record them, so `trom theme show` won't reflect them.");
+            Output.Notice($"{outcome.Device.Name}'s colors reached the C64, but Trom API couldn't record them, so `trom theme show` won't reflect them.");
         }
         return Finish(outcomes);
     }

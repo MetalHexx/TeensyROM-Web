@@ -14,11 +14,11 @@ internal static class ApiErrors
     public static string ToMessage(Exception ex) => ex switch
     {
         TeensyApiException known => known.Message,
-        HttpRequestException => $"tr-web stopped answering at {EngineAddress.DisplayAddress} — start it and try again.",
+        HttpRequestException => $"Trom API stopped answering at {EngineAddress.DisplayAddress} — start it and try again.",
         ApiException { StatusCode: 400 } api when ValidationText(api.Response) is { } text => text,
         ApiException<ProblemDetails> { Result: { } problem } when FirstText(problem.Title, problem.Detail) is { } text => text,
-        ApiException api => FromBody(api.Response) ?? $"tr-web couldn't complete that request (HTTP {api.StatusCode}).",
-        _ => "tr-web couldn't complete that request."
+        ApiException api => FromBody(api.Response) ?? $"Trom API couldn't complete that request (HTTP {api.StatusCode}).",
+        _ => "Trom API couldn't complete that request."
     };
 
     /// <summary>

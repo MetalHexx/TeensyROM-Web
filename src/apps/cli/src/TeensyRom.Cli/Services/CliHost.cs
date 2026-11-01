@@ -84,25 +84,25 @@ internal static class CliHost
     /// </summary>
     internal static readonly PublicNoun[] PublicTree =
     [
-        new("engine", "Check on or stop the TeensyROM engine.",
+        new("engine", "Check on or stop Trom API.",
         [
-            PublicVerb.Of<EngineStatusCommand, EngineStatusSettings>("status", "Show whether the TeensyROM engine is running and which version.", ["engine", "status"]),
-            PublicVerb.Of<EngineStopCommand, EngineStopSettings>("stop", "Stop the TeensyROM engine and the web app it serves.", ["engine", "stop"])
+            PublicVerb.Of<EngineStatusCommand, EngineStatusSettings>("status", "Show whether Trom API is running and which version.", ["engine", "status"]),
+            PublicVerb.Of<EngineStopCommand, EngineStopSettings>("stop", "Stop Trom API and the Trom UI it serves.", ["engine", "stop"])
         ]),
         new("device", "List, reconnect, rename, forget, ping or reset TeensyROM devices.",
         [
-            PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices tr-web already knows, and whether each storage is fully indexed (sdIndexed and usbIndexed in --json).", ["device", "list"]),
+            PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices Trom API already knows, and whether each storage is fully indexed (sdIndexed and usbIndexed in --json).", ["device", "list"]),
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>(DeviceListCommand.DiscoverVerb, "Scan for TeensyROM devices, then list them.", ["device", DeviceListCommand.DiscoverVerb]),
             PublicVerb.Of<DeviceReconnectCommand, DeviceSettings>("reconnect", "Reconnect a TeensyROM, even one that is offline.", ["device", "reconnect", "--device", "Bench"]),
             PublicVerb.Of<DeviceRenameCommand, DeviceRenameSettings>("rename", "Give a TeensyROM a new name, even one that is offline.", ["device", "rename", "Bench", "--device", "TeensyROM"]),
-            PublicVerb.Of<DeviceForgetCommand, DeviceSettings>("forget", "Make tr-web forget a TeensyROM, even one that is offline.", ["device", "forget", "--device", "Bench"]),
+            PublicVerb.Of<DeviceForgetCommand, DeviceSettings>("forget", "Make Trom API forget a TeensyROM, even one that is offline.", ["device", "forget", "--device", "Bench"]),
             PublicVerb.Of<DevicePingCommand, DeviceSettings>("ping", "Check that an online TeensyROM answers.", ["device", "ping"]),
             PublicVerb.Of<DeviceResetCommand, DeviceSettings>("reset", "Reset an online TeensyROM, which stops whatever it is running.", ["device", "reset"])
         ]),
         new("theme", "List, show, apply, save and delete the C64's menu colors.",
         [
             PublicVerb.Of<ThemeListCommand, ThemeListSettings>("list", "List the shipped and custom themes with their seven menu colors. Needs no device.", ["theme", "list"]),
-            PublicVerb.Of<ThemeShowCommand, ThemeShowSettings>("show", "Show the colors each TeensyROM tr-web knows was last given, and the theme they came from while they still match it. Name one with --device.", ["theme", "show"]),
+            PublicVerb.Of<ThemeShowCommand, ThemeShowSettings>("show", "Show the colors each TeensyROM Trom API knows was last given, and the theme they came from while they still match it. Name one with --device.", ["theme", "show"]),
             PublicVerb.Of<ThemeApplyCommand, ThemeApplySettings>("apply", "Apply a theme and/or single colors (--background, --border, --banner, --time, --keys, --sources, --names; a C64 color by name or 0-15) to every online TeensyROM unless --device names one. It resets each C64, ending whatever it is running.", ["theme", "apply", "the-blues"]),
             PublicVerb.Of<ThemeSaveCommand, ThemeSaveSettings>("save", "Save a custom theme from a base theme, or from a TeensyROM's current colors when none is named, with any color flags laid over it. --overwrite replaces a custom theme of the same name. Needs no device when a base theme is named.", ["theme", "save", "Night", "c64-mono", "--border", "blue"]),
             PublicVerb.Of<ThemeDeleteCommand, ThemeDeleteSettings>("delete", "Delete a custom theme; shipped themes can't be deleted. Asks first unless --yes, which is required without a terminal. Needs no device.", ["theme", "delete", "Night"])
@@ -110,14 +110,14 @@ internal static class CliHost
         new("file", "Browse, search and launch the files on a TeensyROM's storage.",
         [
             PublicVerb.Of<FileLsCommand, FileLsSettings>("ls", "List a directory: its subdirectories, then its files.", ["file", "ls", "/music"]),
-            PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the files tr-web has cached for a storage. Until a full index is built (trom index build) results can be incomplete, and a notice on stderr says so.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
+            PublicVerb.Of<FileSearchCommand, FileSearchSettings>("search", "Search the files Trom API has cached for a storage. Until a full index is built (trom index build) results can be incomplete, and a notice on stderr says so.", ["file", "search", "commando", "--filter", "music", "--take", "10"]),
             PublicVerb.Of<FileLaunchOneShotCommand, FileLaunchOneShotSettings>("launch", "Launch one file; --player then opens the player on it.", ["file", "launch", "/music/MUSICIANS/T/Tjelta_Geir/Artillery.sid"]),
-            PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it. Picks from the files tr-web has cached, so a storage that is not fully indexed gets a notice on stderr.", ["file", "random", "--filter", "music", "--directory", "/music"]),
+            PublicVerb.Of<FileRandomOneShotCommand, FileRandomOneShotSettings>("random", "Launch a random file; --player then opens the player on it. Picks from the files Trom API has cached, so a storage that is not fully indexed gets a notice on stderr.", ["file", "random", "--filter", "music", "--directory", "/music"]),
             PublicVerb.Of<FileNextCommand, FilePlaybackSettings>("next", "Launch the next file after the one last launched on this TeensyROM: through its folder, its search results, or a new random pick.", ["file", "next"]),
             PublicVerb.Of<FilePreviousCommand, FilePlaybackSettings>("previous", "Launch the file before the one last launched on this TeensyROM; after random picks, walk back through them.", ["file", "previous"]),
             PublicVerb.Of<FilePauseCommand, FilePlaybackSettings>("pause", "Play/pause for music: pause or resume the song playing. Games and programs can't be paused, so they are stopped instead, which resets the TeensyROM; something stopped is launched again.", ["file", "pause"]),
             PublicVerb.Of<FileStopCommand, FilePlaybackSettings>("stop", "Stop whatever is running by resetting the TeensyROM, the same reset as `trom device reset`.", ["file", "stop"]),
-            PublicVerb.Of<FileUploadCommand, FileUploadSettings>("upload", "Copy files and folders from this computer to the TeensyROM; with no paths, the current folder's contents (asks first unless --yes). Folders keep their layout. Only the file types the TeensyROM takes are sent (.sid .crt .prg .p00 .hex .kla .koa .art .aas .hpi .seq .txt .d64 .nfo .md .ocp .pic .d71 .d81 .reu .trh .zip .7z .rar); others are left out and counted on stderr, and links, hidden and system files are left out silently. .zip, .7z and .rar are expanded on the TeensyROM. --launch has the TeensyROM launch that one file once it lands; with tr-web's auto-launch setting on, an upload launches one file anyway.", ["file", "upload", "Commando.sid", "--to", "/music"]),
+            PublicVerb.Of<FileUploadCommand, FileUploadSettings>("upload", "Copy files and folders from this computer to the TeensyROM; with no paths, the current folder's contents (asks first unless --yes). Folders keep their layout. Only the file types the TeensyROM takes are sent (.sid .crt .prg .p00 .hex .kla .koa .art .aas .hpi .seq .txt .d64 .nfo .md .ocp .pic .d71 .d81 .reu .trh .zip .7z .rar); others are left out and counted on stderr, and links, hidden and system files are left out silently. .zip, .7z and .rar are expanded on the TeensyROM. --launch has the TeensyROM launch that one file once it lands; with Trom API's auto-launch setting on, an upload launches one file anyway.", ["file", "upload", "Commando.sid", "--to", "/music"]),
             PublicVerb.Of<FileDownloadCommand, FileDownloadSettings>("download", "Copy files and folders from the TeensyROM to this computer, into the current folder unless --to names another. Folders keep their layout; files over 10 MB are skipped and reported.", ["file", "download", "/games"]),
             PublicVerb.Of<FileFavoriteCommand, FilePathsSettings>("favorite", "Tag files as favorites; give paths, or - to read them from stdin.", ["file", "favorite", "/music/Commando.sid", "/music/Delta.sid"]),
             PublicVerb.Of<FileUnfavoriteCommand, FilePathsSettings>("unfavorite", "Untag favorites; give paths, or - to read them from stdin.", ["file", "unfavorite", "/favorites/music/Commando.sid"]),
@@ -134,9 +134,9 @@ internal static class CliHost
             PublicVerb.Of<WatchFolderEnabledCommand, WatchFolderSettings>("pause", "Stop sending a watch folder's files until it is resumed. Files that land while it is paused are not sent later, not even after resume. Exits 5 when the folder isn't watched.", ["watch-folder", "pause", "./roms"]),
             PublicVerb.Of<WatchFolderEnabledCommand, WatchFolderSettings>(WatchFolderEnabledCommand.ResumeVerb, "Start sending a paused watch folder's files again. Exits 5 when the folder isn't watched.", ["watch-folder", "resume", "./roms"])
         ]),
-        new("transfer", "See the transfers the engine is running.",
+        new("transfer", "See the transfers Trom API is running.",
         [
-            PublicVerb.Of<TransferListCommand, TransferListSettings>("list", "List the transfers tr-web is running or has just finished, from uploads and watch folders alike. Needs no device.", ["transfer", "list"])
+            PublicVerb.Of<TransferListCommand, TransferListSettings>("list", "List the transfers Trom API is running or has just finished, from uploads and watch folders alike. Needs no device.", ["transfer", "list"])
         ]),
         new("index", "Index a TeensyROM's storage for search and random launches.",
         [
@@ -162,7 +162,7 @@ internal static class CliHost
     /// <summary>Commands that sit beside the nouns: <c>trom init</c>, and <c>trom wait</c>.</summary>
     internal static readonly PublicCommand[] PublicCommands =
     [
-        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, engine, web UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when the engine can't be made ready.", ["init"]),
+        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, Trom API, Trom UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when Trom API can't be made ready.", ["init"]),
         PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])
     ];
 

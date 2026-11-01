@@ -41,7 +41,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
     : TromCommand<InitSettings>(output)
 {
     private const string WebUiAddress = EngineAddress.BaseUrl + "/";
-    private const string EngineNotRunning = "No TeensyROM engine is running.";
+    private const string EngineNotRunning = "No Trom API is running.";
 
     protected override async Task<int> RunAsync(CommandContext context, InitSettings settings, CancellationToken ct)
     {
@@ -57,7 +57,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         {
             if (ready.Ok && !status.Matches)
             {
-                problems.Add($"The running engine is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs the engine restarts it.");
+                problems.Add($"The running Trom API is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs Trom API restarts it.");
             }
             found = await FindDevicesAsync(problems, ct);
         }
@@ -80,7 +80,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
 
         Write(report);
 
-        if (!ready.Ok) throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "The TeensyROM engine isn't running.");
+        if (!ready.Ok) throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "Trom API isn't running.");
 
         return 0;
     }
@@ -106,14 +106,14 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
 
         if (locator.Locate().Location is not { Mode: EngineMode.Source, ApiProject: { } apiProject } source)
         {
-            return $"The engine is running but isn't serving the web UI at {WebUiAddress} — check its logs in {TeensyRomHome.EngineLogsPath}.";
+            return $"Trom API is running but isn't serving Trom UI at {WebUiAddress} — check its logs in {TeensyRomHome.EngineLogsPath}.";
         }
 
         var wwwroot = Path.Combine(Path.GetDirectoryName(apiProject)!, "wwwroot");
 
         return System.IO.File.Exists(Path.Combine(wwwroot, "index.html"))
-            ? $"The engine is running but isn't serving the web UI at {WebUiAddress} although {wwwroot} holds a build — {RestartAndCheck} to restart it."
-            : $"The web UI isn't served because the front end isn't built: {wwwroot} has no index.html. Run `pnpm run build:frontend` from {Path.Combine(source.Folder, "src")}, then {RestartAndCheck}.";
+            ? $"Trom API is running but isn't serving Trom UI at {WebUiAddress} although {wwwroot} holds a build — {RestartAndCheck} to restart it."
+            : $"Trom UI isn't served because the front end isn't built: {wwwroot} has no index.html. Run `pnpm run build:frontend` from {Path.Combine(source.Folder, "src")}, then {RestartAndCheck}.";
     }
 
     private async Task<IReadOnlyList<DeviceSummary>> FindDevicesAsync(List<string> problems, CancellationToken ct)
@@ -160,12 +160,12 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         List<(string Label, string Value)> fields =
         [
             ("TROM version", report.Trom.Version),
-            ("Engine", report.Engine.Running ? "running" : "not running"),
-            ("Engine address", report.Engine.Address),
-            ("Engine version", report.Engine.Version ?? string.Empty),
+            ("Trom API", report.Engine.Running ? "running" : "not running"),
+            ("Trom API address", report.Engine.Address),
+            ("Trom API version", report.Engine.Version ?? string.Empty),
             ("Version match", report.Engine.Running ? (report.Engine.Matches ? "yes" : "no") : string.Empty),
-            ("Web UI", report.WebUi.Available ? "available" : "not available"),
-            ("Web UI address", report.WebUi.Address)
+            ("Trom UI", report.WebUi.Available ? "available" : "not available"),
+            ("Trom UI address", report.WebUi.Address)
         ];
 
         if (Output.Mode == OutputMode.Plain)

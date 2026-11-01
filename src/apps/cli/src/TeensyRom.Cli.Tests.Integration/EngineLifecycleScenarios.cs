@@ -31,8 +31,8 @@ public sealed class EngineLifecycleScenarios
 
             (await cli.RunAsync("device", "list")).Should().Be(0);
 
-            cli.Error.Should().Contain("Starting the TeensyROM engine");
-            cli.Output.Should().NotContain("Starting the TeensyROM engine", "engine notices belong on stderr");
+            cli.Error.Should().Contain("Starting Trom API");
+            cli.Output.Should().NotContain("Starting Trom API", "engine notices belong on stderr");
             (await RunningVersionAsync(bound.Token)).Should().Be(CliVersion);
             TestEngine.IsEngineLockHeld(home).Should().BeTrue();
             File.Exists(Path.Combine(home, "api", "Assets", ".package-version")).Should().BeTrue();
@@ -112,14 +112,14 @@ public sealed class EngineLifecycleScenarios
 
             (await cli.RunAsync("engine", "stop")).Should().Be(0);
 
-            cli.Error.Should().Contain("engine stopped");
+            cli.Error.Should().Contain("Trom API stopped");
             cli.Output.Should().BeEmpty();
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
             TestEngine.IsEngineLockHeld(home).Should().BeFalse();
 
             (await cli.RunAsync("engine", "stop", "--json")).Should().Be(0);
 
-            cli.Error.Should().Contain("No TeensyROM engine is running.");
+            cli.Error.Should().Contain("No Trom API is running.");
             JsonDocument.Parse(cli.Output).RootElement.GetProperty("outcome").GetString().Should().Be("notRunning");
         }
         finally
