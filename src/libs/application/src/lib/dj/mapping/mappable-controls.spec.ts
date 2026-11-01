@@ -364,7 +364,7 @@ describe('MappableControls', () => {
     });
 
     describe('loop-length', () => {
-      /** 24 play calls a beat: the ladder runs ⅛ to 32 beats, nine sizes. */
+      /** 24 play calls a beat: the ladder runs 1/12 (2 frames), then ⅛ to 128 beats, twelve sizes. */
       const GRID = {
         beatFrames: 24,
         beatOneFrame: 0,
@@ -403,36 +403,36 @@ describe('MappableControls', () => {
 
         seedMarker(96);
 
-        expect(length().max).toBe(8);
+        expect(length().max).toBe(11);
         expect(length().wholeSteps).toBe(true);
       });
 
       it("reads the size's index, a half index off the ladder, the ends beyond it and the 4-beat index on a cue", () => {
         seedMarker(96);
-        expect(length().read()).toBe(5);
+        expect(length().read()).toBe(6);
 
         seedMarker(100);
-        expect(length().read()).toBe(5.5);
+        expect(length().read()).toBe(6.5);
 
-        seedMarker(2000);
-        expect(length().read()).toBe(8);
+        seedMarker(4000);
+        expect(length().read()).toBe(11);
 
-        seedMarker(2);
+        seedMarker(1);
         expect(length().read()).toBe(0);
 
         seedMarker(null);
-        expect(length().read()).toBe(5);
+        expect(length().read()).toBe(6);
       });
 
       it('halves or doubles once for a step either way, whatever the length', () => {
         const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
         seedMarker(100);
 
-        length().set(6.5);
-        length().set(4.5);
+        length().set(7.5);
+        length().set(5.5);
         seedMarker(96);
-        length().set(6);
-        length().set(4);
+        length().set(7);
+        length().set(5);
 
         expect(resize.mock.calls).toEqual([
           ['A', 'double'],
@@ -444,9 +444,9 @@ describe('MappableControls', () => {
 
       it('does nothing for a turn past either end', () => {
         const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
-        seedMarker(2000);
-        length().set(8);
-        seedMarker(2);
+        seedMarker(4000);
+        length().set(11);
+        seedMarker(1);
         length().set(0);
 
         expect(resize).not.toHaveBeenCalled();

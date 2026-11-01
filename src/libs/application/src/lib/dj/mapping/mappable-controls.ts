@@ -442,7 +442,7 @@ export class MappableControls {
   }
 
   /** Where the selected marker's length sits on the length ladder, kept inside the knob's range:
-   *  a size's own index, halfway between two for a length off the ladder, the top above 32 beats,
+   *  a size's own index, halfway between two for a length off the ladder, the top above its longest,
    *  the bottom below the shortest size, and the 4-beat size for a cue. */
   private lengthIndex(slot: Slot): number {
     const grid = this.djStore.decks()[slot].beatGrid;

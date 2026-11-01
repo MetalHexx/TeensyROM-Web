@@ -55,36 +55,74 @@ export interface LadderSize {
  *  grid's beat length, not a real fraction. */
 const WHOLE_FRAME_TOLERANCE = 1e-9;
 
-/** The lengths a loop can take on a grid of `beatFrames` per beat: the powers of two from 1/32 to
- *  32 beats whose length is a whole number of frames, at least 1, ascending. At 24 frames a beat the
- *  ladder starts at ⅛ (3 frames): 1/16 would be 1.5 frames, so it is left out. */
+/** The ladder's powers of two run from 2^-5 (1/32 beat) to 2^7 (128 beats, 32 bars of four). */
+const SHORTEST_POWER = -5;
+const LONGEST_POWER = 7;
+
+/** The shortest loop that keeps time, in play calls: one the tune plays and one the engine's re-entry
+ *  gate-off takes. The engine stretches a 1-call loop to 2 calls, so a lap of 1 would fall behind
+ *  the grid. */
+const MIN_LOOP_FRAMES = 2;
+
+/**
+ * The lengths a loop can take on a grid of `beatFrames` per beat, ascending: the powers of two from
+ * 1/32 to 128 beats whose length is a whole number of frames, at least `MIN_LOOP_FRAMES`. Below the
+ * shortest of them sits the shortest whole-frame loop that fits a whole number of times into the beat,
+ * when there is a shorter one, so it still keeps time with the grid. At 24 frames a beat the powers
+ * start at ⅛ (3 frames), since 1/16 would be 1.5 frames, and 2 frames (1/12 of a beat) sits below.
+ *
+ * The rung below the powers is a bench experiment (2026-11-01): how short a loop the chip's
+ * envelopes carry, with a gate-off every lap, is for the ear to judge.
+ */
 export function lengthLadder(beatFrames: number): readonly LadderSize[] {
   const sizes: LadderSize[] = [];
-  for (let power = -5; power <= 5; power++) {
+  for (let power = SHORTEST_POWER; power <= LONGEST_POWER; power++) {
     const beats = 2 ** power;
     const frames = beats * beatFrames;
     const whole = Math.round(frames);
-    if (whole >= 1 && Math.abs(frames - whole) < WHOLE_FRAME_TOLERANCE) {
+    if (whole >= MIN_LOOP_FRAMES && Math.abs(frames - whole) < WHOLE_FRAME_TOLERANCE) {
       sizes.push({ beats, frames: whole });
     }
+  }
+  const division = shortestDivision(beatFrames);
+  if (division !== null && (sizes.length === 0 || division < sizes[0].frames)) {
+    sizes.unshift({ beats: division / beatFrames, frames: division });
   }
   return sizes;
 }
 
+/** The shortest loop of at least `MIN_LOOP_FRAMES` whole frames that fits a whole number of times
+ *  into a beat of `beatFrames`, or null when the beat is not a whole number of frames or no shorter
+ *  loop divides it. */
+function shortestDivision(beatFrames: number): number | null {
+  const beat = Math.round(beatFrames);
+  if (Math.abs(beatFrames - beat) >= WHOLE_FRAME_TOLERANCE) {
+    return null;
+  }
+  for (let frames = MIN_LOOP_FRAMES; frames < beat; frames++) {
+    if (beat % frames === 0) {
+      return frames;
+    }
+  }
+  return null;
+}
+
 const FRACTION_LABELS: ReadonlyMap<number, string> = new Map([
-  [0.5, '½ BEAT'],
-  [0.25, '¼ BEAT'],
-  [0.125, '⅛ BEAT'],
-  [0.0625, '1/16 BEAT'],
-  [0.03125, '1/32 BEAT'],
+  [2, '½ BEAT'],
+  [4, '¼ BEAT'],
+  [8, '⅛ BEAT'],
 ]);
 
-/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/16 BEAT`. */
+/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/12 BEAT`. */
 export function beatsLabel(beats: number): string {
   if (Number.isInteger(beats)) {
     return `${beats} ${beats === 1 ? 'BEAT' : 'BEATS'}`;
   }
-  return FRACTION_LABELS.get(beats) ?? `${Number(beats.toFixed(3))} BEATS`;
+  const parts = Math.round(1 / beats);
+  if (beats < 1 && Math.abs(parts * beats - 1) < WHOLE_FRAME_TOLERANCE) {
+    return FRACTION_LABELS.get(parts) ?? `1/${parts} BEAT`;
+  }
+  return `${Number(beats.toFixed(3))} BEATS`;
 }
 
 /** Closer than this to a beat, in frames, and a frame counts as on it. */

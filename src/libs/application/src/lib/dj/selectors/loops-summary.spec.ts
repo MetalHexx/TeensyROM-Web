@@ -389,6 +389,7 @@ describe('loopsSummary', () => {
 
       expect(selected?.lengthText).toBe('4 BEATS');
       expect(selected?.lengthOptions.map((option) => option.label)).toEqual([
+        '1/12 BEAT',
         '⅛ BEAT',
         '¼ BEAT',
         '½ BEAT',
@@ -398,6 +399,8 @@ describe('loopsSummary', () => {
         '8 BEATS',
         '16 BEATS',
         '32 BEATS',
+        '64 BEATS',
+        '128 BEATS',
       ]);
       expect(selected?.lengthOptions.filter((option) => option.selected)).toEqual([
         { beats: 4, label: '4 BEATS', selected: true },

@@ -103,24 +103,34 @@ describe('nearestBeat', () => {
 });
 
 describe('lengthLadder', () => {
-  it('starts at an eighth of a beat when 1/16 would be a fraction of a frame', () => {
+  it('runs the powers of two up to 128 beats, with the shortest even division of the beat below', () => {
     const sizes = lengthLadder(24);
 
-    expect(sizes.map((size) => size.beats)).toEqual([0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32]);
-    expect(sizes.map((size) => size.frames)).toEqual([3, 6, 12, 24, 48, 96, 192, 384, 768]);
+    expect(sizes.map((size) => size.beats)).toEqual([
+      2 / 24, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128,
+    ]);
+    expect(sizes.map((size) => size.frames)).toEqual([
+      2, 3, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072,
+    ]);
   });
 
-  it('reaches 1/32 of a beat when the beat is long enough to hold it in whole frames', () => {
-    const sizes = lengthLadder(32);
-
-    expect(sizes[0]).toEqual({ beats: 1 / 32, frames: 1 });
-    expect(sizes).toHaveLength(11);
+  it('reaches 1/32 of a beat when the beat holds it in at least two whole frames', () => {
+    expect(lengthLadder(64)[0]).toEqual({ beats: 1 / 32, frames: 2 });
+    expect(lengthLadder(64)).toHaveLength(13);
+    // 1/32 of a 32-frame beat is a single frame, which cannot lap in time.
+    expect(lengthLadder(32)[0]).toEqual({ beats: 1 / 16, frames: 2 });
   });
 
-  it('leaves out every size shorter than a frame or not a whole number of them', () => {
-    expect(lengthLadder(25).map((size) => size.beats)).toEqual([1, 2, 4, 8, 16, 32]);
-    expect(lengthLadder(1).map((size) => size.beats)).toEqual([1, 2, 4, 8, 16, 32]);
-    expect(lengthLadder(24.5).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32]);
+  it('adds no division a power of two already reaches, nor one longer than the shortest power', () => {
+    expect(lengthLadder(32).map((size) => size.frames)).not.toContain(1);
+    expect(lengthLadder(48).map((size) => size.frames).slice(0, 3)).toEqual([2, 3, 6]);
+  });
+
+  it('keeps time on an odd beat with a division, and leaves out what is not whole frames', () => {
+    expect(lengthLadder(25).map((size) => size.beats)).toEqual([0.2, 1, 2, 4, 8, 16, 32, 64, 128]);
+    expect(lengthLadder(1).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
+    expect(lengthLadder(24.5).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
+    expect(lengthLadder(0)).toEqual([]);
   });
 });
 
@@ -138,6 +148,13 @@ describe('beatsLabel', () => {
     expect(beatsLabel(0.125)).toBe('⅛ BEAT');
     expect(beatsLabel(1 / 16)).toBe('1/16 BEAT');
     expect(beatsLabel(1 / 32)).toBe('1/32 BEAT');
+  });
+
+  it('writes a division of the beat as one part of it, and anything else as a decimal', () => {
+    expect(beatsLabel(2 / 24)).toBe('1/12 BEAT');
+    expect(beatsLabel(5 / 25)).toBe('1/5 BEAT');
+    expect(beatsLabel(0.375)).toBe('0.375 BEATS');
+    expect(beatsLabel(1.5)).toBe('1.5 BEATS');
   });
 });
 

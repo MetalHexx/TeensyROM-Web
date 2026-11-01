@@ -869,7 +869,8 @@ describe('DeckLoops', () => {
   });
 
   describe('beat commands', () => {
-    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at ⅛. */
+    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at 2
+     *  frames (1/12 of a beat), below ⅛. */
     const GRID: DeckBeatGrid = {
       beatFrames: 24,
       beatOneFrame: 0,
@@ -1049,18 +1050,23 @@ describe('DeckLoops', () => {
         expect(spanOf('cue')).toEqual([100, 196]);
       });
 
-      it("stops doubling at 32 beats and at the tune's end, and halving at the shortest size", () => {
+      it("stops doubling at 128 beats and at the tune's end, and halving at the shortest size", () => {
+        setLength(4000);
         loops.select('A', 'big');
         loops.resize('A', 'double');
+        loops.resize('A', 'double');
+        loops.resize('A', 'double');
+        // ⅛ halves once more, to 2 frames (1/12 of the beat), and no further.
         loops.select('A', 'tiny');
+        loops.resize('A', 'halve');
         loops.resize('A', 'halve');
         setLength(450);
         loops.select('A', 'loop');
         loops.resize('A', 'double');
         loops.resize('A', 'double');
 
-        expect(spanOf('big')).toEqual([0, 768]);
-        expect(spanOf('tiny')).toEqual([240, 243]);
+        expect(spanOf('big')).toEqual([0, 3072]);
+        expect(spanOf('tiny')).toEqual([240, 242]);
         expect(spanOf('loop')).toEqual([240, 432]);
         expect(refusals()).toHaveLength(3);
       });

@@ -566,7 +566,7 @@ export class DeckLoops {
   /**
    * Halves or doubles the selected loop, keeping its start. From a length off the ladder, halving
    * takes the largest size below it and doubling the smallest above, so the length lands on the
-   * ladder in that direction. Doubling stops at 32 beats and at the tune's end; a cue gains a
+   * ladder in that direction. Doubling stops at 128 beats and at the tune's end; a cue gains a
    * 4-beat end either way. A no-op, logged, off the grid.
    */
   resize(slot: Slot, direction: 'halve' | 'double'): void {
