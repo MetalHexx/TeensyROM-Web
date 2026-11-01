@@ -53,7 +53,14 @@ If `init` shows no engine or no device online, go straight to `references/doctor
 ## Documentation links
 
 - TeensyROM hardware docs: https://github.com/SensoriumEmbedded/TeensyROM/tree/main/docs
-- tr-web: https://github.com/MetalHexx/TeensyROM-Web/blob/main/README.md
+- TeensyROM Suite docs, the index: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/README.md
+- Getting started, to install and connect a cart: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
+- Trom UI, the web app: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-ui.md
+- DJ Mixer, two SID decks played live: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/dj-mixer.md
+- Trom Terminal, the command line and its menu: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-terminal.md
+- Trom Agent, this companion: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-agent.md
+- Trom API, running it on its own: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-api.md
+- Contributing, to build from source: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md
 - The TeensyROM community on Discord, for support and chat with real people: https://discord.com/invite/ubSAb74S5U
 
 ## Safety rules
