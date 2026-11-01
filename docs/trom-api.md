@@ -12,3 +12,5 @@ It listens on port `10213`.
 ## API docs
 
 With Trom API running, its API documentation is at [http://localhost:10213/scalar/v1](http://localhost:10213/scalar/v1).
+
+<img width="2560" height="1440" alt="Trom API documentation page" src="../.github/images/trom-api-docs.png" />

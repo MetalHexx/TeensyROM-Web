@@ -31,12 +31,10 @@ A guided, BBS-style menu and one-line commands for launching, shuffling, searchi
 Your TeensyROM companion in Claude Code: ask it to play, run timed sets, tour your library and check your setup.
 </td>
     <td align="center" width="50%" valign="top">
-
-> 🖼️ **Image placeholder:** Trom API docs page
-
-<b><a href="docs/trom-api.md">Trom API</a></b><br>
-The REST API behind it all, for custom clients and automation, with its own documentation page.
-</td>
+      <a href="docs/trom-api.md"><img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="320"></a><br>
+      <b><a href="docs/trom-api.md">Trom API</a></b><br>
+      The REST API behind it all, for custom clients and automation, with its own documentation page.
+    </td>
   </tr>
 </table>
 
