@@ -22,17 +22,24 @@ internal sealed class StartupGate(IEngineControl engine, IDeviceService devices,
     public async Task<bool> EnsureReadyAsync(CancellationToken ct = default)
     {
         if (_ready) return true;
-
-        var running = await engine.EnsureRunningAsync(ct);
-
-        if (!running.Ok)
-        {
-            RadHelper.WriteError(running.FailureMessage ?? "The TeensyROM engine isn't running.");
-            return false;
-        }
+        if (!await EnsureEngineAsync(ct)) return false;
 
         _ready = await SelectDeviceAsync(ct);
         return _ready;
+    }
+
+    /// <summary>
+    /// For a menu entry that works with the engine but not with one device, such as managing themes: returns true once
+    /// an engine is running, without selecting a device or requiring one to be online; false after telling the user why.
+    /// </summary>
+    public async Task<bool> EnsureEngineAsync(CancellationToken ct = default)
+    {
+        var running = await engine.EnsureRunningAsync(ct);
+
+        if (running.Ok) return true;
+
+        RadHelper.WriteError(running.FailureMessage ?? "The TeensyROM engine isn't running.");
+        return false;
     }
 
     private async Task<bool> SelectDeviceAsync(CancellationToken ct)

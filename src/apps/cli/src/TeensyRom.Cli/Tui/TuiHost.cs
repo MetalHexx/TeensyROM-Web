@@ -15,7 +15,7 @@ namespace TeensyRom.Cli.Tui;
 /// </summary>
 internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput output, CliConsoles consoles, ITransferLineStream? lines = null)
 {
-    private sealed record MenuEntry(string Label, string Flow, bool NeedsEngine);
+    private sealed record MenuEntry(string Label, string Flow, bool NeedsEngine, bool NeedsDevice = true);
 
     private static readonly MenuEntry[] Menu =
     [
@@ -23,7 +23,7 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
         new("Watch Folders", "watch-folders", NeedsEngine: true),
         new("Index Files", "index", NeedsEngine: true),
         new("Devices", "ports", NeedsEngine: true),
-        new("Theme", "theme", NeedsEngine: true),
+        new("Theme", "theme", NeedsEngine: true, NeedsDevice: false),
         new("Generate ASID Patches", "chipsynth", NeedsEngine: false),
         new("Credits", "credits", NeedsEngine: false),
         new("Settings", "settings", NeedsEngine: true)
@@ -62,7 +62,7 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
 
                 if (entry.NeedsEngine)
                 {
-                    if (!await gate.EnsureReadyAsync()) return 1;
+                    if (!await (entry.NeedsDevice ? gate.EnsureReadyAsync() : gate.EnsureEngineAsync())) return 1;
 
                     // Joins the start already running, or retries one that found no engine before a flow started it.
                     _ = StartLinesAsync();

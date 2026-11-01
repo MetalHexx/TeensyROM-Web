@@ -65,16 +65,35 @@ public sealed class TuiHostTests : IDisposable
         screen.Should().NotContain("Stop Engine");
     }
 
+    private static ThemeDto FactoryTheme() => new()
+    {
+        Id = ThemeColors.FactoryThemeId,
+        Name = "TR Default",
+        Kind = ThemeKind.Shipped,
+        Parts = new ThemePartsDto { Device = new ThemeColors(6, 14, 14, 1, 3, 1, 15).ToDto() }
+    };
+
+    [Fact]
+    public async Task ThemeEntry_WithNoOnlineDevice_StillOpensTheScreen_WithoutSelectingADevice()
+    {
+        _themes.ListAsync(Arg.Any<CancellationToken>()).Returns(new[] { FactoryTheme() });
+        _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DeviceSummary>());
+        Pick(Theme);
+        Pick(4);
+        Pick(Leave);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0, _host.Consoles.StdErr);
+        Screen.Should().Contain("Theme: TR Default  (shipped)");
+        _host.Devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
+    }
+
     [Fact]
     public async Task ThemeEntry_StartsTheThemeScreen_ThenReturnsToTheMenu()
     {
-        var factory = new ThemeDto
-        {
-            Id = ThemeColors.FactoryThemeId,
-            Name = "TR Default",
-            Kind = ThemeKind.Shipped,
-            Parts = new ThemePartsDto { Device = new ThemeColors(6, 14, 14, 1, 3, 1, 15).ToDto() }
-        };
+        var factory = FactoryTheme();
+
         _themes.ListAsync(Arg.Any<CancellationToken>()).Returns(new[] { factory });
         _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected") });
         _themes.GetDeviceRecordAsync("a", Arg.Any<CancellationToken>()).Returns(

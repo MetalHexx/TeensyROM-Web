@@ -165,4 +165,41 @@ public sealed class StartupGateTests : IDisposable
         plain.Output.Should().Contain("Several TeensyROMs are available").And.Contain("--device");
         _devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
     }
+
+    [Fact]
+    public async Task EnsureEngine_WithNoOnlineDevice_SucceedsWithoutLookingForOne()
+    {
+        TrWebKnows(Offline("c", "Charlie"));
+
+        var ready = await _sut.EnsureEngineAsync();
+
+        ready.Should().BeTrue();
+        await _devices.DidNotReceive().GetDevicesAsync(Arg.Any<CancellationToken>());
+        _devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
+    }
+
+    [Fact]
+    public async Task EnsureEngine_WhenTheEngineIsNotReady_ShowsWhyAndFails()
+    {
+        _engine.EnsureRunningAsync(Arg.Any<CancellationToken>())
+            .Returns(EngineReady.Failed("The TeensyROM engine didn't start (it didn't answer within 180 seconds)."));
+
+        var ready = await _sut.EnsureEngineAsync();
+
+        ready.Should().BeFalse();
+        _console.Output.Should().Contain("The TeensyROM engine didn't start");
+    }
+
+    [Fact]
+    public async Task EnsureEngine_DoesNotMakeTheGateReady_ForTheFlowsThatNeedADevice()
+    {
+        var alpha = Online("a", "Alpha");
+        TrWebKnows(alpha);
+        await _sut.EnsureEngineAsync();
+
+        var ready = await _sut.EnsureReadyAsync();
+
+        ready.Should().BeTrue();
+        _devices.Received(1).Select(alpha);
+    }
 }
