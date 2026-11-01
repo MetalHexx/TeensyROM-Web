@@ -52,7 +52,7 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
             return;
         }
 
-        var table = new Table().Border(TableBorder.Rounded).HideHeaders();
+        var table = new Table().BorderColor(RadHelper.Theme.Secondary.Color).Border(TableBorder.Rounded).HideHeaders();
         table.AddColumn(new TableColumn(string.Empty));
         table.AddColumn(new TableColumn(string.Empty));
 

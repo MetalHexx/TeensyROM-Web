@@ -100,6 +100,16 @@ public class CliOutputTests
     }
 
     [Fact]
+    public void Fields_OnATerminal_AreDrawnInTheThemeColor_LikeTheOtherTables()
+    {
+        _consoles.Out.EmitAnsiSequences();
+
+        Output(outIsTerminal: true).Fields([("Status", "launched")]);
+
+        _consoles.StdOut.Should().Contain("\u001b[", "the table's border takes the theme's secondary color, as the list tables do");
+    }
+
+    [Fact]
     public void Fields_WithAnHttpUrl_AreALinkOnATerminal_AndPlainTextWhenRedirected()
     {
         _consoles.Out.EmitAnsiSequences();
