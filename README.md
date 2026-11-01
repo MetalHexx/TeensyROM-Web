@@ -1,7 +1,7 @@
 <h1 align="center">TeensyROM Suite</h1>
 
 <p align="center">
-  <b>Turn your Commodore 64 into a jukebox, an arcade and a DJ booth.</b>
+  <b>Turn your Commodore 64 into a jukebox, an arcade or a DJ booth.</b>
 </p>
 
 <p align="center">
