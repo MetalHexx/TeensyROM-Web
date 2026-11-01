@@ -25,12 +25,12 @@ Browse the SD and USB storage of every connected cart, along with your saved set
 - **Transport:** play, pause, stop and repeat the tune.
 - **Position:** see how far in you are, and jump to any point.
 - **Tunes:** step to the previous or next tune in the loaded set, and to the previous or next sub-tune of the tune that is loaded.
-- **Speed:** change the playback speed in steps as fine as 0.01%, nudge it up or down for a moment, or return to normal. Turn a knob or scroll slowly for fine steps and quickly for big ones.
+- **Speed:** change the playback speed in steps as fine as 0.01%, nudge it up or down for a moment, or return to normal.
 - **Voices:** mute any of a tune's three voices, or hold one.
 
 ## Beat grid and BPM
 
-Each tune gets a beat grid, and each deck shows its BPM under the speed. The BPM follows the speed you are playing at, so you can match two tunes by setting their speeds until the readouts agree. A tune with no steady beat, or a stretch of a tune at another tempo, shows no BPM.
+Each tune gets a beat grid, and each deck shows its BPM under the speed. The BPM follows the speed you are playing at, so you can match two tunes by setting their speeds until the readouts agree.
 
 If a grid is wrong, tap along with the tune for a few beats to set it yourself. Tapping is also how you give a tune with no grid one.
 
@@ -48,7 +48,7 @@ The settings show the chip's live values as the tune plays, and every voice has 
 
 ## Loops and cues
 
-Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats. Without one they land at the playhead, and Length and Move don't apply.
+Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats.
 
 - **Set:** add a marker at the current position. Give it an end to make it a loop, or leave it as a cue. Stop a running loop at any time.
 - **Start and end:** set a marker's start or end at the current position, anywhere in the tune. Setting the end of a cue makes it a loop.
