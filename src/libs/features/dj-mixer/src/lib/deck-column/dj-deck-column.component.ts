@@ -181,9 +181,10 @@ export class DjDeckColumnComponent {
   readonly dropActive = input<boolean>(false);
 
   /** The playhead readouts' targets: `PlayheadPainter` writes the transport's position, elapsed
-   *  time and frame, and the running tile's lap, straight to them. */
+   *  time and frame, the running tile's lap and the speed display's BPM, straight to them. */
   private readonly transport = viewChild.required(DeckTransportComponent);
   private readonly loopsPlate = viewChild.required(LoopsCuesPlateComponent);
+  private readonly channelStrip = viewChild.required(DeckChannelStripComponent);
 
   /** Never reads the playhead, so `transportModel` keeps its identity while the deck plays. */
   private readonly summary = computed(() => this.djStore.transportSummary(this.deck().slot)());
@@ -246,6 +247,7 @@ export class DjDeckColumnComponent {
       detach = this.playheadPainter.attach(this.deck().slot, {
         transport: this.transport(),
         loops: this.loopsPlate(),
+        speed: this.channelStrip(),
       });
     });
     inject(DestroyRef).onDestroy(() => detach?.());
@@ -304,7 +306,7 @@ export class DjDeckColumnComponent {
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
-    const { speed, faderSpeed, nudging, voices } = this.deckState();
+    const { speed, faderSpeed, nudging, tapping, voices } = this.deckState();
     return {
       settingsSign: settingsSignModel(this.deck(), this.settingsInPlay()),
       voiceAccessibleName: `Voice deck ${letter}`,
@@ -322,6 +324,8 @@ export class DjDeckColumnComponent {
       }),
       speedText: formatSpeedPercent(speed),
       nudging,
+      tapping,
+      tapAccessibleName: `Tap the beat deck ${letter}`,
       fader: {
         value: Math.min(Math.max(faderSpeed, SPEED_FADER_RANGE.min), SPEED_FADER_RANGE.max),
         min: SPEED_FADER_RANGE.min,
@@ -549,6 +553,10 @@ export class DjDeckColumnComponent {
     if (isSpeedJump(id)) {
       this.deckService.jumpSpeed(this.deck().slot, id);
     }
+  }
+
+  onTap(): void {
+    this.deckService.tap(this.deck().slot);
   }
 
   onVoiceMutedChange({ index, muted }: { index: number; muted: boolean }): void {

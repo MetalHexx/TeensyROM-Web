@@ -14,8 +14,15 @@ export interface LoopLapTarget {
   setLiveProgress(percent: number): void;
 }
 
+/** The speed display's tempo readout. */
+export interface SpeedReadoutTarget {
+  /** '125.31 BPM', or '---.-- BPM' with no tempo. */
+  setLiveBpm(text: string): void;
+}
+
 /** Every playhead readout of one deck. */
 export interface DeckPlayheadTargets {
   readonly transport: TransportPlayheadTarget;
   readonly loops: LoopLapTarget;
+  readonly speed: SpeedReadoutTarget;
 }

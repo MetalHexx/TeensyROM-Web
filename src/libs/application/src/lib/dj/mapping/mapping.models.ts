@@ -49,6 +49,7 @@ export type DeckControlId =
   | 'speed-jump-down'
   | 'speed-nudge-up'
   | 'speed-nudge-down'
+  | 'tap'
   | 'loop-select'
   | 'loop-toggle'
   | 'loop-play-now'
@@ -90,6 +91,7 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'speed-jump-down',
   'speed-nudge-up',
   'speed-nudge-down',
+  'tap',
   'loop-select',
   'loop-toggle',
   'loop-play-now',

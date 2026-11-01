@@ -16,6 +16,8 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
     })),
     speedText: '0.00%',
     nudging: false,
+    tapping: false,
+    tapAccessibleName: 'Tap the beat deck A',
     fader: {
       value: 1,
       min: 0.5,
@@ -45,6 +47,7 @@ describe('DeckChannelStripComponent', () => {
   let held: { index: number; held: boolean }[];
   let nudges: { direction: 'up' | 'down'; held: boolean }[];
   let jumps: string[];
+  let taps: number;
   let faders: number[];
   let wheels: { clicks: number; timeStampMs: number }[];
 
@@ -58,6 +61,7 @@ describe('DeckChannelStripComponent', () => {
     held = [];
     nudges = [];
     jumps = [];
+    taps = 0;
     faders = [];
     wheels = [];
     const strip = fixture.componentInstance;
@@ -65,6 +69,7 @@ describe('DeckChannelStripComponent', () => {
     strip.heldChange.subscribe((e) => held.push(e));
     strip.nudgeChange.subscribe((e) => nudges.push(e));
     strip.jump.subscribe((id) => jumps.push(id));
+    strip.tap.subscribe(() => taps++);
     strip.faderChange.subscribe((v) => faders.push(v));
     strip.faderWheel.subscribe((e) => wheels.push(e));
     fixture.detectChanges();
@@ -184,6 +189,7 @@ describe('DeckChannelStripComponent', () => {
   it('exposes the anchors by data-control', () => {
     for (const control of [
       'speed',
+      'tap',
       'speed-nudge-up',
       'speed-nudge-down',
       'jump-up',
@@ -200,7 +206,35 @@ describe('DeckChannelStripComponent', () => {
 
     setModel({ nudging: true, speedText: '+5.00%' });
     expect(q('.speed-display').hasAttribute('data-nudging')).toBe(true);
-    expect(q('.speed-display').textContent?.trim()).toBe('+5.00%');
+    expect(q('.speed-display .percent').textContent?.trim()).toBe('+5.00%');
+  });
+
+  it('shows no tempo until a painter sets one, and writes a live BPM straight on the DOM', () => {
+    const bpm = q('.speed-display .bpm');
+    expect(bpm.textContent).toBe('---.-- BPM');
+
+    fixture.componentInstance.setLiveBpm('125.31 BPM');
+    expect(bpm.textContent).toBe('125.31 BPM');
+
+    fixture.componentInstance.setLiveBpm('---.-- BPM');
+    expect(bpm.textContent).toBe('---.-- BPM');
+  });
+
+  it('keeps a live BPM through a model change', () => {
+    fixture.componentInstance.setLiveBpm('98.50 BPM');
+    setModel({ speedText: '+2.00%' });
+    expect(q('.speed-display .bpm').textContent).toBe('98.50 BPM');
+  });
+
+  it('emits tap when the Tap key is pressed, and tints it and the display while tapping', () => {
+    byName('Tap the beat deck A').click();
+    expect(taps).toBe(1);
+    expect(q('[data-control="tap"]').hasAttribute('data-tapping')).toBe(false);
+    expect(q('.speed-display').hasAttribute('data-tapping')).toBe(false);
+
+    setModel({ tapping: true });
+    expect(q('[data-control="tap"]').hasAttribute('data-tapping')).toBe(true);
+    expect(q('.speed-display').hasAttribute('data-tapping')).toBe(true);
   });
 
   it('reports every native control disabled when the strip is disabled', () => {
@@ -211,6 +245,7 @@ describe('DeckChannelStripComponent', () => {
       'Kill voice 1 deck A',
       'Nudge speed up deck A',
       'Speed home deck A',
+      'Tap the beat deck A',
     ];
     for (const name of names) {
       expect((byName(name) as HTMLButtonElement | HTMLInputElement).disabled, name).toBe(true);

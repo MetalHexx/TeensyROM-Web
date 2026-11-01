@@ -54,15 +54,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 82 controls per deck and 3 for the set, 167 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(167);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(167);
+    it('holds 83 controls per deck and 3 for the set, 169 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(169);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(169);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(82);
+        expect(ids).toHaveLength(83);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });

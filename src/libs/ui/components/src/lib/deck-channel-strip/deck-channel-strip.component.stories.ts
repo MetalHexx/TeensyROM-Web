@@ -11,7 +11,8 @@ const meta: Meta<DeckChannelStripComponent> = {
         component:
           "One deck's voice-and-speed channel strip on a single faceplate: three voice pairs " +
           '(a latching mute key over a Kill/Punch hold pad), the speed display, a hardware-drawn ' +
-          'fader that is still a native range, the nudge pads and the jump keys. It is sized for ' +
+          'fader that is still a native range, the nudge pads and the jump keys. The speed display ' +
+          'carries the BPM under the percent, and a Tap key sits under it. It is sized for ' +
           'the roughly 88px voice-and-speed column and fills its height. A sign at the top of the ' +
           'voice section names whose settings are in play. Purely presentational. ' +
           'The Held story presses the pads with an Enter keydown.',
@@ -31,6 +32,7 @@ const meta: Meta<DeckChannelStripComponent> = {
     },
     nudgeChange: { description: 'A nudge pad was pressed or released.' },
     jump: { description: 'A jump key was pressed; carries its id.' },
+    tap: { description: 'The Tap key was pressed.' },
   },
   render: (args) => ({
     props: args,
@@ -63,6 +65,8 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
     })),
     speedText: '0.00%',
     nudging: false,
+    tapping: false,
+    tapAccessibleName: `Tap the beat deck ${deck}`,
     fader: {
       value: 1,
       min: 0.5,
@@ -94,6 +98,20 @@ const pressWithEnter = (canvasElement: HTMLElement, name: string): void => {
 };
 
 export const AtRest: Story = { args: { model: baseModel() } };
+
+/** The BPM line under the percent is set live by a painter, not by the model. */
+export const WithBpm: Story = {
+  args: { model: baseModel() },
+  play: async ({ canvasElement }) => {
+    const bpm = canvasElement.querySelector('.bpm');
+    if (bpm) {
+      bpm.textContent = '125.31 BPM';
+    }
+  },
+};
+
+/** The speed display and the Tap key take the nudge's magenta while the deck is tapping. */
+export const Tapping: Story = { args: { model: { ...baseModel(), tapping: true } } };
 
 /** The speed display tints magenta while a nudge is in effect; the fader does not move. */
 export const Nudging: Story = {

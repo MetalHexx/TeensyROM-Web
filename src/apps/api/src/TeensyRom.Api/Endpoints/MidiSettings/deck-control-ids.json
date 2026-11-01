@@ -12,6 +12,7 @@
   "speed-jump-down",
   "speed-nudge-up",
   "speed-nudge-down",
+  "tap",
   "loop-select",
   "loop-toggle",
   "loop-play-now",

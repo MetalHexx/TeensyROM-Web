@@ -27,9 +27,24 @@
 
     <section class="speed" [attr.aria-label]="model().speedAccessibleName">
       <span class="section-label" aria-hidden="true">Speed</span>
-      <div class="speed-display" [attr.data-nudging]="model().nudging ? '' : null">
-        {{ model().speedText }}
+      <div
+        class="speed-display"
+        [attr.data-nudging]="model().nudging ? '' : null"
+        [attr.data-tapping]="model().tapping ? '' : null"
+      >
+        <span class="percent">{{ model().speedText }}</span>
+        <span #bpm class="bpm">---.-- BPM</span>
       </div>
+      <lib-synth-key
+        data-control="tap"
+        label="Tap"
+        class="tap"
+        [attr.data-tapping]="model().tapping ? '' : null"
+        [accessibleName]="model().tapAccessibleName"
+        [latched]="model().tapping"
+        [disabled]="model().disabled"
+        (press)="tap.emit()"
+      />
       <lib-synth-fader
         data-control="speed"
         [value]="model().fader.value"

@@ -346,6 +346,7 @@ export class MappableControls {
         (held, amount) => decks.setNudge(slot, 'down', held, amount ?? NUDGE_DEFAULT_AMOUNT),
         NUDGE_DEFAULT_AMOUNT
       ),
+      trigger(id('tap'), 'Tap', () => decks.tap(slot)),
       wholeStepValue(
         id('loop-select'),
         'Loop select',

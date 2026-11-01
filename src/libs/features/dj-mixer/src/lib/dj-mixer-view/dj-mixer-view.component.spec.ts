@@ -1304,7 +1304,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(162);
+      expect(ALL_IDENTITIES).toHaveLength(164);
       expect(mismatched).toEqual([]);
     });
 

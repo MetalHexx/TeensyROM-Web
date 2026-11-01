@@ -136,6 +136,7 @@ function createDeckServiceStub() {
     setVoiceMuted: vi.fn(),
     setVoiceHeld: vi.fn(),
     setNudge: vi.fn(),
+    tap: vi.fn(),
     addMarker: vi.fn(),
     stopMarkerLoop: vi.fn(),
     toggleMarker: vi.fn().mockResolvedValue(undefined),
@@ -205,6 +206,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     speed: 1,
     faderSpeed: 1,
     nudging: false,
+    tapping: false,
     lengthFrames: null as number | null,
     playCallIntervalUs: null as number | null,
     voices: [
@@ -959,7 +961,7 @@ describe('DjDeckColumnComponent', () => {
       expect(painter.pin).not.toHaveBeenCalledWith('A', null);
     });
 
-    it("hands the transport and the plate to the playhead painter once rendered, for this deck's slot, and detaches on destroy", () => {
+    it("hands the transport, the plate and the speed strip to the playhead painter once rendered, for this deck's slot, and detaches on destroy", () => {
       const { fixture, painter } = render({ slot: 'B', letter: 'B', index: 1 });
 
       expect(painter.attach).toHaveBeenCalledTimes(1);
@@ -967,6 +969,7 @@ describe('DjDeckColumnComponent', () => {
       expect(slot).toBe('B');
       expect(targets.transport).toBe(transport(fixture));
       expect(targets.loops).toBe(plate(fixture));
+      expect(targets.speed).toBe(strip(fixture));
 
       fixture.destroy();
       expect(painter.detach).toHaveBeenCalledTimes(1);
@@ -1133,6 +1136,25 @@ describe('DjDeckColumnComponent', () => {
         ['B', 'up', false],
         ['B', 'down', true],
       ]);
+    });
+
+    it("dispatches the Tap key to tap with this deck's slot", () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      strip(fixture).tap.emit();
+
+      expect(deckService.tap).toHaveBeenCalledExactlyOnceWith('B');
+    });
+
+    it('names the Tap key for the deck and lights it while the deck is tapping', () => {
+      const { fixture, store } = renderLive(DECK_B);
+      expect(strip(fixture).model().tapping).toBe(false);
+
+      store.setDeckTapping({ slot: 'B', tapping: true });
+      fixture.detectChanges();
+
+      expect(strip(fixture).model().tapping).toBe(true);
+      expect(strip(fixture).model().tapAccessibleName).toBe('Tap the beat deck B');
     });
 
     it("dispatches each jump button to jumpSpeed with this deck's slot", () => {

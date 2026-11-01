@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, type Signal } from '@angular/core';
 import { DeckRuntime } from './deck-runtime';
-import { DjStore, type DeckLoopsState } from './dj-store';
+import { DjStore, type DeckBeatGrid, type DeckLoopsState } from './dj-store';
+import { bpmOf, formatBpm, inGridSpan } from './grid/beat-math';
 import { clamp, resolvedFrame } from './loops/loop-marker-math';
 import { formatElapsed } from './selectors/transport-time';
 import type { DeckPlayheadTargets } from './playhead-targets';
@@ -47,6 +48,8 @@ function lapPercent(positionFrames: number, lap: LapSpan | null): number {
 interface SlotSources {
   readonly lengthFrames: Signal<number | null>;
   readonly playCallIntervalUs: Signal<number | null>;
+  readonly beatGrid: Signal<DeckBeatGrid | null>;
+  readonly speed: Signal<number>;
   readonly lap: Signal<LapSpan | null>;
 }
 
@@ -60,6 +63,7 @@ interface SlotPaint {
   /** The frame the frame label last showed. */
   labelFrame: number;
   lapPercent: number;
+  bpmText: string | null;
   stillPaintScheduled: boolean;
 }
 
@@ -71,19 +75,21 @@ function createSlotPaint(): SlotPaint {
     elapsedText: null,
     labelFrame: UNPAINTED,
     lapPercent: UNPAINTED,
+    bpmText: null,
     stillPaintScheduled: false,
   };
 }
 
 /**
- * Paints a deck's playhead readouts — the transport's bar, elapsed time and frame, and the running
- * marker loop's lap — straight into their targets, bypassing the store and change detection. The
+ * Paints a deck's playhead readouts — the transport's bar, elapsed time and frame, the running
+ * marker loop's lap and the speed display's BPM, blank where the playhead is off the beat grid —
+ * straight into their targets, bypassing the store and change detection. The
  * decks' animation-frame loop calls `paint` on the frames it paints on, about 30 a second, when the
  * playhead moved; each paint reads the live position from the engine and writes only the readouts
  * whose shown value changed. While the deck is not playing that loop does not paint it, so one
  * extra paint is scheduled for anything that changes what the readouts show in the meantime: a
  * stop, pause, seek or load sampling the playhead into the store, the tune's length or play-call
- * interval, the running loop, a hand letting go. A scrub drag pins the transport to the pointer
+ * interval, the beat grid, the speed, the running loop, a hand letting go. A scrub drag pins the transport to the pointer
  * through `pin`. Never writes the store.
  */
 @Injectable({ providedIn: 'root' })
@@ -107,6 +113,7 @@ export class PlayheadPainter {
     state.elapsedText = null;
     state.labelFrame = UNPAINTED;
     state.lapPercent = UNPAINTED;
+    state.bpmText = null;
     this.paint(slot);
     return () => {
       if (state.targets === targets) {
@@ -131,7 +138,7 @@ export class PlayheadPainter {
     if (targets === null) {
       return;
     }
-    const { lengthFrames, playCallIntervalUs, lap } = this.sources[slot];
+    const { lengthFrames, playCallIntervalUs, beatGrid, speed, lap } = this.sources[slot];
     const position = this.runtime.position(slot);
     const length = lengthFrames();
     const pin = state.pin;
@@ -160,6 +167,18 @@ export class PlayheadPainter {
       state.lapPercent = progress;
       targets.loops.setLiveProgress(progress);
     }
+
+    const grid = beatGrid();
+    const interval = playCallIntervalUs();
+    const bpmText = formatBpm(
+      grid && interval && inGridSpan(grid, position)
+        ? bpmOf(grid.beatFrames, interval, speed())
+        : null
+    );
+    if (state.bpmText !== bpmText) {
+      state.bpmText = bpmText;
+      targets.speed.setLiveBpm(bpmText);
+    }
   }
 
   /** The narrow signals a paint reads for `slot`, and the effect that schedules a still paint when
@@ -173,6 +192,8 @@ export class PlayheadPainter {
     const varispeed = computed(() => deck().varispeed);
     const lengthFrames = computed(() => deck().lengthFrames);
     const playCallIntervalUs = computed(() => deck().playCallIntervalUs);
+    const beatGrid = computed(() => deck().beatGrid);
+    const speed = computed(() => deck().speed);
     const loops = this.store.deckLoops(slot);
     const lap = computed<LapSpan | null>(() => runningLap(loops()), { equal: sameLap });
     // Sampled only on a transport transition — a stop, pause, seek, load or a hand letting go —
@@ -186,13 +207,15 @@ export class PlayheadPainter {
       sampled();
       lengthFrames();
       playCallIntervalUs();
+      beatGrid();
+      speed();
       lap();
       if (current !== 'playing') {
         this.scheduleStillPaint(slot);
       }
     });
 
-    return { lengthFrames, playCallIntervalUs, lap };
+    return { lengthFrames, playCallIntervalUs, beatGrid, speed, lap };
   }
 
   /** Schedules one paint on the next animation frame, at most one pending per deck. */
