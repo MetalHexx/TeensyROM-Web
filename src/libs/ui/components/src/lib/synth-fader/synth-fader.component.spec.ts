@@ -5,6 +5,7 @@ import { SynthFaderComponent } from './synth-fader.component';
 describe('SynthFaderComponent', () => {
   let fixture: ComponentFixture<SynthFaderComponent>;
   let emitted: number[];
+  let wheels: { clicks: number; timeStampMs: number }[];
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [SynthFaderComponent] }).compileComponents();
@@ -15,7 +16,9 @@ describe('SynthFaderComponent', () => {
     fixture.componentRef.setInput('step', 0.001);
     fixture.componentRef.setInput('accessibleName', 'Speed multiplier deck A');
     emitted = [];
+    wheels = [];
     fixture.componentInstance.valueChange.subscribe((v) => emitted.push(v));
+    fixture.componentInstance.wheelTurn.subscribe((w) => wheels.push(w));
     fixture.detectChanges();
   });
 
@@ -43,6 +46,108 @@ describe('SynthFaderComponent', () => {
     expect(range().disabled).toBe(true);
     range().dispatchEvent(new Event('input'));
     expect(emitted).toEqual([]);
+  });
+
+  function wheel(deltaY: number, deltaMode = 0, timeStamp?: number): WheelEvent {
+    const event = new WheelEvent('wheel', { deltaY, deltaMode, bubbles: true, cancelable: true });
+    if (timeStamp !== undefined) {
+      Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+    }
+    range().dispatchEvent(event);
+    return event;
+  }
+
+  describe('wheel', () => {
+    it('emits one click per 100 px, upward positive, without scrolling the page', () => {
+      const up = wheel(-100, 0, 1234);
+      const down = wheel(100);
+
+      expect(wheels.map((w) => w.clicks)).toEqual([1, -1]);
+      expect(wheels[0].timeStampMs).toBe(1234);
+      expect(up.defaultPrevented).toBe(true);
+      expect(down.defaultPrevented).toBe(true);
+    });
+
+    it('accumulates small pixel deltas until they make a click', () => {
+      wheel(-40);
+      wheel(-40);
+      expect(wheels).toEqual([]);
+
+      wheel(-40);
+      expect(wheels.map((w) => w.clicks)).toEqual([1]);
+
+      wheel(-100);
+      expect(wheels.map((w) => w.clicks)).toEqual([1, 1]);
+    });
+
+    it('drops a partial click after a pause or a change of direction', () => {
+      wheel(-60, 0, 1000);
+      wheel(-60, 0, 1500);
+      expect(wheels).toEqual([]);
+
+      wheel(-80, 0, 2000);
+      wheel(10, 0, 2010);
+      wheel(-40, 0, 2020);
+      expect(wheels).toEqual([]);
+    });
+
+    it('emits several clicks for a large delta and keeps the remainder', () => {
+      wheel(-250);
+      wheel(-50);
+      expect(wheels.map((w) => w.clicks)).toEqual([2, 1]);
+    });
+
+    it('counts 3 lines, or one page, as a click', () => {
+      wheel(-1, 1);
+      wheel(-2, 1);
+      wheel(1, 2);
+
+      expect(wheels.map((w) => w.clicks)).toEqual([1, -1]);
+    });
+
+    it('emits nothing and lets the page scroll while disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      const event = wheel(-300);
+
+      expect(wheels).toEqual([]);
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
+  describe('double-click', () => {
+    const doubleClick = (): void => {
+      range().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    };
+
+    it('emits the home value', () => {
+      fixture.componentRef.setInput('home', 1);
+      fixture.detectChanges();
+
+      doubleClick();
+
+      expect(emitted).toEqual([1]);
+    });
+
+    it('does nothing without a home, or while disabled', () => {
+      doubleClick();
+      fixture.componentRef.setInput('home', 1);
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      doubleClick();
+
+      expect(emitted).toEqual([]);
+    });
+  });
+
+  it('announces the value text in place of the number, when given', () => {
+    expect(range().hasAttribute('aria-valuetext')).toBe(false);
+
+    fixture.componentRef.setInput('valueText', '+1.25%');
+    fixture.detectChanges();
+
+    expect(range().getAttribute('aria-valuetext')).toBe('+1.25%');
   });
 
   it('draws the home line at the home value along the travel, and none without a home', () => {

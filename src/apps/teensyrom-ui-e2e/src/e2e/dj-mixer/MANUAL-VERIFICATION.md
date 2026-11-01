@@ -800,3 +800,208 @@ two decks. The grip default (250 ms) is the value to tune.
     endless tone, with no stop at the start and no seam at the end.
 11. Learn WRAP onto a MIDI control and press it. The selected loop's WRAP toggles, and a scrub
     backward past the start now wraps or stops to match.
+
+## Matching by hand (ASID-DJ-18)
+
+Browser check of the deck's slow speed controls, the beat grid with Tap and BPM, and the beat-based
+loop commands (Add, In, Out, Length, Move and the edge arrows), driven against the running dev
+build, plus what the operator needs at the bench. The listening verdict is the operator's and is
+not given here.
+
+**How this was driven.** `nx run teensyrom-ui:serve` (the dev build, so `djBench` exists) and the
+API from this branch (`dotnet run` in `apps/api/src/TeensyRom.Api`), with `/dj-mixer` open in a
+Chrome tab of 1375 x 868 CSS px. Port 10213 on all addresses was held by another worktree's engine,
+so the API was bound to `127.0.0.2:10213` and the UI served from `127.0.0.2:4201` (the dev build
+reads the API from the page's own host); `TEENSYROM_DATA_DIR` pointed at a scratch folder so the
+operator's sets and grids were not touched. No cartridge was bound, so each deck's output ticked on
+its own. The tunes were the two bundled with the player POC: `InSID3_Out.sid` (deck A: 2x
+multispeed, 9975 µs a play call, 16183 frames, 125.31 BPM scanned at 48 frames a beat) and
+`Still_Time.sid` (deck B: 19950 µs a play call, 22 frames a beat, 136.71 BPM), and two small PSIDs
+written for this check: one whose play routine does nothing (`Silent Bench`: no notes) and one that
+gates voice 1 at pseudo-random frames (`Irregular Bench`: 255-frame period, notes with no steady
+beat). They were loaded through `DeckService.load` with the content request answered from a local
+server (the listing is not what this checks), and after a reload through the saved set's rows. The
+page needs a click before the first load: with none, the load never finishes (see the findings).
+State was read from the store and the engine's snapshot; controls were pressed as DOM clicks on
+their accessible names, the speed fader with real key presses and mouse wheel, and the Length and
+Move step menus with real clicks. Not driven: the MIDI paths, a drop from the listing, and sound of
+any kind.
+
+**Speed (deck A, `Speed multiplier deck A`).** Five presses of ArrowUp moved the fader from 1 to
+1.0005 and the readout read `0.05%` (0.01% a press). A double-click on the fader went home
+(`0.00%`, value 1). One wheel notch from the tool moved 0.01%; five notches 0.05%, ten the other way
+0.10%; the tool's notches are well over 200 ms apart, so all of them evidently took the floor. For the fast
+end, wheel events of 100 px were dispatched on the fader a measured gap apart (the second click's
+move, from a fresh click at home):
+
+| gap between two clicks | move of the second click |
+| --- | --- |
+| 9 ms | 1.00% |
+| 22 ms | 1.00% |
+| 44 ms | 0.90% |
+| 63 ms | 0.52% |
+| 104 ms | 0.16% |
+| 153 ms | 0.04% |
+| 209 ms | 0.01% |
+| 415 ms | 0.01% |
+
+The first click of any gesture moved 0.01% in every row, so one notch is always the finest move and
+a flick of N notches in 22 ms moves about (N-1)% plus 0.01%. These are the starting values
+(`SLOW_TURN_FAST_MS` 40, `SLOW_TURN_SLOW_MS` 200) as shipped; whether they feel right on the knob and
+the wheel is the operator's. The BPM followed the speed (125.31 at 0.00%, 125.33 at +0.01%, 125.39
+at +0.06%, 125.45 at +0.11%).
+
+**Grid and BPM.** Deck A read `125.31 BPM` and deck B `136.71 BPM` (both scans). The first reading
+of deck B right after its load was `---.-- BPM`; 1.5 s later it read 136.71 (the readout paints on
+animation frames and this tab's ran at about 41 a second; not chased). `Silent Bench` read
+`---.-- BPM` with a null grid. Nine Taps 500 ms apart on it lit Tap's tapping state and then cleared
+it two seconds later with no grid: a tune with no note starts cannot be tapped (the service does
+nothing until the tune has them). `Irregular Bench` was scanned to 15 frames a beat (`200.50 BPM`),
+a grid on a tune with no steady beat. Tapped on deck B 600 ms apart (about 100 BPM): the first three
+Taps changed nothing (`200.50`), the fourth read `93.98 BPM` (32 frames, beat one 131), then `91.14`
+and, from the seventh, `107.41 BPM` (28 frames, beat one 2), with the source `tap`; the grid fitted
+snaps to the tune's own note starts, which is why it is not 100. Two seconds after the last Tap the
+server held `beatFrames 28, beatOneFrame 2` for subtune 1. With the same tune loaded on deck A it
+showed `107.41` at once (the tapped grid beat its own scan). Tapped on deck A 500 ms apart: A read
+`120.30 BPM` live (25 frames, beat one 27), deck B stayed at `107.41` until the taps stopped and
+read `120.30` about two seconds after the last Tap; the server held 25 / 27. After a reload of the
+page the set came back with its four rows, and loading the tune on both decks from the set showed
+`120.30 BPM` on both with the source `tap`.
+
+**Loops.** On deck A (125.31 BPM, beats at 29 + 48 n):
+- Add with the playhead at about 14280 placed the cue at 14285, beat 297 (it snaps).
+- Out pressed at 14528 (beat 302.06) made a loop 14285-14525, five beats, the end on beat 302. In
+  pressed at 14735, past the end, changed nothing (refused).
+- Length by the buttons, from a cue: Double gave 4 beats (192 frames). Halve took it through 2, 1,
+  ½, ¼, ⅛ and 1/16 (3 frames) and stayed there (1/32 would be 1.5 frames); Double took it back up
+  through 1/8 ... 32 beats, 1536 frames. The Length menu lists 1/16 ... 32 beats; picking ½ BEAT gave
+  24 frames.
+- Move step menu: 1, 2, 4, 8 and 16 beats. On a 32-beat loop at each step, Move shifted start and end
+  together by exactly that many beats with the length kept, and the start and end arrows each moved
+  their edge by exactly that many beats.
+- On a loop running at 14285-14813 (11 beats, 143 s into a 161 s tune), `seekToFrame`, `queueJump`
+  and `setActiveLoop` on the runtime were logged with the engine's hand-off count and the position
+  every 8 ms:
+
+| edit, pressed at | queued | hand-off at the pass end | bounds after |
+| --- | --- | --- | --- |
+| Double, playhead 14708 | 1 ms | 1061 ms, as the playhead reached 14813 | 14285-15053 (16 beats) |
+| Halve, 14458 on 14285-14477 (new end 14381, behind the playhead) | 1 ms | 175 ms, as it reached 14477 | 14285-14381 |
+| Move later (1 beat), 14333 | 1 ms | 475 ms | 14333-14429 |
+| Double, 14381 | 1 ms | 493 ms | 14333-14525 |
+| In at 14450 (start to beat 300) | 1 ms | 737 ms | 14429-14525 |
+| End later, 14488 | 1 ms | 360 ms | 14429-14573 |
+
+  No `seekToFrame` was called by any edit, and the only backward jump in each position trace was the
+  wrap at the pass end; the halved loop did not jump when its new end fell behind the playhead.
+  Passes after the hand-offs were the new length (the 96-frame loop wrapped every 952-992 ms, 957.6
+  ideal). An Out pressed where the nearest beat was the loop's current end made no edit and queued
+  nothing.
+- The marks lane's bracket moved at once, ahead of the hand-off, for each edit (width in percent of
+  the tune: Double 0.890 to 1.186, Halve to 0.593, Move later left 89.162 to 89.458, Move earlier
+  back, start earlier to a width of 0.890 at left 88.865), and settled on the engine's bounds
+  (14381-14525).
+
+**Two decks and the timing probes.** With deck B's fader at 0.9166 its BPM read `125.30` against
+deck A's `125.31`, each running a four-beat loop (192 frames at 9975 µs and 88 frames at 21765 µs, a
+pass of 1915.2 ms and 1915.3 ms). That is 0.14 ms a pass apart, 1 ms in about seven passes. Polling
+the wraps every 4 ms in the page could not show that: over 11 passes deck A averaged 1922.6 ms and B
+1938.3 ms, which is the polling and the tab, not the clocks (deck A's clock reported 25 ms of drift in
+310 s). Whether they hold together by ear is the checklist's.
+
+The protocol below was run four ways on those decks (A at 1.00x with its loop; B a loop on
+`Still Time`; display refresh by `requestAnimationFrame` about 41 Hz here, 2 Hz when the tab had been
+left; Claude in Chrome attached; other worktrees' builds and tests running). `longTasks` was
+`{ count: 0, longestMs: 0 }` in every window.
+
+| window | A: lag p99 / max | A: collapsed / on grid | A: worst gap | B: lag p99 | B: collapsed / on grid |
+| --- | --- | --- | --- | --- | --- |
+| B at 0.9166, clocks running since load | 17.76 / 20.68 ms | 35.8% / 4.2% | 79.2 ms | 17.93 ms | 0% / 11.3% |
+| both 1.00x, the same clocks | 17.41 / 19.01 ms | 35.8% / 4.3% | 79.2 ms | 17.12 ms | 0% / 61.8% |
+| both 1.00x, after Pause and Play | 9.98 / 11.98 ms | 1.4% / 97.2% | 13.6 ms | 10.18 ms | 0% / 95.0% |
+| both 1.00x, next window, no restart | 16.03 / 19.76 ms | 22.1% / 40.8% | 21.7 ms | 15.38 ms | 0% / 77.4% |
+| B at 0.9166, after Pause and Play | 13.51 / 16.41 ms | 8.7% / 53.3% | 17.0 ms | 13.55 ms | 0% / 65.6% |
+
+`intervalMs` read 9.98 on A and 19.95 on B at 1.00x, and 21.77 on B at 0.9166. The recorded numbers
+(*Where it stands*, end of the ASID-DJ-15 session, one deck at 1x on a 100 Hz display with Dashlane
+off) are lag p99 10.5 ms, collapsed 3.8%, on grid 90.8%, and 0 long tasks over 8192 frames; the log
+does not record `worstGapMs`. Only the third row is near them. The rest, and the spread between
+windows of the same decks a minute apart (collapsed 1.4% to 35.8%), are not comparable readings of
+the build: they were taken under automation in a tab that was being throttled. Read them as the
+reason the protocol below asks for a quiet page; the operator's own run is the reading.
+
+### Audition on every edit
+
+On a running loop, In, Out, Length (the buttons and the menu), Move and the edge arrows each held the
+pass they were pressed in and took effect at its end, a queued hand-off in the engine and no seek.
+The pass-end rule held 143 s into a long tune and with a halving that put the new end behind the
+playhead. The edits that were not driven: a nudge (it applies at once, as in the section above), an
+edit arriving from the other deck on the same row, and any edit through a controller.
+
+### Findings
+
+1. **The first load on a page with no click never finishes.** With the tab untouched, `DeckService.load`
+   stalled with the deck `indexing`, busy and switching, and no console error: the player's `play()`
+   waits on the clock's `AudioContext.resume()`, which the autoplay policy leaves pending until the
+   page has had a user gesture. After one click, loading again played at once. At the bench the
+   operator's first click does it; it matters for anything that loads before the first click.
+2. **`djBench.reset()` does not reset the clock.** It clears the probes and the long-task count only;
+   `clock.worstGapMs`, `clock.jitterMs` and `clock.lateCallbacks` run from the deck's last play. Two
+   consecutive windows read an identical `worstGapMs` (79.2 ms on A) while the probe figures
+   changed, and a Pause then Play of each deck, which restarts the clock, brought it to 13.6 ms. The
+   protocol below starts the clocks just before Reset for that reason.
+3. **Tap on a tune with no note starts does nothing and says nothing.** Nine Taps lit and then cleared
+   the tapping state with the grid still null. By design (the service waits for note starts), but the
+   operator sees nothing happen on a silent or noteless tune.
+4. **The scan gave a grid to a tune with no steady beat.** `Irregular Bench` got 15 frames a beat
+   (`200.50 BPM`) rather than `---.-- BPM`. The tune is synthetic and repeats every 255 frames, so
+   this is one data point only: whether real tunes with no steady beat show `---.-- BPM` or a wrong
+   BPM is the checklist's grid item to settle.
+5. **The BPM read `---.-- BPM` for a moment after a deck's load** (deck B, read straight after the
+   load resolved) and the right value 1.5 s later. Not chased; likely the readout waiting on an
+   animation frame in a throttled tab.
+6. **Timing readings under automation are not usable as the build's numbers** (see the table above).
+
+### Timing protocol
+
+Run on a fresh page with Chrome DevTools closed, Claude in Chrome off the tab (its automation costs
+frames), and both decks
+playing loops. `djBench` is in the dev build only (`pnpm start`, API on the default port).
+
+0. Start both decks' loops, then press Pause and Play on each, so each clock's window starts now
+   (`reset()` does not restart the clock; see finding 2).
+1. Run `djBench.reset()`.
+2. Wait about 10 s.
+3. Run `djBench.report()`.
+4. Compare `lagMs` p99, `spacing.collapsedPct`, `clock.worstGapMs` and `longTasks.count` (it
+   should be 0; `longTasks` is `{ count, longestMs }`) with the Performance log's *Where it stands*:
+   lag p99 10.5 ms, collapsed 3.8%, on grid 90.8% (so `spacing.onGridPct` too), 0 long tasks;
+   `worstGapMs` has no recorded figure, so the first run is the baseline. Note the extensions on and
+   the display's refresh rate with the reading.
+5. Repeat with the deck at 1.00x (`intervalMs` reads the tune's nominal interval: 9.98 on a 2x
+   multispeed tune such as `InSID3 Out`, 19.95 on a 50 Hz one).
+
+The operator listens throughout and records the verdict in their words.
+
+### Bench checklist (operator, real hardware)
+
+- [ ] Two decks matched by hand with the fine knob and the BPMs, each running a whole-beat loop,
+  hold together pass after pass with no nudge. (Matching to 0.01% leaves about 0.2 ms a pass on a
+  four-beat loop.)
+- [ ] Grids judged on drum-heavy, arpeggio-heavy, swung and multispeed tunes and a tune with no
+  steady beat, and a wrong grid put right with Tap. On the no-steady-beat tune, note whether it
+  shows `---.-- BPM` or a BPM (finding 4); on a wrong grid, note how many Taps it takes and whether
+  the tapped one holds after a reload and on the other deck.
+- [ ] The slow-turn curve tuned on the knob and the wheel: the 40 ms / 200 ms starting values in
+  `mixer/slow-turn.ts` (the table above has the curve as shipped), judged on a real mouse wheel and
+  on the knob, for setting a fine match without the first notch feeling dead.
+- [ ] In, Out, Length (fractions included) and Move on a running loop deep in a long tune: each
+  edit lands at the end of its pass with no late pass.
+- [ ] Very short loops (1/16 beat is 3 frames at 125 BPM on a 2x tune): whether they stutter or hold
+  a note.
+- [ ] Playback timing run per the timing protocol above with both decks looping, and the fields
+  recorded against the Performance log's numbers.
+
+### Verdict
+
+Pending: the operator's, from the bench, with both cartridges connected.

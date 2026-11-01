@@ -12,7 +12,8 @@ const meta: Meta<SynthFaderComponent> = {
           'A vertical fader drawn as hardware: a dark slot, tick marks, an optional magenta home ' +
           'line and a cap with a white line. It is still a native range input, so drag and the ' +
           'arrow keys work, and it emits the raw unrounded value. The home line is a mark only — ' +
-          'there is no detent. Disabled, it dims and emits nothing.',
+          'there is no detent. The wheel over it reports whole clicks and a double-click returns it to ' +
+          'home. Disabled, it dims and emits nothing.',
       },
     },
   },
@@ -25,8 +26,14 @@ const meta: Meta<SynthFaderComponent> = {
     accessibleName: {
       description: "Accessible name of the range, e.g. 'Speed multiplier deck A'.",
     },
+    valueText: {
+      description: "Text announced for the range instead of its number, e.g. '+1.25%'.",
+    },
     disabled: { description: 'Disables the range; it emits nothing.' },
     valueChange: { description: 'The raw, unrounded value read off the range.' },
+    wheelTurn: {
+      description: 'Whole wheel clicks over the fader, upward positive, with the event time.',
+    },
   },
   render: (args) => ({
     props: args,
@@ -39,6 +46,7 @@ const meta: Meta<SynthFaderComponent> = {
           [step]="step"
           [home]="home"
           [accessibleName]="accessibleName"
+          [valueText]="valueText"
           [disabled]="disabled"
         />
       </div>
@@ -56,6 +64,7 @@ const base = {
   step: 0.001,
   home: 1.25,
   accessibleName: 'Speed multiplier deck A',
+  valueText: null,
   disabled: false,
 };
 

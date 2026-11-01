@@ -308,26 +308,31 @@ describe('MidiMappingEngine', () => {
   describe('relative', () => {
     it('relative-offset moves by (raw − 64) ticks of the amount, either way', () => {
       map(ccSource(10), SPEED_A, style('relative-offset', 0.05));
+      h.engine.handle(cc(10, 65));
+      const base = speed();
 
       h.engine.handle(cc(10, 66));
-      expect(speed()).toBeCloseTo(1.1, 10);
+      expect(speed()).toBeCloseTo(base + 0.1, 10);
 
       h.engine.handle(cc(10, 63));
-      expect(speed()).toBeCloseTo(1.05, 10);
+      expect(speed()).toBeCloseTo(base + 0.05, 10);
     });
 
     it('relative-signed counts up from 0 and down from 127', () => {
       map(ccSource(10), SPEED_A, style('relative-signed', 0.05));
+      h.engine.handle(cc(10, 1));
+      const base = speed();
 
       h.engine.handle(cc(10, 2));
-      expect(speed()).toBeCloseTo(1.1, 10);
+      expect(speed()).toBeCloseTo(base + 0.1, 10);
 
       h.engine.handle(cc(10, 126));
-      expect(speed()).toBeCloseTo(1, 10);
+      expect(speed()).toBeCloseTo(base, 10);
     });
 
     it('stops at the ends of the range', () => {
       map(ccSource(10), SPEED_A, style('relative-offset', 0.5));
+      h.engine.handle(cc(10, 65));
 
       h.engine.handle(cc(10, 127));
       expect(speed()).toBe(1.5);
@@ -388,6 +393,103 @@ describe('MidiMappingEngine', () => {
       h.engine.handle(cc(10, 127));
 
       expect(h.djStore.deckPanel('A')().keySemitones).toBe(11);
+    });
+
+    describe('a speed knob turned slowly', () => {
+      const tick = (raw: number, timeStampMs: number): SourceEvent =>
+        cc(10, raw, 1, LAUNCH_CONTROL, timeStampMs);
+
+      let mappingId: string;
+
+      beforeEach(() => {
+        mappingId = map(ccSource(10), SPEED_A, style('relative-offset', 0.01));
+      });
+
+      it('takes the full sensitivity for fast clicks and the floor for slow ones', () => {
+        h.engine.handle(tick(65, 1000));
+        expect(speed()).toBeCloseTo(1.0001, 10);
+
+        h.engine.handle(tick(65, 1030));
+        expect(speed()).toBeCloseTo(1.0101, 10);
+
+        h.engine.handle(tick(65, 1400));
+        expect(speed()).toBeCloseTo(1.0102, 10);
+      });
+
+      it('moves a multi-tick message by its ticks times the step', () => {
+        h.engine.handle(tick(65, 1000));
+        h.engine.handle(tick(67, 1020));
+
+        expect(speed()).toBeCloseTo(1.0001 + 3 * 0.01, 10);
+      });
+
+      it('never moves more than the sensitivity per tick', () => {
+        h.engine.handle(tick(65, 1000));
+        const before = speed();
+        h.engine.handle(tick(65, 1000));
+
+        expect(speed() - before).toBeLessThanOrEqual(0.01 + 1e-12);
+      });
+
+      it('moves between the floor and the full step for a gap in between', () => {
+        h.engine.handle(tick(65, 1000));
+        const before = speed();
+        h.engine.handle(tick(65, 1100));
+
+        const moved = speed() - before;
+        expect(moved).toBeGreaterThan(0.0001);
+        expect(moved).toBeLessThan(0.01);
+      });
+
+      it('does not take a neutral message for a click', () => {
+        h.engine.handle(tick(65, 1000));
+        h.engine.handle(tick(64, 1390));
+        const before = speed();
+
+        h.engine.handle(tick(65, 1400));
+
+        expect(speed() - before).toBeCloseTo(0.0001, 10);
+      });
+
+      it('reads the first click after releaseMapping as a lone click', () => {
+        h.engine.handle(tick(65, 1000));
+        h.engine.releaseMapping(mappingId);
+        const before = speed();
+
+        h.engine.handle(tick(65, 1010));
+
+        expect(speed() - before).toBeCloseTo(0.0001, 10);
+      });
+
+      it('keeps the gap on its own mapping', () => {
+        map(ccSource(11), SPEED_A, style('relative-offset', 0.01));
+        h.engine.handle(tick(65, 1000));
+        const before = speed();
+
+        h.engine.handle(cc(11, 65, 1, LAUNCH_CONTROL, 1010));
+
+        expect(speed() - before).toBeCloseTo(0.0001, 10);
+      });
+    });
+
+    it('seek, key and panel knobs do not slow down on slow clicks', () => {
+      const seek = vi.spyOn(h.deckService, 'seek').mockResolvedValue();
+      map(ccSource(12), { owner: 'A', control: 'seek' }, style('relative-offset', 0.01));
+      map(ccSource(13), KEY_A, style('relative-offset', 1 / 24));
+
+      h.engine.handle(cc(12, 66, 1, LAUNCH_CONTROL, 5000));
+      h.engine.handle(cc(13, 65, 1, LAUNCH_CONTROL, 5000));
+
+      expect(seek).toHaveBeenCalledWith('A', 2);
+      expect(h.djStore.deckPanel('A')().keySemitones).toBe(1);
+    });
+
+    it('an absolute speed mapping ignores timing', () => {
+      map(ccSource(14), SPEED_A, style('absolute'));
+
+      h.engine.handle(cc(14, 127, 1, LAUNCH_CONTROL, 99999));
+
+      expect(speed()).toBe(1.5);
     });
 
     it('seek turns a relative encoder into seeks from the playhead', () => {

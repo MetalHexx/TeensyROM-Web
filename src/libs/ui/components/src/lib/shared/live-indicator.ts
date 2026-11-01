@@ -19,6 +19,11 @@ export interface LivePlayheadIndicator extends LivePositionIndicator {
   setLiveFrame(label: string): void;
 }
 
+/** A tempo readout a painter sets directly: '125.31 BPM', or '---.-- BPM' with no tempo. */
+export interface LiveBpmIndicator {
+  setLiveBpm(text: string): void;
+}
+
 /** A progress a painter sets directly: 0–100. */
 export interface LiveProgressIndicator {
   setLiveProgress(percent: number): void;

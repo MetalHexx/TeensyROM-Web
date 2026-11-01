@@ -6,8 +6,8 @@ using TeensyRom.Core.Logging;
 namespace TeensyRom.Core.Dj
 {
     /// <summary>
-    /// Keeps sets, tune memory and the library state as JSON files under dj/ in the engine's home:
-    /// sets/{setId}.json, tunes/{sidHash}.json and library.json. Every read-modify-write is serialized by one lock,
+    /// Keeps sets, tune memory, tune beat grids and the library state as JSON files under dj/ in the engine's home:
+    /// sets/{setId}.json, tunes/{sidHash}.json, grids/{sidHash}.json and library.json. Every read-modify-write is serialized by one lock,
     /// and a write goes to a temp file that then replaces the target, so a failed write keeps the old file.
     /// A file that cannot be read, or whose stored id does not match its name, is warned about, left in place and read as missing.
     /// Set summaries are cached after the first list.
@@ -24,6 +24,7 @@ namespace TeensyRom.Core.Dj
         private static string RootPath => Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), DjLibraryPaths.RootFolder);
         private static string SetsPath => Path.Combine(RootPath, DjLibraryPaths.SetsFolder);
         private static string TunesPath => Path.Combine(RootPath, DjLibraryPaths.TunesFolder);
+        private static string GridsPath => Path.Combine(RootPath, DjLibraryPaths.GridsFolder);
         private static string LibraryPath => Path.Combine(RootPath, DjLibraryPaths.LibraryFile);
 
         private readonly ILoggingService _log;
@@ -116,6 +117,24 @@ namespace TeensyRom.Core.Dj
             }
         }
 
+        public DjTuneGrids? GetTuneGrids(string sidHash)
+        {
+            RequireSidHash(sidHash);
+            lock (_lock)
+            {
+                return Read<DjTuneGrids>(GridsFilePath(sidHash), "DJ tune grids", grids => grids.SidHash == sidHash);
+            }
+        }
+
+        public bool SaveTuneGrids(DjTuneGrids grids)
+        {
+            RequireSidHash(grids.SidHash);
+            lock (_lock)
+            {
+                return Write(GridsFilePath(grids.SidHash), grids, "DJ tune grids");
+            }
+        }
+
         public DjLibraryState GetLibraryState()
         {
             lock (_lock)
@@ -147,6 +166,8 @@ namespace TeensyRom.Core.Dj
         private static string SetFilePath(string setId) => Path.Combine(SetsPath, setId + DjLibraryPaths.Extension);
 
         private static string TuneFilePath(string sidHash) => Path.Combine(TunesPath, sidHash + DjLibraryPaths.Extension);
+
+        private static string GridsFilePath(string sidHash) => Path.Combine(GridsPath, sidHash + DjLibraryPaths.Extension);
 
         private static DjSetSummary Summarize(DjSet set) => new(set.Id, set.Name, set.Rows?.Count ?? 0, set.Updated);
 

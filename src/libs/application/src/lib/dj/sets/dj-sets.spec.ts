@@ -28,12 +28,14 @@ import {
   DJ_LIBRARY_STATE_REPOSITORY,
   SET_STORE,
   TUNE_INSERTER,
+  BEAT_GRID_STORE,
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from '../ports';
 import { DjSets } from './dj-sets';
 import { MAX_ROWS_PER_SET, MAX_SETS, SET_NAME_MAX_LENGTH, sanitizeName } from './set-limits';
 import { decodeRowHost } from './row-host';
+import { EMPTY_BEAT_GRID_STORE } from '../grid/testing/empty-beat-grid-store';
 
 function deferred<T = void>() {
   let resolve!: (value: T) => void;
@@ -204,6 +206,7 @@ describe('DjSets', () => {
       providers: [
         { provide: SET_STORE, useValue: setStore },
         { provide: TUNE_MEMORY_STORE, useValue: memoryStore },
+        { provide: BEAT_GRID_STORE, useValue: EMPTY_BEAT_GRID_STORE },
         { provide: DJ_LIBRARY_STATE_REPOSITORY, useValue: libraryState },
         { provide: ALERT_SERVICE, useValue: alerts },
         { provide: FILE_CONTENT_SERVICE, useValue: fileContent },

@@ -25,6 +25,13 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
             Updated = dto.Updated
         };
 
+        public static DjTuneGrids ToDocument(DjTuneGridsDto dto) => new()
+        {
+            SidHash = dto.SidHash,
+            Subtunes = dto.Subtunes.Select(s => new DjSubtuneGrid { Subtune = s.Subtune, BeatFrames = s.BeatFrames, BeatOneFrame = s.BeatOneFrame }).ToList(),
+            Updated = dto.Updated
+        };
+
         public static DjLibraryState ToDocument(DjLibraryStateDto dto) => new() { CurrentSetId = dto.CurrentSetId };
 
         public static DjSetDto ToDto(DjSet document) => new()
@@ -42,6 +49,13 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
             SidHash = document.SidHash,
             LastSubtune = document.LastSubtune,
             Subtunes = (document.Subtunes ?? []).Select(ToDto).ToList(),
+            Updated = document.Updated
+        };
+
+        public static DjTuneGridsDto ToDto(DjTuneGrids document) => new()
+        {
+            SidHash = document.SidHash,
+            Subtunes = (document.Subtunes ?? []).Select(s => new DjSubtuneGridDto { Subtune = s.Subtune, BeatFrames = s.BeatFrames, BeatOneFrame = s.BeatOneFrame }).ToList(),
             Updated = document.Updated
         };
 

@@ -27,6 +27,7 @@ import {
   REPLAY_RUNNER_FACTORY,
   SET_STORE,
   TUNE_INSERTER,
+  BEAT_GRID_STORE,
   TUNE_MEMORY_STORE,
   TUNE_RESOLVER,
 } from './ports';
@@ -38,6 +39,7 @@ import type {
 } from './ports/midi-access';
 import { DjSets } from './sets/dj-sets';
 import type { Slot } from './slot';
+import { EMPTY_BEAT_GRID_STORE } from './grid/testing/empty-beat-grid-store';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -140,6 +142,7 @@ describe('DeckMemoryKeeper', () => {
       providers: [
         { provide: SET_STORE, useValue: new InMemorySetStore() },
         { provide: TUNE_MEMORY_STORE, useValue: memoryStore },
+        { provide: BEAT_GRID_STORE, useValue: EMPTY_BEAT_GRID_STORE },
         {
           provide: DJ_LIBRARY_STATE_REPOSITORY,
           useValue: {

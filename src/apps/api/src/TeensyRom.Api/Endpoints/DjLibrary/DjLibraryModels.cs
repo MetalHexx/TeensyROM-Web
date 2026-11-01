@@ -241,6 +241,48 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
     }
 
     /// <summary>
+    /// The beat grids a DJ tapped for one tune, shared across sets.
+    /// </summary>
+    public record DjTuneGridsDto
+    {
+        /// <summary>
+        /// The tune's SID hash: 32 lowercase hexadecimal characters. Must equal the hash in the route.
+        /// </summary>
+        [Required] public string SidHash { get; set; } = string.Empty;
+
+        /// <summary>
+        /// One grid per subtune. Subtune numbers are unique, 1-256.
+        /// </summary>
+        [Required] public List<DjSubtuneGridDto> Subtunes { get; set; } = [];
+
+        /// <summary>
+        /// When the grids were last changed, as an ISO-8601 timestamp.
+        /// </summary>
+        [Required] public string Updated { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// The beat grid of one subtune, holding over the whole subtune.
+    /// </summary>
+    public record DjSubtuneGridDto
+    {
+        /// <summary>
+        /// The subtune number, 1-256.
+        /// </summary>
+        [Required] public int Subtune { get; set; }
+
+        /// <summary>
+        /// The length of one beat in frames, 1-4096.
+        /// </summary>
+        [Required] public int BeatFrames { get; set; }
+
+        /// <summary>
+        /// The frame the first beat falls on, 0 or more.
+        /// </summary>
+        [Required] public int BeatOneFrame { get; set; }
+    }
+
+    /// <summary>
     /// A set as listed, without its rows.
     /// </summary>
     public record DjSetSummaryDto
@@ -294,6 +336,7 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
         public const int MaxVoices = 3;
         public const int MaxVoiceNumber = 2;
         public const int MaxOpaqueLength = 8192;
+        public const int MaxBeatFrames = 4096;
     }
 
     /// <summary>
@@ -560,6 +603,45 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
                 .InclusiveBetween(1, DjLibraryLimits.MaxSubtuneCount).WithMessage($"Last subtune must be 1-{DjLibraryLimits.MaxSubtuneCount}.");
 
             this.AddSubtuneRules(x => x.Subtunes, _ => DjLibraryLimits.MaxSubtuneCount);
+
+            RuleFor(x => x.Updated)
+                .Must(DjLibraryRules.IsTimestamp).WithMessage("Updated must be an ISO-8601 timestamp.");
+        }
+    }
+
+    public class DjSubtuneGridValidator : AbstractValidator<DjSubtuneGridDto>
+    {
+        public DjSubtuneGridValidator()
+        {
+            RuleFor(x => x.Subtune)
+                .InclusiveBetween(1, DjLibraryLimits.MaxSubtuneCount).WithMessage($"Subtune must be 1-{DjLibraryLimits.MaxSubtuneCount}.");
+
+            RuleFor(x => x.BeatFrames)
+                .InclusiveBetween(1, DjLibraryLimits.MaxBeatFrames).WithMessage($"Beat frames must be 1-{DjLibraryLimits.MaxBeatFrames}.");
+
+            RuleFor(x => x.BeatOneFrame)
+                .GreaterThanOrEqualTo(0).WithMessage("Beat one frame must be 0 or more.");
+        }
+    }
+
+    public class DjTuneGridsValidator : AbstractValidator<DjTuneGridsDto>
+    {
+        public DjTuneGridsValidator()
+        {
+            RuleFor(x => x.SidHash)
+                .Must(DjLibraryIds.IsSidHash).WithMessage("SID hash must be 32 lowercase hexadecimal characters.");
+
+            RuleFor(x => x.Subtunes).Cascade(CascadeMode.Stop)
+                .NotNull().WithMessage("Subtunes list is required.")
+                .Must(subtunes => subtunes.Count <= DjLibraryLimits.MaxSubtuneCount)
+                .WithMessage($"At most {DjLibraryLimits.MaxSubtuneCount} subtune grids are allowed.");
+
+            RuleForEach(x => x.Subtunes)
+                .NotNull().WithMessage("Subtune entries must not be null.")
+                .SetValidator(new DjSubtuneGridValidator());
+
+            RuleFor(x => x).Custom((grids, context) =>
+                DjLibraryRules.FlagDuplicates(grids.Subtunes, s => s.Subtune, "Subtunes", ".Subtune", "Subtune is already used by another entry.", context));
 
             RuleFor(x => x.Updated)
                 .Must(DjLibraryRules.IsTimestamp).WithMessage("Updated must be an ISO-8601 timestamp.");

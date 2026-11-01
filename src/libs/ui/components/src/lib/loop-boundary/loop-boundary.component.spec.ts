@@ -1,31 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  LoopBoundaryComponent,
-  type LoopBoundaryAction,
-  type LoopBoundaryModel,
-} from './loop-boundary.component';
+import { LoopBoundaryComponent, type LoopBoundaryModel } from './loop-boundary.component';
 
 const boundary: LoopBoundaryModel = {
-  tag: 'Start',
+  key: { label: 'In', accessibleName: 'Loop in', control: 'loop-in', disabled: false },
   empty: false,
   disabled: false,
   offsetFrames: 0,
   rangeFrames: 50,
   tickPercents: [20, 70],
-  previousDisabled: false,
-  nextDisabled: false,
   nudgeAccessibleName: 'Nudge start',
-  previousAccessibleName: 'Snap start to previous moment',
-  nextAccessibleName: 'Snap start to next moment',
-};
-
-const setEndAction: LoopBoundaryAction = {
-  label: 'Set End',
-  icon: 'last_page',
-  accessibleName: 'Set end here',
-  disabled: false,
-  control: 'loop-set-end',
+  earlierAccessibleName: 'Move start earlier',
+  laterAccessibleName: 'Move start later',
 };
 
 describe('LoopBoundaryComponent', () => {
@@ -49,8 +35,8 @@ describe('LoopBoundaryComponent', () => {
 
   const el = (): HTMLElement => fixture.nativeElement;
   const range = (): HTMLInputElement => el().querySelector('input[type="range"]') as HTMLInputElement;
-  const snap = (part: string): HTMLButtonElement =>
-    el().querySelector(`[data-part="${part}"] button`) as HTMLButtonElement;
+  const part = (name: string): HTMLButtonElement =>
+    el().querySelector(`[data-part="${name}"] button`) as HTMLButtonElement;
   const readout = (): string => el().querySelector('.readout')?.textContent?.trim() ?? '';
 
   function drag(type: 'input' | 'change', value: number): void {
@@ -76,7 +62,7 @@ describe('LoopBoundaryComponent', () => {
     expect(readout()).toBe('+3 fr');
   });
 
-  it('spans the range and draws one tick per moment', () => {
+  it('spans the range and draws one tick per beat', () => {
     expect(range().min).toBe('-50');
     expect(range().max).toBe('50');
     expect(el().querySelectorAll('.tick')).toHaveLength(2);
@@ -93,73 +79,64 @@ describe('LoopBoundaryComponent', () => {
     expect([inputs, commits]).toEqual([[10], [12]]);
   });
 
-  it('emits the snap direction from each key', () => {
-    const emitted: string[] = [];
-    fixture.componentInstance.snapPrevious.subscribe(() => emitted.push('previous'));
-    fixture.componentInstance.snapNext.subscribe(() => emitted.push('next'));
-    snap('snap-next').click();
-    snap('snap-previous').click();
-    expect(emitted).toEqual(['next', 'previous']);
-  });
+  describe('the key', () => {
+    const keyHost = (): HTMLElement => el().querySelector('[data-part="key"]') as HTMLElement;
 
-  it('disables a single snap when the model says so', () => {
-    setModel({ previousDisabled: true });
-    expect(snap('snap-previous').disabled).toBe(true);
-    expect(snap('snap-next').disabled).toBe(false);
-  });
-
-  it('draws an empty boundary with a dash readout and every control disabled', () => {
-    setModel({ empty: true, offsetFrames: 9 });
-    expect(readout()).toBe('—');
-    expect(range().disabled).toBe(true);
-    expect(snap('snap-previous').disabled).toBe(true);
-    expect(snap('snap-next').disabled).toBe(true);
-    expect(el().querySelector('.tick')).toBeNull();
-    expect(el().querySelector('.bar')).toBeNull();
-  });
-
-  describe('with an action', () => {
-    const action = (): HTMLElement | null => el().querySelector('[data-part="action"]');
-
-    beforeEach(() => {
-      setModel({ tag: 'End', empty: true });
-      set('action', setEndAction);
+    it('shows the label and carries the control id for the learn overlay', () => {
+      expect(keyHost().textContent).toContain('In');
+      expect(keyHost().getAttribute('data-control')).toBe('loop-in');
+      setModel({
+        key: { label: 'Out', accessibleName: 'Loop out', control: 'loop-set-end', disabled: false },
+      });
+      expect(keyHost().textContent).toContain('Out');
+      expect(keyHost().getAttribute('data-control')).toBe('loop-set-end');
     });
 
-    it('holds the action key in place of the snap keys, strip and readout, keeping the tag', () => {
-      expect(action()?.getAttribute('data-control')).toBe('loop-set-end');
-      expect(action()?.textContent).toContain('Set End');
-      expect(el().querySelector('.tag')?.textContent?.trim()).toBe('End');
-      expect(el().querySelector('[data-part="snap-previous"]')).toBeNull();
-      expect(el().querySelector('[data-part="snap-next"]')).toBeNull();
-      expect(el().querySelector('input[type="range"]')).toBeNull();
-      expect(el().querySelector('.readout')).toBeNull();
-    });
-
-    it('emits actionPress when the key is pressed, and not when it is disabled', () => {
+    it('emits keyPress, and not when its own flag disables it', () => {
       const presses: number[] = [];
-      fixture.componentInstance.actionPress.subscribe(() => presses.push(1));
-      el().querySelector<HTMLButtonElement>('[data-part="action"] button')?.click();
+      fixture.componentInstance.keyPress.subscribe(() => presses.push(1));
+      part('key').click();
       expect(presses).toHaveLength(1);
-      set('action', { ...setEndAction, disabled: true });
-      expect(el().querySelector<HTMLButtonElement>('[data-part="action"] button')?.disabled).toBe(true);
+      setModel({ key: { ...boundary.key, disabled: true } });
+      expect(part('key').disabled).toBe(true);
     });
 
-    it('renders the usual snap keys, strip and readout once the action is cleared', () => {
-      set('action', null);
-      expect(action()).toBeNull();
-      expect(snap('snap-next')).not.toBeNull();
-      expect(range()).not.toBeNull();
+    it('stays enabled on a cue-style empty boundary beside an inert strip', () => {
+      setModel({
+        empty: true,
+        key: { label: 'Out', accessibleName: 'Loop out', control: 'loop-set-end', disabled: false },
+      });
+      expect(part('key').disabled).toBe(false);
+      expect(range().disabled).toBe(true);
       expect(readout()).toBe('—');
     });
   });
 
-  it('disables every control when disabled, and the strip alone for a zero range', () => {
+  it('emits the edge move from each arrow', () => {
+    const emitted: string[] = [];
+    fixture.componentInstance.moveEarlier.subscribe(() => emitted.push('earlier'));
+    fixture.componentInstance.moveLater.subscribe(() => emitted.push('later'));
+    part('move-later').click();
+    part('move-earlier').click();
+    expect(emitted).toEqual(['later', 'earlier']);
+  });
+
+  it('draws an empty boundary with a dash readout and the strip and arrows disabled', () => {
+    setModel({ empty: true, offsetFrames: 9 });
+    expect(readout()).toBe('—');
+    expect(range().disabled).toBe(true);
+    expect(part('move-earlier').disabled).toBe(true);
+    expect(part('move-later').disabled).toBe(true);
+    expect(el().querySelector('.tick')).toBeNull();
+    expect(el().querySelector('.bar')).toBeNull();
+  });
+
+  it('disables the strip and arrows when disabled, and the strip alone for a zero range', () => {
     setModel({ disabled: true });
     expect(range().disabled).toBe(true);
-    expect(snap('snap-next').disabled).toBe(true);
+    expect(part('move-later').disabled).toBe(true);
     setModel({ rangeFrames: 0 });
     expect(range().disabled).toBe(true);
-    expect(snap('snap-next').disabled).toBe(false);
+    expect(part('move-later').disabled).toBe(false);
   });
 });

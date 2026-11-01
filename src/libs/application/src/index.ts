@@ -19,6 +19,8 @@ export * from './lib/dj/selectors/sets';
 export * from './lib/dj/cartridge-options';
 export * from './lib/dj/load-source';
 export * from './lib/dj/deck-runtime';
+export * from './lib/dj/deck-grid';
+export * from './lib/dj/grid/beat-math';
 export * from './lib/dj/tune-loader';
 export * from './lib/dj/sets/dj-sets';
 export * from './lib/dj/sets/set-limits';
@@ -38,6 +40,7 @@ export * from './lib/dj/mixer-applier';
 export * from './lib/dj/mixer/panel-ranges';
 export * from './lib/dj/mixer/pitch';
 export * from './lib/dj/mixer/speed-range';
+export * from './lib/dj/mixer/speed-readout';
 export * from './lib/dj/mapping';
 
 // Player state management

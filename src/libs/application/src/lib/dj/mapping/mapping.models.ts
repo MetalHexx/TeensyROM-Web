@@ -49,11 +49,13 @@ export type DeckControlId =
   | 'speed-jump-down'
   | 'speed-nudge-up'
   | 'speed-nudge-down'
+  | 'tap'
   | 'loop-select'
   | 'loop-toggle'
   | 'loop-play-now'
   | 'loop-add'
   | 'loop-stop'
+  | 'loop-in'
   | 'loop-set-end'
   | 'loop-clear-end'
   | 'loop-global'
@@ -62,6 +64,10 @@ export type DeckControlId =
   | 'loop-start-snap-next'
   | 'loop-end-snap-previous'
   | 'loop-end-snap-next'
+  | 'loop-length'
+  | 'loop-move-earlier'
+  | 'loop-move-later'
+  | 'loop-move-step'
   | 'repeat'
   | `voice-${VoiceNumber}-mute`
   | `voice-${VoiceNumber}-hold`
@@ -90,11 +96,13 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'speed-jump-down',
   'speed-nudge-up',
   'speed-nudge-down',
+  'tap',
   'loop-select',
   'loop-toggle',
   'loop-play-now',
   'loop-add',
   'loop-stop',
+  'loop-in',
   'loop-set-end',
   'loop-clear-end',
   'loop-global',
@@ -103,6 +111,10 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-start-snap-next',
   'loop-end-snap-previous',
   'loop-end-snap-next',
+  'loop-length',
+  'loop-move-earlier',
+  'loop-move-later',
+  'loop-move-step',
   'repeat',
   ...VOICE_NUMBERS.map((n) => `voice-${n}-mute` as const),
   ...VOICE_NUMBERS.map((n) => `voice-${n}-hold` as const),

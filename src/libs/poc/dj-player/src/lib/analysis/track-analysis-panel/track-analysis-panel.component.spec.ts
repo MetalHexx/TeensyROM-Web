@@ -133,9 +133,8 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
     tuningCents: 3.2,
     keyConfidence: 'strong',
     scalePitchClasses: [0, 2, 4, 5, 7, 9, 11],
-    dominantIntervalFrames: 25,
-    pulseConfidence: 'strong',
-    nativeTempo: 120,
+    beatGrid: { beatFrames: 25, beatOneFrame: 0, startFrame: 0, endFrame: null },
+    beatConfidence: 'strong',
     callsPerFrame: 1,
     exactCallsPerFrame: 1,
     timingMode: 'exact',
@@ -615,8 +614,7 @@ describe('TrackAnalysisPanelComponent', () => {
       fakeTuneIndexRecord({
         loopStartFrame: 500,
         loopPeriodFrames: 6250,
-        dominantIntervalFrames: 24,
-        nativeTempo: 120,
+        beatGrid: { beatFrames: 24, beatOneFrame: 0, startFrame: 0, endFrame: null },
         tonic: 2,
         mode: 'minor',
         camelot: '5A',
@@ -636,7 +634,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(readoutValue('Pulse interval')).toBe(`${(24).toLocaleString()} frames`);
     expect(readoutValue('Key (native)')).toContain('D minor');
     expect(readoutValue('Key (native)')).toContain('5A');
-    expect(readoutValue('Tempo (sounding)')).toBe(`${(120 * 1.06).toFixed(1)} BPM`);
+    expect(readoutValue('Tempo (sounding)')).toBe(`${(60 / ((24 * 19_950) / 1_000_000) * 1.06).toFixed(1)} BPM`);
     expect(readoutValue('Key (sounding)')).toContain('D# minor');
   });
 
@@ -656,6 +654,29 @@ describe('TrackAnalysisPanelComponent', () => {
 
     expect(readoutValue('Length')).toBe(formatDuration((6000 * (19_950 / 2)) / 1_000_000));
     expect(readoutValue('Length')).not.toBe(atSingleSpeed);
+  });
+
+  it('reads a cached tempo at the exact rate in force, not the rounded one it was scanned at', () => {
+    expand();
+    setTempoMultiplier(player, 1.06);
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        beatGrid: { beatFrames: 24, beatOneFrame: 0, startFrame: 0, endFrame: null },
+        callsPerFrame: 2,
+        exactCallsPerFrame: 2.4,
+      })
+    );
+    setPlayRate(player, {
+      callsPerFrame: 2.4,
+      exactCallsPerFrame: 2.4,
+      roundedCallsPerFrame: 2,
+      mode: 'exact',
+    });
+    fixture.detectChanges();
+
+    const native = 60 / ((24 * (19_950 / 2.4)) / 1_000_000);
+    expect(readoutValue('Tempo (native)')).toBe(`${native.toFixed(1)} BPM`);
+    expect(readoutValue('Tempo (sounding)')).toBe(`${(native * 1.06).toFixed(1)} BPM`);
   });
 
   it('reads a cached record that ends rather than loops as an end point, not as no answer', () => {
@@ -687,7 +708,7 @@ describe('TrackAnalysisPanelComponent', () => {
       fakeTuneIndexRecord({
         loopStartFrame: 0,
         loopPeriodFrames: 99_999,
-        dominantIntervalFrames: 999,
+        beatGrid: { beatFrames: 999, beatOneFrame: 0, startFrame: 0, endFrame: null },
         tonic: 2,
         mode: 'minor',
         camelot: '5A',

@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ALERT_SERVICE, type Device } from '@teensyrom-nx/domain';
+import { NTSC_PHI2_HZ, PAL_PHI2_HZ } from '@sidablist/core';
+import { ALERT_SERVICE, DeviceVideoStandard, type Device } from '@teensyrom-nx/domain';
 import { DeviceStore } from '../device/device-store';
 import { DeckBindings } from './deck-bindings';
 import { DeckRuntime } from './deck-runtime';
@@ -83,6 +84,11 @@ function device(deviceId: string, name: string): Device {
   return { deviceId, name } as Device;
 }
 
+/** A device that reports the video standard of the machine it sits in. */
+function machine(deviceId: string, videoStandard: DeviceVideoStandard): Device {
+  return { deviceId, name: `TR-${deviceId}`, videoStandard } as Device;
+}
+
 /** A repository holding one settings set in memory, the way the server does. */
 function fakeRepository(initial: MidiSettingsRecord = NO_SETTINGS) {
   let stored = initial;
@@ -108,6 +114,7 @@ describe('DeckBindings', () => {
   let midiAccess: FakeMidiAccess;
   let runtime: {
     setPort: ReturnType<typeof vi.fn>;
+    setTargetClock: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
     snapshot: ReturnType<typeof vi.fn>;
     resync: ReturnType<typeof vi.fn>;
@@ -124,6 +131,7 @@ describe('DeckBindings', () => {
     transport = 'stopped';
     runtime = {
       setPort: vi.fn(),
+      setTargetClock: vi.fn(),
       identify: vi.fn(),
       snapshot: vi.fn(() => ({ transport })),
       resync: vi.fn(),
@@ -389,6 +397,60 @@ describe('DeckBindings', () => {
 
       expect(store.binding('A')().device?.name).toBe('TR-1');
       expect(repository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('machine clock', () => {
+    /** The last φ2 the runtime was told for `slot`, `undefined` when it was never told one. */
+    function lastClockFor(slot: 'A' | 'B'): number | null | undefined {
+      return runtime.setTargetClock.mock.calls.filter(([called]) => called === slot).at(-1)?.[1];
+    }
+
+    it("tells the deck the φ2 of the machine its cartridge sits in", () => {
+      devices.set([machine('1111', DeviceVideoStandard.Pal), machine('2222', DeviceVideoStandard.Ntsc)]);
+      midiAccess.ports.set([PORT_1, PORT_2]);
+
+      service.bindDevice('A', '1111');
+      service.bindDevice('B', '2222');
+
+      expect(lastClockFor('A')).toBe(PAL_PHI2_HZ);
+      expect(lastClockFor('B')).toBe(NTSC_PHI2_HZ);
+    });
+
+    it('follows DeviceStore when the bound machine reports its standard', async () => {
+      configure(settingsWith({ slot: 'A', deviceId: '1111', lastSeenName: 'TR-1' }));
+      devices.set([machine('1111', DeviceVideoStandard.Unknown)]);
+      midiAccess.ports.set([PORT_1]);
+      await service.hydrate();
+      TestBed.flushEffects();
+      expect(lastClockFor('A')).toBeNull();
+
+      devices.set([machine('1111', DeviceVideoStandard.Ntsc)]);
+      TestBed.flushEffects();
+
+      expect(lastClockFor('A')).toBe(NTSC_PHI2_HZ);
+    });
+
+    it('keeps the clock of a bound cartridge whose port is missing', () => {
+      devices.set([machine('1111', DeviceVideoStandard.Pal)]);
+
+      service.bindDevice('A', '1111');
+
+      expect(store.binding('A')().present).toBe(false);
+      expect(lastClockFor('A')).toBe(PAL_PHI2_HZ);
+    });
+
+    it('names none for a cartridge DeviceStore does not know, and none once the slot is cleared', () => {
+      devices.set([machine('1111', DeviceVideoStandard.Pal)]);
+      midiAccess.ports.set([PORT_1, PORT_2]);
+
+      service.bindDevice('A', '2222');
+      expect(lastClockFor('A')).toBeNull();
+
+      service.bindDevice('B', '1111');
+      expect(lastClockFor('B')).toBe(PAL_PHI2_HZ);
+      service.bindDevice('B', null);
+      expect(lastClockFor('B')).toBeNull();
     });
   });
 

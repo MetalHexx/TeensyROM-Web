@@ -20,10 +20,14 @@ import { setDeckEngineControls } from './set-deck-engine-controls';
 import { setDeckDetectedKey } from './set-deck-detected-key';
 import { setDeckSwitching } from './set-deck-switching';
 import { setDeckTiming } from './set-deck-timing';
+import { setDeckBeatGrid } from './set-deck-beat-grid';
+import { setDeckTapping } from './set-deck-tapping';
+import { setDeckMoveStep } from './set-deck-move-step';
 import { setDeckLoops } from './set-deck-loops';
 import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
 import { setLoopActivity } from './set-loop-activity';
+import { setRunningBounds } from './set-running-bounds';
 import { setSettingsInPlay } from './set-settings-in-play';
 import { setSetsLibrary } from './set-sets-library';
 import { putOpenSet } from './put-open-set';
@@ -62,10 +66,14 @@ export function withDjActions() {
       ...setDeckDetectedKey(writableStore),
       ...setDeckSwitching(writableStore),
       ...setDeckTiming(writableStore),
+      ...setDeckBeatGrid(writableStore),
+      ...setDeckTapping(writableStore),
+      ...setDeckMoveStep(writableStore),
       ...setDeckLoops(writableStore),
       ...setLoopMarkers(writableStore),
       ...setLoopSelection(writableStore),
       ...setLoopActivity(writableStore),
+      ...setRunningBounds(writableStore),
       ...setSettingsInPlay(writableStore),
       ...setSetsLibrary(writableStore),
       ...putOpenSet(writableStore),

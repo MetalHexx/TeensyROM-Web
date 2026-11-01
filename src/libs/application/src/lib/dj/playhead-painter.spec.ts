@@ -2,7 +2,14 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { TuneReference } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
-import { DjStore, EMPTY_DECK_LOOPS, type DeckLoopMarker, type DeckStatus } from './dj-store';
+import {
+  DjStore,
+  EMPTY_DECK_LOOPS,
+  type DeckBeatGrid,
+  type DeckLoopMarker,
+  type DeckLoopsState,
+  type DeckStatus,
+} from './dj-store';
 import { PlayheadPainter } from './playhead-painter';
 import type { DeckPlayheadTargets } from './playhead-targets';
 import type { Slot } from './slot';
@@ -25,6 +32,7 @@ interface RecordingTargets {
   readonly setLiveElapsed: ReturnType<typeof vi.fn>;
   readonly setLiveFrame: ReturnType<typeof vi.fn>;
   readonly setLiveProgress: ReturnType<typeof vi.fn>;
+  readonly setLiveBpm: ReturnType<typeof vi.fn>;
 }
 
 function recordingTargets(): RecordingTargets {
@@ -32,15 +40,18 @@ function recordingTargets(): RecordingTargets {
   const setLiveElapsed = vi.fn();
   const setLiveFrame = vi.fn();
   const setLiveProgress = vi.fn();
+  const setLiveBpm = vi.fn();
   return {
     targets: {
       transport: { setLivePosition, setLiveElapsed, setLiveFrame },
       loops: { setLiveProgress },
+      speed: { setLiveBpm },
     },
     setLivePosition,
     setLiveElapsed,
     setLiveFrame,
     setLiveProgress,
+    setLiveBpm,
   };
 }
 
@@ -50,6 +61,7 @@ function allCalls(recording: RecordingTargets): ReturnType<typeof vi.fn>[] {
     recording.setLiveElapsed,
     recording.setLiveFrame,
     recording.setLiveProgress,
+    recording.setLiveBpm,
   ];
 }
 
@@ -152,6 +164,7 @@ describe('PlayheadPainter', () => {
     expect(recording.setLiveElapsed).toHaveBeenCalledExactlyOnceWith('00:05.0');
     expect(recording.setLiveFrame).toHaveBeenCalledExactlyOnceWith('frame 250');
     expect(recording.setLiveProgress).toHaveBeenCalledExactlyOnceWith(0);
+    expect(recording.setLiveBpm).toHaveBeenCalledExactlyOnceWith('---.-- BPM');
 
     clearCalls(recording);
     paintNextFrame();
@@ -250,14 +263,29 @@ describe('PlayheadPainter', () => {
   });
 
   describe('the running marker loop', () => {
+    /** The running marker runs on the bounds its list entry holds, unless `runningBounds` says the
+     *  engine is still on others. */
     function runLoop(
       markers: readonly DeckLoopMarker[],
       runningId: string | null,
-      selectedId: string | null = null
+      selectedId: string | null = null,
+      runningBounds?: DeckLoopsState['runningBounds']
     ): void {
+      const running = markers.find((marker) => marker.id === runningId);
       store.setDeckLoops({
         slot: 'A',
-        loops: { ...EMPTY_DECK_LOOPS, markers, runningId, selectedId },
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers,
+          runningId,
+          selectedId,
+          runningBounds:
+            runningBounds !== undefined
+              ? runningBounds
+              : running?.end
+              ? { start: running.start.frame, end: running.end.frame }
+              : null,
+        },
       });
       TestBed.flushEffects();
     }
@@ -274,6 +302,21 @@ describe('PlayheadPainter', () => {
       positions.A = 400;
       paintNextFrame();
       expect(recording.setLiveProgress).toHaveBeenLastCalledWith(100);
+    });
+
+    it('paints the lap of the bounds the engine enforces while an edit waits for the end of the pass', () => {
+      const recording = recordingTargets();
+      positions.A = 150;
+      painter.attach('A', recording.targets);
+      runLoop([loopMarker('loop', 100, 500)], 'loop', null, { start: 100, end: 300 });
+
+      paintNextFrame();
+      expect(recording.setLiveProgress).toHaveBeenLastCalledWith(25);
+
+      store.setRunningBounds({ slot: 'A', runningBounds: { start: 100, end: 500 } });
+      TestBed.flushEffects();
+      paintNextFrame();
+      expect(recording.setLiveProgress).toHaveBeenLastCalledWith(12.5);
     });
 
     it('paints 0 for a running marker with no length, and once no loop runs', () => {
@@ -307,12 +350,111 @@ describe('PlayheadPainter', () => {
     });
   });
 
+  describe('the BPM', () => {
+    /** 25 play calls a beat at 20 ms: 120 BPM at 1x. */
+    const GRID: DeckBeatGrid = {
+      beatFrames: 25,
+      beatOneFrame: 0,
+      startFrame: 100,
+      endFrame: 500,
+      source: 'scan',
+    };
+
+    function setGrid(beatGrid: DeckBeatGrid | null): void {
+      store.setDeckBeatGrid({ slot: 'A', beatGrid });
+      TestBed.flushEffects();
+    }
+
+    function setSpeed(speed: number): void {
+      store.setDeckEngineControls({
+        slot: 'A',
+        speed,
+        faderSpeed: speed,
+        nudging: false,
+        varispeed: false,
+        voices: store.decks().A.voices,
+      });
+      TestBed.flushEffects();
+    }
+
+    it('shows the tempo of the grid at the played speed while the playhead is in the span', () => {
+      tuneAt(200);
+      setGrid(GRID);
+      setSpeed(1.5);
+      const recording = recordingTargets();
+
+      painter.attach('A', recording.targets);
+
+      expect(recording.setLiveBpm).toHaveBeenCalledExactlyOnceWith('180.00 BPM');
+    });
+
+    it('blanks with no grid and outside the span, and returns on re-entry', () => {
+      tuneAt(200);
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('---.-- BPM');
+
+      setGrid(GRID);
+      positions.A = 200;
+      paintNextFrame();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('120.00 BPM');
+
+      positions.A = 500;
+      paintNextFrame();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('---.-- BPM');
+
+      positions.A = 50;
+      paintNextFrame();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('---.-- BPM');
+
+      positions.A = 150;
+      paintNextFrame();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('120.00 BPM');
+    });
+
+    it('writes only when the text changed', () => {
+      tuneAt(200);
+      setGrid(GRID);
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      recording.setLiveBpm.mockClear();
+
+      positions.A = 300;
+      paintNextFrame();
+
+      expect(recording.setLiveBpm).not.toHaveBeenCalled();
+    });
+
+    it('repaints a paused deck on a fader move or a new grid', () => {
+      tuneAt(200);
+      setGrid(GRID);
+      setStatus('paused');
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      runFrames();
+      recording.setLiveBpm.mockClear();
+
+      setSpeed(0.5);
+      runFrames();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('60.00 BPM');
+
+      setGrid({ ...GRID, beatFrames: 50 });
+      runFrames();
+      expect(recording.setLiveBpm).toHaveBeenLastCalledWith('30.00 BPM');
+    });
+  });
+
   describe('a scrub drag pin', () => {
     it('shows the pin on the transport at once, while the lap keeps following the playhead', () => {
       tuneAt(100);
       store.setDeckLoops({
         slot: 'A',
-        loops: { ...EMPTY_DECK_LOOPS, markers: [loopMarker('loop', 0, 400)], runningId: 'loop' },
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers: [loopMarker('loop', 0, 400)],
+          runningId: 'loop',
+          runningBounds: { start: 0, end: 400 },
+        },
       });
       const recording = recordingTargets();
       painter.attach('A', recording.targets);
@@ -433,6 +575,7 @@ describe('PlayheadPainter', () => {
               ...EMPTY_DECK_LOOPS,
               markers: [loopMarker('loop', 0, 400)],
               runningId: 'loop',
+              runningBounds: { start: 0, end: 400 },
             },
           }),
       ],

@@ -84,12 +84,39 @@
   overflow: hidden;
   padding: 3px 0;
   @include styles.synth-display;
-  font-size: 0.7rem;
   text-align: center;
   white-space: nowrap;
 
-  &[data-nudging] {
+  &[data-nudging],
+  &[data-tapping] {
     color: var(--color-primary-bright);
+  }
+}
+
+.percent,
+.bpm {
+  display: block;
+}
+
+.percent {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.bpm {
+  font-size: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+// The key is lit with the highlight; while tapping the highlight is the nudge's magenta.
+.tap {
+  align-self: center;
+
+  &[data-tapping] {
+    --color-highlight: var(--color-primary-bright);
+    --color-highlight-rgb: var(--color-primary-rgb);
   }
 }
 

@@ -4,6 +4,7 @@ import { withDjActions } from './actions';
 import { withDjSelectors } from './selectors';
 import type { Slot } from './slot';
 import type { DjFileKey } from './dj-file-key.util';
+import type { MoveStep } from './grid/beat-math';
 import type { MidiAccessState, MidiPortOption } from './ports/midi-access';
 import type { SetSummary, TuneReference, TuneSet } from '@sidablist/tunes';
 
@@ -112,6 +113,17 @@ export interface DeckMixerSettings {
   readonly mutes: readonly [boolean, boolean, boolean];
 }
 
+/** The grid a deck plays to: the tune's tapped correction if it has one, else the scan's. */
+export interface DeckBeatGrid {
+  readonly beatFrames: number;
+  readonly beatOneFrame: number;
+  /** 0 from the top. */
+  readonly startFrame: number;
+  /** Exclusive; null runs to the end of the tune. */
+  readonly endFrame: number | null;
+  readonly source: 'scan' | 'tap';
+}
+
 export interface DeckState {
   loaded: TuneReference | null;
   status: DeckStatus;
@@ -137,6 +149,13 @@ export interface DeckState {
   playCallIntervalUs: number | null;
   voices: readonly DeckVoiceState[];
   detectedKey: DeckDetectedKey | null;
+  /** The grid the deck plays to, or null when the tune has none. */
+  beatGrid: DeckBeatGrid | null;
+  /** How far the Move controls shift a loop or an edge: a whole number of beats, or `'frame'` for
+   *  one play call by the edges' nudges. Kept across loads. */
+  moveStepBeats: MoveStep;
+  /** True from the first tap of a sequence until the taps stop. */
+  tapping: boolean;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
    *  also spans the `await` in a play toggle. */
   switching: boolean;
@@ -201,8 +220,9 @@ export interface DeckLoopsState {
   /** Queued in the engine, or waiting for readiness. */
   queuedId: string | null;
   selectionMovedWhileQueued: boolean;
-  /** Frames, ascending, from the tune index. */
-  detectedMoments: readonly number[];
+  /** The bounds the engine is enforcing for the running marker, in play calls. They trail the
+   *  marker's list entry while an edit waits for the end of the pass, so the lap follows these. */
+  runningBounds: { readonly start: number; readonly end: number } | null;
   /** The marker whose own settings are in play, or null while the main track's are. */
   settingsInPlayId: string | null;
   /** The main track's settings, held aside while a marker's own are in play; null otherwise,
@@ -278,7 +298,7 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
   runningId: null,
   queuedId: null,
   selectionMovedWhileQueued: false,
-  detectedMoments: [],
+  runningBounds: null,
   settingsInPlayId: null,
   mainSettings: null,
 };
@@ -303,6 +323,9 @@ const initialDeckState: DeckState = {
     { muted: false, held: false },
   ],
   detectedKey: null,
+  beatGrid: null,
+  moveStepBeats: 1,
+  tapping: false,
   switching: false,
   handHeld: false,
   varispeed: false,

@@ -81,6 +81,26 @@ namespace TeensyRom.Core.Dj
     }
 
     /// <summary>
+    /// The beat grids a DJ tapped for one tune, keyed by its SID hash: one per subtune, each holding over the whole subtune.
+    /// </summary>
+    public record DjTuneGrids
+    {
+        public string SidHash { get; init; } = string.Empty;
+        public IReadOnlyList<DjSubtuneGrid> Subtunes { get; init; } = [];
+        public string Updated { get; init; } = string.Empty;
+    }
+
+    /// <summary>
+    /// The beat grid of one subtune: the length of a beat and the frame the first beat falls on.
+    /// </summary>
+    public record DjSubtuneGrid
+    {
+        public int Subtune { get; init; }
+        public int BeatFrames { get; init; }
+        public int BeatOneFrame { get; init; }
+    }
+
+    /// <summary>
     /// Which set is current, or null when none is.
     /// </summary>
     public record DjLibraryState

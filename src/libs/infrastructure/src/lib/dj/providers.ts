@@ -9,6 +9,7 @@ import {
   MidiSettingsApiService,
 } from '@teensyrom-nx/data-access/api-client';
 import {
+  BEAT_GRID_STORE,
   DJ_LIBRARY_STATE_REPOSITORY,
   FRAME_CLOCK_FACTORY,
   MIDI_ACCESS,
@@ -23,7 +24,12 @@ import {
 } from '@teensyrom-nx/application';
 import type { RegisterRecorder } from '@teensyrom-nx/application';
 import { IndexedDbTuneStore } from './database';
-import { ApiDjLibraryStateRepository, ApiSetStore, ApiTuneMemoryStore } from './dj-library';
+import {
+  ApiBeatGridStore,
+  ApiDjLibraryStateRepository,
+  ApiSetStore,
+  ApiTuneMemoryStore,
+} from './dj-library';
 import { ApiMidiSettingsRepository } from './midi-settings';
 import { WorkerRegisterRecorder } from './analysis/worker-register-recorder';
 import { WorkerTuneIndexer } from './analysis/worker-tune-indexer';
@@ -71,6 +77,7 @@ export const DJ_STORAGE_PROVIDERS: Provider[] = [
   DJ_LIBRARY_API_CLIENT_PROVIDER,
   { provide: SET_STORE, useClass: ApiSetStore },
   { provide: TUNE_MEMORY_STORE, useClass: ApiTuneMemoryStore },
+  { provide: BEAT_GRID_STORE, useClass: ApiBeatGridStore },
   { provide: DJ_LIBRARY_STATE_REPOSITORY, useClass: ApiDjLibraryStateRepository },
 ];
 

@@ -49,9 +49,13 @@ interface SeededTuneIndexRecord {
   readonly tuningCents: number | null;
   readonly keyConfidence: 'strong' | 'weak' | 'none';
   readonly scalePitchClasses: readonly number[];
-  readonly dominantIntervalFrames: number | null;
-  readonly pulseConfidence: 'strong' | 'weak' | 'none';
-  readonly nativeTempo: number | null;
+  readonly beatGrid: {
+    readonly beatFrames: number;
+    readonly beatOneFrame: number;
+    readonly startFrame: number;
+    readonly endFrame: number | null;
+  } | null;
+  readonly beatConfidence: 'strong' | 'weak' | 'none';
   readonly callsPerFrame: number;
   readonly exactCallsPerFrame: number;
   readonly timingMode: 'exact' | 'rounded';
@@ -75,17 +79,16 @@ function seededRecord(): SeededTuneIndexRecord {
     tuningCents: null,
     keyConfidence: 'none',
     scalePitchClasses: [],
-    dominantIntervalFrames: null,
-    pulseConfidence: 'none',
-    nativeTempo: null,
+    beatGrid: null,
+    beatConfidence: 'none',
     callsPerFrame: 1,
     exactCallsPerFrame: 1,
     timingMode: 'exact',
-    // Must match `TUNE_INDEX_FORMAT_VERSION` (`tune-index.model.ts`, currently 4) or the app
+    // Must match `TUNE_INDEX_FORMAT_VERSION` (`tune-index.model.ts`, currently 6) or the app
     // discards this seed as stale and falls back to a real background scan instead of the
     // deterministic moments above — not imported, to keep this spec at arm's length from the app's
     // own source (see this file's own header comment).
-    formatVersion: 4,
+    formatVersion: 6,
     computedAt: new Date().toISOString(),
   };
 }

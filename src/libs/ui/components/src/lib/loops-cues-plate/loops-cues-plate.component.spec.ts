@@ -1,24 +1,29 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 import type { LoopSelectedRowModel } from '../loop-selected-row/loop-selected-row.component';
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
 import { LoopsCuesPlateComponent, type LoopsCuesPlateModel } from './loops-cues-plate.component';
 
-function boundary(tag: string, overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
+function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
   const lower = tag.toLowerCase();
+  const isStart = tag === 'Start';
   return {
-    tag,
+    key: {
+      label: isStart ? 'In' : 'Out',
+      accessibleName: isStart ? 'Loop in deck A' : 'Loop out deck A',
+      control: isStart ? 'loop-in' : 'loop-set-end',
+      disabled: false,
+    },
     empty: false,
     disabled: false,
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [],
-    previousDisabled: false,
-    nextDisabled: false,
     nudgeAccessibleName: `Nudge ${lower} deck A`,
-    previousAccessibleName: `Snap ${lower} to previous moment deck A`,
-    nextAccessibleName: `Snap ${lower} to next moment deck A`,
+    earlierAccessibleName: `Move ${lower} earlier deck A`,
+    laterAccessibleName: `Move ${lower} later deck A`,
     ...overrides,
   };
 }
@@ -32,13 +37,28 @@ function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelecte
     activity: 'idle',
     ready: true,
     triggerDisabled: false,
-    setEndDisabled: false,
     clearEndDisabled: false,
     deleteDisabled: false,
     start: boundary('Start'),
     end: boundary('End'),
+    length: {
+      text: '16 BEATS',
+      options: [{ beats: 16, label: '16 BEATS', selected: true }],
+      halveAccessibleName: 'Halve deck A',
+      doubleAccessibleName: 'Double deck A',
+      pickAccessibleName: 'Loop length deck A',
+    },
+    move: {
+      stepText: '1 BEAT',
+      options: [
+        { beats: 1, label: '1 BEAT', selected: true },
+        { beats: 4, label: '4 BEATS', selected: false },
+      ],
+      earlierAccessibleName: 'Move earlier deck A',
+      laterAccessibleName: 'Move later deck A',
+      pickAccessibleName: 'Move step deck A',
+    },
     triggerAccessibleName: 'Trigger selected deck A',
-    setEndAccessibleName: 'Set end deck A',
     clearEndAccessibleName: 'Clear end deck A',
     deleteAccessibleName: 'Delete selected deck A',
     playNowDisabled: false,
@@ -105,6 +125,7 @@ describe('LoopsCuesPlateComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [LoopsCuesPlateComponent],
+      providers: [provideNoopAnimations()],
     }).compileComponents();
     fixture = TestBed.createComponent(LoopsCuesPlateComponent);
     const component = fixture.componentInstance;
@@ -117,14 +138,21 @@ describe('LoopsCuesPlateComponent', () => {
     component.playNowSelected.subscribe(plain('playNowSelected'));
     component.toggleGlobal.subscribe(plain('toggleGlobal'));
     component.toggleWrap.subscribe(plain('toggleWrap'));
-    component.setEnd.subscribe(plain('setEnd'));
+    component.setIn.subscribe(plain('setIn'));
+    component.setOut.subscribe(plain('setOut'));
+    component.halve.subscribe(plain('halve'));
+    component.double.subscribe(plain('double'));
+    component.pickLength.subscribe(valued('pickLength'));
+    component.moveEarlier.subscribe(plain('moveEarlier'));
+    component.moveLater.subscribe(plain('moveLater'));
+    component.pickMoveStep.subscribe(valued('pickMoveStep'));
     component.clearEnd.subscribe(plain('clearEnd'));
     component.deleteSelected.subscribe(plain('delete'));
     component.triggerTile.subscribe(valued('triggerTile'));
     component.playNowTile.subscribe(valued('playNowTile'));
     component.selectTile.subscribe(valued('selectTile'));
     component.nudgeCommit.subscribe(valued('nudgeCommit'));
-    component.snap.subscribe(valued('snap'));
+    component.moveEdge.subscribe(valued('moveEdge'));
     component.rename.subscribe(valued('rename'));
   });
 
@@ -178,11 +206,35 @@ describe('LoopsCuesPlateComponent', () => {
       ]);
     });
 
-    it("re-emits Set End from a cue's End slot", () => {
-      setModel(model({ selected: selectedRow({ kindLabel: 'CUE', end: boundary('End', { empty: true }) }) }));
-      byName('Set end deck A').click();
+    it('re-emits the In, Out, Length and Move keys as their own outputs', () => {
+      byName('Loop in deck A').click();
+      byName('Loop out deck A').click();
+      byName('Halve deck A').click();
+      byName('Double deck A').click();
+      byName('Move earlier deck A').click();
+      byName('Move later deck A').click();
 
-      expect(emitted).toEqual(['setEnd']);
+      expect(emitted).toEqual(['setIn', 'setOut', 'halve', 'double', 'moveEarlier', 'moveLater']);
+    });
+
+    it('re-emits a picked length and a picked Move step in beats', () => {
+      for (const [id, label] of [
+        ['loop-length', '16 BEATS'],
+        ['loop-move-step', '4 BEATS'],
+      ]) {
+        control(id)?.click();
+        fixture.detectChanges();
+        const item = Array.from(
+          document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')
+        ).find((candidate) => candidate.textContent?.includes(label));
+        item?.click();
+        fixture.detectChanges();
+      }
+
+      expect(emitted).toEqual([
+        ['pickLength', 16],
+        ['pickMoveStep', 4],
+      ]);
     });
 
     it('re-emits a rename from the selected row', () => {
@@ -197,13 +249,13 @@ describe('LoopsCuesPlateComponent', () => {
       expect(emitted).toEqual([['rename', 'Chorus']]);
     });
 
-    it('re-emits a boundary snap tagged with the boundary and direction', () => {
-      byName('Snap start to next moment deck A').click();
-      byName('Snap end to previous moment deck A').click();
+    it('re-emits an edge move tagged with the boundary and direction', () => {
+      byName('Move start later deck A').click();
+      byName('Move end earlier deck A').click();
 
       expect(emitted).toEqual([
-        ['snap', { boundary: 'start', direction: 'next' }],
-        ['snap', { boundary: 'end', direction: 'previous' }],
+        ['moveEdge', { boundary: 'start', direction: 1 }],
+        ['moveEdge', { boundary: 'end', direction: -1 }],
       ]);
     });
 

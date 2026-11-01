@@ -4,6 +4,7 @@ import { clamp } from '@sidablist/core';
 import { logWarn } from '@teensyrom-nx/utils';
 import type { HandTarget } from '../deck-hand';
 import { HAND_GRIP_SECONDS } from './hand-settings';
+import { slowTurnStep } from '../mixer/slow-turn';
 import { MappableControls, type MappableControl } from './mappable-controls';
 import { relativeTicks, type RelativeStyleKind } from './mapping-styles';
 import {
@@ -70,6 +71,8 @@ export class MidiMappingEngine {
   /** The part of a stepped control's relative movement that has not yet made a whole step, per
    *  mapping id. */
   private readonly remainders = new Map<string, number>();
+  /** When the last relative tick arrived per mapping id, for controls that slow-turn. */
+  private readonly lastTickMs = new Map<string, number>();
   /** Active holds by source key. */
   private readonly holds = new Map<string, ActiveHold>();
   /** Strips mapped as a hand with a finger on them, by source key. */
@@ -162,7 +165,7 @@ export class MidiMappingEngine {
       case 'relative-offset':
       case 'relative-signed':
         if (event.kind === 'cc' && control.nature === 'value' && amount !== null) {
-          this.applyRelative(mapping.id, control, kind, amount, event.value);
+          this.applyRelative(mapping.id, control, kind, amount, event.value, event.timeStampMs);
         }
         return;
       case 'step':
@@ -228,6 +231,7 @@ export class MidiMappingEngine {
       }
     }
     this.remainders.delete(mappingId);
+    this.lastTickMs.delete(mappingId);
     const mapping = this.store.mappings().find((candidate) => candidate.id === mappingId);
     if (mapping !== undefined) {
       this.down.delete(sourceKey(mapping.source));
@@ -277,17 +281,29 @@ export class MidiMappingEngine {
     control: ValueControl,
     kind: RelativeStyleKind,
     amount: number,
-    raw: number
+    raw: number,
+    timeStampMs: number
   ): void {
     const ticks = relativeTicks(kind, raw);
     if (ticks === 0) {
       return;
     }
+    let gapMs: number | null = null;
+    if (control.slowTurnFloor !== undefined) {
+      const last = this.lastTickMs.get(mappingId);
+      gapMs = last === undefined ? null : timeStampMs - last;
+      this.lastTickMs.set(mappingId, timeStampMs);
+    }
     if (control.wholeSteps) {
       this.moveWholeSteps(control, ticks);
       return;
     }
-    const delta = ticks * amount * (control.max - control.min);
+    const fullStep = amount * (control.max - control.min);
+    const delta =
+      ticks *
+      (control.slowTurnFloor === undefined
+        ? fullStep
+        : slowTurnStep(fullStep, control.slowTurnFloor, gapMs));
     if (control.step === null) {
       control.set(clamp(control.read() + delta, control.min, control.max));
       return;

@@ -1,22 +1,18 @@
-<span class="tag">{{ model().tag }}</span>
-@if (action(); as action) {
 <lib-synth-key
-  class="action"
-  data-part="action"
-  [attr.data-control]="action.control"
-  [label]="action.label"
-  [icon]="action.icon"
-  [accessibleName]="action.accessibleName"
-  [disabled]="action.disabled"
-  (press)="actionPress.emit()"
+  class="key"
+  data-part="key"
+  [attr.data-control]="model().key.control"
+  [label]="model().key.label"
+  [accessibleName]="model().key.accessibleName"
+  [disabled]="model().key.disabled"
+  (press)="keyPress.emit()"
 />
-} @else {
 <lib-synth-key
-  data-part="snap-previous"
+  data-part="move-earlier"
   icon="chevron_left"
-  [accessibleName]="model().previousAccessibleName"
-  [disabled]="controlsDisabled() || model().previousDisabled"
-  (press)="snapPrevious.emit()"
+  [accessibleName]="model().earlierAccessibleName"
+  [disabled]="controlsDisabled()"
+  (press)="moveEarlier.emit()"
 />
 <div class="nudge">
   <input
@@ -42,11 +38,10 @@
   </div>
 </div>
 <lib-synth-key
-  data-part="snap-next"
+  data-part="move-later"
   icon="chevron_right"
-  [accessibleName]="model().nextAccessibleName"
-  [disabled]="controlsDisabled() || model().nextDisabled"
-  (press)="snapNext.emit()"
+  [accessibleName]="model().laterAccessibleName"
+  [disabled]="controlsDisabled()"
+  (press)="moveLater.emit()"
 />
 <span class="readout" data-part="readout">{{ readout() }}</span>
-}

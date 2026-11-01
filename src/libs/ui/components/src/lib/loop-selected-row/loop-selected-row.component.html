@@ -76,20 +76,102 @@
     data-control="loop-start"
     [model]="startBoundary()"
     [dragOffsetFrames]="startDragOffset()"
+    (keyPress)="setIn.emit()"
     (nudgeInput)="nudgeInput.emit({ boundary: 'start', offsetFrames: $event })"
     (nudgeCommit)="nudgeCommit.emit({ boundary: 'start', offsetFrames: $event })"
-    (snapPrevious)="snap.emit({ boundary: 'start', direction: 'previous' })"
-    (snapNext)="snap.emit({ boundary: 'start', direction: 'next' })"
+    (moveEarlier)="moveEdge.emit({ boundary: 'start', direction: -1 })"
+    (moveLater)="moveEdge.emit({ boundary: 'start', direction: 1 })"
   />
   <lib-loop-boundary
     data-control="loop-end"
     [model]="endBoundary()"
-    [action]="endAction()"
     [dragOffsetFrames]="endDragOffset()"
+    (keyPress)="setOut.emit()"
     (nudgeInput)="nudgeInput.emit({ boundary: 'end', offsetFrames: $event })"
     (nudgeCommit)="nudgeCommit.emit({ boundary: 'end', offsetFrames: $event })"
-    (snapPrevious)="snap.emit({ boundary: 'end', direction: 'previous' })"
-    (snapNext)="snap.emit({ boundary: 'end', direction: 'next' })"
-    (actionPress)="setEnd.emit()"
+    (moveEarlier)="moveEdge.emit({ boundary: 'end', direction: -1 })"
+    (moveLater)="moveEdge.emit({ boundary: 'end', direction: 1 })"
   />
+</div>
+<div class="controls">
+  <div class="control">
+    <span class="tag" aria-hidden="true">Length</span>
+    <lib-synth-key
+      class="step"
+      label="½"
+      [accessibleName]="model().length.halveAccessibleName"
+      [disabled]="model().empty"
+      (press)="halve.emit()"
+    />
+    @if (model().length.options.length > 0) {
+    <lib-dropdown-menu #lengthMenu>
+      <button
+        type="button"
+        class="readout"
+        data-control="loop-length"
+        aria-haspopup="menu"
+        [attr.aria-label]="model().length.pickAccessibleName + ', ' + model().length.text"
+        (click)="lengthMenu.toggle()"
+      >
+        {{ model().length.text }}<span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <div dropdown-content>
+        @for (option of model().length.options; track option.beats) {
+        <lib-dropdown-menu-item [selected]="option.selected" (itemClick)="pickLength.emit(option.beats)">
+          {{ option.label }}
+        </lib-dropdown-menu-item>
+        }
+      </div>
+    </lib-dropdown-menu>
+    } @else {
+    <span class="readout" data-control="loop-length">{{ model().length.text }}</span>
+    }
+    <lib-synth-key
+      class="step"
+      label="2×"
+      [accessibleName]="model().length.doubleAccessibleName"
+      [disabled]="model().empty"
+      (press)="double.emit()"
+    />
+  </div>
+  <div class="control">
+    <span class="tag" aria-hidden="true">Move</span>
+    <lib-synth-key
+      class="step"
+      data-control="loop-move-earlier"
+      icon="arrow_back"
+      [accessibleName]="model().move.earlierAccessibleName"
+      (press)="moveEarlier.emit()"
+    />
+    @if (model().move.options.length > 0) {
+    <lib-dropdown-menu #moveMenu>
+      <button
+        type="button"
+        class="readout"
+        data-control="loop-move-step"
+        aria-haspopup="menu"
+        [attr.aria-label]="model().move.pickAccessibleName + ', ' + model().move.stepText"
+        (click)="moveMenu.toggle()"
+      >
+        {{ model().move.stepText }}<span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <div dropdown-content>
+        @for (option of model().move.options; track option.beats) {
+        <lib-dropdown-menu-item [selected]="option.selected" (itemClick)="pickMoveStep.emit(option.beats)">
+          {{ option.label }}
+        </lib-dropdown-menu-item>
+        }
+      </div>
+    </lib-dropdown-menu>
+    } @else {
+    <span class="readout" data-control="loop-move-step">{{ model().move.stepText }}</span>
+    }
+    <lib-synth-key
+      class="step"
+      data-control="loop-move-later"
+      icon="arrow_forward"
+      [accessibleName]="model().move.laterAccessibleName"
+      (press)="moveLater.emit()"
+    />
+  </div>
 </div>

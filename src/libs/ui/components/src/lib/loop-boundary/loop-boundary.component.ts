@@ -1,49 +1,47 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 
+/** The In or Out key that heads a boundary. */
+export interface LoopBoundaryKey {
+  readonly label: 'In' | 'Out';
+  readonly accessibleName: string;
+  /** Rendered as the key's `data-control`, so a learn overlay can find it. */
+  readonly control: 'loop-in' | 'loop-set-end';
+  readonly disabled: boolean;
+}
+
 /** One loop or cue boundary's caller-composed state. */
 export interface LoopBoundaryModel {
-  /** 'Start' | 'End'. */
-  readonly tag: string;
-  /** A cue's End: drawn empty, readout '—', every control disabled. */
+  /** The In or Out key at the row's head. Enabled on a cue's End row: Out makes the cue a loop. */
+  readonly key: LoopBoundaryKey;
+  /** A cue's End: drawn empty, readout '—', the strip and edge arrows disabled. */
   readonly empty: boolean;
   readonly disabled: boolean;
   /** Committed nudge, −`rangeFrames`..+`rangeFrames`. */
   readonly offsetFrames: number;
   /** One second, in play calls; 0 disables the strip. */
   readonly rangeFrames: number;
-  /** Detected moments in reach, 0–100 across the strip. */
+  /** Beats of the grid in reach, 0–100 across the strip. */
   readonly tickPercents: readonly number[];
-  readonly previousDisabled: boolean;
-  readonly nextDisabled: boolean;
   readonly nudgeAccessibleName: string;
-  readonly previousAccessibleName: string;
-  readonly nextAccessibleName: string;
-}
-
-/** A one-shot key that takes the place of a boundary's snap keys, strip and readout. */
-export interface LoopBoundaryAction {
-  readonly label: string;
-  readonly icon: string;
-  readonly accessibleName: string;
-  readonly disabled: boolean;
-  /** Rendered as the key's `data-control`, so a learn overlay can find it. */
-  readonly control: string;
+  readonly earlierAccessibleName: string;
+  readonly laterAccessibleName: string;
 }
 
 const MINUS = '−';
 const EMPTY_READOUT = '—';
 
 /**
- * One boundary of the selected loop or cue: the tag, a previous-snap key, a bipolar nudge strip, a
- * next-snap key and the offset readout. Purely presentational: it holds no drag value, so the
- * caller feeds `dragOffsetFrames` while a drag is live and the committed offset is shown otherwise.
+ * One boundary of the selected loop or cue: the In or Out key, an edge-move arrow either way, a
+ * bipolar nudge strip between them, and the offset readout. Purely presentational: it holds no
+ * drag value, so the caller feeds `dragOffsetFrames` while a drag is live and the committed offset
+ * is shown otherwise.
  *
- * With an `action` set the boundary keeps its frame and tag but holds one full-width one-shot key
- * in place of the snap keys, strip and readout; `actionPress` reports the press. A cue's End slot
- * uses it for Set End.
+ * The key reports `keyPress` and is disabled by its own flag alone, so a cue's End row draws an
+ * empty strip and `—` beside an enabled Out key. The arrows report `moveEarlier` and `moveLater`
+ * and are disabled with the boundary (`empty` or `disabled`), never for want of a grid.
  *
- * The strip is a native range input under a drawn strip (centre line, magenta moment ticks, a bar
+ * The strip is a native range input under a drawn strip (centre line, magenta beat ticks, a bar
  * from the centre to the value), so it stays keyboard-operable and visible to assistive tech.
  * `nudgeInput` fires on every tick and is for the readout only; `nudgeCommit` fires on release.
  *
@@ -52,10 +50,11 @@ const EMPTY_READOUT = '—';
  * <lib-loop-boundary
  *   [model]="startBoundary()"
  *   [dragOffsetFrames]="startDrag()"
+ *   (keyPress)="onSetIn()"
+ *   (moveEarlier)="onMoveEdge('start', -1)"
+ *   (moveLater)="onMoveEdge('start', 1)"
  *   (nudgeInput)="onNudgeInput($event)"
  *   (nudgeCommit)="onNudgeCommit($event)"
- *   (snapPrevious)="onSnap('previous')"
- *   (snapNext)="onSnap('next')"
  * />
  * ```
  */
@@ -74,18 +73,16 @@ export class LoopBoundaryComponent {
   readonly model = input.required<LoopBoundaryModel>();
   /** While non-null, the readout and bar follow it instead of the committed offset. */
   readonly dragOffsetFrames = input<number | null>(null);
-  /** When set, replaces the snap keys, strip and readout with this one key. */
-  readonly action = input<LoopBoundaryAction | null>(null);
   /** Fires on every drag tick with the live offset in frames — readout only. */
   readonly nudgeInput = output<number>();
   /** Fires on release with the offset in frames — the value to apply. */
   readonly nudgeCommit = output<number>();
-  /** Emits when the snap-to-previous-moment key is pressed. */
-  readonly snapPrevious = output<void>();
-  /** Emits when the snap-to-next-moment key is pressed. */
-  readonly snapNext = output<void>();
-  /** Emits when the action key is pressed. */
-  readonly actionPress = output<void>();
+  /** Emits when the In or Out key is pressed. */
+  readonly keyPress = output<void>();
+  /** Emits when the move-edge-earlier arrow is pressed. */
+  readonly moveEarlier = output<void>();
+  /** Emits when the move-edge-later arrow is pressed. */
+  readonly moveLater = output<void>();
 
   protected readonly controlsDisabled = computed(() => {
     const model = this.model();

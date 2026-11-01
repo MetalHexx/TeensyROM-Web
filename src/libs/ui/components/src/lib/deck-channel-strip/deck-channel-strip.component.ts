@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import {
   DeckSettingsSignComponent,
   type DeckSettingsSignModel,
@@ -7,6 +14,7 @@ import { HoldPadComponent } from '../hold-pad/hold-pad.component';
 import type { JumpButtonModel } from '../jump-button-group/jump-button-group.component';
 import { SynthFaderComponent } from '../synth-fader/synth-fader.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
+import type { LiveBpmIndicator } from '../shared/live-indicator';
 import { SynthPanelComponent } from '../synth-panel/synth-panel.component';
 
 /** One voice's pair of controls: a latching mute key over a Kill/Punch hold pad. */
@@ -33,10 +41,14 @@ export interface DeckChannelStripModel {
   /** Whose settings are in play; drawn full-width above the first voice. */
   readonly settingsSign: DeckSettingsSignModel;
   readonly voices: readonly ChannelStripVoiceModel[];
-  /** The speed being played, e.g. '1.000×'. */
+  /** The speed being played as signed percent off 1×, e.g. '+1.25%'. */
   readonly speedText: string;
   /** Tints the speed display magenta while a nudge is in effect. */
   readonly nudging: boolean;
+  /** Tints the speed display and the Tap key magenta while the deck is tapping. */
+  readonly tapping: boolean;
+  /** The Tap key's accessible name, e.g. 'Tap the beat deck A'. */
+  readonly tapAccessibleName: string;
   /** The speed fader. The caller pins `value` into the travel; a nudge never moves it. */
   readonly fader: {
     readonly value: number;
@@ -45,6 +57,8 @@ export interface DeckChannelStripModel {
     readonly step: number;
     readonly home: number;
     readonly accessibleName: string;
+    /** What the range announces in place of its number, e.g. '+1.25%'. */
+    readonly valueText: string;
   };
   readonly nudge: { readonly downAccessibleName: string; readonly upAccessibleName: string };
   readonly jumpButtons: readonly JumpButtonModel[];
@@ -52,12 +66,19 @@ export interface DeckChannelStripModel {
   readonly disabled: boolean;
 }
 
+/** What the BPM line shows until a painter sets it; matches the template's initial text. */
+const NO_BPM_TEXT = '---.-- BPM';
+
 /**
  * One deck's voice-and-speed channel strip on a single faceplate: a sign naming whose settings are
  * in play, three voice pairs (a latching mute key over a Kill/Punch hold pad), the speed display, a
  * hardware-drawn speed fader that is still a native range, the speed-nudge pads and the jump keys.
+ * The speed display carries the deck's BPM under the percent, and a Tap key sits under the display.
  * Purely presentational — it keeps no state and the caller feeds every value back through
  * `model`. It is sized for the roughly 88px voice-and-speed column and fills that column's height.
+ *
+ * The BPM is position-dependent, so it is not in `model`: a painter sets it through `setLiveBpm`,
+ * straight on the DOM, outside change detection.
  *
  * @example
  * ```html
@@ -84,7 +105,10 @@ export interface DeckChannelStripModel {
     DeckSettingsSignComponent,
   ],
 })
-export class DeckChannelStripComponent {
+export class DeckChannelStripComponent implements LiveBpmIndicator {
+  private readonly bpm = viewChild.required<ElementRef<HTMLElement>>('bpm');
+  private liveBpm = NO_BPM_TEXT;
+
   /** Everything the strip draws; the caller builds it from the deck's store state. */
   readonly model = input.required<DeckChannelStripModel>();
   /** A mute key was pressed, carrying the voice's index and the mute it should now have. */
@@ -93,8 +117,24 @@ export class DeckChannelStripComponent {
   readonly heldChange = output<{ index: number; held: boolean }>();
   /** The fader moved; the raw, unrounded value. */
   readonly faderChange = output<number>();
+  /** The wheel turned over the fader: whole clicks, upward positive, with the event's time. */
+  readonly faderWheel = output<{ clicks: number; timeStampMs: number }>();
   /** A nudge pad was pressed or released, including a release forced by the strip being disabled. */
   readonly nudgeChange = output<{ direction: 'up' | 'down'; held: boolean }>();
   /** A jump key was pressed, carrying its `id`. */
   readonly jump = output<string>();
+  /** The Tap key was pressed. */
+  readonly tap = output<void>();
+
+  /** Sets the BPM line under the speed percent, e.g. '125.31 BPM' or '---.-- BPM'. Deliberately not
+   *  a field of `model`: the tempo follows the playhead, and a binding would put change detection
+   *  on every frame. Writes straight to the DOM, and only a changed text. Valid once the view has
+   *  rendered. */
+  setLiveBpm(text: string): void {
+    if (text === this.liveBpm) {
+      return;
+    }
+    this.liveBpm = text;
+    this.bpm().nativeElement.textContent = text;
+  }
 }

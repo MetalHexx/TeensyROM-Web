@@ -18,15 +18,18 @@ import type {
   DeleteDjSetResponse,
   DjLibraryStateDto,
   DjSetDto,
+  DjTuneGridsDto,
   DjTuneMemoryDto,
   GetDjLibraryStateResponse,
   GetDjSetResponse,
+  GetTuneGridsResponse,
   GetTuneMemoryResponse,
   HttpValidationProblemDetails,
   ListDjSetsResponse,
   ProblemDetails,
   SaveDjLibraryStateResponse,
   SaveDjSetResponse,
+  SaveTuneGridsResponse,
   SaveTuneMemoryResponse,
 } from '../models/index';
 import {
@@ -36,12 +39,16 @@ import {
     DjLibraryStateDtoToJSON,
     DjSetDtoFromJSON,
     DjSetDtoToJSON,
+    DjTuneGridsDtoFromJSON,
+    DjTuneGridsDtoToJSON,
     DjTuneMemoryDtoFromJSON,
     DjTuneMemoryDtoToJSON,
     GetDjLibraryStateResponseFromJSON,
     GetDjLibraryStateResponseToJSON,
     GetDjSetResponseFromJSON,
     GetDjSetResponseToJSON,
+    GetTuneGridsResponseFromJSON,
+    GetTuneGridsResponseToJSON,
     GetTuneMemoryResponseFromJSON,
     GetTuneMemoryResponseToJSON,
     HttpValidationProblemDetailsFromJSON,
@@ -54,6 +61,8 @@ import {
     SaveDjLibraryStateResponseToJSON,
     SaveDjSetResponseFromJSON,
     SaveDjSetResponseToJSON,
+    SaveTuneGridsResponseFromJSON,
+    SaveTuneGridsResponseToJSON,
     SaveTuneMemoryResponseFromJSON,
     SaveTuneMemoryResponseToJSON,
 } from '../models/index';
@@ -64,6 +73,10 @@ export interface DeleteDjSetRequest {
 
 export interface GetDjSetRequest {
     setId: string;
+}
+
+export interface GetTuneGridsRequest {
+    sidHash: string;
 }
 
 export interface GetTuneMemoryRequest {
@@ -77,6 +90,11 @@ export interface SaveDjLibraryStateRequest {
 export interface SaveDjSetRequest {
     setId: string;
     djSetDto: DjSetDto;
+}
+
+export interface SaveTuneGridsRequest {
+    sidHash: string;
+    djTuneGridsDto: DjTuneGridsDto;
 }
 
 export interface SaveTuneMemoryRequest {
@@ -184,6 +202,41 @@ export class DjLibraryApiService extends runtime.BaseAPI {
      */
     async getDjSet(requestParameters: GetDjSetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetDjSetResponse> {
         const response = await this.getDjSetRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Reads the beat grids a DJ tapped for one tune: a beat length and first-beat frame per subtune.  The grids are null when none exist for the tune or their file is corrupt; a corrupt file is left on disk.  **Validation:** - The SID hash is 32 lowercase hexadecimal characters
+     * Get Tune Grids
+     */
+    async getTuneGridsRaw(requestParameters: GetTuneGridsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetTuneGridsResponse>> {
+        if (requestParameters['sidHash'] == null) {
+            throw new runtime.RequiredError(
+                'sidHash',
+                'Required parameter "sidHash" was null or undefined when calling getTuneGrids().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/dj/tunes/{sidHash}/grids`.replace(`{${"sidHash"}}`, encodeURIComponent(String(requestParameters['sidHash']))),
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GetTuneGridsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Reads the beat grids a DJ tapped for one tune: a beat length and first-beat frame per subtune.  The grids are null when none exist for the tune or their file is corrupt; a corrupt file is left on disk.  **Validation:** - The SID hash is 32 lowercase hexadecimal characters
+     * Get Tune Grids
+     */
+    async getTuneGrids(requestParameters: GetTuneGridsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetTuneGridsResponse> {
+        const response = await this.getTuneGridsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -330,6 +383,51 @@ export class DjLibraryApiService extends runtime.BaseAPI {
      */
     async saveDjSet(requestParameters: SaveDjSetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SaveDjSetResponse> {
         const response = await this.saveDjSetRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Saves the beat grids kept for one tune, replacing any stored grids for the same SID hash.  **Validation:** - The route SID hash and the body SID hash are the same 32 lowercase hexadecimal characters - At most 256 subtune grids, unique and within 1-256 - Beat frames is 1-4096; beat one frame is 0 or more - Updated is an ISO-8601 timestamp  Anything outside these rules is rejected with a 400 and nothing is written.
+     * Save Tune Grids
+     */
+    async saveTuneGridsRaw(requestParameters: SaveTuneGridsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveTuneGridsResponse>> {
+        if (requestParameters['sidHash'] == null) {
+            throw new runtime.RequiredError(
+                'sidHash',
+                'Required parameter "sidHash" was null or undefined when calling saveTuneGrids().'
+            );
+        }
+
+        if (requestParameters['djTuneGridsDto'] == null) {
+            throw new runtime.RequiredError(
+                'djTuneGridsDto',
+                'Required parameter "djTuneGridsDto" was null or undefined when calling saveTuneGrids().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        const response = await this.request({
+            path: `/api/dj/tunes/{sidHash}/grids`.replace(`{${"sidHash"}}`, encodeURIComponent(String(requestParameters['sidHash']))),
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DjTuneGridsDtoToJSON(requestParameters['djTuneGridsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SaveTuneGridsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Saves the beat grids kept for one tune, replacing any stored grids for the same SID hash.  **Validation:** - The route SID hash and the body SID hash are the same 32 lowercase hexadecimal characters - At most 256 subtune grids, unique and within 1-256 - Beat frames is 1-4096; beat one frame is 0 or more - Updated is an ISO-8601 timestamp  Anything outside these rules is rejected with a 400 and nothing is written.
+     * Save Tune Grids
+     */
+    async saveTuneGrids(requestParameters: SaveTuneGridsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SaveTuneGridsResponse> {
+        const response = await this.saveTuneGridsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

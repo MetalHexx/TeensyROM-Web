@@ -28,7 +28,6 @@ import {
   IDLE_PERIOD_SECONDS,
   MIN_TAIL_SECONDS,
   computePulse,
-  impliedTempo,
   segmentNotes,
   detectKey,
   detectKeyPerSection,
@@ -922,45 +921,38 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
         : pulse.dominantInterval.toLocaleString();
     }
     const record = this.cachedRecord();
-    return record === null || record.dominantIntervalFrames === null
+    return record === null || record.beatGrid === null
       ? '—'
-      : record.dominantIntervalFrames.toLocaleString();
+      : record.beatGrid.beatFrames.toLocaleString();
   });
 
-  protected readonly pulseNativeTempoLabel = computed<string>(() => {
-    const scan = this.scanOutput();
-    if (scan !== null) {
-      const pulse = this.pulseResult();
-      if (pulse === null || pulse.dominantInterval === null) return '—';
-      const { native } = impliedTempo(
-        pulse.dominantInterval,
-        this.view.snapshot().tempo.nominalIntervalUs,
-        scan.callsPerFrame,
-        1.0
-      );
-      return native === null ? '—' : native.toFixed(1);
+  /** The beat a tempo is read from, in play calls: the live scan's dominant interval, else the
+   *  cached record's beat grid; null with neither. */
+  private readonly beatPlayCalls = computed<number | null>(() => {
+    if (this.scanOutput() !== null) {
+      return this.pulseResult()?.dominantInterval ?? null;
     }
-    const record = this.cachedRecord();
-    return record === null || record.nativeTempo === null ? '—' : record.nativeTempo.toFixed(1);
+    return this.cachedRecord()?.beatGrid?.beatFrames ?? null;
+  });
+
+  /** The tempo of one beat of `beatPlayCalls`, through the rate in force like every duration in
+   *  this panel, so an exact-timed multispeed tune is not read at its rounded rate. Sounding is
+   *  native times the tempo multiplier. */
+  private tempoAt(multiplier: number): number | null {
+    const calls = this.beatPlayCalls();
+    if (calls === null || calls <= 0) return null;
+    const seconds = this.toSeconds(calls);
+    return seconds > 0 ? (60 / seconds) * multiplier : null;
+  }
+
+  protected readonly pulseNativeTempoLabel = computed<string>(() => {
+    const native = this.tempoAt(1.0);
+    return native === null ? '—' : native.toFixed(1);
   });
 
   protected readonly pulseSoundingTempoLabel = computed<string>(() => {
-    const scan = this.scanOutput();
-    if (scan !== null) {
-      const pulse = this.pulseResult();
-      if (pulse === null || pulse.dominantInterval === null) return '—';
-      const { sounding } = impliedTempo(
-        pulse.dominantInterval,
-        this.view.snapshot().tempo.nominalIntervalUs,
-        scan.callsPerFrame,
-        this.view.snapshot().tempo.multiplier
-      );
-      return sounding === null ? '—' : sounding.toFixed(1);
-    }
-    const record = this.cachedRecord();
-    return record === null || record.nativeTempo === null
-      ? '—'
-      : (record.nativeTempo * this.view.snapshot().tempo.multiplier).toFixed(1);
+    const sounding = this.tempoAt(this.view.snapshot().tempo.multiplier);
+    return sounding === null ? '—' : sounding.toFixed(1);
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
@@ -969,7 +961,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       return pulse === null ? '—' : pulse.confidence;
     }
     const record = this.cachedRecord();
-    return record === null ? '—' : record.pulseConfidence;
+    return record === null ? '—' : record.beatConfidence;
   });
 
   /** The key a pitched deck is actually sounding in. Reported beside the native key exactly as the

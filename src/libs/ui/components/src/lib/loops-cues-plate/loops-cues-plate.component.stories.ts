@@ -19,7 +19,8 @@ const meta: Meta<LoopsCuesPlateComponent & ProgressArgs> = {
       description: {
         component:
           "One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the " +
-          'fixed selected-loop row, and a two-column tile grid that takes the remaining height and ' +
+          'fixed selected-loop row (In and Out keys, a Length row and a Move row), and a two-column tile ' +
+          'grid that takes the remaining height and ' +
           'scrolls. Purely presentational — it holds no state of its own; the caller owns every ' +
           'marker, the drag offsets and the running tile’s progress, which a painter sets live ' +
           'through `setLiveProgress`. Each tile and the selected row ' +
@@ -54,25 +55,64 @@ const meta: Meta<LoopsCuesPlateComponent & ProgressArgs> = {
 export default meta;
 type Story = StoryObj<LoopsCuesPlateComponent & ProgressArgs>;
 
-function boundary(tag: string, overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
+function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
   const lower = tag.toLowerCase();
+  const isStart = tag === 'Start';
   return {
-    tag,
+    key: {
+      label: isStart ? 'In' : 'Out',
+      accessibleName: `Loop ${isStart ? 'in' : 'out'} selected deck A`,
+      control: isStart ? 'loop-in' : 'loop-set-end',
+      disabled: false,
+    },
     empty: false,
     disabled: false,
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [12, 38, 64, 90],
-    previousDisabled: false,
-    nextDisabled: false,
     nudgeAccessibleName: `Nudge ${lower} deck A`,
-    previousAccessibleName: `Snap ${lower} to previous moment deck A`,
-    nextAccessibleName: `Snap ${lower} to next moment deck A`,
+    earlierAccessibleName: `Move ${lower} earlier deck A`,
+    laterAccessibleName: `Move ${lower} later deck A`,
     ...overrides,
   };
 }
 
-function emptySelected(): LoopSelectedRowModel {
+const LENGTH_BEATS = [1, 2, 4, 8, 16, 32];
+const MOVE_STEPS = [1, 2, 4, 8, 16] as const;
+
+function beatsLabel(beats: number): string {
+  return beats === 1 ? '1 BEAT' : `${beats} BEATS`;
+}
+
+function lengthModel(text: string, onGrid: boolean): LoopSelectedRowModel['length'] {
+  return {
+    text,
+    options: onGrid
+      ? LENGTH_BEATS.map((beats) => ({
+          beats,
+          label: beatsLabel(beats),
+          selected: text === beatsLabel(beats),
+        }))
+      : [],
+    halveAccessibleName: 'Halve selected deck A',
+    doubleAccessibleName: 'Double selected deck A',
+    pickAccessibleName: 'Loop length selected deck A',
+  };
+}
+
+function moveModel(onGrid: boolean): LoopSelectedRowModel['move'] {
+  return {
+    stepText: '1 BEAT',
+    options: onGrid
+      ? MOVE_STEPS.map((beats) => ({ beats, label: beatsLabel(beats), selected: beats === 1 }))
+      : [],
+    earlierAccessibleName: 'Move selected earlier deck A',
+    laterAccessibleName: 'Move selected later deck A',
+    pickAccessibleName: 'Move step deck A',
+  };
+}
+
+function emptySelected(onGrid = true): LoopSelectedRowModel {
   return {
     empty: true,
     name: '',
@@ -81,13 +121,22 @@ function emptySelected(): LoopSelectedRowModel {
     activity: 'idle',
     ready: true,
     triggerDisabled: true,
-    setEndDisabled: true,
     clearEndDisabled: true,
     deleteDisabled: true,
-    start: boundary('Start', { disabled: true }),
-    end: boundary('End', { empty: true, disabled: true }),
+    start: boundary('Start', {
+      disabled: true,
+      tickPercents: [],
+      key: { ...boundary('Start').key, disabled: true },
+    }),
+    end: boundary('End', {
+      empty: true,
+      disabled: true,
+      tickPercents: [],
+      key: { ...boundary('End').key, disabled: true },
+    }),
+    length: lengthModel('—', false),
+    move: moveModel(onGrid),
     triggerAccessibleName: 'Trigger selected deck A',
-    setEndAccessibleName: 'Set end deck A',
     clearEndAccessibleName: 'Clear end deck A',
     deleteAccessibleName: 'Delete selected deck A',
     playNowDisabled: true,
@@ -104,10 +153,10 @@ function emptySelected(): LoopSelectedRowModel {
   };
 }
 
-function selectedFor(tile: LoopTileModel): LoopSelectedRowModel {
+function selectedFor(tile: LoopTileModel, onGrid = true): LoopSelectedRowModel {
   const isCue = tile.kind === 'cue';
   return {
-    ...emptySelected(),
+    ...emptySelected(onGrid),
     empty: false,
     name: tile.name,
     kindLabel: isCue ? 'CUE' : 'LOOP',
@@ -115,7 +164,6 @@ function selectedFor(tile: LoopTileModel): LoopSelectedRowModel {
     activity: tile.activity,
     ready: tile.ready,
     triggerDisabled: false,
-    setEndDisabled: !isCue,
     clearEndDisabled: isCue,
     deleteDisabled: false,
     playNowDisabled: false,
@@ -129,7 +177,8 @@ function selectedFor(tile: LoopTileModel): LoopSelectedRowModel {
     renameLabel: `Rename ${tile.name}`,
     nameMaxLength: 48,
     start: boundary('Start'),
-    end: boundary('End', { empty: isCue, disabled: isCue }),
+    end: boundary('End', { empty: isCue }),
+    length: lengthModel(isCue ? 'NO END' : tile.lengthText, onGrid),
   };
 }
 
@@ -139,7 +188,7 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
     id: `item-${number}`,
     name: `Item ${number}`,
     kind,
-    lengthText: kind === 'cue' ? 'CUE' : `${(number * 1.3 + 2).toFixed(1)}s`,
+    lengthText: kind === 'cue' ? 'CUE' : `${number * 4} BEATS`,
     activity: 'idle',
     selected: false,
     ready: true,
@@ -215,6 +264,54 @@ export const MixedSettings: Story = {
   },
 };
 
+/** A loop on the grid selected: lengths in beats, the Length and Move pickers live. */
+export const LoopOnGrid: Story = {
+  args: {
+    runningProgressPercent: 0,
+    model: plateModel([
+      tile(1, { selected: true, lengthText: '16 BEATS' }),
+      tile(2, { lengthText: '8 BEATS' }),
+    ]),
+  },
+};
+
+/** A cue selected: the Length readout says NO END and the End row keeps an enabled Out key. */
+export const CueNoEnd: Story = {
+  args: {
+    runningProgressPercent: 0,
+    model: plateModel([
+      tile(1, { lengthText: '16 BEATS' }),
+      tile(2, { kind: 'cue', selected: true }),
+    ]),
+  },
+};
+
+/** A loop off the grid: its length reads in seconds and the Length picker is plain text. */
+export const OffGridLoop: Story = {
+  args: {
+    runningProgressPercent: 0,
+    model: (() => {
+      const loop = tile(1, { selected: true, lengthText: '7.8s' });
+      return plateModel([loop, tile(2, { lengthText: '13.4s' })], {
+        selected: { ...selectedFor(loop), length: lengthModel('7.8s', false) },
+      });
+    })(),
+  },
+};
+
+/** No grid on the deck: the Length and Move readouts are plain text, with no pickers. */
+export const NoGrid: Story = {
+  args: {
+    runningProgressPercent: 0,
+    model: (() => {
+      const loop = tile(1, { selected: true, lengthText: '7.8s' });
+      return plateModel([loop, tile(2, { lengthText: '13.4s' })], {
+        selected: selectedFor(loop, false),
+      });
+    })(),
+  },
+};
+
 /** Many markers: the grid scrolls, the selected row stays put, and the selection sits lower. */
 export const ManyMarkers: Story = {
   args: {
@@ -234,7 +331,7 @@ export const ManyMarkers: Story = {
 
 /** The six items of the queued-jump sequence, with the given states applied by item number. */
 function jumpTiles(states: Record<number, Partial<LoopTileModel>>): LoopTileModel[] {
-  const lengths = ['7.8s', '13.4s', 'CUE', '8.0s', '8.0s', 'CUE'];
+  const lengths = ['8 BEATS', '16 BEATS', 'CUE', '8 BEATS', '4 BEATS', 'CUE'];
   return lengths.map((lengthText, index) =>
     tile(index + 1, {
       kind: lengthText === 'CUE' ? 'cue' : 'loop',
