@@ -6,6 +6,8 @@ Two decks of SID music, played live through real C64s. Every note is made by the
 
 The DJ Mixer is part of Trom UI.
 
+> 🖼️ **Image placeholder:** DJ Mixer with a tune loaded on each deck
+
 ## What you need
 
 - A browser with MIDI support, such as Chrome or Edge, on the computer that runs the suite.
@@ -16,7 +18,7 @@ Allow MIDI access when the browser asks, then pick the TeensyROM each deck plays
 
 ## Load tunes
 
-Browse the SD and USB storage of every connected cart, along with your saved sets, or search the storage you have open. Drag a tune onto either deck to load it, or load a whole set onto a deck.
+Browse the SD and USB storage of every connected cart, along with your saved sets, or search the storage you have open. Load a tune onto either deck, or load a whole set onto a deck.
 
 ## Play a deck
 
@@ -63,11 +65,11 @@ A light between the decks shows how well the keys of the two loaded tunes fit, f
 
 ## Scratch
 
-Map a pitch bend strip on your controller to a deck. Touch the strip and the record is yours: move your finger to scratch. Let go and the record is thrown back up to the deck's speed.
+Scratch a deck's record from your MIDI controller. Let go and the record is thrown back up to the deck's speed.
 
 ## Controllers
 
-Map any control on the mixer to a knob, slider, key or pad on your MIDI controller by learning it. Each mapping can be a toggle, a hold, or an absolute or relative knob, and you can change it, relearn it or delete it. Your controllers are listed, and you choose which ones to listen to.
+Map any control on the mixer to your MIDI controller by learning it. A mapping can toggle, hold, or follow a control's position or its movement, and you can change it, relearn it or delete it. Your controllers are listed, and you choose which ones to listen to.
 
 ## Start the ASID player
 
@@ -80,5 +82,3 @@ The mixer remembers your work across a refresh of the page:
 - A tune's loops, cues and settings are kept per tune.
 - Your sets, and the settings and markers of each tune in them, are kept per set.
 - Your controller mappings and their settings are kept.
-
-> 🖼️ **Image placeholder:** DJ Mixer with a tune loaded on each deck

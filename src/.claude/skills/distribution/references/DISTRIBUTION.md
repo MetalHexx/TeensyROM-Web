@@ -346,7 +346,7 @@ brew install teensyrom-suite
 
 ### Formula Structure
 
-**Dual architecture support**:
+**Dual architecture support** (the URLs below take effect at the first suite release; see the upgrade path):
 ```ruby
 class TeensyromSuite < Formula
   desc "TeensyROM Suite: Trom UI, Trom Terminal and Trom API for your TeensyROM"

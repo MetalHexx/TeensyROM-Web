@@ -12,7 +12,7 @@ The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-term
 
 1. Unpack the archive into a folder.
 2. Start the suite by running `TeensyRom.Api` (`TeensyRom.Api.exe` on Windows) at the root of that folder. Or run `cli/trom`, which starts it for you.
-3. Run `trom path add` once to put `trom` on your PATH.
+3. Run `cli/trom path add` once (`cli\trom path add` on Windows) to put `trom` on your PATH, then open a new terminal.
 
 On Linux, make the program executable first with `chmod +x TeensyRom.Api`. Windows may show a security warning the first time: choose "More info", then "Run anyway".
 
@@ -50,7 +50,7 @@ Plug your TeensyROM into the computer that runs the suite, over USB or the netwo
 
 Connect as many carts as you like, in any mix of USB and network. They all work at the same time.
 
-A cart keeps its library and settings whichever way it connects, because the suite recognises it by an identity file it keeps on the cart's storage. Leave that file in place.
+A cart keeps its library and settings whichever way it connects.
 
 ### Rename a cart
 

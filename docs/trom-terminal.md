@@ -24,8 +24,6 @@ New here? [Getting started](getting-started.md) covers installing the suite and 
 
 Run `trom` on its own and follow the prompts. The menu reaches everything above, and it prints a line whenever a transfer starts or ends, whether a watch folder or another app started it.
 
-Launch is the star of the show. Start a stream and enjoy.
-
 ## Stream Player
 
 The Stream Player plays through your library like a streaming service. Open it from Launch in the guided menu, or start it on a file with `--player`:
@@ -35,7 +33,7 @@ trom file launch /music/MUSICIANS/T/Tjelta_Geir/Artillery.sid --player
 trom file random --filter music --player
 ```
 
-Skip to the next or previous file, pause and resume, favorite or ban what is playing, and share it. Shape the stream with a mode, a filter, a play timer or a pinned folder. A timer moves games, demos and images along by themselves. Try one on a folder of demos, on your favorites, or on images for a screensaver.
+Skip to the next or previous file, pause and resume, favorite or ban what is playing, and share it. Shape the stream with a mode, a filter, a play timer or a pinned folder. A timer moves games, demos and images along by themselves.
 
 > 🖼️ **Image placeholder:** Stream Player
 
@@ -114,8 +112,7 @@ Chipsynth C64 can stream ASID MIDI to external hardware such as your TeensyROM. 
 trom chipsynth generate --source "c:\your\preset\directory" --target ASID --clock ntsc
 ```
 
-It scans the preset folder and its subfolders for `.fermatax` files and writes the copies into a new folder named by `--target`. Your originals are never overwritten, and the new presets show up in Chipsynth's preset browser the next time you start it. Back up your factory presets first, as a good habit.
-
+It scans the preset folder and its subfolders for `.fermatax` files and writes the copies into a new folder named by `--target`. Your originals are never overwritten, and the new presets show up in Chipsynth's preset browser the next time you start it.
 Read more in the [TeensyROM ASID player documentation](https://github.com/SensoriumEmbedded/TeensyROM/blob/main/docs/ASID_Player.md).
 
 ## Next
