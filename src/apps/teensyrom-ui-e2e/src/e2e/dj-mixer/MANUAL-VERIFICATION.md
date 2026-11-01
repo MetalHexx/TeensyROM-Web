@@ -801,7 +801,7 @@ two decks. The grip default (250 ms) is the value to tune.
 11. Learn WRAP onto a MIDI control and press it. The selected loop's WRAP toggles, and a scrub
     backward past the start now wraps or stops to match.
 
-## Speed, grids and loops on the grid (ASID-DJ-18)
+## Matching by hand (ASID-DJ-18)
 
 Browser check of the deck's slow speed controls, the beat grid with Tap and BPM, and the beat-based
 loop commands (Add, In, Out, Length, Move and the edge arrows), driven against the running dev
@@ -879,7 +879,7 @@ page the set came back with its four rows, and loading the tune on both decks fr
 - Move step menu: 1, 2, 4, 8 and 16 beats. On a 32-beat loop at each step, Move shifted start and end
   together by exactly that many beats with the length kept, and the start and end arrows each moved
   their edge by exactly that many beats.
-- On a loop running at 14285-14813 (11 beats, 143 s into a 162 s tune), `seekToFrame`, `queueJump`
+- On a loop running at 14285-14813 (11 beats, 143 s into a 161 s tune), `seekToFrame`, `queueJump`
   and `setActiveLoop` on the runtime were logged with the engine's hand-off count and the position
   every 8 ms:
 
@@ -999,7 +999,9 @@ The operator listens throughout and records the verdict in their words.
   edit lands at the end of its pass with no late pass.
 - [ ] Very short loops (1/16 beat is 3 frames at 125 BPM on a 2x tune): whether they stutter or hold
   a note.
+- [ ] Playback timing run per the timing protocol above with both decks looping, and the fields
+  recorded against the Performance log's numbers.
 
 ### Verdict
 
-Pending: the operator's, from the bench.
+Pending: the operator's, from the bench, with both cartridges connected.
