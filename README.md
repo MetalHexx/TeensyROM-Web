@@ -48,6 +48,7 @@ Browse your library from the couch, stream it like a music service, script it, a
 **Just ask.** Type `/trom` in [Claude Code](https://claude.com/claude-code) and say what you want.
 
 <p align="center">
+  <img src=".github/images/trom-agent-greeting.png" alt="Trom Agent greeting you in Claude Code" width="49%">
   <img src=".github/images/trom-agent.png" alt="Trom Agent playing a Depeche Mode set in Claude Code" width="49%">
 </p>
 
