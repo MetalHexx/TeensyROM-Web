@@ -47,7 +47,9 @@ Browse your library from the couch, stream it like a music service, script it, a
 
 **Just ask.** Type `/trom` in [Claude Code](https://claude.com/claude-code) and say what you want.
 
-> 🖼️ **Image placeholder:** Trom Agent in Claude Code
+<p align="center">
+  <img src=".github/images/trom-agent.png" alt="Trom Agent playing a Depeche Mode set in Claude Code" width="49%">
+</p>
 
 - **Play by request:** "play me some Rob Hubbard", "give me a 30-minute set", "show me demos from 1989".
 - **Tours and curation:** explores your library with you, and tells you about what is playing.
