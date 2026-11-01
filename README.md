@@ -1,79 +1,74 @@
-# TeensyROM Suite
+<h1 align="center">TeensyROM Suite</h1>
 
-<img width="2557" height="1301" alt="Trom UI playing a SID" src=".github/images/hero-screenshot.png" />
+<p align="center">
+  <b>Turn your Commodore 64 into a jukebox, an arcade and a DJ booth.</b>
+</p>
 
-TeensyROM Suite is everything you need to run your Commodore 64 through a [TeensyROM cartridge](https://github.com/SensoriumEmbedded/TeensyROM): launch games, SID music, demos and images from massive collections, remotely and in an instant.
-Use it in your browser, from your terminal, from Claude Code or from your own code, on Windows, macOS and Linux.
+<p align="center">
+  <a href="#get-started">Get started</a> · <a href="docs/README.md">Docs</a> · <a href="https://discord.com/invite/ubSAb74S5U">Discord</a>
+</p>
 
-## Four apps, one suite
+TeensyROM Suite is a set of apps for the [TeensyROM](https://github.com/SensoriumEmbedded/TeensyROM) cartridge. They put everything on your cart, every game, demo, SID tune and image, a click, a command or a sentence away, and it all plays on your real C64.
 
-<table>
-  <tr>
-    <td align="center" width="50%" valign="top">
-      <a href="docs/trom-ui.md"><img src=".github/images/hero-screenshot.png" alt="Trom UI" width="320"></a><br>
-      <b><a href="docs/trom-ui.md">Trom UI</a></b><br>
-      Browse and search your cart, launch games, demos, SIDs and images from any browser, and stream it all like a retro media service.
-    </td>
-    <td align="center" width="50%" valign="top">
+Browse your library from the couch, stream it like a music service, script it, ask an AI for a set, or take the stage with two C64s as your decks. Pick the app that suits the moment. They all run on Trom API, so they work with the same carts at the same time, on Windows, macOS and Linux.
+
+## Trom UI
+
+**Browse, search and launch your whole library from your desktop, phone or tablet.**
+
+<p align="center">
+  <img src=".github/images/hero-screenshot.png" alt="Trom UI playing a SID" width="49%">
+  <img src=".github/images/dj-mixer.png" alt="The DJ Mixer with a tune on each deck" width="49%">
+</p>
+
+- **Stream it:** shuffle and auto-play games, demos, SIDs and images, hands-free.
+- **Watch it:** see your C64's picture in the browser, with CRT effects.
+- **Mix it:** the [DJ Mixer](docs/dj-mixer.md) turns two C64s into decks you play live, with every note from a real SID chip.
+- **Make it yours:** copy files to your cart, watch folders, and set your C64's menu colors.
+
+[Explore Trom UI →](docs/trom-ui.md)
+
+## Trom Terminal
+
+**Your library from the command line, BBS-style.**
 
 > 🖼️ **Image placeholder:** Trom Terminal main menu
 
-<b><a href="docs/trom-terminal.md">Trom Terminal</a></b><br>
-A guided, BBS-style menu and one-line commands for launching, shuffling, searching and scripting your library.
-</td>
-  </tr>
-  <tr>
-    <td align="center" width="50%" valign="top">
+- **Guided menu:** explore and launch without learning a single command.
+- **Stream Player:** plays through your library like a streaming service.
+- **One-line commands:** every action as a command, with `--json` output that pipes into your scripts.
+
+[Explore Trom Terminal →](docs/trom-terminal.md)
+
+## Trom Agent
+
+**Just ask.** Type `/trom` in [Claude Code](https://claude.com/claude-code) and say what you want.
 
 > 🖼️ **Image placeholder:** Trom Agent in Claude Code
 
-<b><a href="docs/trom-agent.md">Trom Agent</a></b><br>
-Your TeensyROM companion in Claude Code: ask it to play, run timed sets, tour your library and check your setup.
-</td>
-    <td align="center" width="50%" valign="top">
-      <a href="docs/trom-api.md"><img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="320"></a><br>
-      <b><a href="docs/trom-api.md">Trom API</a></b><br>
-      Control your cart from your own scripts and tools: launch files, search your library, copy files over and set themes. It's the same server Trom UI and Trom Terminal use.
-    </td>
-  </tr>
-</table>
+- **Play by request:** "play me some Rob Hubbard", "give me a 30-minute set", "show me demos from 1989".
+- **Tours and curation:** explores your library with you, and tells you about what is playing.
+- **Setup:** installs the suite, keeps it up to date, and checks your setup with Virtual Travis.
 
-## One download gets you everything
+[Explore Trom Agent →](docs/trom-agent.md)
 
-Download the package for your platform from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac. It holds Trom API, Trom UI and Trom Terminal, and Trom Agent installs the suite for you. [Getting started](docs/getting-started.md) takes you from download to your first launch.
+## Trom API
 
-## Highlights
+**Drive your cart from your own code:** launch files, search your library, copy files and set themes. It's the same API Trom UI and Trom Terminal use.
 
-### DJ Mixer
+<p align="center">
+  <img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="98%">
+</p>
 
-<img width="2501" height="1227" alt="DJ Mixer with a tune loaded on each deck" src=".github/images/dj-mixer.png" />
+[Explore Trom API →](docs/trom-api.md)
 
-Two decks of SID music, played live through real C64s. Every note is made by the SID chip itself, and none by an emulator.
+## Get started
 
-- Shape each voice, the filter and the key of a tune
-- Loop, cue and scratch
-- See each deck's BPM, with loops that land on the beat
-- Build sets and mix between decks
-- See at a glance how well two keys fit
-- Map any control to your MIDI controller
+1. **Download** the suite for Windows, macOS or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac. Trom Agent can also install it for you.
+2. **Connect** your TeensyROM over USB or your network.
+3. **Play.** Open Trom UI at `http://localhost:10213`, run `trom`, or type `/trom` in Claude Code.
 
-[Read about the DJ Mixer](docs/dj-mixer.md)
-
-### Copying files and watch folders
-
-Send files to your cart from your computer, or let a watch folder send whatever lands in it. [More in Trom UI](docs/trom-ui.md#copy-files-to-your-cart).
-
-### Themes
-
-Pick the colors of your C64's menu, tune your own and apply them to one cart or all of them. [More in Trom UI](docs/trom-ui.md#themes).
-
-### Trom Terminal
-
-A guided menu with a Stream Player that plays through your library, or one-line commands you can pipe into scripts. [Meet Trom Terminal](docs/trom-terminal.md).
-
-### Trom Agent
-
-Type `/trom` in Claude Code and ask for what you want in plain words, from a quick shuffle to a timed set. [Meet Trom Agent](docs/trom-agent.md).
+[Getting started](docs/getting-started.md) has the details, from your first download to a fully indexed library.
 
 ## Discord
 
