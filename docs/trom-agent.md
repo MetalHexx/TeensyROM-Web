@@ -4,6 +4,8 @@ Trom Agent is your TeensyROM companion inside [Claude Code](https://claude.com/c
 
 It also installs TeensyROM Suite for you if you don't have it yet, and keeps it up to date.
 
+Plugins for other AI coding agents are coming soon.
+
 <img width="1471" height="747" alt="Trom Agent playing a Depeche Mode set in Claude Code" src="../.github/images/trom-agent.png" />
 
 ## Install

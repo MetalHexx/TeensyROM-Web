@@ -56,6 +56,8 @@ Browse your library from the couch, stream it like a music service, script it, a
 - **Tours and curation:** explores your library with you, and tells you about what is playing.
 - **Setup:** installs the suite, keeps it up to date, and checks your setup with Virtual Travis.
 
+Plugins for other AI coding agents are coming soon.
+
 [Explore Trom Agent →](docs/trom-agent.md)
 
 ## Trom API
