@@ -6,7 +6,7 @@ namespace TeensyRom.Core.Dj
     public enum DjSaveResult { Saved, LimitReached, Failed }
 
     /// <summary>
-    /// Stores DJ sets, tune memory and the current-set state as files under the engine's home.
+    /// Stores DJ sets, tune memory, tune beat grids and the current-set state as files under the engine's home.
     /// Methods throw <see cref="ArgumentException"/> for an id that is not a valid set id or SID hash.
     /// </summary>
     public interface IDjLibraryService
@@ -37,6 +37,13 @@ namespace TeensyRom.Core.Dj
         DjTuneMemory? GetTuneMemory(string sidHash);
 
         bool SaveTuneMemory(DjTuneMemory memory);
+
+        /// <summary>
+        /// The beat grids for the tune, or null when there are none, the file is corrupt or its stored hash does not match.
+        /// </summary>
+        DjTuneGrids? GetTuneGrids(string sidHash);
+
+        bool SaveTuneGrids(DjTuneGrids grids);
 
         /// <summary>
         /// The library state, with no current set when none was saved or its file is corrupt.

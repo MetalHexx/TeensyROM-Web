@@ -45,6 +45,7 @@ public class DjLibraryServiceTests : IDisposable
     private string SetFile(string id) => Path.Combine(_root, DjLibraryPaths.SetsFolder, id + ".json");
 
     private string TuneFile(string hash) => Path.Combine(_root, DjLibraryPaths.TunesFolder, hash + ".json");
+    private string GridsFile(string hash) => Path.Combine(_root, DjLibraryPaths.GridsFolder, hash + ".json");
 
     private static JsonElement Opaque(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
@@ -94,6 +95,13 @@ public class DjLibraryServiceTests : IDisposable
         Updated = "2026-10-26T21:02:44.871Z"
     };
 
+    private static DjTuneGrids Grids(string hash = SidHash) => new()
+    {
+        SidHash = hash,
+        Subtunes = [new DjSubtuneGrid { Subtune = 1, BeatFrames = 24, BeatOneFrame = 6 }, new DjSubtuneGrid { Subtune = 3, BeatFrames = 30, BeatOneFrame = 0 }],
+        Updated = "2026-10-26T21:02:44.871Z"
+    };
+
     private static void AssertSameJson<T>(T actual, T expected)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -122,6 +130,75 @@ public class DjLibraryServiceTests : IDisposable
         service.SaveTuneMemory(Memory()).Should().BeTrue();
 
         AssertSameJson(NewService().GetTuneMemory(SidHash), Memory());
+    }
+
+    [Fact]
+    public void TuneGrids_RoundTrip_AndStayApartFromTuneMemory()
+    {
+        var service = NewService();
+
+        service.SaveTuneGrids(Grids()).Should().BeTrue();
+
+        AssertSameJson(NewService().GetTuneGrids(SidHash), Grids());
+        File.Exists(GridsFile(SidHash)).Should().BeTrue();
+        File.Exists(TuneFile(SidHash)).Should().BeFalse();
+        service.GetTuneMemory(SidHash).Should().BeNull();
+    }
+
+    [Fact]
+    public void TuneGrids_SavedAgain_ReplaceTheStoredGrids()
+    {
+        var service = NewService();
+        service.SaveTuneGrids(Grids());
+
+        service.SaveTuneGrids(Grids() with { Subtunes = [new DjSubtuneGrid { Subtune = 2, BeatFrames = 12, BeatOneFrame = 1 }] });
+
+        NewService().GetTuneGrids(SidHash)!.Subtunes.Should().ContainSingle().Which.Subtune.Should().Be(2);
+    }
+
+    [Fact]
+    public void MissingTuneGrids_ReadAsNull_WithoutWarning()
+    {
+        NewService().GetTuneGrids(SidHash).Should().BeNull();
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public void CorruptTuneGrids_ReadAsNull_WarnAndStayOnDisk()
+    {
+        var service = NewService();
+        service.SaveTuneGrids(Grids());
+        File.WriteAllText(GridsFile(SidHash), "{ not json");
+
+        service.GetTuneGrids(SidHash).Should().BeNull();
+
+        _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains(SidHash)), Arg.Any<string?>());
+        File.ReadAllText(GridsFile(SidHash)).Should().Be("{ not json");
+    }
+
+    [Fact]
+    public void TuneGrids_WithHashNotMatchingTheirFileName_ReadAsNull_AndStayOnDisk()
+    {
+        var service = NewService();
+        var other = new string('a', 32);
+        service.SaveTuneGrids(Grids());
+        File.Copy(GridsFile(SidHash), GridsFile(other));
+
+        service.GetTuneGrids(other).Should().BeNull();
+
+        File.Exists(GridsFile(other)).Should().BeTrue();
+        _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains(other)), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public void SaveTuneGrids_WhenFileCannotBeReplaced_FailsWithoutTempFile()
+    {
+        var service = NewService();
+        Directory.CreateDirectory(GridsFile(SidHash));
+
+        service.SaveTuneGrids(Grids()).Should().BeFalse();
+
+        Directory.GetFiles(Path.GetDirectoryName(GridsFile(SidHash))!, "*.tmp").Should().BeEmpty();
     }
 
     [Fact]
@@ -305,5 +382,7 @@ public class DjLibraryServiceTests : IDisposable
 
         service.Invoking(s => s.GetTuneMemory(hash)).Should().Throw<ArgumentException>();
         service.Invoking(s => s.SaveTuneMemory(Memory(hash))).Should().Throw<ArgumentException>();
+        service.Invoking(s => s.GetTuneGrids(hash)).Should().Throw<ArgumentException>();
+        service.Invoking(s => s.SaveTuneGrids(Grids(hash))).Should().Throw<ArgumentException>();
     }
 }

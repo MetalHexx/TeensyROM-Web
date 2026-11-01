@@ -2875,6 +2875,118 @@
         }
       }
     },
+    "/api/dj/tunes/{sidHash}/grids": {
+      "put": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Save Tune Grids",
+        "description": "Saves the beat grids kept for one tune, replacing any stored grids for the same SID hash.\n\n**Validation:**\n- The route SID hash and the body SID hash are the same 32 lowercase hexadecimal characters\n- At most 256 subtune grids, unique and within 1-256\n- Beat frames is 1-4096; beat one frame is 0 or more\n- Updated is an ISO-8601 timestamp\n\nAnything outside these rules is rejected with a 400 and nothing is written.",
+        "operationId": "SaveTuneGrids",
+        "parameters": [
+          {
+            "name": "sidHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DjTuneGridsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveTuneGridsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "DjLibrary"
+        ],
+        "summary": "Get Tune Grids",
+        "description": "Reads the beat grids a DJ tapped for one tune: a beat length and first-beat frame per subtune.\n\nThe grids are null when none exist for the tune or their file is corrupt; a corrupt file is left on disk.\n\n**Validation:**\n- The SID hash is 32 lowercase hexadecimal characters",
+        "operationId": "GetTuneGrids",
+        "parameters": [
+          {
+            "name": "sidHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTuneGridsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dj/sets/{setId}": {
       "put": {
         "tags": [
@@ -3986,6 +4098,28 @@
           }
         }
       },
+      "DjSubtuneGridDto": {
+        "required": [
+          "subtune",
+          "beatFrames",
+          "beatOneFrame"
+        ],
+        "type": "object",
+        "properties": {
+          "subtune": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "beatFrames": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "beatOneFrame": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "DjSubtuneMemoryDto": {
         "required": [
           "subtune",
@@ -4007,6 +4141,51 @@
             "$ref": "#/components/schemas/NullableOfJsonElement"
           }
         }
+      },
+      "DjTuneGridsDto": {
+        "required": [
+          "sidHash",
+          "subtunes",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "subtunes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSubtuneGridDto"
+            }
+          },
+          "updated": {
+            "type": "string"
+          }
+        }
+      },
+      "DjTuneGridsDto2": {
+        "required": [
+          "sidHash",
+          "subtunes",
+          "updated"
+        ],
+        "type": "object",
+        "properties": {
+          "sidHash": {
+            "type": "string"
+          },
+          "subtunes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DjSubtuneGridDto"
+            }
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "nullable": true
       },
       "DjTuneMemoryDto": {
         "required": [
@@ -4409,6 +4588,14 @@
         "properties": {
           "theme": {
             "$ref": "#/components/schemas/ThemeDto"
+          }
+        }
+      },
+      "GetTuneGridsResponse": {
+        "type": "object",
+        "properties": {
+          "grids": {
+            "$ref": "#/components/schemas/DjTuneGridsDto2"
           }
         }
       },
@@ -5076,6 +5263,17 @@
         "properties": {
           "theme": {
             "$ref": "#/components/schemas/ThemeDto"
+          }
+        }
+      },
+      "SaveTuneGridsResponse": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
           }
         }
       },

@@ -1,6 +1,7 @@
 using TeensyRom.Api.Endpoints.DjLibrary;
 using TeensyRom.Api.Endpoints.DjLibrary.DeleteDjSet;
 using TeensyRom.Api.Endpoints.DjLibrary.GetDjSet;
+using TeensyRom.Api.Endpoints.DjLibrary.GetTuneGrids;
 using TeensyRom.Api.Endpoints.DjLibrary.GetTuneMemory;
 using TeensyRom.Api.Endpoints.DjLibrary.SaveDjLibraryState;
 
@@ -46,6 +47,21 @@ public class DjLibraryRouteValidatorTests
     public void GetTuneMemory_RequiresA32CharacterLowercaseHexSidHash(string sidHash, bool valid)
     {
         var result = new GetTuneMemoryRequestValidator().Validate(new GetTuneMemoryRequest { SidHash = sidHash });
+
+        result.IsValid.Should().Be(valid);
+        if (!valid) result.Errors.Should().Contain(e => e.PropertyName == "SidHash");
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef", true)]
+    [InlineData("0123456789abcdef0123456789abcde", false)]
+    [InlineData("0123456789abcdef0123456789abcdef0", false)]
+    [InlineData("0123456789ABCDEF0123456789ABCDEF", false)]
+    [InlineData("../0123456789abcdef0123456789abc", false)]
+    [InlineData("0123456789abcdef0123456789abcdef\n", false)]
+    public void GetTuneGrids_RequiresA32CharacterLowercaseHexSidHash(string sidHash, bool valid)
+    {
+        var result = new GetTuneGridsRequestValidator().Validate(new GetTuneGridsRequest { SidHash = sidHash });
 
         result.IsValid.Should().Be(valid);
         if (!valid) result.Errors.Should().Contain(e => e.PropertyName == "SidHash");

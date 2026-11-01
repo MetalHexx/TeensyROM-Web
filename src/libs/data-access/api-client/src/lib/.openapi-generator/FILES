@@ -48,7 +48,10 @@ models/DjSetDto.ts
 models/DjSetDto2.ts
 models/DjSetRowDto.ts
 models/DjSetSummaryDto.ts
+models/DjSubtuneGridDto.ts
 models/DjSubtuneMemoryDto.ts
+models/DjTuneGridsDto.ts
+models/DjTuneGridsDto2.ts
 models/DjTuneMemoryDto.ts
 models/DjTuneMemoryDto2.ts
 models/FileItemDto.ts
@@ -67,6 +70,7 @@ models/GetJobResponse.ts
 models/GetMidiSettingsResponse.ts
 models/GetSettingsResponse.ts
 models/GetThemeResponse.ts
+models/GetTuneGridsResponse.ts
 models/GetTuneMemoryResponse.ts
 models/GetVersionResponse.ts
 models/GetWatchFoldersResponse.ts
@@ -108,6 +112,7 @@ models/SaveSettingsRequest.ts
 models/SaveSettingsResponse.ts
 models/SaveThemeBody.ts
 models/SaveThemeResponse.ts
+models/SaveTuneGridsResponse.ts
 models/SaveTuneMemoryResponse.ts
 models/SealJobResponse.ts
 models/SearchResponse.ts

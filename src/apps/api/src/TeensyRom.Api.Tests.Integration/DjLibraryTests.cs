@@ -4,10 +4,12 @@ using TeensyRom.Api.Endpoints.DjLibrary;
 using TeensyRom.Api.Endpoints.DjLibrary.DeleteDjSet;
 using TeensyRom.Api.Endpoints.DjLibrary.GetDjLibraryState;
 using TeensyRom.Api.Endpoints.DjLibrary.GetDjSet;
+using TeensyRom.Api.Endpoints.DjLibrary.GetTuneGrids;
 using TeensyRom.Api.Endpoints.DjLibrary.GetTuneMemory;
 using TeensyRom.Api.Endpoints.DjLibrary.ListDjSets;
 using TeensyRom.Api.Endpoints.DjLibrary.SaveDjLibraryState;
 using TeensyRom.Api.Endpoints.DjLibrary.SaveDjSet;
+using TeensyRom.Api.Endpoints.DjLibrary.SaveTuneGrids;
 using TeensyRom.Api.Endpoints.DjLibrary.SaveTuneMemory;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Dj;
@@ -47,6 +49,8 @@ namespace TeensyRom.Api.Tests.Integration
         private static string SetFile(string id) => Path.Combine(DjRoot, DjLibraryPaths.SetsFolder, id + ".json");
         private static string TuneFile(string hash) => Path.Combine(DjRoot, DjLibraryPaths.TunesFolder, hash + ".json");
 
+        private static string GridsFile(string hash) => Path.Combine(DjRoot, DjLibraryPaths.GridsFolder, hash + ".json");
+
         public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
@@ -60,6 +64,7 @@ namespace TeensyRom.Api.Tests.Integration
             if (Directory.Exists(SetFile(SetId))) Directory.Delete(SetFile(SetId), recursive: true);
             if (File.Exists(SetFile(SetId))) File.Delete(SetFile(SetId));
             if (File.Exists(TuneFile(SidHash))) File.Delete(TuneFile(SidHash));
+            if (File.Exists(GridsFile(SidHash))) File.Delete(GridsFile(SidHash));
             var library = Path.Combine(DjRoot, DjLibraryPaths.LibraryFile);
             if (File.Exists(library)) File.Delete(library);
         }
@@ -221,6 +226,44 @@ namespace TeensyRom.Api.Tests.Integration
             r.Should().BeValidationProblem().WithKey("Body.SidHash");
             File.Exists(TuneFile(SidHash)).Should().BeFalse();
             File.Exists(TuneFile(body.SidHash)).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task TuneGrids_RoundTrip_AndUnknownTuneIsNull()
+        {
+            (await f.Client.GetAsync<GetTuneGridsEndpoint, GetTuneGridsRequest, GetTuneGridsResponse>(new() { SidHash = SidHash }))
+                .Content.Grids.Should().BeNull();
+
+            var gridsJson = $$"""
+                { "sidHash": "{{SidHash}}",
+                  "subtunes": [{ "subtune": 1, "beatFrames": 24, "beatOneFrame": 6 }, { "subtune": 2, "beatFrames": 30, "beatOneFrame": 0 }],
+                  "updated": "2026-10-26T21:02:44.871Z" }
+                """;
+            var body = JsonSerializer.Deserialize<DjTuneGridsDto>(gridsJson, Web)!;
+
+            var saved = await f.Client.PutAsync<SaveTuneGridsEndpoint, SaveTuneGridsRequest, SaveTuneGridsResponse>(new() { SidHash = SidHash, Body = body });
+            saved.Should().BeSuccessful<SaveTuneGridsResponse>().WithStatusCode(HttpStatusCode.OK);
+
+            var got = await f.Client.GetAsync<GetTuneGridsEndpoint, GetTuneGridsRequest, GetTuneGridsResponse>(new() { SidHash = SidHash });
+            got.Should().BeSuccessful<GetTuneGridsResponse>();
+            AssertSameJson(got.Content.Grids!, gridsJson);
+            File.Exists(TuneFile(SidHash)).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveTuneGrids_WithInvalidBody_IsRejectedAndWritesNothing()
+        {
+            var body = new DjTuneGridsDto
+            {
+                SidHash = SidHash,
+                Subtunes = [new DjSubtuneGridDto { Subtune = 1, BeatFrames = 0, BeatOneFrame = 0 }],
+                Updated = "2026-10-26T21:02:44.871Z"
+            };
+
+            var r = await f.Client.PutAsync<SaveTuneGridsEndpoint, SaveTuneGridsRequest, ValidationProblemDetails>(new() { SidHash = SidHash, Body = body });
+
+            r.Should().BeValidationProblem().WithKey("Body.Subtunes[0].BeatFrames");
+            File.Exists(GridsFile(SidHash)).Should().BeFalse();
         }
 
         [Fact]

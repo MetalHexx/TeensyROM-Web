@@ -10,6 +10,7 @@ namespace TeensyRom.Core.Dj
         public const string RootFolder = "dj";
         public const string SetsFolder = "sets";
         public const string TunesFolder = "tunes";
+        public const string GridsFolder = "grids";
         public const string LibraryFile = "library.json";
         public const string Extension = ".json";
     }
