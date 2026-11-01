@@ -2,7 +2,7 @@
 
 ## What it is
 
-Two decks of SID music, played live through real C64s. Every note is made by the SID chip itself, and none by an emulator. Load a tune on each deck, shape its sound, loop and cue it, scratch it, and mix between them.
+Two decks of SID music, played live through real C64s. Every note is made by the SID chip itself, and none by an emulator. Load a tune on each deck, match their tempos by BPM, shape the sound, loop and cue on the beat, scratch, and mix between them.
 
 The DJ Mixer is part of Trom UI.
 
@@ -25,8 +25,14 @@ Browse the SD and USB storage of every connected cart, along with your saved set
 - **Transport:** play, pause, stop and repeat the tune.
 - **Position:** see how far in you are, and jump to any point.
 - **Tunes:** step to the previous or next tune in the loaded set, and to the previous or next sub-tune of the tune that is loaded.
-- **Speed:** change the playback speed, nudge it up or down for a moment, or return to normal.
+- **Speed:** change the playback speed in steps as fine as 0.01%, nudge it up or down for a moment, or return to normal. Turn a knob or scroll slowly for fine steps and quickly for big ones.
 - **Voices:** mute any of a tune's three voices, or hold one.
+
+## Beat grid and BPM
+
+Each tune gets a beat grid, and each deck shows its BPM under the speed. The BPM follows the speed you are playing at, so you can match two tunes by setting their speeds until the readouts agree. A tune with no steady beat, or a stretch of a tune at another tempo, shows no BPM.
+
+If a grid is wrong, tap along with the tune for a few beats to set it yourself. Tapping is also how you give a tune with no grid one.
 
 ## Shape the sound
 
@@ -42,13 +48,18 @@ The settings show the chip's live values as the tune plays, and every voice has 
 
 ## Loops and cues
 
-Each deck keeps a list of loops and cues for the tune it holds.
+Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats. Without one they land at the playhead, and Length and Move don't apply.
 
 - **Set:** add a marker at the current position. Give it an end to make it a loop, or leave it as a cue. Stop a running loop at any time.
-- **Fine tune:** nudge a marker's start or end, or snap it to the previous or next moment in the tune.
+- **Start and end:** set a marker's start or end at the current position, anywhere in the tune. Setting the end of a cue makes it a loop.
+- **Length:** halve or double a loop, or pick its size in beats, from a fraction of a beat up to 128. A loop's length reads in beats.
+- **Move:** slide a loop, or just its start or end, earlier or later by 1, 2, 4, 8 or 16 beats, anywhere in the tune. A marker that is off the beat lands on a beat the first time you move it.
+- **Fine tune:** nudge a marker's start or end by up to a second, which can put it off the beat.
 - **Name:** rename any marker.
 - **Jump:** jump to a marker, or start it right away.
 - **Own mixer settings:** a marker follows the deck's settings by default. Give it voice, filter and key settings of its own, and the list shows which markers have them.
+
+Changes to a running loop take effect when its current pass ends, so the deck stays on the beat.
 
 ## Sets
 
@@ -80,5 +91,6 @@ The decks play through the ASID player on each cart. Start it on both decks' car
 The mixer remembers your work across a refresh of the page:
 
 - A tune's loops, cues and settings are kept per tune.
+- A beat grid you correct by tapping is kept with the tune, and every set that holds the tune uses it.
 - Your sets, and the settings and markers of each tune in them, are kept per set.
 - Your controller mappings and their settings are kept.

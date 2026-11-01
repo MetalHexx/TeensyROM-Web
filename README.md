@@ -52,6 +52,7 @@ Two decks of SID music, played live through real C64s. Every note is made by the
 
 - Shape each voice, the filter and the key of a tune
 - Loop, cue and scratch
+- See each deck's BPM, with loops that land on the beat
 - Build sets and mix between decks
 - See at a glance how well two keys fit
 - Map any control to your MIDI controller
