@@ -41,7 +41,14 @@
       (playNowSelected)="onPlayNowSelected()"
       (toggleGlobal)="onToggleGlobal()"
       (toggleWrap)="onToggleWrap()"
-      (setEnd)="onSetEnd()"
+      (setIn)="onSetIn()"
+      (setOut)="onSetOut()"
+      (halve)="onHalve()"
+      (double)="onDouble()"
+      (pickLength)="onPickLength($event)"
+      (moveEarlier)="onMoveEarlier()"
+      (moveLater)="onMoveLater()"
+      (pickMoveStep)="onPickMoveStep($event)"
       (clearEnd)="onClearEnd()"
       (deleteSelected)="onDeleteSelected()"
       (rename)="onRenameSelected($event)"
@@ -50,7 +57,7 @@
       (selectTile)="onSelectTile($event)"
       (nudgeInput)="onNudgeInput($event)"
       (nudgeCommit)="onNudgeCommit($event)"
-      (snap)="onSnap($event)"
+      (moveEdge)="onMoveEdge($event)"
     ></lib-loops-cues-plate>
   </lib-scaling-container>
 

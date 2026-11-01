@@ -1,21 +1,26 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LoopSelectedRowComponent, type LoopSelectedRowModel } from './loop-selected-row.component';
 import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 
-function boundary(tag: string, overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
+function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
+  const isStart = tag === 'Start';
   return {
-    tag,
+    key: {
+      label: isStart ? 'In' : 'Out',
+      accessibleName: isStart ? 'Loop in' : 'Loop out',
+      control: isStart ? 'loop-in' : 'loop-set-end',
+      disabled: false,
+    },
     empty: false,
     disabled: false,
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [],
-    previousDisabled: false,
-    nextDisabled: false,
     nudgeAccessibleName: `Nudge ${tag}`,
-    previousAccessibleName: `Snap ${tag} previous`,
-    nextAccessibleName: `Snap ${tag} next`,
+    earlierAccessibleName: `Move ${tag} earlier`,
+    laterAccessibleName: `Move ${tag} later`,
     ...overrides,
   };
 }
@@ -28,13 +33,31 @@ const loop: LoopSelectedRowModel = {
   activity: 'idle',
   ready: true,
   triggerDisabled: false,
-  setEndDisabled: false,
   clearEndDisabled: false,
   deleteDisabled: false,
   start: boundary('Start'),
   end: boundary('End'),
+  length: {
+    text: '16 BEATS',
+    options: [
+      { beats: 8, label: '8 BEATS', selected: false },
+      { beats: 16, label: '16 BEATS', selected: true },
+    ],
+    halveAccessibleName: 'Halve Item 3',
+    doubleAccessibleName: 'Double Item 3',
+    pickAccessibleName: 'Loop length Item 3',
+  },
+  move: {
+    stepText: '1 BEAT',
+    options: [
+      { beats: 1, label: '1 BEAT', selected: true },
+      { beats: 4, label: '4 BEATS', selected: false },
+    ],
+    earlierAccessibleName: 'Move Item 3 earlier',
+    laterAccessibleName: 'Move Item 3 later',
+    pickAccessibleName: 'Move step',
+  },
   triggerAccessibleName: 'Trigger Item 3',
-  setEndAccessibleName: 'Set end of Item 3',
   clearEndAccessibleName: 'Clear end of Item 3',
   deleteAccessibleName: 'Delete Item 3',
   playNowDisabled: false,
@@ -54,13 +77,17 @@ const cue: Partial<LoopSelectedRowModel> = {
   kindLabel: 'CUE',
   clearEndDisabled: true,
   end: boundary('End', { empty: true }),
+  length: { ...loop.length, text: 'NO END', options: [] },
 };
 
 describe('LoopSelectedRowComponent', () => {
   let fixture: ComponentFixture<LoopSelectedRowComponent>;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [LoopSelectedRowComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [LoopSelectedRowComponent],
+      providers: [provideNoopAnimations()],
+    }).compileComponents();
     fixture = TestBed.createComponent(LoopSelectedRowComponent);
     setModel({});
   });
@@ -73,6 +100,8 @@ describe('LoopSelectedRowComponent', () => {
   const el = (): HTMLElement => fixture.nativeElement;
   const button = (selector: string): HTMLButtonElement =>
     el().querySelector(`${selector} button`) as HTMLButtonElement;
+  const named = (label: string): HTMLButtonElement =>
+    el().querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement;
   const range = (control: string): HTMLInputElement =>
     el().querySelector(`[data-control="${control}"] input[type="range"]`) as HTMLInputElement;
   const display = (): HTMLElement => el().querySelector('.display') as HTMLElement;
@@ -106,25 +135,30 @@ describe('LoopSelectedRowComponent', () => {
     ]);
   });
 
-  it('shows the End boundary on a loop and no Set End key anywhere', () => {
-    expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
-    expect(range('loop-end')).not.toBeNull();
-    expect(el().querySelector('[data-control="loop-end"] [data-part="snap-next"]')).not.toBeNull();
-  });
-
-  it("puts Set End in a cue's End slot, in place of the snap keys, and emits setEnd from it", () => {
-    setModel(cue);
+  it('relays the In and Out keys, each from its own boundary', () => {
     const emitted: string[] = [];
-    fixture.componentInstance.setEnd.subscribe(() => emitted.push('setEnd'));
-    button('[data-control="loop-end"] [data-control="loop-set-end"]').click();
-    expect(emitted).toEqual(['setEnd']);
-    expect(el().querySelector('[data-control="loop-end"] [data-part^="snap-"]')).toBeNull();
-    expect(el().querySelector('[data-control="loop-end"] input')).toBeNull();
+    fixture.componentInstance.setIn.subscribe(() => emitted.push('setIn'));
+    fixture.componentInstance.setOut.subscribe(() => emitted.push('setOut'));
+    button('[data-control="loop-in"]').click();
+    button('[data-control="loop-set-end"]').click();
+    expect(emitted).toEqual(['setIn', 'setOut']);
+    expect(el().querySelector('[data-control="loop-start"] [data-control="loop-in"]')).not.toBeNull();
+    expect(el().querySelector('[data-control="loop-end"] [data-control="loop-set-end"]')).not.toBeNull();
   });
 
-  it("disables a cue's Set End key from the model", () => {
-    setModel({ ...cue, setEndDisabled: true });
-    expect(button('[data-control="loop-set-end"]').disabled).toBe(true);
+  it("keeps an enabled Out key on a cue's empty End row", () => {
+    setModel(cue);
+    expect(button('[data-control="loop-set-end"]').disabled).toBe(false);
+    expect(range('loop-end').disabled).toBe(true);
+  });
+
+  it('relays the halve and double keys', () => {
+    const emitted: string[] = [];
+    fixture.componentInstance.halve.subscribe(() => emitted.push('halve'));
+    fixture.componentInstance.double.subscribe(() => emitted.push('double'));
+    named('Halve Item 3').click();
+    named('Double Item 3').click();
+    expect(emitted).toEqual(['halve', 'double']);
   });
 
   it('follows sharesGlobal in the GBL switch and the display text', () => {
@@ -185,15 +219,74 @@ describe('LoopSelectedRowComponent', () => {
     expect(commits).toEqual([{ boundary: 'start', offsetFrames: -4 }]);
   });
 
-  it('tags snaps with the boundary and direction', () => {
-    const snaps: unknown[] = [];
-    fixture.componentInstance.snap.subscribe((v) => snaps.push(v));
-    button('[data-control="loop-start"] [data-part="snap-previous"]').click();
-    button('[data-control="loop-end"] [data-part="snap-next"]').click();
-    expect(snaps).toEqual([
-      { boundary: 'start', direction: 'previous' },
-      { boundary: 'end', direction: 'next' },
+  it('tags edge moves with the boundary and direction', () => {
+    const moves: unknown[] = [];
+    fixture.componentInstance.moveEdge.subscribe((v) => moves.push(v));
+    button('[data-control="loop-start"] [data-part="move-earlier"]').click();
+    button('[data-control="loop-end"] [data-part="move-later"]').click();
+    expect(moves).toEqual([
+      { boundary: 'start', direction: -1 },
+      { boundary: 'end', direction: 1 },
     ]);
+  });
+
+  describe('the Length and Move rows', () => {
+    const picker = (control: string): HTMLButtonElement =>
+      el().querySelector(`button[data-control="${control}"]`) as HTMLButtonElement;
+    const openPicker = (control: string): void => {
+      picker(control).click();
+      fixture.detectChanges();
+    };
+    const menuItems = (): HTMLButtonElement[] =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item'));
+
+    it('relays Move earlier and later', () => {
+      const emitted: string[] = [];
+      fixture.componentInstance.moveEarlier.subscribe(() => emitted.push('earlier'));
+      fixture.componentInstance.moveLater.subscribe(() => emitted.push('later'));
+      button('[data-control="loop-move-earlier"]').click();
+      button('[data-control="loop-move-later"]').click();
+      expect(emitted).toEqual(['earlier', 'later']);
+    });
+
+    it('opens the Length picker and emits the picked beats', () => {
+      const picked: number[] = [];
+      fixture.componentInstance.pickLength.subscribe((beats) => picked.push(beats));
+      expect(picker('loop-length').textContent).toContain('16 BEATS');
+      openPicker('loop-length');
+      expect(menuItems().map((item) => item.classList.contains('selected'))).toEqual([false, true]);
+      menuItems().find((item) => item.textContent?.includes('8 BEATS'))?.click();
+      expect(picked).toEqual([8]);
+    });
+
+    it('opens the Move step picker and emits the picked beats', () => {
+      const picked: number[] = [];
+      fixture.componentInstance.pickMoveStep.subscribe((beats) => picked.push(beats));
+      openPicker('loop-move-step');
+      menuItems().find((item) => item.textContent?.includes('4 BEATS'))?.click();
+      expect(picked).toEqual([4]);
+    });
+
+    it('draws a readout with no options as plain text that keeps its control id', () => {
+      setModel({
+        length: { ...loop.length, text: '7.8s', options: [] },
+        move: { ...loop.move, options: [] },
+      });
+      for (const [control, text] of [
+        ['loop-length', '7.8s'],
+        ['loop-move-step', '1 BEAT'],
+      ]) {
+        const readout = el().querySelector(`[data-control="${control}"]`) as HTMLElement;
+        expect(readout.tagName).not.toBe('BUTTON');
+        expect(readout.textContent?.trim()).toBe(text);
+      }
+    });
+
+    it('names each picker with its readout so the visible text is in the name', () => {
+      expect(picker('loop-length').getAttribute('aria-label')).toBe(
+        'Loop length Item 3, 16 BEATS'
+      );
+    });
   });
 
   it('feeds each drag offset to its own boundary', () => {
@@ -269,14 +362,29 @@ describe('LoopSelectedRowComponent', () => {
     expect(range('loop-start').disabled).toBe(false);
   });
 
-  it('blanks the display and disables every key and boundary when nothing is selected', () => {
-    setModel({ empty: true, name: '', kindLabel: '', spanText: '', end: boundary('End', { empty: true }) });
+  it('blanks the display and disables every key and boundary but the Move row when nothing is selected', () => {
+    setModel({
+      empty: true,
+      name: '',
+      kindLabel: '',
+      spanText: '',
+      end: boundary('End', { empty: true }),
+      length: { ...loop.length, text: '—', options: [] },
+    });
     expect(display().getAttribute('aria-label')).toBe('nothing selected');
     expect(display().textContent?.trim()).toBe('');
-    const controls = Array.from(el().querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input'));
-    expect(controls.length).toBeGreaterThan(0);
-    expect(controls.every((control) => control.disabled)).toBe(true);
-    expect(el().querySelector('[data-control="loop-set-end"]')).toBeNull();
+    const live = Array.from(
+      el().querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input')
+    ).filter((control) => !control.disabled);
+    expect(live.map((control) => control.closest('[data-control]')?.getAttribute('data-control'))).toEqual([
+      'loop-move-earlier',
+      'loop-move-step',
+      'loop-move-later',
+    ]);
+    for (const control of ['loop-in', 'loop-set-end']) {
+      expect(button(`[data-control="${control}"]`).disabled).toBe(true);
+    }
+    expect(el().querySelector('[data-control="loop-length"]')).not.toBeNull();
     expect(button('[data-control="loop-global"]').hasAttribute('aria-pressed')).toBe(false);
     expect(button('[data-control="loop-wrap"]').hasAttribute('aria-pressed')).toBe(false);
   });

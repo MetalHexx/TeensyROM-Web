@@ -13,12 +13,15 @@ const meta: Meta<LoopSelectedRowComponent> = {
           'The selected loop or cue: a trigger key, a one-shot play-now key, a small display of the ' +
           'name, kind and span, the GBL switch (lit and pressed while the marker shares the main ' +
           "track's settings), an icon-only Clear End key and Delete, and beneath them the Start and " +
-          "End boundaries. On a cue the End slot holds the Set End key instead of the snap keys and " +
-          'strip. With nothing selected the display is blank and every key and boundary is ' +
-          "disabled. The display's accessible text carries the running, queued, not-ready and " +
+          "End boundaries, each headed by its In or Out key with edge-move arrows and a beat-tick nudge " +
+          'strip, and under them the Length row (½, a size picker, 2×) and the Move row (earlier, a ' +
+          "step picker, later). A cue's End keeps an enabled Out key. With nothing selected the " +
+          'display is blank and every key and boundary is disabled, but the Move row stays live. The ' +
+          "display's accessible text carries the running, queued, not-ready and " +
           'own-settings state in words. ' +
-          'Presentational only: it computes no time or snap target and holds no drag value; the ' +
-          'boundary outputs are tagged with the boundary they came from.',
+          'Presentational only: it computes no time, beat or target and holds no drag value; the ' +
+          'boundary outputs are tagged with the boundary they came from. A picker with no options ' +
+          '(no grid) shows its readout as plain text.',
       },
     },
   },
@@ -30,13 +33,22 @@ const meta: Meta<LoopSelectedRowComponent> = {
     playNow: { description: 'Emits when the play-now key is pressed.' },
     toggleGlobal: { description: 'Emits when the GBL switch is pressed.' },
     toggleWrap: { description: 'Emits when the WRAP switch is pressed.' },
-    setEnd: { description: "Emits when Set End, in a cue's End slot, is pressed." },
+    setIn: { description: 'Emits when the In key is pressed.' },
+    setOut: { description: 'Emits when the Out key is pressed.' },
+    halve: { description: 'Emits when the ½ key is pressed.' },
+    double: { description: 'Emits when the 2× key is pressed.' },
+    pickLength: { description: 'Emits the picked size in beats.' },
+    moveEarlier: { description: 'Emits when the Move earlier key is pressed.' },
+    moveLater: { description: 'Emits when the Move later key is pressed.' },
+    pickMoveStep: { description: 'Emits the picked Move step in beats.' },
+    moveEdge: {
+      description: "Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction.",
+    },
     clearEnd: { description: 'Emits when Clear End is pressed.' },
     deleteMarker: { description: 'Emits when Delete is pressed.' },
     nudgeInput: { description: 'Fires on every nudge drag tick, tagged with the boundary.' },
     nudgeCommit: { description: 'Fires when a nudge is released, tagged with the boundary.' },
     rename: { description: 'Emits the new name when the name is renamed in place; empty is allowed.' },
-    snap: { description: 'Emits when a snap key is pressed, tagged with the boundary and direction.' },
   },
   render: (args) => ({
     props: args,
@@ -57,21 +69,42 @@ type Story = StoryObj<LoopSelectedRowComponent>;
 
 function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
   const side = tag.toLowerCase();
+  const isStart = tag === 'Start';
   return {
-    tag,
+    key: {
+      label: isStart ? 'In' : 'Out',
+      accessibleName: isStart ? 'Loop in Item 3' : 'Loop out Item 3',
+      control: isStart ? 'loop-in' : 'loop-set-end',
+      disabled: false,
+    },
     empty: false,
     disabled: false,
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [15, 42, 77],
-    previousDisabled: false,
-    nextDisabled: false,
     nudgeAccessibleName: `Nudge ${side} of Item 3`,
-    previousAccessibleName: `Snap ${side} of Item 3 to the previous moment`,
-    nextAccessibleName: `Snap ${side} of Item 3 to the next moment`,
+    earlierAccessibleName: `Move ${side} of Item 3 earlier`,
+    laterAccessibleName: `Move ${side} of Item 3 later`,
     ...overrides,
   };
 }
+
+const lengthOptions = [
+  { beats: 1, label: '1 BEAT', selected: false },
+  { beats: 2, label: '2 BEATS', selected: false },
+  { beats: 4, label: '4 BEATS', selected: false },
+  { beats: 8, label: '8 BEATS', selected: false },
+  { beats: 16, label: '16 BEATS', selected: true },
+  { beats: 32, label: '32 BEATS', selected: false },
+];
+
+const moveStepOptions = [
+  { beats: 1 as const, label: '1 BEAT', selected: true },
+  { beats: 2 as const, label: '2 BEATS', selected: false },
+  { beats: 4 as const, label: '4 BEATS', selected: false },
+  { beats: 8 as const, label: '8 BEATS', selected: false },
+  { beats: 16 as const, label: '16 BEATS', selected: false },
+];
 
 const loop: LoopSelectedRowModel = {
   empty: false,
@@ -81,13 +114,25 @@ const loop: LoopSelectedRowModel = {
   activity: 'idle',
   ready: true,
   triggerDisabled: false,
-  setEndDisabled: false,
   clearEndDisabled: false,
   deleteDisabled: false,
   start: boundary('Start', { offsetFrames: 6 }),
   end: boundary('End', { offsetFrames: -7 }),
+  length: {
+    text: '16 BEATS',
+    options: lengthOptions,
+    halveAccessibleName: 'Halve Item 3',
+    doubleAccessibleName: 'Double Item 3',
+    pickAccessibleName: 'Loop length Item 3',
+  },
+  move: {
+    stepText: '1 BEAT',
+    options: moveStepOptions,
+    earlierAccessibleName: 'Move Item 3 earlier',
+    laterAccessibleName: 'Move Item 3 later',
+    pickAccessibleName: 'Move step',
+  },
   triggerAccessibleName: 'Trigger Item 3',
-  setEndAccessibleName: 'Set the end of Item 3 here',
   clearEndAccessibleName: 'Clear the end of Item 3, making it a cue',
   deleteAccessibleName: 'Delete Item 3',
   playNowDisabled: false,
@@ -110,14 +155,23 @@ const none: LoopSelectedRowModel = {
   kindLabel: '',
   spanText: '',
   triggerDisabled: true,
-  setEndDisabled: true,
   clearEndDisabled: true,
   deleteDisabled: true,
   playNowDisabled: true,
   globalDisabled: true,
   wrapDisabled: true,
-  start: boundary('Start', { disabled: true, tickPercents: [] }),
-  end: boundary('End', { empty: true, disabled: true, tickPercents: [] }),
+  start: boundary('Start', {
+    disabled: true,
+    tickPercents: [],
+    key: { ...loop.start.key, disabled: true },
+  }),
+  end: boundary('End', {
+    empty: true,
+    disabled: true,
+    tickPercents: [],
+    key: { ...loop.end.key, disabled: true },
+  }),
+  length: { ...loop.length, text: '—', options: [] },
 };
 
 const cue: LoopSelectedRowModel = {
@@ -128,6 +182,7 @@ const cue: LoopSelectedRowModel = {
   clearEndDisabled: true,
   wrapDisabled: true,
   end: boundary('End', { empty: true, tickPercents: [] }),
+  length: { ...loop.length, text: 'NO END', options: [] },
   renameLabel: 'Rename Item 4',
   triggerAccessibleName: 'Trigger Item 4',
   playNowAccessibleName: 'Play now Item 4',
@@ -150,12 +205,41 @@ export const Wraps: Story = {
   args: { model: { ...loop, wraps: true }, startDragOffset: null, endDragOffset: null },
 };
 
-/** A selected cue: Clear End disabled, and the End slot holds Set End in place of the snap keys. */
-export const CueSetEndSlot: Story = {
+/** A selected cue: Clear End disabled, and the End row keeps an enabled Out key beside an empty strip. */
+export const CueOutKey: Story = {
   args: { model: cue, startDragOffset: null, endDragOffset: null },
 };
 
-/** Nothing selected: blank display, every key and boundary disabled. */
+/** A loop off the grid: its length is in seconds and the Length picker is plain text. */
+export const OffGridLoop: Story = {
+  args: {
+    model: {
+      ...loop,
+      length: { ...loop.length, text: '7.8s', options: [] },
+      start: boundary('Start', { tickPercents: [] }),
+      end: boundary('End', { tickPercents: [] }),
+    },
+    startDragOffset: null,
+    endDragOffset: null,
+  },
+};
+
+/** No grid on the deck: both pickers are plain text, and the keys stay enabled but do nothing. */
+export const NoGrid: Story = {
+  args: {
+    model: {
+      ...loop,
+      length: { ...loop.length, options: [] },
+      move: { ...loop.move, options: [] },
+      start: boundary('Start', { tickPercents: [] }),
+      end: boundary('End', { tickPercents: [] }),
+    },
+    startDragOffset: null,
+    endDragOffset: null,
+  },
+};
+
+/** Nothing selected: blank display, every key and boundary disabled; the Move row stays live. */
 export const NothingSelected: Story = {
   args: { model: none, startDragOffset: null, endDragOffset: null },
 };

@@ -25,7 +25,7 @@ import type {
   DeckTransportState,
   LoopBoundaryModel,
   LoopBoundaryNudge,
-  LoopBoundarySnap,
+  LoopEdgeMove,
   LoopSelectedRowModel,
   LoopTileModel,
   LoopsCuesPlateModel,
@@ -40,8 +40,11 @@ import {
   formatSpeedPercent,
   type DeckTransportSummary,
   type LoopActivity,
+  type LoopBoundaryName,
   type LoopBoundarySummary,
   type LoopItemSummary,
+  type MoveStepBeats,
+  type LoopMoveStepOption,
   type LoopSelectionSummary,
   cartridgeOptions,
 } from '@teensyrom-nx/application';
@@ -90,33 +93,43 @@ function tileSelectName(item: LoopItemSummary, letter: string): string {
     .join(', ');
 }
 
-/** A boundary model from its summary; null is a cue's End or an empty row: drawn empty, inert. */
+/** A boundary model from its summary; null is a cue's End or an empty row: drawn empty, inert. The
+ *  key is enabled whenever a marker is selected: Out on a cue makes it a loop. */
 function boundaryModel(
-  tag: 'Start' | 'End',
+  boundary: LoopBoundaryName,
   letter: string,
+  name: string,
+  selected: boolean,
   summary: LoopBoundarySummary | null
 ): LoopBoundaryModel {
-  const word = tag.toLowerCase();
+  const isStart = boundary === 'start';
+  const word = isStart ? 'start' : 'end';
   return {
-    tag,
+    key: {
+      label: isStart ? 'In' : 'Out',
+      accessibleName: `Loop ${isStart ? 'in' : 'out'} ${name} deck ${letter}`,
+      control: isStart ? 'loop-in' : 'loop-set-end',
+      disabled: !selected,
+    },
     empty: summary === null,
-    disabled: summary === null || summary.rangeFrames === 0,
+    disabled: !selected,
     offsetFrames: summary?.offsetFrames ?? 0,
     rangeFrames: summary?.rangeFrames ?? 0,
     tickPercents: summary?.tickPercents ?? [],
-    previousDisabled: !summary?.canSnapPrevious,
-    nextDisabled: !summary?.canSnapNext,
     nudgeAccessibleName: `Nudge ${word} deck ${letter}`,
-    previousAccessibleName: `Snap ${word} to previous moment deck ${letter}`,
-    nextAccessibleName: `Snap ${word} to next moment deck ${letter}`,
+    earlierAccessibleName: `Move ${word} of ${name} earlier deck ${letter}`,
+    laterAccessibleName: `Move ${word} of ${name} later deck ${letter}`,
   };
 }
 
 function selectedRowModel(
   selection: LoopSelectionSummary | null,
+  moveStepText: string,
+  moveStepOptions: readonly LoopMoveStepOption[],
   letter: string
 ): LoopSelectedRowModel {
   const name = selection?.name ?? 'selected marker';
+  const selected = selection !== null;
   return {
     empty: selection === null,
     name: selection?.name ?? '',
@@ -125,7 +138,6 @@ function selectedRowModel(
     activity: selection?.activity ?? 'idle',
     ready: selection?.ready ?? true,
     triggerDisabled: selection === null,
-    setEndDisabled: selection === null,
     clearEndDisabled: selection?.kind !== 'loop',
     deleteDisabled: selection === null,
     playNowDisabled: selection === null,
@@ -139,10 +151,23 @@ function selectedRowModel(
     renameDisabled: selection === null,
     renameLabel: `Rename ${name}`,
     nameMaxLength: MARKER_NAME_MAX_LENGTH,
-    start: boundaryModel('Start', letter, selection?.start ?? null),
-    end: boundaryModel('End', letter, selection?.end ?? null),
+    start: boundaryModel('start', letter, name, selected, selection?.start ?? null),
+    end: boundaryModel('end', letter, name, selected, selection?.end ?? null),
+    length: {
+      text: selection?.lengthText ?? '—',
+      options: selection?.lengthOptions ?? [],
+      halveAccessibleName: `Halve ${name} deck ${letter}`,
+      doubleAccessibleName: `Double ${name} deck ${letter}`,
+      pickAccessibleName: `Loop length ${name} deck ${letter}`,
+    },
+    move: {
+      stepText: moveStepText,
+      options: moveStepOptions,
+      earlierAccessibleName: `Move ${name} earlier deck ${letter}`,
+      laterAccessibleName: `Move ${name} later deck ${letter}`,
+      pickAccessibleName: `Move step deck ${letter}`,
+    },
     triggerAccessibleName: `Trigger ${name} deck ${letter}`,
-    setEndAccessibleName: `Set end of ${name} deck ${letter}`,
     clearEndAccessibleName: `Clear end of ${name} deck ${letter}`,
     deleteAccessibleName: `Delete ${name} deck ${letter}`,
   };
@@ -204,7 +229,8 @@ export class DjDeckColumnComponent {
 
   readonly plateModel = computed<LoopsCuesPlateModel>(() => {
     const { letter } = this.deck();
-    const { hasTune, canAdd, canStop, items, selected } = this.loops();
+    const { hasTune, canAdd, canStop, items, selected, moveStepText, moveStepOptions } =
+      this.loops();
     return {
       accessibleName: `Loops/Cues deck ${letter}`,
       addAccessibleName: `Add cue deck ${letter}`,
@@ -213,7 +239,7 @@ export class DjDeckColumnComponent {
       stopDisabled: !canStop,
       gridAccessibleName: `Loops deck ${letter}`,
       emptyText: hasTune ? 'Add a cue at the playhead' : 'Load a tune to add loops',
-      selected: selectedRowModel(selected, letter),
+      selected: selectedRowModel(selected, moveStepText, moveStepOptions, letter),
       tiles: items.map(
         (item): LoopTileModel => ({
           id: item.id,
@@ -509,8 +535,36 @@ export class DjDeckColumnComponent {
     this.deckService.selectMarker(this.deck().slot, id);
   }
 
-  onSetEnd(): void {
-    this.deckService.setMarkerEnd(this.deck().slot);
+  onSetIn(): void {
+    this.deckService.setMarkerIn(this.deck().slot);
+  }
+
+  onSetOut(): void {
+    this.deckService.setMarkerOut(this.deck().slot);
+  }
+
+  onHalve(): void {
+    this.deckService.resizeMarker(this.deck().slot, 'halve');
+  }
+
+  onDouble(): void {
+    this.deckService.resizeMarker(this.deck().slot, 'double');
+  }
+
+  onPickLength(beats: number): void {
+    this.deckService.setMarkerLength(this.deck().slot, beats);
+  }
+
+  onMoveEarlier(): void {
+    this.deckService.moveMarker(this.deck().slot, -1);
+  }
+
+  onMoveLater(): void {
+    this.deckService.moveMarker(this.deck().slot, 1);
+  }
+
+  onPickMoveStep(beats: MoveStepBeats): void {
+    this.deckService.setMoveStep(this.deck().slot, beats);
   }
 
   onClearEnd(): void {
@@ -528,8 +582,8 @@ export class DjDeckColumnComponent {
     this.deckService.deleteMarker(this.deck().slot);
   }
 
-  onSnap({ boundary, direction }: LoopBoundarySnap): void {
-    void this.deckService.snapMarker(this.deck().slot, boundary, direction);
+  onMoveEdge({ boundary, direction }: LoopEdgeMove): void {
+    this.deckService.moveMarkerEdge(this.deck().slot, boundary, direction);
   }
 
   onNudgeInput({ boundary, offsetFrames }: LoopBoundaryNudge): void {

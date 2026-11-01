@@ -1,15 +1,49 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { InlineEditTitleComponent } from '../inline-edit-title/inline-edit-title.component';
-import {
-  LoopBoundaryComponent,
-  type LoopBoundaryAction,
-  type LoopBoundaryModel,
-} from '../loop-boundary/loop-boundary.component';
+import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
+import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
+import { LoopBoundaryComponent, type LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 import type { LoopTileActivity } from '../loop-tile/loop-tile.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
 
 /** Which end of the selected loop a boundary output is about. */
 export type LoopBoundaryName = 'start' | 'end';
+
+/** One size the Length picker offers. */
+export interface LoopLengthOptionModel {
+  readonly beats: number;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+/** One distance the Move step picker offers. */
+export interface LoopMoveStepOptionModel {
+  readonly beats: 1 | 2 | 4 | 8 | 16;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+/** The Length row: halve and double keys around a readout that opens a picker of sizes. */
+export interface LoopLengthModel {
+  /** '16 BEATS' | '7.8s' | 'NO END'. */
+  readonly text: string;
+  /** Empty when there is no grid: the readout is then plain text with no list. */
+  readonly options: readonly LoopLengthOptionModel[];
+  readonly halveAccessibleName: string;
+  readonly doubleAccessibleName: string;
+  readonly pickAccessibleName: string;
+}
+
+/** The Move row: move-earlier and move-later keys around a readout that opens a picker of steps. */
+export interface LoopMoveModel {
+  /** '1 BEAT' | '4 BEATS'. */
+  readonly stepText: string;
+  /** The deck's step, so it is offered whatever is selected. */
+  readonly options: readonly LoopMoveStepOptionModel[];
+  readonly earlierAccessibleName: string;
+  readonly laterAccessibleName: string;
+  readonly pickAccessibleName: string;
+}
 
 /** The selected loop or cue's caller-composed state. */
 export interface LoopSelectedRowModel {
@@ -22,15 +56,16 @@ export interface LoopSelectedRowModel {
   readonly activity: LoopTileActivity;
   readonly ready: boolean;
   readonly triggerDisabled: boolean;
-  readonly setEndDisabled: boolean;
   /** True on a cue. */
   readonly clearEndDisabled: boolean;
   readonly deleteDisabled: boolean;
   readonly start: LoopBoundaryModel;
   /** `empty` on a cue. */
   readonly end: LoopBoundaryModel;
+  readonly length: LoopLengthModel;
+  /** Per deck: drawn and enabled whatever is selected, even nothing. */
+  readonly move: LoopMoveModel;
   readonly triggerAccessibleName: string;
-  readonly setEndAccessibleName: string;
   readonly clearEndAccessibleName: string;
   readonly deleteAccessibleName: string;
   readonly playNowDisabled: boolean;
@@ -58,10 +93,10 @@ export interface LoopBoundaryNudge {
   readonly offsetFrames: number;
 }
 
-/** A boundary snap, tagged with the boundary and the direction. */
-export interface LoopBoundarySnap {
+/** A boundary's edge moved a step, tagged with the boundary and the direction. */
+export interface LoopEdgeMove {
   readonly boundary: LoopBoundaryName;
-  readonly direction: 'previous' | 'next';
+  readonly direction: -1 | 1;
 }
 
 const ACTIVITY_WORDS: Record<LoopTileActivity, string> = {
@@ -74,24 +109,25 @@ const NOTHING_SELECTED = 'nothing selected';
 const NOT_READY = 'not ready';
 const OWN_SETTINGS = 'own settings';
 const WRAPS = 'wraps';
-const SET_END_LABEL = 'Set End';
-const SET_END_ICON = 'last_page';
-const SET_END_CONTROL = 'loop-set-end';
 const LAMP_ON = 'radio_button_checked';
 const LAMP_OFF = 'radio_button_unchecked';
 
 /**
  * The selected loop or cue, across both columns of the plate: a trigger key, a small display of the
  * name, kind and span, a play-now key, the GBL and WRAP switches, the Clear End and Delete keys, and
- * beneath them the Start and End boundaries side by side. On a cue the End boundary holds the Set End key.
+ * beneath them the Start and End boundaries side by side, each headed by its In or Out key, and under
+ * those the Length row (½, a size picker, 2×) and the Move row (move earlier, a step picker, move later).
+ * A cue's End boundary keeps an enabled Out key, which makes the cue a loop.
  * The GBL switch draws a lamp beside its label, a ringed dot while the marker shares the main
  * track's settings and an empty ring while it has its own, and is a plain disabled key (no pressed
  * state) with nothing selected. WRAP draws the same lamp, lit while a scrubbed record wraps from the
- * loop's start to its end, and is disabled on a cue as well. Purely presentational: it computes no time or snap target and holds
+ * loop's start to its end, and is disabled on a cue as well. Purely presentational: it computes no time, beat or target and holds
  * no drag value. The caller supplies every label and the drag offsets.
  *
  * The name is renamed in place — click it, type, Enter; an empty name is allowed. With
- * `model.empty` the display is blank and every key and boundary is disabled. The display's
+ * `model.empty` the display is blank and every key and boundary is disabled, as are ½ and 2×; the
+ * Move row stays live, as the Move step belongs to the deck. A picker opens a list of its `options`
+ * and emits the picked beats; with no options (no grid) its readout is plain text. The display's
  * accessible text carries the running, queued, not-ready, own-settings and wraps state in words.
  *
  * @example
@@ -104,19 +140,32 @@ const LAMP_OFF = 'radio_button_unchecked';
  *   (playNow)="onPlayNow()"
  *   (toggleGlobal)="onToggleGlobal()"
  *   (toggleWrap)="onToggleWrap()"
- *   (setEnd)="onSetEnd()"
+ *   (setIn)="onSetIn()"
+ *   (setOut)="onSetOut()"
+ *   (halve)="onHalve()"
+ *   (double)="onDouble()"
+ *   (pickLength)="onPickLength($event)"
+ *   (moveEarlier)="onMoveEarlier()"
+ *   (moveLater)="onMoveLater()"
+ *   (pickMoveStep)="onPickMoveStep($event)"
+ *   (moveEdge)="onMoveEdge($event)"
  *   (clearEnd)="onClearEnd()"
  *   (deleteMarker)="onDelete()"
  *   (nudgeInput)="onNudgeInput($event)"
  *   (nudgeCommit)="onNudgeCommit($event)"
- *   (snap)="onSnap($event)"
  *   (rename)="onRename($event)"
  * />
  * ```
  */
 @Component({
   selector: 'lib-loop-selected-row',
-  imports: [InlineEditTitleComponent, LoopBoundaryComponent, SynthKeyComponent],
+  imports: [
+    DropdownMenuComponent,
+    DropdownMenuItemComponent,
+    InlineEditTitleComponent,
+    LoopBoundaryComponent,
+    SynthKeyComponent,
+  ],
   templateUrl: './loop-selected-row.component.html',
   styleUrl: './loop-selected-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -139,8 +188,22 @@ export class LoopSelectedRowComponent {
   readonly toggleGlobal = output<void>();
   /** Emits when the WRAP switch is pressed. */
   readonly toggleWrap = output<void>();
-  /** Emits when Set End, in a cue's End slot, is pressed. */
-  readonly setEnd = output<void>();
+  /** Emits when the In key is pressed. */
+  readonly setIn = output<void>();
+  /** Emits when the Out key is pressed. */
+  readonly setOut = output<void>();
+  /** Emits when the ½ key is pressed. */
+  readonly halve = output<void>();
+  /** Emits when the 2× key is pressed. */
+  readonly double = output<void>();
+  /** Emits the picked size in beats. */
+  readonly pickLength = output<number>();
+  /** Emits when the Move earlier key is pressed. */
+  readonly moveEarlier = output<void>();
+  /** Emits when the Move later key is pressed. */
+  readonly moveLater = output<void>();
+  /** Emits the picked Move step in beats. */
+  readonly pickMoveStep = output<1 | 2 | 4 | 8 | 16>();
   /** Emits when Clear End is pressed. */
   readonly clearEnd = output<void>();
   /** Emits when Delete is pressed. */
@@ -149,8 +212,8 @@ export class LoopSelectedRowComponent {
   readonly nudgeInput = output<LoopBoundaryNudge>();
   /** Fires when a nudge is released, tagged with the boundary. */
   readonly nudgeCommit = output<LoopBoundaryNudge>();
-  /** Emits when a boundary's snap key is pressed, tagged with the boundary and direction. */
-  readonly snap = output<LoopBoundarySnap>();
+  /** Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction. */
+  readonly moveEdge = output<LoopEdgeMove>();
   /** Emits the new name when the name is committed; an empty name returns the marker to its place name. */
   readonly rename = output<string>();
 
@@ -205,22 +268,11 @@ export class LoopSelectedRowComponent {
   protected readonly startBoundary = computed(() => this.boundary('start'));
   protected readonly endBoundary = computed(() => this.boundary('end'));
 
-  /** Set End, in the End slot of a selected cue; a loop and an empty row show the boundary. */
-  protected readonly endAction = computed<LoopBoundaryAction | null>(() => {
-    const model = this.model();
-    if (model.empty || !model.end.empty) return null;
-    return {
-      label: SET_END_LABEL,
-      icon: SET_END_ICON,
-      accessibleName: model.setEndAccessibleName,
-      disabled: model.setEndDisabled,
-      control: SET_END_CONTROL,
-    };
-  });
-
   private boundary(name: LoopBoundaryName): LoopBoundaryModel {
     const model = this.model();
     const boundary = model[name];
-    return model.empty ? { ...boundary, disabled: true } : boundary;
+    return model.empty
+      ? { ...boundary, disabled: true, key: { ...boundary.key, disabled: true } }
+      : boundary;
   }
 }

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output, viewChild } from '@a
 import {
   LoopSelectedRowComponent,
   type LoopBoundaryNudge,
-  type LoopBoundarySnap,
+  type LoopEdgeMove,
   type LoopSelectedRowModel,
 } from '../loop-selected-row/loop-selected-row.component';
 import { LoopTileGridComponent } from '../loop-tile-grid/loop-tile-grid.component';
@@ -32,7 +32,10 @@ export interface LoopsCuesPlateModel {
  * selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
  * Purely presentational and inert — the caller owns every marker, every drag offset and every
  * write. The keys carry their own `data-control` ids (`loop-add`, `loop-stop`), distinct from the
- * transport's `stop`, so the mapping overlay resolves each to the right control. The running
+ * transport's `stop`, so the mapping overlay resolves each to the right control. The selected row's
+ * In and Out keys are `loop-in` and `loop-set-end`, the Length readout `loop-length`, the Move keys
+ * `loop-move-earlier` and `loop-move-later`, and the step readout `loop-move-step`; the boundaries'
+ * edge-move arrows sit under `loop-start` and `loop-end` as `move-earlier` and `move-later` parts. The running
  * tile's progress moves per animation frame, so a painter sets it through `setLiveProgress`
  * rather than an input.
  *
@@ -47,6 +50,15 @@ export interface LoopsCuesPlateModel {
  *   (playNowSelected)="onPlayNowSelected()"
  *   (toggleGlobal)="onToggleGlobal()"
  *   (toggleWrap)="onToggleWrap()"
+ *   (setIn)="onSetIn()"
+ *   (setOut)="onSetOut()"
+ *   (halve)="onHalve()"
+ *   (double)="onDouble()"
+ *   (pickLength)="onPickLength($event)"
+ *   (moveEarlier)="onMoveEarlier()"
+ *   (moveLater)="onMoveLater()"
+ *   (pickMoveStep)="onPickMoveStep($event)"
+ *   (moveEdge)="onMoveEdge($event)"
  *   (selectTile)="onSelect($event)"
  * />
  * ```
@@ -77,8 +89,22 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly toggleGlobal = output<void>();
   /** Emits when the selected row's WRAP switch is pressed. */
   readonly toggleWrap = output<void>();
-  /** Emits when the selected row's Set End key, in a cue's End slot, is pressed. */
-  readonly setEnd = output<void>();
+  /** Emits when the selected row's In key is pressed. */
+  readonly setIn = output<void>();
+  /** Emits when the selected row's Out key is pressed. */
+  readonly setOut = output<void>();
+  /** Emits when the selected row's ½ key is pressed. */
+  readonly halve = output<void>();
+  /** Emits when the selected row's 2× key is pressed. */
+  readonly double = output<void>();
+  /** Emits the size picked in the selected row's Length picker, in beats. */
+  readonly pickLength = output<number>();
+  /** Emits when the selected row's Move earlier key is pressed. */
+  readonly moveEarlier = output<void>();
+  /** Emits when the selected row's Move later key is pressed. */
+  readonly moveLater = output<void>();
+  /** Emits the step picked in the selected row's Move step picker, in beats. */
+  readonly pickMoveStep = output<1 | 2 | 4 | 8 | 16>();
   /** Emits when the selected row's Clear End key is pressed. */
   readonly clearEnd = output<void>();
   /** Emits when the selected row's Delete key is pressed. */
@@ -93,8 +119,8 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly nudgeInput = output<LoopBoundaryNudge>();
   /** Fires when a nudge is released, tagged with the boundary. */
   readonly nudgeCommit = output<LoopBoundaryNudge>();
-  /** Emits when a boundary's snap key is pressed, tagged with the boundary and direction. */
-  readonly snap = output<LoopBoundarySnap>();
+  /** Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction. */
+  readonly moveEdge = output<LoopEdgeMove>();
   /** Emits the new name when the selected row's name is renamed in place. */
   readonly rename = output<string>();
 

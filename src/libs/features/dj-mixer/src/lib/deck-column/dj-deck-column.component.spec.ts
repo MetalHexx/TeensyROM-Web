@@ -58,8 +58,22 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
   };
 }
 
+const MOVE_STEP_OPTIONS: DeckLoopsSummary['moveStepOptions'] = [
+  { beats: 1, label: '1 BEAT', selected: true },
+  { beats: 4, label: '4 BEATS', selected: false },
+];
+
 function emptyLoopsSummary(overrides: Partial<DeckLoopsSummary> = {}): DeckLoopsSummary {
-  return { hasTune: false, canAdd: false, canStop: false, items: [], selected: null, ...overrides };
+  return {
+    hasTune: false,
+    canAdd: false,
+    canStop: false,
+    moveStepText: '1 BEAT',
+    moveStepOptions: MOVE_STEP_OPTIONS,
+    items: [],
+    selected: null,
+    ...overrides,
+  };
 }
 
 function loopItem(overrides: Partial<LoopItemSummary> = {}): LoopItemSummary {
@@ -83,8 +97,6 @@ function boundarySummary(overrides: Partial<LoopSelectionSummary['start']> = {})
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [25, 75],
-    canSnapPrevious: true,
-    canSnapNext: false,
     ...overrides,
   };
 }
@@ -99,6 +111,11 @@ function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelection
     sharesGlobal: true,
     wraps: false,
     spanText: '00:01.0–00:08.8',
+    lengthText: '16 BEATS',
+    lengthOptions: [
+      { beats: 8, label: '8 BEATS', selected: false },
+      { beats: 16, label: '16 BEATS', selected: true },
+    ],
     start: boundarySummary(),
     end: boundarySummary(),
     ...overrides,
@@ -144,11 +161,16 @@ function createDeckServiceStub() {
     toggleMarkerGlobal: vi.fn(),
     toggleMarkerWrap: vi.fn(),
     selectMarker: vi.fn(),
-    setMarkerEnd: vi.fn(),
+    setMarkerIn: vi.fn(),
+    setMarkerOut: vi.fn(),
+    resizeMarker: vi.fn(),
+    setMarkerLength: vi.fn(),
+    moveMarker: vi.fn(),
+    moveMarkerEdge: vi.fn(),
+    setMoveStep: vi.fn(),
     clearMarkerEnd: vi.fn(),
     deleteMarker: vi.fn(),
     nudgeMarker: vi.fn(),
-    snapMarker: vi.fn(),
     renameMarker: vi.fn(),
     previousRow: vi.fn().mockResolvedValue(undefined),
     nextRow: vi.fn().mockResolvedValue(undefined),
@@ -406,7 +428,6 @@ describe('DjDeckColumnComponent', () => {
       expect([model.addDisabled, model.stopDisabled]).toEqual([true, true]);
       expect(model.tiles).toEqual([]);
       expect(model.selected.empty).toBe(true);
-      expect(model.selected.setEndDisabled).toBe(true);
       expect(model.selected.deleteDisabled).toBe(true);
     });
 
@@ -589,15 +610,11 @@ describe('DjDeckColumnComponent', () => {
         'LOOP',
         '00:01.0–00:08.8',
       ]);
-      expect([row.setEndDisabled, row.clearEndDisabled, row.deleteDisabled]).toEqual([
+      expect([row.clearEndDisabled, row.deleteDisabled]).toEqual([false, false]);
+      expect([row.start.disabled, row.start.key.disabled, row.end.key.disabled]).toEqual([
         false,
         false,
         false,
-      ]);
-      expect([row.start.disabled, row.start.previousDisabled, row.start.nextDisabled]).toEqual([
-        false,
-        false,
-        true,
       ]);
       expect(row.start.nudgeAccessibleName).toBe('Nudge start deck B');
       expect(row.triggerAccessibleName).toBe('Trigger Item 1 deck B');
@@ -617,8 +634,76 @@ describe('DjDeckColumnComponent', () => {
       row = plate(fixture).model().selected;
 
       expect(row.clearEndDisabled).toBe(true);
-      expect([row.end.empty, row.end.disabled]).toEqual([true, true]);
-      expect(row.start.disabled).toBe(true);
+      expect([row.end.empty, row.end.disabled]).toEqual([true, false]);
+      expect(row.end.key.disabled).toBe(false);
+    });
+
+    it('names the In and Out keys, the edge arrows and the Length row with the item and the deck', () => {
+      const { fixture } = render(DECK_B, {
+        loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
+      });
+      const row = plate(fixture).model().selected;
+
+      expect([row.start.key.label, row.start.key.control, row.start.key.accessibleName]).toEqual([
+        'In',
+        'loop-in',
+        'Loop in Item 1 deck B',
+      ]);
+      expect([row.end.key.label, row.end.key.control, row.end.key.accessibleName]).toEqual([
+        'Out',
+        'loop-set-end',
+        'Loop out Item 1 deck B',
+      ]);
+      expect([row.start.earlierAccessibleName, row.end.laterAccessibleName]).toEqual([
+        'Move start of Item 1 earlier deck B',
+        'Move end of Item 1 later deck B',
+      ]);
+      expect(row.length).toEqual({
+        text: '16 BEATS',
+        options: [
+          { beats: 8, label: '8 BEATS', selected: false },
+          { beats: 16, label: '16 BEATS', selected: true },
+        ],
+        halveAccessibleName: 'Halve Item 1 deck B',
+        doubleAccessibleName: 'Double Item 1 deck B',
+        pickAccessibleName: 'Loop length Item 1 deck B',
+      });
+      expect(row.move).toEqual({
+        stepText: '1 BEAT',
+        options: MOVE_STEP_OPTIONS,
+        earlierAccessibleName: 'Move Item 1 earlier deck B',
+        laterAccessibleName: 'Move Item 1 later deck B',
+        pickAccessibleName: 'Move step deck B',
+      });
+    });
+
+    it('keeps the Move row live with nothing selected, and leaves the keys and Length inert', () => {
+      const { fixture } = render(DECK_B, {
+        loops: { hasTune: true, moveStepText: '4 BEATS' },
+      });
+      const row = plate(fixture).model().selected;
+
+      expect([row.start.key.disabled, row.end.key.disabled, row.start.disabled]).toEqual([
+        true,
+        true,
+        true,
+      ]);
+      expect([row.length.text, row.length.options]).toEqual(['—', []]);
+      expect(row.move.stepText).toBe('4 BEATS');
+      expect(row.move.options).toEqual(MOVE_STEP_OPTIONS);
+    });
+
+    it("hands a cue's NO END and an off-grid loop's empty options through to the Length row", () => {
+      const { fixture } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem({ kind: 'cue', endPercent: null })],
+          selected: selection({ kind: 'cue', end: null, lengthText: 'NO END', lengthOptions: [] }),
+        },
+      });
+      const { length } = plate(fixture).model().selected;
+
+      expect([length.text, length.options]).toEqual(['NO END', []]);
     });
 
     it('hands the transport the markers from the store', () => {
@@ -640,10 +725,17 @@ describe('DjDeckColumnComponent', () => {
       ['toggleGlobal', 'toggleMarkerGlobal', undefined, ['B']],
       ['toggleWrap', 'toggleMarkerWrap', undefined, ['B']],
       ['selectTile', 'selectMarker', 'm2', ['B', 'm2']],
-      ['setEnd', 'setMarkerEnd', undefined, ['B']],
+      ['setIn', 'setMarkerIn', undefined, ['B']],
+      ['setOut', 'setMarkerOut', undefined, ['B']],
+      ['halve', 'resizeMarker', undefined, ['B', 'halve']],
+      ['double', 'resizeMarker', undefined, ['B', 'double']],
+      ['pickLength', 'setMarkerLength', 16, ['B', 16]],
+      ['moveEarlier', 'moveMarker', undefined, ['B', -1]],
+      ['moveLater', 'moveMarker', undefined, ['B', 1]],
+      ['pickMoveStep', 'setMoveStep', 4, ['B', 4]],
       ['clearEnd', 'clearMarkerEnd', undefined, ['B']],
       ['deleteSelected', 'deleteMarker', undefined, ['B']],
-      ['snap', 'snapMarker', { boundary: 'end', direction: 'next' }, ['B', 'end', 'next']],
+      ['moveEdge', 'moveMarkerEdge', { boundary: 'end', direction: 1 }, ['B', 'end', 1]],
     ] as const)(
       'routes the plate output %s to DeckService.%s with the slot',
       (output, method, payload, args) => {

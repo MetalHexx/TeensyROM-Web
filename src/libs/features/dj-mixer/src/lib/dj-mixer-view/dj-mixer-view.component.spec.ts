@@ -135,19 +135,28 @@ function idleBindingSummary(): DeckBindingSummary {
   };
 }
 
+const MOVE_STEP_OPTIONS: DeckLoopsSummary['moveStepOptions'] = [
+  { beats: 1, label: '1 BEAT', selected: true },
+  { beats: 4, label: '4 BEATS', selected: false },
+];
+
 const NO_LOOPS: DeckLoopsSummary = {
   hasTune: false,
   canAdd: false,
   canStop: false,
+  moveStepText: '1 BEAT',
+  moveStepOptions: MOVE_STEP_OPTIONS,
   items: [],
   selected: null,
 };
 
-/** A deck with one cue, selected: the only state that renders the Set End key. */
+/** A deck with one cue, selected: its Out key makes it a loop. */
 const SELECTED_CUE: DeckLoopsSummary = {
   hasTune: true,
   canAdd: true,
   canStop: false,
+  moveStepText: '1 BEAT',
+  moveStepOptions: MOVE_STEP_OPTIONS,
   items: [
     {
       id: 'm1',
@@ -171,12 +180,12 @@ const SELECTED_CUE: DeckLoopsSummary = {
     sharesGlobal: true,
     wraps: false,
     spanText: '00:01.0',
+    lengthText: 'NO END',
+    lengthOptions: [],
     start: {
       offsetFrames: 0,
       rangeFrames: 0,
       tickPercents: [],
-      canSnapPrevious: false,
-      canSnapNext: false,
     },
     end: null,
   },
@@ -1285,12 +1294,8 @@ describe('DjMixerViewComponent', () => {
   });
 
   describe('the control anchors', () => {
-    // Set End lives in a selected cue's End slot, so no element exists with nothing or a loop selected.
-    const ONLY_WITH_A_CUE: readonly string[] = ['loop-set-end'];
     const ALL_IDENTITIES: readonly ControlIdentity[] = DECK_SLOTS.flatMap((owner) =>
-      DECK_CONTROL_IDS.filter((control) => !ONLY_WITH_A_CUE.includes(control)).map(
-        (control): ControlIdentity => ({ owner, control })
-      )
+      DECK_CONTROL_IDS.map((control): ControlIdentity => ({ owner, control }))
     );
 
     it('finds every mappable control as exactly one element in the rendered grid', () => {
@@ -1304,7 +1309,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(164);
+      expect(ALL_IDENTITIES).toHaveLength(176);
       expect(mismatched).toEqual([]);
     });
 
@@ -1322,7 +1327,7 @@ describe('DjMixerViewComponent', () => {
       }
     });
 
-    it("finds each deck's Set End key as exactly one element once a cue is selected", () => {
+    it("finds each deck's Out key as exactly one element once a cue is selected", () => {
       const { fixture } = render([], {}, { loops: SELECTED_CUE });
       const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
 
