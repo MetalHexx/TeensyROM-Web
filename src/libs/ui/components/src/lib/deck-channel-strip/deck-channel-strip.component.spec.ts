@@ -14,15 +14,16 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
       muteAccessibleName: `Mute voice ${n} deck A`,
       holdAccessibleName: `Kill voice ${n} deck A`,
     })),
-    speedText: '1.000×',
+    speedText: '0.00%',
     nudging: false,
     fader: {
       value: 1,
       min: 0.5,
       max: 1.5,
-      step: 0.001,
+      step: 0.0001,
       home: 1,
       accessibleName: 'Speed multiplier deck A',
+      valueText: '0.00%',
     },
     nudge: {
       downAccessibleName: 'Nudge speed down deck A',
@@ -45,6 +46,7 @@ describe('DeckChannelStripComponent', () => {
   let nudges: { direction: 'up' | 'down'; held: boolean }[];
   let jumps: string[];
   let faders: number[];
+  let wheels: { clicks: number; timeStampMs: number }[];
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -57,12 +59,14 @@ describe('DeckChannelStripComponent', () => {
     nudges = [];
     jumps = [];
     faders = [];
+    wheels = [];
     const strip = fixture.componentInstance;
     strip.mutedChange.subscribe((e) => muted.push(e));
     strip.heldChange.subscribe((e) => held.push(e));
     strip.nudgeChange.subscribe((e) => nudges.push(e));
     strip.jump.subscribe((id) => jumps.push(id));
     strip.faderChange.subscribe((v) => faders.push(v));
+    strip.faderWheel.subscribe((e) => wheels.push(e));
     fixture.detectChanges();
   });
 
@@ -91,7 +95,11 @@ describe('DeckChannelStripComponent', () => {
 
   it('renders the settings sign at the top of the voice section, above V1', () => {
     setModel({
-      settingsSign: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' },
+      settingsSign: {
+        text: 'Item 2',
+        own: true,
+        accessibleName: 'Settings in play deck A: Item 2',
+      },
     });
     const voices = q('section.voices');
     const sign = voices.querySelector('lib-deck-settings-sign') as HTMLElement;
@@ -169,6 +177,14 @@ describe('DeckChannelStripComponent', () => {
     expect(faders).toEqual([1.2345]);
   });
 
+  it('relays the fader wheel and announces the fader value text', () => {
+    const range = byName('Speed multiplier deck A') as HTMLInputElement;
+    expect(range.getAttribute('aria-valuetext')).toBe('0.00%');
+
+    range.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }));
+    expect(wheels.map((w) => w.clicks)).toEqual([1]);
+  });
+
   it('exposes the anchors by data-control', () => {
     for (const control of [
       'speed',
@@ -186,9 +202,9 @@ describe('DeckChannelStripComponent', () => {
     const display = q('.speed-display');
     expect(display.hasAttribute('data-nudging')).toBe(false);
 
-    setModel({ nudging: true, speedText: '1.050×' });
+    setModel({ nudging: true, speedText: '+5.00%' });
     expect(q('.speed-display').hasAttribute('data-nudging')).toBe(true);
-    expect(q('.speed-display').textContent?.trim()).toBe('1.050×');
+    expect(q('.speed-display').textContent?.trim()).toBe('+5.00%');
   });
 
   it('reports every native control disabled when the strip is disabled', () => {

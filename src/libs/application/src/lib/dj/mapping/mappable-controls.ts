@@ -9,7 +9,8 @@ import type { MappingStyleKind } from '../ports';
 import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
 import { PANEL_RANGES } from '../mixer/panel-ranges';
 import { NUDGE_DEFAULT_AMOUNT } from '../mixer/speed-excursion';
-import { SPEED_FADER_RANGE } from '../mixer/speed-range';
+import { SLOW_TURN_FLOOR } from '../mixer/slow-turn';
+import { SPEED_DEFAULT_SENSITIVITY, SPEED_FADER_RANGE } from '../mixer/speed-range';
 import { DECK_SLOTS, type Slot } from '../slot';
 import type { PanelFilterMode, PanelWaveform, VoiceSwitch } from '../dj-store';
 import {
@@ -62,6 +63,9 @@ export type MappableControl =
       /** A selection that moves one place per tick or press: the engine ignores sensitivity, reads
        *  a step amount only for its sign (the direction), and never applies `absolute`. */
       readonly wholeSteps?: boolean;
+      /** Present on a control whose relative ticks move less the more slowly they arrive: the
+       *  smallest move one tick makes, in the control's own units. */
+      readonly slowTurnFloor?: number;
       /** What a pitch bend strip mapped here drives as a hand; a control without one takes no
        *  pitch bend. */
       readonly hand?: HandTarget;
@@ -86,7 +90,7 @@ const SEEK_DEFAULTS: ValueDefaults = {
 };
 const SPEED_DEFAULTS: ValueDefaults = {
   ccStyle: 'relative-offset',
-  sensitivity: 0.01,
+  sensitivity: SPEED_DEFAULT_SENSITIVITY,
   stepAmount: 0.05,
 };
 const KEY_DEFAULTS: ValueDefaults = {
@@ -212,7 +216,8 @@ function value(
   defaults: ValueDefaults,
   read: () => number,
   set: (value: number) => void,
-  hand?: HandTarget
+  hand?: HandTarget,
+  slowTurnFloor?: number
 ): MappableControl {
   return {
     identity,
@@ -223,6 +228,7 @@ function value(
     read,
     set,
     ...(hand === undefined ? {} : { hand }),
+    ...(slowTurnFloor === undefined ? {} : { slowTurnFloor }),
   };
 }
 
@@ -321,7 +327,9 @@ export class MappableControls {
         SPEED_RANGE,
         SPEED_DEFAULTS,
         () => clamp(deck().faderSpeed, SPEED_RANGE.min, SPEED_RANGE.max),
-        (speed) => decks.setSpeed(slot, speed)
+        (speed) => decks.setSpeed(slot, speed),
+        undefined,
+        SLOW_TURN_FLOOR
       ),
       trigger(id('speed-jump-up'), 'Speed +50%', () => decks.jumpSpeed(slot, 'up')),
       trigger(id('speed-jump-home'), 'Speed home', () => decks.jumpSpeed(slot, 'home')),

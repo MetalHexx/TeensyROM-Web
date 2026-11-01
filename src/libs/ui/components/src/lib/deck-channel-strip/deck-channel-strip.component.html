@@ -38,8 +38,10 @@
         [step]="model().fader.step"
         [home]="model().fader.home"
         [accessibleName]="model().fader.accessibleName"
+        [valueText]="model().fader.valueText"
         [disabled]="model().disabled"
         (valueChange)="faderChange.emit($event)"
+        (wheelTurn)="faderWheel.emit($event)"
       />
       <div class="nudge">
         <span class="nudge-caption" aria-hidden="true">Nudge</span>

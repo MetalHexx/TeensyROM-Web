@@ -6,3 +6,6 @@ export const SPEED_FADER_RANGE = {
   max: 1 + SPEED_INPUT_SPAN,
   home: 1,
 } as const;
+
+/** The fraction of the speed range one relative tick or wheel click moves at full step. */
+export const SPEED_DEFAULT_SENSITIVITY = 0.01;

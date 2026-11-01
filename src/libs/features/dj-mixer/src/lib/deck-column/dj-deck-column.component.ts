@@ -37,6 +37,7 @@ import {
   MARKER_NAME_MAX_LENGTH,
   PlayheadPainter,
   SPEED_FADER_RANGE,
+  formatSpeedPercent,
   type DeckTransportSummary,
   type LoopActivity,
   type LoopBoundarySummary,
@@ -319,15 +320,16 @@ export class DjDeckColumnComponent {
           holdAccessibleName: `${holdLabel} voice ${n} deck ${letter}`,
         };
       }),
-      speedText: `${speed.toFixed(3)}×`,
+      speedText: formatSpeedPercent(speed),
       nudging,
       fader: {
         value: Math.min(Math.max(faderSpeed, SPEED_FADER_RANGE.min), SPEED_FADER_RANGE.max),
         min: SPEED_FADER_RANGE.min,
         max: SPEED_FADER_RANGE.max,
-        step: 0.001,
+        step: 0.0001,
         home: SPEED_FADER_RANGE.home,
         accessibleName: `Speed multiplier deck ${letter}`,
+        valueText: formatSpeedPercent(faderSpeed),
       },
       nudge: {
         downAccessibleName: `Nudge down deck ${letter}`,
@@ -537,6 +539,10 @@ export class DjDeckColumnComponent {
 
   onSpeedChange(multiplier: number): void {
     this.deckService.setSpeed(this.deck().slot, multiplier);
+  }
+
+  onSpeedWheel({ clicks, timeStampMs }: { clicks: number; timeStampMs: number }): void {
+    this.deckService.turnSpeed(this.deck().slot, clicks, timeStampMs);
   }
 
   onSpeedJump(id: string): void {

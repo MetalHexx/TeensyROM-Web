@@ -11,7 +11,12 @@ import {
   REGISTER_RECORDER_FACTORY,
   MIDI_ACCESS,
 } from './ports';
-import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
+import type {
+  IMidiAccess,
+  MidiAccessState,
+  MidiPermission,
+  MidiPortOption,
+} from './ports/midi-access';
 import type { Slot } from './slot';
 
 const fakeReplayRunner: ReplayRunner = {
@@ -73,13 +78,43 @@ describe('DeckSpeed', () => {
       expect(tempo('A')).toBe(0.5);
     });
 
-    it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])('ignores %s', (value) => {
-      speed.setFader('A', 1.25);
+    it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+      'ignores %s',
+      (value) => {
+        speed.setFader('A', 1.25);
 
-      speed.setFader('A', value);
+        speed.setFader('A', value);
 
-      expect(tempo('A')).toBe(1.25);
-      expect(speed.faderValue('A')).toBe(1.25);
+        expect(tempo('A')).toBe(1.25);
+        expect(speed.faderValue('A')).toBe(1.25);
+      }
+    );
+  });
+
+  describe('turn', () => {
+    it('moves a lone click by the floor and quick clicks by the full step', () => {
+      speed.turn('A', 1, 1000);
+      expect(speed.faderValue('A')).toBeCloseTo(1.0001, 10);
+
+      speed.turn('A', 1, 1020);
+      expect(speed.faderValue('A')).toBeCloseTo(1.0101, 10);
+      expect(tempo('A')).toBeCloseTo(1.0101, 10);
+    });
+
+    it("moves down for negative clicks and times each deck's clicks on their own", () => {
+      speed.turn('A', 1, 1000);
+      speed.turn('B', -2, 1010);
+
+      expect(speed.faderValue('B')).toBeCloseTo(1 - 2 * 0.0001, 10);
+    });
+
+    it('stops at the fader travel and ignores non-finite clicks', () => {
+      speed.turn('A', 1000, 1000);
+      speed.turn('A', 1000, 1010);
+      expect(speed.faderValue('A')).toBe(1.5);
+
+      speed.turn('A', Number.NaN, 1020);
+      expect(speed.faderValue('A')).toBe(1.5);
     });
   });
 

@@ -25,6 +25,10 @@ const meta: Meta<DeckChannelStripComponent> = {
     },
     heldChange: { description: 'A Kill/Punch pad was pressed or released.' },
     faderChange: { description: 'The fader moved; the raw value.' },
+    faderWheel: {
+      description:
+        'The wheel turned over the fader; whole clicks (upward positive) and their time.',
+    },
     nudgeChange: { description: 'A nudge pad was pressed or released.' },
     jump: { description: 'A jump key was pressed; carries its id.' },
   },
@@ -57,15 +61,16 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
       muteAccessibleName: `Mute voice ${n} deck ${deck}`,
       holdAccessibleName: `Kill voice ${n} deck ${deck}`,
     })),
-    speedText: '1.000×',
+    speedText: '0.00%',
     nudging: false,
     fader: {
       value: 1,
       min: 0.5,
       max: 1.5,
-      step: 0.001,
+      step: 0.0001,
       home: 1,
       accessibleName: `Speed multiplier deck ${deck}`,
+      valueText: '0.00%',
     },
     nudge: {
       downAccessibleName: `Nudge speed down deck ${deck}`,
@@ -92,12 +97,12 @@ export const AtRest: Story = { args: { model: baseModel() } };
 
 /** The speed display tints magenta while a nudge is in effect; the fader does not move. */
 export const Nudging: Story = {
-  args: { model: { ...baseModel(), nudging: true, speedText: '1.040×' } },
+  args: { model: { ...baseModel(), nudging: true, speedText: '+4.00%' } },
 };
 
 /** Deck B holding a Kill pad and nudge plus. */
 export const Held: Story = {
-  args: { model: { ...baseModel('B'), nudging: true, speedText: '1.040×' } },
+  args: { model: { ...baseModel('B'), nudging: true, speedText: '+4.00%' } },
   play: async ({ canvasElement }) => {
     pressWithEnter(canvasElement, 'Kill voice 2 deck B');
     pressWithEnter(canvasElement, 'Nudge speed up deck B');

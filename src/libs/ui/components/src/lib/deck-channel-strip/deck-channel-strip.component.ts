@@ -33,7 +33,7 @@ export interface DeckChannelStripModel {
   /** Whose settings are in play; drawn full-width above the first voice. */
   readonly settingsSign: DeckSettingsSignModel;
   readonly voices: readonly ChannelStripVoiceModel[];
-  /** The speed being played, e.g. '1.000×'. */
+  /** The speed being played as signed percent off 1×, e.g. '+1.25%'. */
   readonly speedText: string;
   /** Tints the speed display magenta while a nudge is in effect. */
   readonly nudging: boolean;
@@ -45,6 +45,8 @@ export interface DeckChannelStripModel {
     readonly step: number;
     readonly home: number;
     readonly accessibleName: string;
+    /** What the range announces in place of its number, e.g. '+1.25%'. */
+    readonly valueText: string;
   };
   readonly nudge: { readonly downAccessibleName: string; readonly upAccessibleName: string };
   readonly jumpButtons: readonly JumpButtonModel[];
@@ -93,6 +95,8 @@ export class DeckChannelStripComponent {
   readonly heldChange = output<{ index: number; held: boolean }>();
   /** The fader moved; the raw, unrounded value. */
   readonly faderChange = output<number>();
+  /** The wheel turned over the fader: whole clicks, upward positive, with the event's time. */
+  readonly faderWheel = output<{ clicks: number; timeStampMs: number }>();
   /** A nudge pad was pressed or released, including a release forced by the strip being disabled. */
   readonly nudgeChange = output<{ direction: 'up' | 'down'; held: boolean }>();
   /** A jump key was pressed, carrying its `id`. */

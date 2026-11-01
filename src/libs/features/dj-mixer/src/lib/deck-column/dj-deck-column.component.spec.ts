@@ -131,6 +131,7 @@ function createDeckServiceStub() {
     enableMidi: vi.fn().mockResolvedValue(undefined),
     identify: vi.fn(),
     setSpeed: vi.fn(),
+    turnSpeed: vi.fn(),
     jumpSpeed: vi.fn(),
     setVoiceMuted: vi.fn(),
     setVoiceHeld: vi.fn(),
@@ -1031,14 +1032,15 @@ describe('DjDeckColumnComponent', () => {
       fixture.detectChanges();
       const model = strip(fixture).model();
 
-      expect(model.speedText).toBe('0.750×');
+      expect(model.speedText).toBe('−25.00%');
       expect(model.fader).toEqual({
         value: 0.75,
         min: 0.5,
         max: 1.5,
-        step: 0.001,
+        step: 0.0001,
         home: 1,
         accessibleName: 'Speed multiplier deck B',
+        valueText: '−25.00%',
       });
       expect([model.voiceAccessibleName, model.speedAccessibleName]).toEqual([
         'Voice deck B',
@@ -1070,7 +1072,7 @@ describe('DjDeckColumnComponent', () => {
       });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(1.5);
-      expect(strip(fixture).model().speedText).toBe('1.700×');
+      expect(strip(fixture).model().speedText).toBe('+70.00%');
 
       store.setDeckEngineControls({
         slot: 'B',
@@ -1082,7 +1084,7 @@ describe('DjDeckColumnComponent', () => {
       });
       fixture.detectChanges();
       expect(strip(fixture).model().fader.value).toBe(0.5);
-      expect(strip(fixture).model().speedText).toBe('0.300×');
+      expect(strip(fixture).model().speedText).toBe('−70.00%');
 
       expect(deckService.setSpeed).not.toHaveBeenCalled();
     });
@@ -1100,7 +1102,7 @@ describe('DjDeckColumnComponent', () => {
       fixture.detectChanges();
       const model = strip(fixture).model();
 
-      expect([model.speedText, model.fader.value, model.nudging]).toEqual(['1.050×', 1, true]);
+      expect([model.speedText, model.fader.value, model.nudging]).toEqual(['+5.00%', 1, true]);
     });
 
     it("dispatches the fader value to setSpeed with this deck's slot", () => {
@@ -1109,6 +1111,14 @@ describe('DjDeckColumnComponent', () => {
       strip(fixture).faderChange.emit(1.234);
 
       expect(deckService.setSpeed).toHaveBeenCalledWith('B', 1.234);
+    });
+
+    it("dispatches the fader wheel to turnSpeed with this deck's slot", () => {
+      const { fixture, deckService } = renderLive(DECK_B);
+
+      strip(fixture).faderWheel.emit({ clicks: -2, timeStampMs: 1234 });
+
+      expect(deckService.turnSpeed).toHaveBeenCalledWith('B', -2, 1234);
     });
 
     it("dispatches a nudge pad's press and release to setNudge with this deck's slot", () => {
@@ -1234,7 +1244,7 @@ describe('DjDeckColumnComponent', () => {
       const { voices, disabled, speedText } = strip(fixture).model();
       expect(voices.map((v) => v.muted)).toEqual([false, false, false]);
       expect(disabled).toBe(true);
-      expect(speedText).toBe('1.000×');
+      expect(speedText).toBe('0.00%');
     });
   });
 

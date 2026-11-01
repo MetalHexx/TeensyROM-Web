@@ -369,6 +369,16 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
+  /** Turns the speed fader by wheel `clicks` (upward positive) received at `timeStampMs`: slow
+   *  clicks move it finely, fast ones by the full step. Refused like `setSpeed`. */
+  turnSpeed(slot: Slot, clicks: number, timeStampMs: number): void {
+    if (!this.canShape(slot, 'turnSpeed')) {
+      return;
+    }
+    this.deckSpeed.turn(slot, clicks, timeStampMs);
+    this.reflectEngineControls(slot);
+  }
+
   /** A speed jump button press, following the remembered-speed excursion rules within
    *  0.3x–1.7x. Refused while the deck has nothing shapeable loaded. */
   jumpSpeed(slot: Slot, id: 'up' | 'home' | 'down'): void {

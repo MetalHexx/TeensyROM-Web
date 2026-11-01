@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { clamp } from '@sidablist/core';
 import { DeckRuntime } from './deck-runtime';
 import type { Slot } from './slot';
+import { SLOW_TURN_FLOOR, slowTurnStep } from './mixer/slow-turn';
+import { SPEED_DEFAULT_SENSITIVITY, SPEED_FADER_RANGE } from './mixer/speed-range';
 import { createSpeedExcursion, SPEED_HARD_SPAN, SPEED_INPUT_SPAN } from './mixer/speed-excursion';
 
 type SpeedExcursion = ReturnType<typeof createSpeedExcursion>;
@@ -40,6 +42,9 @@ export class DeckSpeed {
 
   private readonly tempos: Record<Slot, DeckTempo> = { A: homeTempo(), B: homeTempo() };
 
+  /** When each deck's last wheel click arrived, or null before the first. */
+  private readonly lastTurnMs: Record<Slot, number | null> = { A: null, B: null };
+
   private readonly excursions: Record<Slot, SpeedExcursion> = {
     A: this.createExcursion('A'),
     B: this.createExcursion('B'),
@@ -53,6 +58,23 @@ export class DeckSpeed {
     }
     this.tempos[slot].fader = clamp(multiplier, 1 - SPEED_INPUT_SPAN, 1 + SPEED_INPUT_SPAN);
     this.apply(slot);
+  }
+
+  /** Turns the speed fader by wheel `clicks` (upward positive) at `timeStampMs`. Each click moves
+   *  the fader by the slow-turn rule: the full sensitivity step when clicks come fast, finer the
+   *  slower they arrive. Non-finite clicks are ignored. */
+  turn(slot: Slot, clicks: number, timeStampMs: number): void {
+    if (!Number.isFinite(clicks)) {
+      return;
+    }
+    const last = this.lastTurnMs[slot];
+    this.lastTurnMs[slot] = timeStampMs;
+    const gap = last === null ? null : timeStampMs - last;
+    const fullStep = SPEED_DEFAULT_SENSITIVITY * (SPEED_FADER_RANGE.max - SPEED_FADER_RANGE.min);
+    this.setFader(
+      slot,
+      this.tempos[slot].fader + clicks * slowTurnStep(fullStep, SLOW_TURN_FLOOR, gap)
+    );
   }
 
   /** Presses or releases a nudge pad. A press while the same pad is held replaces its amount —
