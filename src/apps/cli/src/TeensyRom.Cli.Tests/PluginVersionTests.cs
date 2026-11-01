@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace TeensyRom.Cli.Tests;
@@ -17,6 +18,19 @@ public class PluginVersionTests
 
         document.RootElement.GetProperty("version").GetString()
             .Should().Be(suiteVersion, "plugin.json is bumped with src/apps/Version.props on every release");
+    }
+
+    [Fact]
+    public void SkillVersionMarker_CarriesTheSameVersionAsVersionProps()
+    {
+        var src = FindSrcFolder();
+        var suiteVersion = XDocument.Load(Path.Combine(src, "apps", "Version.props")).Descendants("Version").Single().Value.Trim();
+        var skill = Path.Combine(src, "plugins", "trom-agent", "claude", "skills", "trom", "SKILL.md");
+
+        var match = Regex.Match(File.ReadAllText(skill), @"^Agent version: (\S+)\s*$", RegexOptions.Multiline);
+
+        match.Success.Should().BeTrue("SKILL.md must carry an 'Agent version: <version>' line in its Version section");
+        match.Groups[1].Value.Should().Be(suiteVersion, "the SKILL.md marker is bumped with src/apps/Version.props on every release");
     }
 
     private static string FindSrcFolder()

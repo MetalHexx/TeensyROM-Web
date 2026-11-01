@@ -23,10 +23,9 @@ Give the headline list below, one line each, then ask which one the user wants m
 
 ## When it isn't served
 
-`init`'s `problems` names the cause; relay it in plain words. On a source install the usual cause is that the front end was never built, so the engine has nothing to serve:
+`init`'s `problems` names the cause; relay it in plain words. Then classify the install the way "Update" in `references/install.md` does:
 
-1. Look for `index.html` in the folder the `problems` entry names (`src/apps/api/src/TeensyRom.Api/wwwroot` in the tr-web checkout).
-2. Missing: with the user's okay, run `pnpm run build:frontend` in the checkout's `src` folder. It is a long step; see the long-steps note in `install.md`.
-3. Run `trom engine stop`, then `trom init --json`, and check `webUi.available` again.
+- **Release or Homebrew install:** the web UI ships inside the suite, so a missing one means a damaged or partial install. Relay the problem, then offer the reinstall or update from `references/install.md`. Afterwards run `trom engine stop`, then `trom init --json`, and check `webUi.available` again.
+- **Source build:** point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md and change nothing.
 
 Still not served: go to `references/doctor.md`, then point to the documentation links in `SKILL.md`.

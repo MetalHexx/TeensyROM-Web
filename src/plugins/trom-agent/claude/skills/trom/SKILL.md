@@ -75,4 +75,8 @@ Read a reference only when its activity is chosen.
 | Web UI: open it, or a tour of its features | `references/web-ui.md` |
 | The command line and its menu: a tour | `references/cli.md` |
 | Setup problems: the user asks for help, or `init` shows a blocker. Virtual Travis helps. | `references/doctor.md` |
-| `trom` missing, or the user asks to update | `references/install.md` |
+| `trom` missing, or the user asks to install or update | `references/install.md` |
+
+## Version
+
+Agent version: 1.0.0-alpha.8
