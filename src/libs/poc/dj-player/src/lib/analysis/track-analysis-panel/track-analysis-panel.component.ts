@@ -28,7 +28,6 @@ import {
   IDLE_PERIOD_SECONDS,
   MIN_TAIL_SECONDS,
   computePulse,
-  impliedTempo,
   segmentNotes,
   detectKey,
   detectKeyPerSection,
@@ -927,49 +926,32 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       : record.beatGrid.beatFrames.toLocaleString();
   });
 
-  /** The cached record's tempo, derived from its beat grid at the player's nominal call interval. */
-  private cachedTempo(multiplier: number): { native: number | null; sounding: number | null } {
-    const record = this.cachedRecord();
-    if (record === null || record.beatGrid === null) return { native: null, sounding: null };
-    return impliedTempo(
-      record.beatGrid.beatFrames,
-      this.view.snapshot().tempo.nominalIntervalUs,
-      record.callsPerFrame,
-      multiplier
-    );
+  /** The beat a tempo is read from, in play calls: the live scan's dominant interval, else the
+   *  cached record's beat grid; null with neither. */
+  private readonly beatPlayCalls = computed<number | null>(() => {
+    if (this.scanOutput() !== null) {
+      return this.pulseResult()?.dominantInterval ?? null;
+    }
+    return this.cachedRecord()?.beatGrid?.beatFrames ?? null;
+  });
+
+  /** The tempo of one beat of `beatPlayCalls`, through the rate in force like every duration in
+   *  this panel, so an exact-timed multispeed tune is not read at its rounded rate. Sounding is
+   *  native times the tempo multiplier. */
+  private tempoAt(multiplier: number): number | null {
+    const calls = this.beatPlayCalls();
+    if (calls === null || calls <= 0) return null;
+    const seconds = this.toSeconds(calls);
+    return seconds > 0 ? (60 / seconds) * multiplier : null;
   }
 
   protected readonly pulseNativeTempoLabel = computed<string>(() => {
-    const scan = this.scanOutput();
-    if (scan !== null) {
-      const pulse = this.pulseResult();
-      if (pulse === null || pulse.dominantInterval === null) return '—';
-      const { native } = impliedTempo(
-        pulse.dominantInterval,
-        this.view.snapshot().tempo.nominalIntervalUs,
-        scan.callsPerFrame,
-        1.0
-      );
-      return native === null ? '—' : native.toFixed(1);
-    }
-    const { native } = this.cachedTempo(1.0);
+    const native = this.tempoAt(1.0);
     return native === null ? '—' : native.toFixed(1);
   });
 
   protected readonly pulseSoundingTempoLabel = computed<string>(() => {
-    const scan = this.scanOutput();
-    if (scan !== null) {
-      const pulse = this.pulseResult();
-      if (pulse === null || pulse.dominantInterval === null) return '—';
-      const { sounding } = impliedTempo(
-        pulse.dominantInterval,
-        this.view.snapshot().tempo.nominalIntervalUs,
-        scan.callsPerFrame,
-        this.view.snapshot().tempo.multiplier
-      );
-      return sounding === null ? '—' : sounding.toFixed(1);
-    }
-    const { sounding } = this.cachedTempo(this.view.snapshot().tempo.multiplier);
+    const sounding = this.tempoAt(this.view.snapshot().tempo.multiplier);
     return sounding === null ? '—' : sounding.toFixed(1);
   });
 

@@ -656,6 +656,29 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(readoutValue('Length')).not.toBe(atSingleSpeed);
   });
 
+  it('reads a cached tempo at the exact rate in force, not the rounded one it was scanned at', () => {
+    expand();
+    setTempoMultiplier(player, 1.06);
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        beatGrid: { beatFrames: 24, beatOneFrame: 0, startFrame: 0, endFrame: null },
+        callsPerFrame: 2,
+        exactCallsPerFrame: 2.4,
+      })
+    );
+    setPlayRate(player, {
+      callsPerFrame: 2.4,
+      exactCallsPerFrame: 2.4,
+      roundedCallsPerFrame: 2,
+      mode: 'exact',
+    });
+    fixture.detectChanges();
+
+    const native = 60 / ((24 * (19_950 / 2.4)) / 1_000_000);
+    expect(readoutValue('Tempo (native)')).toBe(`${native.toFixed(1)} BPM`);
+    expect(readoutValue('Tempo (sounding)')).toBe(`${(native * 1.06).toFixed(1)} BPM`);
+  });
+
   it('reads a cached record that ends rather than loops as an end point, not as no answer', () => {
     expand();
     tuneIndex.record.set(
