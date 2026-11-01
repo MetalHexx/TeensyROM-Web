@@ -6,7 +6,7 @@ Trom Terminal is the command line of TeensyROM Suite. Use `trom` as a guided, BB
 
 New here? [Getting started](getting-started.md) covers installing the suite and putting `trom` on your PATH.
 
-> 🖼️ **Image placeholder:** Trom Terminal main menu
+<img width="1462" height="782" alt="Trom Terminal's guided menu" src="../.github/images/trom-terminal-menu.png" />
 
 ## What you can do
 
@@ -52,6 +52,8 @@ trom file search commando --filter music --take 10
 trom file favorite /music/Commando.sid /music/Delta.sid
 trom file ban /music/Delta.sid
 ```
+
+<img width="1465" height="772" alt="Trom Terminal one-line commands" src="../.github/images/trom-terminal-commands.png" />
 
 - **Launch:** `file launch` starts one file. `file random` launches a random one, and is how you shuffle: narrow it with `--filter` and `--directory`.
 - **Move along:** `file next` and `file previous` step through what you were playing. `file pause` pauses or resumes a song, and `file stop` stops whatever is running.

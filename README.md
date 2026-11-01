@@ -32,7 +32,10 @@ Browse your library from the couch, stream it like a music service, script it, a
 
 **Your library from the command line, BBS-style.**
 
-> 🖼️ **Image placeholder:** Trom Terminal main menu
+<p align="center">
+  <img src=".github/images/trom-terminal-menu.png" alt="Trom Terminal's guided menu" width="49%">
+  <img src=".github/images/trom-terminal-commands.png" alt="Trom Terminal one-line commands" width="49%">
+</p>
 
 - **Guided menu:** explore and launch without learning a single command.
 - **Stream Player:** plays through your library like a streaming service.
