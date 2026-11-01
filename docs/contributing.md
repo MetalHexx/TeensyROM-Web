@@ -22,8 +22,7 @@ This page builds the suite from source. If you only want to use it, [get started
 6. Put it on your PATH by running the built `trom` once with `path add`. Open a new terminal afterwards.
 7. Run `trom init` to start Trom API. It builds Trom API from the same checkout on first use, and Trom UI is served at [http://localhost:10213](http://localhost:10213).
 
-The installs and builds can take a few minutes, especially the first `trom init`. If the frontend build seems stuck after it finished, check that `wwwroot` holds an `index.html`, and run `pnpm nx daemon --stop` from `src` to release the helper process.
-
+The installs and builds can take a few minutes, especially the first `trom init`.
 To update, `git pull` in both repos and repeat the build steps.
 
 ## Working on the code

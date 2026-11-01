@@ -6,7 +6,7 @@ Trom Terminal is the command line of TeensyROM Suite. Use `trom` as a guided, BB
 
 New here? [Getting started](getting-started.md) covers installing the suite and putting `trom` on your PATH.
 
-<!-- Image placeholder: screenshot of the guided menu -->
+> 🖼️ **Image placeholder:** Trom Terminal main menu
 
 ## What you can do
 
@@ -37,7 +37,7 @@ trom file random --filter music --player
 
 Skip to the next or previous file, pause and resume, favorite or ban what is playing, and share it. Shape the stream with a mode, a filter, a play timer or a pinned folder. A timer moves games, demos and images along by themselves. Try one on a folder of demos, on your favorites, or on images for a screensaver.
 
-<!-- Image placeholder: screenshot of the Stream Player -->
+> 🖼️ **Image placeholder:** Stream Player
 
 ## One-line commands
 

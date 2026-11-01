@@ -15,22 +15,28 @@ Use it in your browser, from your terminal, from Claude Code or from your own co
       Browse and search your cart, launch games, demos, SIDs and images from any browser, and stream it all like a retro media service.
     </td>
     <td align="center" width="50%" valign="top">
-      <!-- Image placeholder: screenshot of the Trom Terminal guided menu -->
-      <b><a href="docs/trom-terminal.md">Trom Terminal</a></b><br>
-      A guided, BBS-style menu and one-line commands for launching, shuffling, searching and scripting your library.
-    </td>
+
+> 🖼️ **Image placeholder:** Trom Terminal main menu
+
+<b><a href="docs/trom-terminal.md">Trom Terminal</a></b><br>
+A guided, BBS-style menu and one-line commands for launching, shuffling, searching and scripting your library.
+</td>
   </tr>
   <tr>
     <td align="center" width="50%" valign="top">
-      <!-- Image placeholder: screenshot of Trom Agent in Claude Code -->
-      <b><a href="docs/trom-agent.md">Trom Agent</a></b><br>
-      Your TeensyROM companion in Claude Code: ask it to play, run timed sets, tour your library and check your setup.
-    </td>
+
+> 🖼️ **Image placeholder:** Trom Agent in Claude Code
+
+<b><a href="docs/trom-agent.md">Trom Agent</a></b><br>
+Your TeensyROM companion in Claude Code: ask it to play, run timed sets, tour your library and check your setup.
+</td>
     <td align="center" width="50%" valign="top">
-      <!-- Image placeholder: screenshot of the Trom API docs page -->
-      <b><a href="docs/trom-api.md">Trom API</a></b><br>
-      The REST API behind it all, for custom clients and automation, with its own documentation page.
-    </td>
+
+> 🖼️ **Image placeholder:** Trom API docs page
+
+<b><a href="docs/trom-api.md">Trom API</a></b><br>
+The REST API behind it all, for custom clients and automation, with its own documentation page.
+</td>
   </tr>
 </table>
 
@@ -42,7 +48,7 @@ Download the package for your platform from the [releases page](https://github.c
 
 ### DJ Mixer
 
-<!-- Image placeholder: screenshot of the DJ Mixer with a tune loaded on each deck -->
+> 🖼️ **Image placeholder:** DJ Mixer with a tune loaded on each deck
 
 Two decks of SID music, played live through real C64s. Every note is made by the SID chip itself, and none by an emulator.
 
