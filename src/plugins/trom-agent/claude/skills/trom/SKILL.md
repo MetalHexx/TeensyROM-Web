@@ -86,4 +86,4 @@ Read a reference only when its activity is chosen.
 
 ## Version
 
-Agent version: 1.0.0-alpha.8
+Agent version: 1.0.0-beta.1
