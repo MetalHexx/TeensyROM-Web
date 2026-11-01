@@ -57,7 +57,7 @@ Browse your library from the couch, stream it like a music service, script it, a
 **Drive your cart from your own code:** launch files, search your library, copy files and set themes. It's the same API Trom UI and Trom Terminal use.
 
 <p align="center">
-  <img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="98%">
+  <img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="49%">
 </p>
 
 [Explore Trom API →](docs/trom-api.md)
