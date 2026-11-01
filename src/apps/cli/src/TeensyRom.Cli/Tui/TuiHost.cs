@@ -21,11 +21,12 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
     [
         new("Launch", "launch", NeedsEngine: true),
         new("Watch Folders", "watch-folders", NeedsEngine: true),
-        new("Settings", "settings", NeedsEngine: true),
         new("Index Files", "index", NeedsEngine: true),
         new("Devices", "ports", NeedsEngine: true),
+        new("Theme", "theme", NeedsEngine: true),
         new("Generate ASID Patches", "chipsynth", NeedsEngine: false),
-        new("Credits", "credits", NeedsEngine: false)
+        new("Credits", "credits", NeedsEngine: false),
+        new("Settings", "settings", NeedsEngine: true)
     ];
 
     private const string Leave = "Leave";

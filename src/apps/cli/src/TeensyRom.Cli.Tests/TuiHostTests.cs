@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Spectre.Console;
 using TeensyRom.Cli.Api;
+using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Themes;
 
 namespace TeensyRom.Cli.Tests;
 
@@ -15,14 +17,20 @@ namespace TeensyRom.Cli.Tests;
 public sealed class TuiHostTests : IDisposable
 {
     private const int Credits = 6;
-    private const int Devices = 4;
-    private const int Leave = 7;
+    private const int Devices = 3;
+    private const int Theme = 4;
+    private const int Leave = 8;
 
+    private readonly IThemeService _themes = Substitute.For<IThemeService>();
     private readonly TestHost _host;
 
     public TuiHostTests()
     {
-        _host = new TestHost(terminal: true, configure: services => services.AddSingleton(Substitute.For<IPlayerService>()));
+        _host = new TestHost(terminal: true, configure: services =>
+        {
+            services.AddSingleton(Substitute.For<IPlayerService>());
+            services.AddSingleton(_themes);
+        });
         _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
     }
 
@@ -47,7 +55,7 @@ public sealed class TuiHostTests : IDisposable
 
         exitCode.Should().Be(0);
         var screen = Screen;
-        new[] { "Launch", "Watch Folders", "Settings", "Index Files", "Devices", "Generate ASID Patches", "Credits", "Leave" }
+        new[] { "Launch", "Watch Folders", "Index Files", "Devices", "Theme", "Generate ASID Patches", "Credits", "Settings", "Leave" }
             .Aggregate(-1, (previous, label) =>
             {
                 var at = screen.IndexOf(label, previous + 1, StringComparison.Ordinal);
@@ -55,6 +63,30 @@ public sealed class TuiHostTests : IDisposable
                 return at;
             });
         screen.Should().NotContain("Stop Engine");
+    }
+
+    [Fact]
+    public async Task ThemeEntry_StartsTheThemeScreen_ThenReturnsToTheMenu()
+    {
+        var factory = new ThemeDto
+        {
+            Id = ThemeColors.FactoryThemeId,
+            Name = "TR Default",
+            Kind = ThemeKind.Shipped,
+            Parts = new ThemePartsDto { Device = new ThemeColors(6, 14, 14, 1, 3, 1, 15).ToDto() }
+        };
+        _themes.ListAsync(Arg.Any<CancellationToken>()).Returns(new[] { factory });
+        _host.Devices.GetDevicesAsync(Arg.Any<CancellationToken>()).Returns(new[] { new DeviceSummary("a", "Alpha", true, "USB COM3", "Connected") });
+        _themes.GetDeviceRecordAsync("a", Arg.Any<CancellationToken>()).Returns(
+            new DeviceThemeRecordDto { DeviceId = "a", Colors = factory.Parts.Device, ThemeId = factory.Id, IsRecorded = false });
+        Pick(Theme);
+        Pick(4);
+        Pick(Leave);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0, _host.Consoles.StdErr);
+        Screen.Should().Contain("Theme: TR Default  (shipped)");
     }
 
     [Fact]
