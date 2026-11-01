@@ -28,7 +28,8 @@ import { DjSets } from './sets/dj-sets';
 import { decodeRowHost } from './sets/row-host';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
-import type { LoopBoundaryName, LoopSnapDirection } from './selectors/loops-summary';
+import type { MoveStepBeats } from './grid/beat-math';
+import type { LoopBoundaryName } from './selectors/loops-summary';
 
 /** `error instanceof Error ? error.message : String(error)` — a local helper, not core's
  *  `describeError`. This file imports nothing from `@sidablist/*`; every type it touches flows in
@@ -304,15 +305,11 @@ export class DeckService {
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
       this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
-      await this.loops.attach(
-        slot,
-        {
-          placementKey: `${moved.setId}:${moved.rowId}`,
-          identity: playable.reference.identity,
-          positions: this.sets.positionsFor(moved),
-        },
-        playable.index.detectedMoments.map((moment) => moment.frame)
-      );
+      await this.loops.attach(slot, {
+        placementKey: `${moved.setId}:${moved.rowId}`,
+        identity: playable.reference.identity,
+        positions: this.sets.positionsFor(moved),
+      });
 
       if (this.sequence[slot] !== mySeq) {
         return;
@@ -472,10 +469,53 @@ export class DeckService {
     }
   }
 
-  /** Ends the selected marker at the playhead, making it a loop. */
-  setMarkerEnd(slot: Slot): void {
-    if (this.canShape(slot, 'setMarkerEnd')) {
-      this.loops.setEnd(slot);
+  /** Sets the selected marker's start at the playhead, on the nearest beat. Auditions nothing. */
+  setMarkerIn(slot: Slot): void {
+    if (this.canShape(slot, 'setMarkerIn')) {
+      this.loops.setIn(slot);
+    }
+  }
+
+  /** Sets the selected marker's end at the playhead, on the nearest beat: a cue becomes a loop, a
+   *  loop's end moves. Auditions nothing. */
+  setMarkerOut(slot: Slot): void {
+    if (this.canShape(slot, 'setMarkerOut')) {
+      this.loops.setOut(slot);
+    }
+  }
+
+  /** Halves or doubles the selected loop, keeping its start; a cue gains a 4-beat end. */
+  resizeMarker(slot: Slot, direction: 'halve' | 'double'): void {
+    if (this.canShape(slot, 'resizeMarker')) {
+      this.loops.resize(slot, direction);
+    }
+  }
+
+  /** Gives the selected marker an end exactly `beats` after its start. */
+  setMarkerLength(slot: Slot, beats: number): void {
+    if (this.canShape(slot, 'setMarkerLength')) {
+      this.loops.setLength(slot, beats);
+    }
+  }
+
+  /** Shifts the selected marker, start and end together, by the deck's Move step. */
+  moveMarker(slot: Slot, direction: -1 | 1): void {
+    if (this.canShape(slot, 'moveMarker')) {
+      this.loops.moveLoop(slot, direction);
+    }
+  }
+
+  /** Moves one edge of the selected marker by the deck's Move step. */
+  moveMarkerEdge(slot: Slot, boundary: LoopBoundaryName, direction: -1 | 1): void {
+    if (this.canShape(slot, 'moveMarkerEdge')) {
+      this.loops.moveEdge(slot, boundary, direction);
+    }
+  }
+
+  /** Sets how many beats the deck's Move controls shift a loop or an edge by. */
+  setMoveStep(slot: Slot, beats: MoveStepBeats): void {
+    if (this.canShape(slot, 'setMoveStep')) {
+      this.loops.setMoveStep(slot, beats);
     }
   }
 
@@ -567,18 +607,6 @@ export class DeckService {
   stopMarkerLoop(slot: Slot): void {
     if (this.canShape(slot, 'stopMarkerLoop')) {
       this.loops.stop(slot);
-    }
-  }
-
-  /** Nudges a boundary of the selected marker onto the next detected moment in `direction`, then
-   *  auditions it as `nudgeMarker` does — also when no moment is in reach. */
-  async snapMarker(
-    slot: Slot,
-    boundary: LoopBoundaryName,
-    direction: LoopSnapDirection
-  ): Promise<void> {
-    if (this.canShape(slot, 'snapMarker')) {
-      await this.auditionEdit(slot, boundary, this.loops.snap(slot, boundary, direction));
     }
   }
 
@@ -788,15 +816,11 @@ export class DeckService {
         lengthFrames: this.runtime.snapshot(slot).basis.positionBasisFrames,
       });
       this.store.setDeckTiming({ slot, playCallIntervalUs: this.runtime.playCallIntervalUs(slot) });
-      await this.loops.attach(
-        slot,
-        {
-          placementKey: `${holding.setId}:${holding.rowId}`,
-          identity: playable.reference.identity,
-          positions: this.sets.positionsFor(holding),
-        },
-        playable.index.detectedMoments.map((moment) => moment.frame)
-      );
+      await this.loops.attach(slot, {
+        placementKey: `${holding.setId}:${holding.rowId}`,
+        identity: playable.reference.identity,
+        positions: this.sets.positionsFor(holding),
+      });
 
       if (this.sequence[slot] !== mySeq) {
         return;

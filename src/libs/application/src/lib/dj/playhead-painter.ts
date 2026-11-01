@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, type Signal } from '@angular/core
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, type DeckBeatGrid, type DeckLoopsState } from './dj-store';
 import { bpmOf, formatBpm, inGridSpan } from './grid/beat-math';
-import { clamp, resolvedFrame } from './loops/loop-marker-math';
+import { clamp } from './loops/loop-marker-math';
 import { formatElapsed } from './selectors/transport-time';
 import type { DeckPlayheadTargets } from './playhead-targets';
 import type { Slot } from './slot';
@@ -22,15 +22,10 @@ interface LapSpan {
   readonly end: number;
 }
 
-/** The running marker loop's span, or null when none runs or it has no length. */
-function runningLap({ markers, runningId }: DeckLoopsState): LapSpan | null {
-  const running = runningId === null ? undefined : markers.find((m) => m.id === runningId);
-  if (running === undefined || running.end === null) {
-    return null;
-  }
-  const start = resolvedFrame(running.start);
-  const end = resolvedFrame(running.end);
-  return end <= start ? null : { start, end };
+/** The span the engine is enforcing for the running marker loop, which trails the marker's list
+ *  entry while an edit waits for the end of the pass; null when none runs or it has no length. */
+function runningLap({ runningBounds }: DeckLoopsState): LapSpan | null {
+  return runningBounds === null || runningBounds.end <= runningBounds.start ? null : runningBounds;
 }
 
 function sameLap(a: LapSpan | null, b: LapSpan | null): boolean {

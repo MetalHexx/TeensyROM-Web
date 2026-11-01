@@ -3,7 +3,7 @@ import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import { DeckLoopsState, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
 
-/** Replaces a deck's whole loop state — the markers and detected moments of a tune attached, or
+/** Replaces a deck's whole loop state — the markers of a tune attached, or
  *  the empty state of one detached. */
 export function setDeckLoops(store: WritableStore<DjState>) {
   return {

@@ -6,6 +6,7 @@ import { DeckRuntime } from './deck-runtime';
 import {
   DjStore,
   EMPTY_DECK_LOOPS,
+  type DeckBeatGrid,
   type DeckLoopBoundary,
   type DeckLoopMarker,
   type DeckLoopsState,
@@ -23,7 +24,15 @@ import {
   type LoopBoundaryName,
 } from './loops/loop-marker-math';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
-import { nextOffset, type LoopSnapDirection } from './loops/moment-reach';
+import {
+  inGridSpan,
+  lengthLadder,
+  MOVE_STEPS,
+  nearestBeat,
+  nextBeat,
+  onBeat,
+  type MoveStepBeats,
+} from './grid/beat-math';
 import { engineSettingsOf } from './mixer/engine-settings';
 import {
   MARKER_NAME_MAX_LENGTH,
@@ -33,6 +42,9 @@ import {
 
 /** The SID's three voices: a new marker plays them all. */
 const ALL_VOICES: readonly number[] = [0, 1, 2];
+
+/** The length a cue gains when a Length press has no loop to halve or double. */
+const CUE_BEATS = 4;
 
 function sameTune(a: TuneIdentity, b: TuneIdentity): boolean {
   return a.sidHash === b.sidHash && a.subtune === b.subtune;
@@ -61,6 +73,19 @@ interface LoopBounds {
  *  its start to be ready. */
 type QueuedVia = 'engine' | 'ready';
 
+/** An edit to the running marker's bounds that waits for the end of the pass instead of applying
+ *  at once, with the marker it belongs to. `'engine'` is queued in the engine; `'behind-queued'` is
+ *  saved here while a queued marker owns the engine's one queue slot. */
+interface EndOfPassEdit {
+  readonly markerId: string;
+  readonly bounds: LoopBounds;
+  readonly via: 'engine' | 'behind-queued';
+}
+
+/** When an edit to the running marker's bounds reaches the engine: at once (a nudge), or when the
+ *  current pass ends (every other positions edit, and any edit arriving from the other deck). */
+type EditTiming = 'immediate' | 'end-of-pass';
+
 type Mutes = DeckMixerSettings['mutes'];
 
 const NO_MUTES: Mutes = [false, false, false];
@@ -69,6 +94,17 @@ const NO_MUTES: Mutes = [false, false, false];
  *  carry. A settings change fires on every knob tick, so it skips what a position change must
  *  redo. */
 type MarkerChange = 'positions' | 'settings';
+
+function sameBoundary(a: DeckLoopBoundary | null, b: DeckLoopBoundary | null): boolean {
+  return (
+    a === b ||
+    (a !== null && b !== null && a.frame === b.frame && a.offsetFrames === b.offsetFrames)
+  );
+}
+
+function sameBounds(a: LoopBounds, b: LoopBounds): boolean {
+  return a.startFrame === b.startFrame && a.endFrame === b.endFrame;
+}
 
 function mutesOf(voices: readonly { readonly muted: boolean }[]): Mutes {
   return [voices[0]?.muted ?? false, voices[1]?.muted ?? false, voices[2]?.muted ?? false];
@@ -157,6 +193,11 @@ function reselect(
  * marker loop is looping when `runningId` is set; the track's own repeat loop counts as nothing
  * looping.
  *
+ * A nudge to the running loop applies at once. Every other edit to its positions (the beat commands
+ * In, Out, Length and Move, and any edit arriving from the other deck) is held for the end of the
+ * pass: the edited loop is queued in the engine and handed off to when the pass ends, while
+ * `runningBounds` keeps publishing the bounds the engine enforces until then.
+ *
  * Each marker can keep its own mixer settings (GBL unlatched). The deck's settings in play are the
  * main track's until a jump lands in an independent marker, which swaps its copy in (the main
  * track's held aside) and carries it to the engine with the jump; a jump into a sharing marker
@@ -184,8 +225,13 @@ export class DeckLoops {
   private readonly queuedVia: Record<Slot, QueuedVia | null> = { A: null, B: null };
 
   /** The bounds the engine is enforcing for the running marker, which trail its list entry while a
-   *  changed start waits for readiness. */
+   *  changed start waits for readiness or an edit waits for the end of the pass. Written through
+   *  `setEngaged`, which publishes them. */
   private readonly engaged: Record<Slot, LoopBounds | null> = { A: null, B: null };
+
+  /** The running marker's edit waiting for the end of the pass; null when there is none. Dropped
+   *  wherever `engaged` is replaced by anything but this edit's own hand-off. */
+  private readonly endOfPass: Record<Slot, EndOfPassEdit | null> = { A: null, B: null };
 
   /** The running marker whose audition is waiting for its changed start to be ready: `reflect` seeks
    *  to that start once it applies. Held only while that marker runs and nothing else is queued. */
@@ -206,11 +252,7 @@ export class DeckLoops {
   /** Loads the holding's saved markers into the deck, selects the first, and declares their start
    *  frames to the engine. A store that fails to load is logged and leaves the deck with no
    *  markers. */
-  async attach(
-    slot: Slot,
-    holding: DeckLoopsHolding,
-    detectedMoments: readonly number[]
-  ): Promise<void> {
+  async attach(slot: Slot, holding: DeckLoopsHolding): Promise<void> {
     const token = ++this.attachTokens[slot];
     this.attached[slot] = null;
 
@@ -248,7 +290,6 @@ export class DeckLoops {
         ...EMPTY_DECK_LOOPS,
         markers,
         selectedId: markers[0]?.id ?? null,
-        detectedMoments: [...detectedMoments].sort((a, b) => a - b),
       },
     });
     this.declare(slot);
@@ -270,7 +311,9 @@ export class DeckLoops {
    * Follows the engine. Mirrors its prepared frames onto the markers' readiness, writing only when
    * a flag changed, then brings the performance state in line with what it did:
    * - a rising `handOffs` is a queued jump landing — the one thing read as a landing, since a
-   *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change;
+   *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change. It is the
+   *   running marker's own queued edit landing when one is held and no marker is queued in the
+   *   engine, else the queued marker;
    * - no loop at all while a marker is running, with no hand-off, is the engine disarming (a
    *   transport stop, a load), which ends the marker and anything queued. A marker only waiting for
    *   readiness is not seen here — `DeckService` drops it through `disengage` on a stop;
@@ -299,7 +342,9 @@ export class DeckLoops {
     }
 
     if (handedOff) {
-      this.landQueued(slot);
+      if (!this.landEdit(slot)) {
+        this.landQueued(slot);
+      }
     } else if (snapshot.loop === null && this.loopsOf(slot).runningId !== null) {
       this.resetActivity(slot);
       this.releaseSettings(slot);
@@ -414,7 +459,7 @@ export class DeckLoops {
     }
   }
 
-  /** Marks the playhead as a new cue and selects it. */
+  /** Marks the playhead, on the nearest beat when the deck has a grid, as a new cue and selects it. */
   add(slot: Slot): void {
     if (this.holdingOf(slot, 'add') === null) {
       return;
@@ -427,7 +472,7 @@ export class DeckLoops {
       );
       return;
     }
-    const frame = this.runtime.capturePosition(slot);
+    const frame = this.cueFrame(slot);
     if (frame === null) {
       this.refuse(slot, 'add', 'has no position to capture');
       return;
@@ -499,23 +544,133 @@ export class DeckLoops {
     this.selectId(slot, markers[clamp(Math.round(index), 0, markers.length - 1)].id);
   }
 
-  /** Ends the selected cue at the playhead, making it a loop. Refused for a marker that already
-   *  has an end, and unless the playhead is after the marker's start. */
-  setEnd(slot: Slot): void {
-    const marker = this.selectedMarker(slot, 'setEnd');
+  /** Sets the selected marker's start at the playhead, on the nearest beat when the deck has a
+   *  grid. Refused when the start would fall past the tune's end or at or after the marker's end. */
+  setIn(slot: Slot): void {
+    const marker = this.selectedMarker(slot, 'setIn');
+    if (marker !== null) {
+      this.place(slot, 'setIn', marker, this.boundaryAt(this.snappedPlayhead(slot)), marker.end);
+    }
+  }
+
+  /** Sets the selected marker's end at the playhead, on the nearest beat when the deck has a grid:
+   *  a cue becomes a loop, a loop's end moves. Refused when the end would fall past the tune's end
+   *  or at or before the marker's start. */
+  setOut(slot: Slot): void {
+    const marker = this.selectedMarker(slot, 'setOut');
+    if (marker !== null) {
+      this.place(slot, 'setOut', marker, marker.start, this.boundaryAt(this.snappedPlayhead(slot)));
+    }
+  }
+
+  /**
+   * Halves or doubles the selected loop, keeping its start. From a length off the ladder, halving
+   * takes the largest size below it and doubling the smallest above, so the length lands on the
+   * ladder in that direction. Doubling stops at 32 beats and at the tune's end; a cue gains a
+   * 4-beat end either way. A no-op, logged, off the grid.
+   */
+  resize(slot: Slot, direction: 'halve' | 'double'): void {
+    const marker = this.selectedMarker(slot, 'resize');
     if (marker === null) {
       return;
     }
-    if (marker.end !== null) {
-      this.refuse(slot, 'setEnd', 'selected marker already has an end');
+    const start = resolvedFrame(marker.start);
+    const grid = this.gridAt(slot, start, 'resize');
+    if (grid === null) {
       return;
     }
-    const position = this.runtime.position(slot);
-    if (!(position > resolvedFrame(marker.start))) {
-      this.refuse(slot, 'setEnd', 'playhead is not after the marker start');
+    const ladder = lengthLadder(grid.beatFrames);
+    const length =
+      markerKind(marker) === 'loop' && marker.end !== null
+        ? resolvedFrame(marker.end) - start
+        : null;
+    const size =
+      length === null
+        ? ladder.find((candidate) => candidate.beats === CUE_BEATS)
+        : direction === 'halve'
+        ? [...ladder].reverse().find((candidate) => candidate.frames < length)
+        : ladder.find((candidate) => candidate.frames > length);
+    if (size === undefined) {
+      this.refuse(slot, 'resize', `has no length to ${direction} to`);
       return;
     }
-    this.replaceSelected(slot, { ...marker, end: { frame: position, offsetFrames: 0 } });
+    this.place(slot, 'resize', marker, marker.start, this.boundaryAt(start + size.frames));
+  }
+
+  /** Gives the selected marker an end exactly `beats` after its start, a ladder size. A no-op,
+   *  logged, off the grid or for a length the grid's beat cannot hold in whole frames. */
+  setLength(slot: Slot, beats: number): void {
+    const marker = this.selectedMarker(slot, 'setLength');
+    if (marker === null) {
+      return;
+    }
+    const start = resolvedFrame(marker.start);
+    const grid = this.gridAt(slot, start, 'setLength');
+    if (grid === null) {
+      return;
+    }
+    const size = lengthLadder(grid.beatFrames).find((candidate) => candidate.beats === beats);
+    if (size === undefined) {
+      this.refuse(slot, 'setLength', `has no ${beats}-beat length on its grid`);
+      return;
+    }
+    this.place(slot, 'setLength', marker, marker.start, this.boundaryAt(start + size.frames));
+  }
+
+  /**
+   * Shifts the selected marker, start and end together, by the deck's Move step in `direction`,
+   * keeping its length; a cue moves alone. A start off the beats lands first on the next beat that
+   * way, the end following at the same length. A no-op, logged, off the grid.
+   */
+  moveLoop(slot: Slot, direction: -1 | 1): void {
+    const marker = this.selectedMarker(slot, 'moveLoop');
+    if (marker === null) {
+      return;
+    }
+    const from = resolvedFrame(marker.start);
+    const to = this.beatStep(slot, from, direction, 'moveLoop');
+    if (to === null) {
+      return;
+    }
+    const end = marker.end === null ? null : this.boundaryAt(resolvedFrame(marker.end) + to - from);
+    this.place(slot, 'moveLoop', marker, this.boundaryAt(to), end);
+  }
+
+  /** Moves one edge of the selected marker by the deck's Move step in `direction`. An edge off the
+   *  beats lands first on the next beat that way. A no-op, logged, off the grid; refused for the
+   *  end of a cue. */
+  moveEdge(slot: Slot, boundary: LoopBoundaryName, direction: -1 | 1): void {
+    const marker = this.selectedMarker(slot, 'moveEdge');
+    if (marker === null) {
+      return;
+    }
+    const edge = this.boundaryOf(slot, marker, boundary, 'moveEdge');
+    if (edge === null) {
+      return;
+    }
+    const to = this.beatStep(slot, resolvedFrame(edge), direction, 'moveEdge');
+    if (to === null) {
+      return;
+    }
+    const moved = this.boundaryAt(to);
+    this.place(
+      slot,
+      'moveEdge',
+      marker,
+      boundary === 'start' ? moved : marker.start,
+      boundary === 'end' ? moved : marker.end
+    );
+  }
+
+  /** Sets how many beats the deck's Move controls shift a loop or an edge by. Kept across loads. */
+  setMoveStep(slot: Slot, beats: MoveStepBeats): void {
+    if (!MOVE_STEPS.includes(beats)) {
+      this.refuse(slot, 'setMoveStep', `has no Move step of ${beats} beats`);
+      return;
+    }
+    if (this.store.decks()[slot].moveStepBeats !== beats) {
+      this.store.setDeckMoveStep({ slot, moveStepBeats: beats });
+    }
   }
 
   /** Turns the selected loop back into a cue. */
@@ -563,28 +718,6 @@ export class DeckLoops {
       );
     }
     return marker.id;
-  }
-
-  /** Nudges a boundary to the next detected moment in `direction` within a second of where it was
-   *  captured. Returns the edited marker's id for the caller to `audition`, even when no moment is
-   *  in reach and the boundary stays put; null when the edit was refused. */
-  snap(slot: Slot, boundary: LoopBoundaryName, direction: LoopSnapDirection): string | null {
-    const marker = this.selectedMarker(slot, 'snap');
-    if (marker === null) {
-      return null;
-    }
-    const target = this.boundaryOf(slot, marker, boundary, 'snap');
-    if (target === null) {
-      return null;
-    }
-    const offset = nextOffset(
-      this.loopsOf(slot).detectedMoments,
-      target.frame,
-      target.offsetFrames,
-      this.oneSecond(slot),
-      direction
-    );
-    return offset === null ? marker.id : this.nudge(slot, boundary, offset);
   }
 
   /**
@@ -682,20 +815,22 @@ export class DeckLoops {
   }
 
   /** Lands a changed list on the slot, saves it, and gives it to the other deck when that deck
-   *  holds the same row and subtune. A settings or names change leaves the other deck's pending
-   *  start audition and its own sound alone: it plays the new settings at its next jump into the
-   *  marker. */
+   *  holds the same row and subtune. `timing` is when an edit to the running marker's bounds
+   *  reaches this deck's engine; the other deck always takes it at the end of its pass. A settings
+   *  or names change leaves the other deck's pending start audition and its own sound alone: it
+   *  plays the new settings at its next jump into the marker. */
   private commit(
     slot: Slot,
     markers: readonly DeckLoopMarker[],
     selectedId: string | null,
-    change: MarkerChange = 'positions'
+    change: MarkerChange = 'positions',
+    timing: EditTiming = 'immediate'
   ): void {
     const mine = this.attached[slot];
     if (mine === null) {
       return;
     }
-    this.land(slot, markers, selectedId, change);
+    this.land(slot, markers, selectedId, change, timing);
     this.save(slot, mine, markers);
 
     const other = otherSlot(slot);
@@ -710,22 +845,27 @@ export class DeckLoops {
         // An edit from this deck never moves the other deck's playhead.
         this.pendingStart[other] = null;
       }
-      this.land(other, markers, reselect(before, beforeId, markers), change);
+      this.land(other, markers, reselect(before, beforeId, markers), change, 'end-of-pass');
     }
   }
 
   /**
    * The one routine that puts a list on a deck, for a local edit and for the other deck alike:
-   * store first — each marker's readiness taken from this deck's own engine — then the engine's
-   * targets (unless only settings changed, which moves no start), then a reflect for whatever the
-   * declaration made ready. A marker in play that the list no longer holds is let go.
+   * store first — each marker's readiness taken from this deck's own engine — then, unless only
+   * settings changed, which moves no start, the running marker's edit held for the end of the pass
+   * (or let go, for an edit that applies at once) and the engine's targets, then the engine's
+   * running and queued markers, then a reflect for whatever the declaration made ready. The targets
+   * are declared before anything is queued, so a start queued in the engine is built by its prepare
+   * runner and never captured off-thread. A marker in play that the list no longer holds is let go.
    */
   private land(
     slot: Slot,
     markers: readonly DeckLoopMarker[],
     selectedId: string | null,
-    change: MarkerChange
+    change: MarkerChange,
+    timing: EditTiming
   ): void {
+    const running = this.runningMarker(slot);
     const prepared = this.preparedOf(slot);
     this.store.setLoopMarkers({
       slot,
@@ -735,13 +875,18 @@ export class DeckLoops {
       })),
     });
     this.selectId(slot, selectedId);
+    if (change === 'positions') {
+      if (timing === 'end-of-pass') {
+        this.holdEdit(slot, running);
+      } else {
+        this.releaseEdit(slot, running);
+      }
+      this.declare(slot);
+    }
     this.syncActivity(slot);
     const { settingsInPlayId } = this.loopsOf(slot);
     if (settingsInPlayId !== null && !markers.some((marker) => marker.id === settingsInPlayId)) {
       this.releaseSettings(slot);
-    }
-    if (change === 'positions') {
-      this.declare(slot);
     }
     this.reflect(slot);
   }
@@ -754,10 +899,11 @@ export class DeckLoops {
   }
 
   /**
-   * Keeps the engine on the running marker's bounds as its entry changes. A changed end or WRAP
-   * mode applies at once, taking effect at the next wrap; a changed start is held until its frame
-   * is ready and takes effect at the next re-entry. None seeks. A marker that is gone, or no longer
-   * a loop, is let go.
+   * Keeps the engine on the running marker's bounds as its entry changes, by one of two rules
+   * chosen by whether an end-of-pass edit is held. With none, a changed end or WRAP mode applies
+   * at once, taking effect at the next wrap; a changed start is held until its frame is ready and
+   * takes effect at the next re-entry. With one, the list's bounds never reach the engine until
+   * the pass ends. None seeks. A marker that is gone, or no longer a loop, is let go.
    */
   private syncRunning(slot: Slot): void {
     const { markers, runningId } = this.loopsOf(slot);
@@ -771,6 +917,11 @@ export class DeckLoops {
       this.stop(slot);
       return;
     }
+    const edit = this.endOfPass[slot];
+    if (edit !== null && edit.markerId === runningId) {
+      this.syncEndOfPass(slot, edit, desired.varispeedStart);
+      return;
+    }
     const next = {
       startFrame: marker.ready ? desired.startFrame : engaged.startFrame,
       endFrame: desired.endFrame,
@@ -781,11 +932,144 @@ export class DeckLoops {
       next.endFrame === engaged.endFrame &&
       next.varispeedStart === engaged.varispeedStart;
     if (!unchanged && next.endFrame > next.startFrame) {
-      this.engaged[slot] = next;
+      this.setEngaged(slot, next);
       this.runtime.setActiveLoop(slot, next);
       // `setActiveLoop` drops the engine's queue.
       this.syncQueued(slot);
     }
+  }
+
+  /** `syncRunning` while the running marker's edit waits for the end of the pass: only a WRAP
+   *  change applies at once, on the bounds in force, and the edit is queued again since
+   *  `setActiveLoop` drops the engine's queue. */
+  private syncEndOfPass(slot: Slot, edit: EndOfPassEdit, varispeedStart: VarispeedLoopStart): void {
+    const engaged = this.engaged[slot];
+    if (engaged !== null && engaged.varispeedStart !== varispeedStart) {
+      const next = { ...engaged, varispeedStart };
+      this.setEngaged(slot, next);
+      this.endOfPass[slot] = { ...edit, bounds: { ...edit.bounds, varispeedStart } };
+      this.runtime.setActiveLoop(slot, next);
+      this.syncQueued(slot);
+    }
+    this.syncPendingEdit(slot);
+  }
+
+  /**
+   * Keeps the running marker's end-of-pass edit where the engine can land it: queued there, unless a
+   * marker queued in the engine owns its one slot, in which case the edit waits behind that marker
+   * and is queued when the marker goes. Queues only when the engine's queue is not already the
+   * edit, and only for the marker still running; an edit of any other marker is dropped.
+   */
+  private syncPendingEdit(slot: Slot): void {
+    const edit = this.endOfPass[slot];
+    if (edit === null) {
+      return;
+    }
+    if (edit.markerId !== this.loopsOf(slot).runningId) {
+      this.endOfPass[slot] = null;
+      return;
+    }
+    const via = this.queuedVia[slot] === 'engine' ? 'behind-queued' : 'engine';
+    if (edit.via !== via) {
+      this.endOfPass[slot] = { ...edit, via };
+    }
+    if (via === 'behind-queued') {
+      return;
+    }
+    const { startFrame, endFrame, varispeedStart } = edit.bounds;
+    const queued = this.runtime.snapshot(slot).tune?.queuedJump ?? null;
+    if (
+      queued?.startFrame !== startFrame ||
+      queued.endFrame !== endFrame ||
+      queued.varispeedStart !== varispeedStart
+    ) {
+      this.runtime.queueJump(slot, { startFrame, endFrame, varispeedStart });
+    }
+  }
+
+  /**
+   * Holds the running marker's bounds from the list as an edit for the end of the pass, when the
+   * edit just landed changed them. An edit that brings them back to what the engine is enforcing
+   * holds nothing and lets go of one already held.
+   */
+  private holdEdit(slot: Slot, before: DeckLoopMarker | undefined): void {
+    const edited = this.editedBounds(slot, before);
+    const engaged = this.engaged[slot];
+    if (edited === null || engaged === null) {
+      return;
+    }
+    if (sameBounds(edited.bounds, engaged)) {
+      this.dropEndOfPass(slot, edited.id);
+      return;
+    }
+    this.endOfPass[slot] = {
+      markerId: edited.id,
+      bounds: edited.bounds,
+      via: this.queuedVia[slot] === 'engine' ? 'behind-queued' : 'engine',
+    };
+  }
+
+  /** An edit that applies at once and changed the running marker's bounds supersedes the edit held
+   *  for the end of the pass. */
+  private releaseEdit(slot: Slot, before: DeckLoopMarker | undefined): void {
+    const edited = this.editedBounds(slot, before);
+    if (edited !== null) {
+      this.dropEndOfPass(slot, edited.id);
+    }
+  }
+
+  /** The running marker and its bounds as listed now, when they differ from what `before` listed;
+   *  null when the deck runs nothing, or the marker is not, or no longer, a loop. */
+  private editedBounds(
+    slot: Slot,
+    before: DeckLoopMarker | undefined
+  ): { readonly id: string; readonly bounds: LoopBounds } | null {
+    const running = this.runningMarker(slot);
+    const previous = before === undefined ? null : loopBoundsOf(before);
+    const bounds = running === undefined ? null : loopBoundsOf(running);
+    return running === undefined ||
+      previous === null ||
+      bounds === null ||
+      sameBounds(previous, bounds)
+      ? null
+      : { id: running.id, bounds };
+  }
+
+  /** Lets go of marker `id`'s end-of-pass edit, taking it out of the engine's queue when it was
+   *  queued there. A different marker's edit stays. */
+  private dropEndOfPass(slot: Slot, id: string): void {
+    const edit = this.endOfPass[slot];
+    if (edit === null || edit.markerId !== id) {
+      return;
+    }
+    this.endOfPass[slot] = null;
+    if (edit.via === 'engine') {
+      this.runtime.queueJump(slot, null);
+    }
+  }
+
+  /** The engine handed off to the running marker's own queued edit: its bounds are what the engine
+   *  enforces now. False when the hand-off was not that edit's — none held, or a marker queued in
+   *  the engine owns the slot. */
+  private landEdit(slot: Slot): boolean {
+    const edit = this.endOfPass[slot];
+    if (
+      edit === null ||
+      edit.via !== 'engine' ||
+      edit.markerId !== this.loopsOf(slot).runningId ||
+      this.queuedVia[slot] === 'engine'
+    ) {
+      return false;
+    }
+    this.endOfPass[slot] = null;
+    this.setEngaged(slot, edit.bounds);
+    return true;
+  }
+
+  /** The marker the deck is running, as listed, or undefined when none is. */
+  private runningMarker(slot: Slot): DeckLoopMarker | undefined {
+    const { markers, runningId } = this.loopsOf(slot);
+    return runningId === null ? undefined : markers.find((marker) => marker.id === runningId);
   }
 
   /** Keeps the engine's queue on the queued marker's current target and the settings it carries,
@@ -834,7 +1118,8 @@ export class DeckLoops {
     // would be queued again.
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
-    this.engaged[slot] = bounds;
+    this.endOfPass[slot] = null;
+    this.setEngaged(slot, bounds);
     this.setActivity(slot, bounds === null ? null : marker.id, null, false);
     if (carried !== null) {
       const { mainSettings } = this.loopsOf(slot);
@@ -915,11 +1200,18 @@ export class DeckLoops {
     this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
     if (via === 'engine') {
       this.runtime.queueJump(slot, null);
+      // A running marker's edit saved behind that queue has the engine's slot to itself again.
+      this.syncPendingEdit(slot);
     }
   }
 
-  /** Queues the marker in the engine to land at the end of the running loop's lap. */
+  /** Queues the marker in the engine to land at the end of the running loop's lap. It replaces the
+   *  running marker's edit there, which waits behind it. */
   private queueThroughEngine(slot: Slot, marker: DeckLoopMarker): void {
+    const edit = this.endOfPass[slot];
+    if (edit !== null) {
+      this.endOfPass[slot] = { ...edit, via: 'behind-queued' };
+    }
     this.queuedVia[slot] = 'engine';
     this.setActivity(slot, this.loopsOf(slot).runningId, marker.id, false);
     this.queueInEngine(slot, marker);
@@ -944,6 +1236,8 @@ export class DeckLoops {
     this.setActivity(slot, this.loopsOf(slot).runningId, null, false);
     if (via === 'engine') {
       this.runtime.queueJump(slot, null);
+      // The running marker's edit saved behind the cancelled marker goes into the engine instead.
+      this.syncPendingEdit(slot);
     }
   }
 
@@ -955,7 +1249,8 @@ export class DeckLoops {
     const bounds = loopBoundsOf(marker);
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
-    this.engaged[slot] = bounds;
+    this.endOfPass[slot] = null;
+    this.setEngaged(slot, bounds);
     this.setActivity(slot, bounds === null ? null : marker.id, null, false);
     if (follow) {
       this.selectId(slot, marker.id);
@@ -1055,8 +1350,21 @@ export class DeckLoops {
   private resetActivity(slot: Slot): void {
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
-    this.engaged[slot] = null;
+    this.endOfPass[slot] = null;
+    this.setEngaged(slot, null);
     this.setActivity(slot, null, null, false);
+  }
+
+  /** Records the bounds the engine is enforcing for the running marker, and publishes them. */
+  private setEngaged(slot: Slot, bounds: LoopBounds | null): void {
+    this.engaged[slot] = bounds;
+    const current = this.loopsOf(slot).runningBounds;
+    if (current?.start !== bounds?.startFrame || current?.end !== bounds?.endFrame) {
+      this.store.setRunningBounds({
+        slot,
+        runningBounds: bounds === null ? null : { start: bounds.startFrame, end: bounds.endFrame },
+      });
+    }
   }
 
   private setActivity(
@@ -1108,13 +1416,107 @@ export class DeckLoops {
     });
   }
 
-  private replaceSelected(slot: Slot, updated: DeckLoopMarker): void {
+  private replaceSelected(
+    slot: Slot,
+    updated: DeckLoopMarker,
+    timing: EditTiming = 'immediate'
+  ): void {
     const { markers, selectedId } = this.loopsOf(slot);
     this.commit(
       slot,
       markers.map((marker) => (marker.id === updated.id ? updated : marker)),
-      selectedId
+      selectedId,
+      'positions',
+      timing
     );
+  }
+
+  private boundaryAt(frame: number): DeckLoopBoundary {
+    return { frame, offsetFrames: 0 };
+  }
+
+  /**
+   * Puts `start` and `end` on the selected marker as an end-of-pass edit. Refused, changing
+   * nothing, when an edge would fall before the start of the tune or past its length, or the end
+   * at or before the start. An edit that leaves both boundaries as they were does nothing.
+   */
+  private place(
+    slot: Slot,
+    command: string,
+    marker: DeckLoopMarker,
+    start: DeckLoopBoundary,
+    end: DeckLoopBoundary | null
+  ): void {
+    const edges = [start, ...(end === null ? [] : [end])].map(
+      (boundary) => boundary.frame + boundary.offsetFrames
+    );
+    const { lengthFrames } = this.store.decks()[slot];
+    if (edges.some((edge) => edge < 0)) {
+      this.refuse(slot, command, 'would put an edge before the start of the tune');
+    } else if (lengthFrames !== null && edges.some((edge) => edge > lengthFrames)) {
+      this.refuse(slot, command, "would put an edge past the tune's length");
+    } else if (end !== null && edges[1] <= edges[0]) {
+      this.refuse(slot, command, 'would put the end at or before the start');
+    } else if (!sameBoundary(start, marker.start) || !sameBoundary(end, marker.end)) {
+      // Nothing is auditioned, so a seek still waiting on an earlier nudge would surprise.
+      this.pendingStart[slot] = null;
+      this.replaceSelected(slot, { ...marker, start, end }, 'end-of-pass');
+    }
+  }
+
+  /** The grid the beat commands snap to when `frame` is inside its span; else null, with a warning
+   *  naming the refused command. */
+  private gridAt(slot: Slot, frame: number, command: string): DeckBeatGrid | null {
+    const grid = this.store.decks()[slot].beatGrid;
+    if (grid === null) {
+      this.refuse(slot, command, 'has no beat grid');
+      return null;
+    }
+    if (!inGridSpan(grid, frame)) {
+      this.refuse(slot, command, 'is outside its beat grid');
+      return null;
+    }
+    return grid;
+  }
+
+  /** Where a Move in `direction` takes the edge at `frame`: the Move step on from the beat it is
+   *  on, else the next beat that way. Null, with a warning, when there is no such beat in the grid's
+   *  span. */
+  private beatStep(slot: Slot, frame: number, direction: -1 | 1, command: string): number | null {
+    const grid = this.gridAt(slot, frame, command);
+    if (grid === null) {
+      return null;
+    }
+    const beat = nearestBeat(grid, frame);
+    const target =
+      beat !== null && onBeat(grid, frame)
+        ? beat + direction * this.store.decks()[slot].moveStepBeats * grid.beatFrames
+        : nextBeat(grid, frame, direction);
+    const rounded = target === null ? null : Math.round(target);
+    if (rounded === null || !inGridSpan(grid, rounded)) {
+      this.refuse(slot, command, 'has no beat to move to');
+      return null;
+    }
+    return rounded;
+  }
+
+  /** The playhead's frame, on the nearest beat when the deck has a grid and the playhead is inside
+   *  its span. */
+  private snappedPlayhead(slot: Slot): number {
+    const position = Math.round(this.runtime.position(slot));
+    const grid = this.store.decks()[slot].beatGrid;
+    const beat = grid === null ? null : nearestBeat(grid, position);
+    return beat === null ? position : Math.round(beat);
+  }
+
+  /** The frame a new cue takes: the playhead's, captured so its image is ready at once, or the
+   *  nearest beat when that is another frame, which the declaration then builds. Null with nothing
+   *  to capture. */
+  private cueFrame(slot: Slot): number | null {
+    const snapped = this.snappedPlayhead(slot);
+    return snapped === Math.round(this.runtime.position(slot))
+      ? this.runtime.capturePosition(slot)
+      : snapped;
   }
 
   private boundaryOf(

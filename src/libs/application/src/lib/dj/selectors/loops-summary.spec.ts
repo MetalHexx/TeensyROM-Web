@@ -5,12 +5,22 @@ import {
   DjStore,
   EMPTY_DECK_LOOPS,
   HOME_DECK_PANEL,
+  type DeckBeatGrid,
   type DeckLoopMarker,
   type DeckStatus,
 } from '../dj-store';
 
 /** 50 play calls a second. */
 const INTERVAL_US = 20_000;
+
+/** 24 play calls a beat from frame 0, so beats sit on multiples of 24. */
+const GRID: DeckBeatGrid = {
+  beatFrames: 24,
+  beatOneFrame: 0,
+  startFrame: 0,
+  endFrame: null,
+  source: 'scan',
+};
 
 const TUNE: TuneReference = {
   identity: { sidHash: 'tune', subtune: 1 },
@@ -74,9 +84,29 @@ describe('loopsSummary', () => {
       hasTune: false,
       canAdd: false,
       canStop: false,
+      moveStepText: '1 BEAT',
+      moveStepOptions: [
+        { beats: 1, label: '1 BEAT', selected: true },
+        { beats: 2, label: '2 BEATS', selected: false },
+        { beats: 4, label: '4 BEATS', selected: false },
+        { beats: 8, label: '8 BEATS', selected: false },
+        { beats: 16, label: '16 BEATS', selected: false },
+      ],
       items: [],
       selected: null,
     });
+  });
+
+  it("reads the deck's Move step, which exists with nothing selected", () => {
+    store.setDeckMoveStep({ slot: 'A', moveStepBeats: 8 });
+
+    const summary = store.loopsSummary('A')();
+
+    expect(summary.moveStepText).toBe('8 BEATS');
+    expect(summary.moveStepOptions.filter((option) => option.selected)).toEqual([
+      { beats: 8, label: '8 BEATS', selected: true },
+    ]);
+    expect(summary.selected).toBeNull();
   });
 
   it.each([
@@ -272,44 +302,116 @@ describe('loopsSummary', () => {
       expect(store.loopsSummary('A')().selected).toBeNull();
     });
 
-    it("lays the reachable moments on each boundary's one-second track and says which way it can snap", () => {
-      setLoops([marker('a', 100)], { detectedMoments: [90, 100, 130, 500] });
+    it("lays the beats within reach on each boundary's one-second track", () => {
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
+      setLoops([marker('a', 100, 300)]);
 
-      const start = store.loopsSummary('A')().selected?.start;
+      const { start, end } = store.loopsSummary('A')().selected ?? {};
 
-      expect(start).toEqual({
-        offsetFrames: 0,
-        rangeFrames: 50,
-        tickPercents: [40, 50, 80],
-        canSnapPrevious: true,
-        canSnapNext: true,
-      });
+      expect(start).toEqual({ offsetFrames: 0, rangeFrames: 50, tickPercents: [22, 46, 70, 94] });
+      expect(end?.tickPercents.map(Math.round)).toEqual([14, 38, 62, 86]);
     });
 
-    it('cannot snap past the last moment in reach', () => {
-      setLoops([{ ...marker('a', 100), start: { frame: 100, offsetFrames: 30 } }], {
-        detectedMoments: [90, 130],
-      });
+    it('draws no ticks with no grid, no beat of its span in reach or while the interval is unknown', () => {
+      setLoops([marker('a', 100, 300)]);
+      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
 
-      const start = store.loopsSummary('A')().selected?.start;
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, endFrame: 40 } });
+      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
 
-      expect(start).toMatchObject({ offsetFrames: 30, canSnapPrevious: true, canSnapNext: false });
-    });
-
-    it('gives a loop an end boundary too, and has no ticks while the interval is unknown', () => {
-      setLoops([marker('a', 100, 300)], { detectedMoments: [100, 310] });
-      expect(store.loopsSummary('A')().selected?.end).toMatchObject({
-        rangeFrames: 50,
-        tickPercents: [60],
-      });
-
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
       store.setDeckTiming({ slot: 'A', playCallIntervalUs: null });
-      expect(store.loopsSummary('A')().selected?.start).toMatchObject({
+      expect(store.loopsSummary('A')().selected?.start).toEqual({
+        offsetFrames: 0,
         rangeFrames: 0,
         tickPercents: [],
-        canSnapPrevious: false,
-        canSnapNext: false,
       });
+    });
+  });
+
+  describe('lengths in beats', () => {
+    beforeEach(() => {
+      loadTune();
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
+    });
+
+    const lengthTexts = () =>
+      store
+        .loopsSummary('A')()
+        .items.map((item) => item.lengthText);
+
+    it('writes a whole number of beats from a start on a beat', () => {
+      setLoops([
+        marker('one', 240, 264),
+        marker('five', 240, 360),
+        marker('sixteen', 240, 240 + 384),
+        marker('forty-eight', 0, 1_152),
+      ]);
+
+      expect(lengthTexts()).toEqual(['1 BEAT', '5 BEATS', '16 BEATS', '48 BEATS']);
+    });
+
+    it('writes a ladder fraction of a beat', () => {
+      setLoops([marker('half', 240, 252), marker('eighth', 240, 243), marker('quarter', 240, 246)]);
+
+      expect(lengthTexts()).toEqual(['½ BEAT', '⅛ BEAT', '¼ BEAT']);
+    });
+
+    it('falls back to seconds off the beats, between ladder sizes, off the grid and outside its span', () => {
+      setLoops([marker('off', 241, 265), marker('between', 240, 270), marker('cue', 240)]);
+      expect(lengthTexts()).toEqual(['0.4s', '0.6s', 'CUE']);
+
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, endFrame: 100 } });
+      setLoops([marker('outside', 240, 264)]);
+      expect(lengthTexts()).toEqual(['0.4s']);
+
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: null });
+      expect(lengthTexts()).toEqual(['0.4s']);
+    });
+
+    it("counts a start's nudge when judging whether it is on a beat", () => {
+      setLoops([{ ...marker('nudged', 240, 264), start: { frame: 240, offsetFrames: 5 } }]);
+
+      expect(lengthTexts()).toEqual(['0.3s']);
+    });
+
+    it('says NO END for a cue and offers the ladder with the loop length selected', () => {
+      setLoops([marker('cue', 240), marker('loop', 240, 336)], { selectedId: 'cue' });
+      expect(store.loopsSummary('A')().selected?.lengthText).toBe('NO END');
+      expect(
+        store
+          .loopsSummary('A')()
+          .selected?.lengthOptions.some((option) => option.selected)
+      ).toBe(false);
+
+      store.setLoopSelection({ slot: 'A', selectedId: 'loop', selectionMovedWhileQueued: false });
+      const selected = store.loopsSummary('A')().selected;
+
+      expect(selected?.lengthText).toBe('4 BEATS');
+      expect(selected?.lengthOptions.map((option) => option.label)).toEqual([
+        '⅛ BEAT',
+        '¼ BEAT',
+        '½ BEAT',
+        '1 BEAT',
+        '2 BEATS',
+        '4 BEATS',
+        '8 BEATS',
+        '16 BEATS',
+        '32 BEATS',
+      ]);
+      expect(selected?.lengthOptions.filter((option) => option.selected)).toEqual([
+        { beats: 4, label: '4 BEATS', selected: true },
+      ]);
+    });
+
+    it('offers no lengths with no grid, and keeps seconds', () => {
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: null });
+      setLoops([marker('loop', 240, 336)]);
+
+      const selected = store.loopsSummary('A')().selected;
+
+      expect(selected?.lengthOptions).toEqual([]);
+      expect(selected?.lengthText).toBe('1.9s');
     });
   });
 

@@ -4,6 +4,7 @@ import { frames } from '@sidablist/core';
 import type { MappableControl } from './mappable-controls';
 import { logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from '../deck-runtime';
+import { EMPTY_DECK_LOOPS } from '../dj-store';
 import {
   DECK_CONTROL_IDS,
   SET_CONTROL_IDS,
@@ -54,15 +55,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 83 controls per deck and 3 for the set, 169 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(169);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(169);
+    it('holds 88 controls per deck and 3 for the set, 179 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(179);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(179);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(83);
+        expect(ids).toHaveLength(88);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -332,12 +333,15 @@ describe('MappableControls', () => {
       ['loop-wrap', 'toggleMarkerWrap', []],
       ['loop-add', 'addMarker', []],
       ['loop-stop', 'stopMarkerLoop', []],
-      ['loop-set-end', 'setMarkerEnd', []],
+      ['loop-in', 'setMarkerIn', []],
+      ['loop-set-end', 'setMarkerOut', []],
       ['loop-clear-end', 'clearMarkerEnd', []],
-      ['loop-start-snap-previous', 'snapMarker', ['start', 'previous']],
-      ['loop-start-snap-next', 'snapMarker', ['start', 'next']],
-      ['loop-end-snap-previous', 'snapMarker', ['end', 'previous']],
-      ['loop-end-snap-next', 'snapMarker', ['end', 'next']],
+      ['loop-move-earlier', 'moveMarker', [-1]],
+      ['loop-move-later', 'moveMarker', [1]],
+      ['loop-start-snap-previous', 'moveMarkerEdge', ['start', -1]],
+      ['loop-start-snap-next', 'moveMarkerEdge', ['start', 1]],
+      ['loop-end-snap-previous', 'moveMarkerEdge', ['end', -1]],
+      ['loop-end-snap-next', 'moveMarkerEdge', ['end', 1]],
     ] as const)('%s fires deckService.%s for its own deck', (id, command, extra) => {
       const spy = vi
         .spyOn(h.deckService, command)
@@ -359,19 +363,118 @@ describe('MappableControls', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
     });
 
-    it.each([
-      ['loop-start-snap-previous'],
-      ['loop-start-snap-next'],
-      ['loop-end-snap-previous'],
-      ['loop-end-snap-next'],
-    ] as const)('%s logs a rejected snap instead of leaving it unhandled', async (id) => {
-      vi.spyOn(h.deckService, 'snapMarker').mockRejectedValue(new Error('boom'));
-      vi.mocked(logWarn).mockClear();
+    describe('loop-length', () => {
+      /** 24 play calls a beat: the ladder runs ⅛ to 32 beats, nine sizes. */
+      const GRID = {
+        beatFrames: 24,
+        beatOneFrame: 0,
+        startFrame: 0,
+        endFrame: null,
+        source: 'scan',
+      } as const;
 
-      pick('A', id, 'trigger').fire();
-      await flush();
+      function seedMarker(end: number | null): void {
+        h.djStore.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
+        h.djStore.setDeckLoops({
+          slot: 'A',
+          loops: {
+            ...EMPTY_DECK_LOOPS,
+            markers: [
+              {
+                id: 'm',
+                name: null,
+                start: { frame: 240, offsetFrames: 0 },
+                end: end === null ? null : { frame: 240 + end, offsetFrames: 0 },
+                voices: [],
+                settings: null,
+                ownSettings: false,
+                wraps: false,
+                ready: true,
+              },
+            ],
+            selectedId: 'm',
+          },
+        });
+      }
+      const length = () => pick('A', 'loop-length', 'value');
 
-      expect(vi.mocked(logWarn)).toHaveBeenCalledWith(expect.stringContaining('boom'));
+      it('counts the ladder sizes of the deck grid, none with no grid', () => {
+        expect(length().max).toBe(0);
+
+        seedMarker(96);
+
+        expect(length().max).toBe(8);
+        expect(length().wholeSteps).toBe(true);
+      });
+
+      it("reads the size's index, a half index off the ladder, the ends beyond it and the 4-beat index on a cue", () => {
+        seedMarker(96);
+        expect(length().read()).toBe(5);
+
+        seedMarker(100);
+        expect(length().read()).toBe(5.5);
+
+        seedMarker(2000);
+        expect(length().read()).toBe(8);
+
+        seedMarker(2);
+        expect(length().read()).toBe(0);
+
+        seedMarker(null);
+        expect(length().read()).toBe(5);
+      });
+
+      it('halves or doubles once for a step either way, whatever the length', () => {
+        const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
+        seedMarker(100);
+
+        length().set(6.5);
+        length().set(4.5);
+        seedMarker(96);
+        length().set(6);
+        length().set(4);
+
+        expect(resize.mock.calls).toEqual([
+          ['A', 'double'],
+          ['A', 'halve'],
+          ['A', 'double'],
+          ['A', 'halve'],
+        ]);
+      });
+
+      it('does nothing for a turn past either end', () => {
+        const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
+        seedMarker(2000);
+        length().set(8);
+        seedMarker(2);
+        length().set(0);
+
+        expect(resize).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('loop-move-step', () => {
+      const step = () => pick('A', 'loop-move-step', 'value');
+
+      it('counts the five steps and reads the deck step', () => {
+        expect(step().max).toBe(4);
+        expect(step().read()).toBe(0);
+
+        h.makeShapeable('A');
+        h.deckService.setMoveStep('A', 8);
+
+        expect(step().read()).toBe(3);
+        expect(step().wholeSteps).toBe(true);
+      });
+
+      it('sets the step an index names through the deck service', () => {
+        h.makeShapeable('A');
+
+        step().set(2);
+
+        expect(h.djStore.deck('A')().moveStepBeats).toBe(4);
+        expect(h.djStore.deck('B')().moveStepBeats).toBe(1);
+      });
     });
 
     describe('loop-select', () => {

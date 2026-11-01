@@ -5,6 +5,8 @@ import { DeckHand, type HandTarget } from '../deck-hand';
 import { DeckService } from '../deck.service';
 import { DjSets } from '../sets/dj-sets';
 import { DjStore } from '../dj-store';
+import { lengthLadder, MOVE_STEPS } from '../grid/beat-math';
+import { markerKind, resolvedFrame } from '../loops/loop-marker-math';
 import type { MappingStyleKind } from '../ports';
 import { MixerService, type FilterKnob, type VoiceKnob } from '../mixer.service';
 import { PANEL_RANGES } from '../mixer/panel-ranges';
@@ -366,21 +368,44 @@ export class MappableControls {
       ),
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
-      trigger(id('loop-set-end'), 'Set loop end', () => decks.setMarkerEnd(slot)),
+      trigger(id('loop-in'), 'Loop in', () => decks.setMarkerIn(slot)),
+      trigger(id('loop-set-end'), 'Loop out', () => decks.setMarkerOut(slot)),
       trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
       trigger(id('loop-global'), 'Loop GBL', () => decks.toggleMarkerGlobal(slot)),
       trigger(id('loop-wrap'), 'Loop WRAP', () => decks.toggleMarkerWrap(slot)),
-      trigger(id('loop-start-snap-previous'), 'Snap loop start back', () =>
-        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'previous'))
+      trigger(id('loop-start-snap-previous'), 'Move loop start earlier', () =>
+        decks.moveMarkerEdge(slot, 'start', -1)
       ),
-      trigger(id('loop-start-snap-next'), 'Snap loop start forward', () =>
-        warnOnFailure('loop start snap', decks.snapMarker(slot, 'start', 'next'))
+      trigger(id('loop-start-snap-next'), 'Move loop start later', () =>
+        decks.moveMarkerEdge(slot, 'start', 1)
       ),
-      trigger(id('loop-end-snap-previous'), 'Snap loop end back', () =>
-        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'previous'))
+      trigger(id('loop-end-snap-previous'), 'Move loop end earlier', () =>
+        decks.moveMarkerEdge(slot, 'end', -1)
       ),
-      trigger(id('loop-end-snap-next'), 'Snap loop end forward', () =>
-        warnOnFailure('loop end snap', decks.snapMarker(slot, 'end', 'next'))
+      trigger(id('loop-end-snap-next'), 'Move loop end later', () =>
+        decks.moveMarkerEdge(slot, 'end', 1)
+      ),
+      wholeStepValue(
+        id('loop-length'),
+        'Loop length',
+        () => lengthLadder(deck().beatGrid?.beatFrames ?? 0).length,
+        () => this.lengthIndex(slot),
+        (index) => {
+          const direction = Math.sign(index - this.lengthIndex(slot));
+          if (direction !== 0) {
+            decks.resizeMarker(slot, direction > 0 ? 'double' : 'halve');
+          }
+        }
+      ),
+      trigger(id('loop-move-earlier'), 'Move loop earlier', () => decks.moveMarker(slot, -1)),
+      trigger(id('loop-move-later'), 'Move loop later', () => decks.moveMarker(slot, 1)),
+      wholeStepValue(
+        id('loop-move-step'),
+        'Move step',
+        () => MOVE_STEPS.length,
+        () => Math.max(0, MOVE_STEPS.indexOf(deck().moveStepBeats)),
+        (index) =>
+          decks.setMoveStep(slot, MOVE_STEPS[clamp(Math.round(index), 0, MOVE_STEPS.length - 1)])
       ),
       state(
         id('repeat'),
@@ -414,6 +439,35 @@ export class MappableControls {
       ),
       ...this.deckPanelControls(slot),
     ];
+  }
+
+  /** Where the selected marker's length sits on the length ladder, kept inside the knob's range:
+   *  a size's own index, halfway between two for a length off the ladder, the top above 32 beats,
+   *  the bottom below the shortest size, and the 4-beat size for a cue. */
+  private lengthIndex(slot: Slot): number {
+    const grid = this.djStore.decks()[slot].beatGrid;
+    const { markers, selectedId } = this.djStore.loops()[slot];
+    const marker = markers.find((candidate) => candidate.id === selectedId);
+    const ladder = grid === null ? [] : lengthLadder(grid.beatFrames);
+    if (marker === undefined || ladder.length === 0) {
+      return 0;
+    }
+    const top = ladder.length - 1;
+    if (markerKind(marker) === 'cue' || marker.end === null) {
+      return Math.max(
+        0,
+        ladder.findIndex((size) => size.beats === 4)
+      );
+    }
+    const length = resolvedFrame(marker.end) - resolvedFrame(marker.start);
+    const above = ladder.findIndex((size) => size.frames >= length);
+    if (above < 0) {
+      return top;
+    }
+    if (ladder[above].frames === length || above === 0) {
+      return above;
+    }
+    return above - 0.5;
   }
 
   /** The set's table: the Select knob and a Load button per deck. Select steps over real rows

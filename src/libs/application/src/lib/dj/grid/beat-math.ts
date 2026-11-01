@@ -44,3 +44,90 @@ export function nearestBeat(grid: DeckBeatGrid, frame: number): number | null {
   }
   return best;
 }
+
+/** One size a loop's length can take: a power of two of beats, and the whole frames it lasts. */
+export interface LadderSize {
+  readonly beats: number;
+  readonly frames: number;
+}
+
+/** How far from a whole frame a size may fall and still count as one: float noise from a tapped
+ *  grid's beat length, not a real fraction. */
+const WHOLE_FRAME_TOLERANCE = 1e-9;
+
+/** The lengths a loop can take on a grid of `beatFrames` per beat: the powers of two from 1/32 to
+ *  32 beats whose length is a whole number of frames, at least 1, ascending. At 24 frames a beat the
+ *  ladder starts at ⅛ (3 frames): 1/16 would be 1.5 frames, so it is left out. */
+export function lengthLadder(beatFrames: number): readonly LadderSize[] {
+  const sizes: LadderSize[] = [];
+  for (let power = -5; power <= 5; power++) {
+    const beats = 2 ** power;
+    const frames = beats * beatFrames;
+    const whole = Math.round(frames);
+    if (whole >= 1 && Math.abs(frames - whole) < WHOLE_FRAME_TOLERANCE) {
+      sizes.push({ beats, frames: whole });
+    }
+  }
+  return sizes;
+}
+
+const FRACTION_LABELS: ReadonlyMap<number, string> = new Map([
+  [0.5, '½ BEAT'],
+  [0.25, '¼ BEAT'],
+  [0.125, '⅛ BEAT'],
+  [0.0625, '1/16 BEAT'],
+  [0.03125, '1/32 BEAT'],
+]);
+
+/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/16 BEAT`. */
+export function beatsLabel(beats: number): string {
+  if (Number.isInteger(beats)) {
+    return `${beats} ${beats === 1 ? 'BEAT' : 'BEATS'}`;
+  }
+  return FRACTION_LABELS.get(beats) ?? `${Number(beats.toFixed(3))} BEATS`;
+}
+
+/** Closer than this to a beat, in frames, and a frame counts as on it. */
+const ON_BEAT_TOLERANCE = 0.5;
+
+/** True when `frame` is on a beat of the grid's span, to the nearest frame. */
+export function onBeat(grid: DeckBeatGrid, frame: number): boolean {
+  const beat = nearestBeat(grid, frame);
+  return beat !== null && Math.abs(beat - frame) < ON_BEAT_TOLERANCE;
+}
+
+/** The frame of the first beat strictly beyond `frame` in `direction` that lies at or after 0 and
+ *  inside the grid's span, or null when there is none. */
+export function nextBeat(grid: DeckBeatGrid, frame: number, direction: -1 | 1): number | null {
+  const index = (frame - grid.beatOneFrame) / grid.beatFrames;
+  const beat =
+    direction === 1
+      ? Math.floor(index + WHOLE_FRAME_TOLERANCE) + 1
+      : Math.ceil(index - WHOLE_FRAME_TOLERANCE) - 1;
+  const beatFrame = grid.beatOneFrame + beat * grid.beatFrames;
+  return beatFrame >= 0 && inGridSpan(grid, beatFrame) ? beatFrame : null;
+}
+
+/** The offsets from `anchor`, ascending, of every beat of the span within `rangeFrames` either
+ *  way: what the boundary's track draws its ticks from. */
+export function beatsInReach(
+  grid: DeckBeatGrid,
+  anchor: number,
+  rangeFrames: number
+): readonly number[] {
+  const first = Math.ceil((anchor - rangeFrames - grid.beatOneFrame) / grid.beatFrames);
+  const last = Math.floor((anchor + rangeFrames - grid.beatOneFrame) / grid.beatFrames);
+  const offsets: number[] = [];
+  for (let beat = first; beat <= last; beat++) {
+    const beatFrame = grid.beatOneFrame + beat * grid.beatFrames;
+    if (beatFrame >= 0 && inGridSpan(grid, beatFrame)) {
+      offsets.push(beatFrame - anchor);
+    }
+  }
+  return offsets;
+}
+
+/** The distances, in beats, the Move controls can shift a loop or an edge by. */
+export type MoveStepBeats = 1 | 2 | 4 | 8 | 16;
+
+export const MOVE_STEPS: readonly MoveStepBeats[] = [1, 2, 4, 8, 16];

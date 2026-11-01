@@ -7,6 +7,7 @@ import {
   EMPTY_DECK_LOOPS,
   type DeckBeatGrid,
   type DeckLoopMarker,
+  type DeckLoopsState,
   type DeckStatus,
 } from './dj-store';
 import { PlayheadPainter } from './playhead-painter';
@@ -262,14 +263,29 @@ describe('PlayheadPainter', () => {
   });
 
   describe('the running marker loop', () => {
+    /** The running marker runs on the bounds its list entry holds, unless `runningBounds` says the
+     *  engine is still on others. */
     function runLoop(
       markers: readonly DeckLoopMarker[],
       runningId: string | null,
-      selectedId: string | null = null
+      selectedId: string | null = null,
+      runningBounds?: DeckLoopsState['runningBounds']
     ): void {
+      const running = markers.find((marker) => marker.id === runningId);
       store.setDeckLoops({
         slot: 'A',
-        loops: { ...EMPTY_DECK_LOOPS, markers, runningId, selectedId },
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers,
+          runningId,
+          selectedId,
+          runningBounds:
+            runningBounds !== undefined
+              ? runningBounds
+              : running?.end
+              ? { start: running.start.frame, end: running.end.frame }
+              : null,
+        },
       });
       TestBed.flushEffects();
     }
@@ -286,6 +302,21 @@ describe('PlayheadPainter', () => {
       positions.A = 400;
       paintNextFrame();
       expect(recording.setLiveProgress).toHaveBeenLastCalledWith(100);
+    });
+
+    it('paints the lap of the bounds the engine enforces while an edit waits for the end of the pass', () => {
+      const recording = recordingTargets();
+      positions.A = 150;
+      painter.attach('A', recording.targets);
+      runLoop([loopMarker('loop', 100, 500)], 'loop', null, { start: 100, end: 300 });
+
+      paintNextFrame();
+      expect(recording.setLiveProgress).toHaveBeenLastCalledWith(25);
+
+      store.setRunningBounds({ slot: 'A', runningBounds: { start: 100, end: 500 } });
+      TestBed.flushEffects();
+      paintNextFrame();
+      expect(recording.setLiveProgress).toHaveBeenLastCalledWith(12.5);
     });
 
     it('paints 0 for a running marker with no length, and once no loop runs', () => {
@@ -418,7 +449,12 @@ describe('PlayheadPainter', () => {
       tuneAt(100);
       store.setDeckLoops({
         slot: 'A',
-        loops: { ...EMPTY_DECK_LOOPS, markers: [loopMarker('loop', 0, 400)], runningId: 'loop' },
+        loops: {
+          ...EMPTY_DECK_LOOPS,
+          markers: [loopMarker('loop', 0, 400)],
+          runningId: 'loop',
+          runningBounds: { start: 0, end: 400 },
+        },
       });
       const recording = recordingTargets();
       painter.attach('A', recording.targets);
@@ -539,6 +575,7 @@ describe('PlayheadPainter', () => {
               ...EMPTY_DECK_LOOPS,
               markers: [loopMarker('loop', 0, 400)],
               runningId: 'loop',
+              runningBounds: { start: 0, end: 400 },
             },
           }),
       ],

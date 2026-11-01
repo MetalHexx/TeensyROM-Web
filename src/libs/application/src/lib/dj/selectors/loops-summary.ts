@@ -1,5 +1,11 @@
 import { computed } from '@angular/core';
-import { DeckLoopBoundary, DeckLoopMarker, DjState, WritableStore } from '../dj-store';
+import {
+  DeckBeatGrid,
+  DeckLoopBoundary,
+  DeckLoopMarker,
+  DjState,
+  WritableStore,
+} from '../dj-store';
 import type { Slot } from '../slot';
 import {
   clamp,
@@ -8,11 +14,19 @@ import {
   resolvedFrame,
   type LoopBoundaryName,
 } from '../loops/loop-marker-math';
-import { nextOffset, reachableOffsets, type LoopSnapDirection } from '../loops/moment-reach';
+import {
+  beatsInReach,
+  beatsLabel,
+  inGridSpan,
+  lengthLadder,
+  MOVE_STEPS,
+  onBeat,
+  type MoveStepBeats,
+} from '../grid/beat-math';
 import { isShapeable } from './mixer';
 import { formatElapsed, formatSeconds } from './transport-time';
 
-export type { LoopBoundaryName, LoopSnapDirection };
+export type { LoopBoundaryName };
 
 export type LoopActivity = 'idle' | 'queued' | 'running';
 
@@ -21,7 +35,8 @@ export interface LoopItemSummary {
   /** The marker's name, else 'Item N' by list position. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
-  /** '7.8s' for a loop, 'CUE' for a cue. */
+  /** In beats ('5 BEATS', '½ BEAT') when the start is a beat of the deck's grid and the length is
+   *  a whole number of beats or a ladder fraction; else in seconds ('7.8s'). 'CUE' for a cue. */
   readonly lengthText: string;
   readonly activity: LoopActivity;
   readonly selected: boolean;
@@ -38,10 +53,22 @@ export interface LoopBoundarySummary {
   readonly offsetFrames: number;
   /** One second of play calls either way. */
   readonly rangeFrames: number;
-  /** Where each reachable detected moment sits on the boundary's ±range track: 0–100. */
+  /** Where each beat of the grid within reach sits on the boundary's ±range track: 0–100. */
   readonly tickPercents: readonly number[];
-  readonly canSnapPrevious: boolean;
-  readonly canSnapNext: boolean;
+}
+
+/** One size the Length picker offers. */
+export interface LoopLengthOption {
+  readonly beats: number;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+/** One distance the Move step picker offers. */
+export interface LoopMoveStepOption {
+  readonly beats: MoveStepBeats;
+  readonly label: string;
+  readonly selected: boolean;
 }
 
 export interface LoopSelectionSummary {
@@ -56,6 +83,10 @@ export interface LoopSelectionSummary {
   readonly wraps: boolean;
   /** 'start–end' elapsed times for a loop, the start alone for a cue. */
   readonly spanText: string;
+  /** As an item's `lengthText`, but 'NO END' for a cue. */
+  readonly lengthText: string;
+  /** The ladder sizes the grid holds in whole frames, ascending; empty with no grid. */
+  readonly lengthOptions: readonly LoopLengthOption[];
   readonly start: LoopBoundarySummary;
   readonly end: LoopBoundarySummary | null;
 }
@@ -64,6 +95,9 @@ export interface DeckLoopsSummary {
   readonly hasTune: boolean;
   readonly canAdd: boolean;
   readonly canStop: boolean;
+  /** The deck's Move step, which exists with nothing selected. */
+  readonly moveStepText: string;
+  readonly moveStepOptions: readonly LoopMoveStepOption[];
   readonly items: readonly LoopItemSummary[];
   readonly selected: LoopSelectionSummary | null;
 }
@@ -74,20 +108,38 @@ function percentOf(frame: number, lengthFrames: number | null): number {
     : clamp((frame / lengthFrames) * 100, 0, 100);
 }
 
+/** A loop's length as the lists write it: in beats when its start is a beat of the span and the
+ *  length is a whole number of them or a ladder fraction, else in seconds. */
+function lengthTextOf(
+  grid: DeckBeatGrid | null,
+  start: number,
+  length: number,
+  intervalUs: number | null
+): string {
+  if (grid !== null && inGridSpan(grid, start) && onBeat(grid, start)) {
+    const whole = Math.round(length / grid.beatFrames);
+    if (whole >= 1 && Math.round(whole * grid.beatFrames) === length) {
+      return beatsLabel(whole);
+    }
+    const size = lengthLadder(grid.beatFrames).find((candidate) => candidate.frames === length);
+    if (size !== undefined) {
+      return beatsLabel(size.beats);
+    }
+  }
+  return formatSeconds(length, intervalUs);
+}
+
 function boundarySummary(
   boundary: DeckLoopBoundary,
-  moments: readonly number[],
+  grid: DeckBeatGrid | null,
   rangeFrames: number
 ): LoopBoundarySummary {
-  const ticks = rangeFrames > 0 ? reachableOffsets(moments, boundary.frame, rangeFrames) : [];
+  const ticks =
+    grid !== null && rangeFrames > 0 ? beatsInReach(grid, boundary.frame, rangeFrames) : [];
   return {
     offsetFrames: boundary.offsetFrames,
     rangeFrames,
     tickPercents: ticks.map((offset) => ((offset + rangeFrames) / (2 * rangeFrames)) * 100),
-    canSnapPrevious:
-      nextOffset(moments, boundary.frame, boundary.offsetFrames, rangeFrames, 'previous') !== null,
-    canSnapNext:
-      nextOffset(moments, boundary.frame, boundary.offsetFrames, rangeFrames, 'next') !== null,
   };
 }
 
@@ -103,11 +155,12 @@ export function loopsSummary(store: WritableStore<DjState>) {
       const loops = store.loops[slot];
 
       return computed<DeckLoopsSummary>(() => {
-        const { markers, selectedId, runningId, queuedId, detectedMoments, settingsInPlayId } =
-          loops();
+        const { markers, selectedId, runningId, queuedId, settingsInPlayId } = loops();
         const lengthFrames = deck.lengthFrames();
         const intervalUs = deck.playCallIntervalUs();
         const loaded = deck.loaded();
+        const grid = deck.beatGrid();
+        const moveStep = deck.moveStepBeats();
 
         const activityOf = (marker: DeckLoopMarker): LoopActivity =>
           marker.id === runningId ? 'running' : marker.id === queuedId ? 'queued' : 'idle';
@@ -121,7 +174,9 @@ export function loopsSummary(store: WritableStore<DjState>) {
             name: marker.name ?? `Item ${index + 1}`,
             kind,
             lengthText:
-              kind === 'loop' && end !== null ? formatSeconds(end - start, intervalUs) : 'CUE',
+              kind === 'loop' && end !== null
+                ? lengthTextOf(grid, start, end - start, intervalUs)
+                : 'CUE',
             activity: activityOf(marker),
             selected: marker.id === selectedId,
             ready: marker.ready,
@@ -137,7 +192,10 @@ export function loopsSummary(store: WritableStore<DjState>) {
           const marker = markers[selectedIndex];
           const kind = markerKind(marker);
           const range = oneSecondFrames(intervalUs);
-          const startText = formatElapsed(resolvedFrame(marker.start), intervalUs);
+          const startFrame = resolvedFrame(marker.start);
+          const startText = formatElapsed(startFrame, intervalUs);
+          const length =
+            kind === 'loop' && marker.end !== null ? resolvedFrame(marker.end) - startFrame : null;
           selected = {
             id: marker.id,
             name: items[selectedIndex].name,
@@ -150,8 +208,17 @@ export function loopsSummary(store: WritableStore<DjState>) {
               kind === 'loop' && marker.end !== null
                 ? `${startText}–${formatElapsed(resolvedFrame(marker.end), intervalUs)}`
                 : startText,
-            start: boundarySummary(marker.start, detectedMoments, range),
-            end: marker.end === null ? null : boundarySummary(marker.end, detectedMoments, range),
+            lengthText: length === null ? 'NO END' : items[selectedIndex].lengthText,
+            lengthOptions:
+              grid === null
+                ? []
+                : lengthLadder(grid.beatFrames).map((size) => ({
+                    beats: size.beats,
+                    label: beatsLabel(size.beats),
+                    selected: size.frames === length,
+                  })),
+            start: boundarySummary(marker.start, grid, range),
+            end: marker.end === null ? null : boundarySummary(marker.end, grid, range),
           };
         }
 
@@ -159,6 +226,12 @@ export function loopsSummary(store: WritableStore<DjState>) {
           hasTune: loaded !== null,
           canAdd: isShapeable({ loaded, switching: deck.switching(), status: deck.status() }),
           canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
+          moveStepText: beatsLabel(moveStep),
+          moveStepOptions: MOVE_STEPS.map((beats) => ({
+            beats,
+            label: beatsLabel(beats),
+            selected: beats === moveStep,
+          })),
           items,
           selected,
         };
