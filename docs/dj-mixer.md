@@ -74,18 +74,18 @@ You can adjust the key for playing track on either deck to help make tunes harmo
 
 If you have a pitch bend touch trip like on the [Arturia Minilab 3](https://www.arturia.com/store/midi-controllers-sequencers/minilab-3), cueing up a new track by hand is as easy as it is on vinyl or CDJ hardware.  Hold, back cue, forward cue or even "throw" the tune and it will settle back to the deck's speed just like vinyl would on a real turntable. Yeah, you can even scratch with it!
 
-## Controllers
+## MIDI Controllers
 
-Map any control on the mixer to your MIDI controller by learning it. A mapping can toggle, hold, or follow a control's position or its movement, and you can change it, relearn it or delete it. Your controllers are listed, and you choose which ones to listen to.
+Just about every control on the UI surface is mappable to any number of MIDI Controllers with an intuitive visual interface and many tuning options.
 
 ## Start the ASID player
 
-The decks play through the ASID player on each cart. Start it on both decks' carts at once. Each deck starts on its own, so one cart failing doesn't stop the other.
+The decks play through the ASID player on each cart with a click of a button.
 
 ## What's remembered
 
 The mixer remembers your work across a refresh of the page:
 
-- A tune's loops, cues, beat grid and settings are kept per tune.
+- A tune's loops, cues, beat grid, SID register settings are kept per tune and per loop/cue.
 - Your sets, and the settings and markers of each tune in them, are kept per set.
-- Your controller mappings and their settings are kept.
+- Your controller mappings and their settings are stored and kept safe on your disk.
