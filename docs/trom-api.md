@@ -4,8 +4,13 @@ Trom API is the server at the heart of TeensyROM Suite. It talks to your carts, 
 
 ## Run it
 
-- **Homebrew:** run `trom-suite`.
-- **A download:** run `TeensyRom.Api` (`TeensyRom.Api.exe` on Windows) from the folder you unpacked. [Getting started](getting-started.md) covers the download.
+`trom` and `trom ui` start Trom API when they need it. To start, check on or stop it yourself:
+
+- `trom api start` starts it in the background.
+- `trom api status` shows whether it is running, and which version.
+- `trom api stop` stops it, and the Trom UI it serves.
+
+To run it in a terminal window instead, run `trom-suite` on Homebrew, or run `./TeensyRom.Api` (`TeensyRom.Api.exe` on Windows) from inside the `api` folder of the download. [Getting started](getting-started.md) covers the download.
 
 It listens on port `10213`.
 

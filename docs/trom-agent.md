@@ -85,7 +85,7 @@ Virtual Travis is an AI stand-in, modeled on the warm, patient support Travis Sm
 
 ## Keep it up to date
 
-Trom Agent installs the suite, and updates it when you ask. To update the plugin itself, run these in Claude Code:
+When a new release of the suite is out, Trom Agent tells you as the session starts and updates it with `trom update` once you agree. You can also ask it to update. To update the plugin itself, run these in Claude Code:
 
 1. `/plugin marketplace update tr-plugin-marketplace`
 2. Update or reinstall `trom-agent@tr-plugin-marketplace` from `/plugin`.

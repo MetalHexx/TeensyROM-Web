@@ -10,11 +10,13 @@ The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-term
 
 ### Windows and Linux
 
-1. Unpack the archive into a folder.
-2. Start the suite by running `TeensyRom.Api` (`TeensyRom.Api.exe` on Windows) at the root of that folder. Or run `cli/trom`, which starts it for you.
+1. Unpack the archive into a folder. It holds `api/` (Trom API and Trom UI) and `cli/` (`trom`).
+2. Run `cli/trom ui` (`cli\trom ui` on Windows) to start the suite and [open Trom UI](#open-trom-ui).
 3. Run `cli/trom path add` once (`cli\trom path add` on Windows) to put `trom` on your PATH, then open a new terminal.
 
-On Linux, make the program executable first with `chmod +x TeensyRom.Api`. Windows may show a security warning the first time: choose "More info", then "Run anyway".
+Windows may show a security warning the first time: choose "More info", then "Run anyway". Windows Firewall asks the first time Trom API starts: allow Private networks so phones and tablets can connect.
+
+On Linux, USB carts need your user in the `dialout` group. Run `sudo usermod -aG dialout $USER`, then log out and back in.
 
 ### macOS
 
@@ -25,15 +27,13 @@ brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite
 brew install teensyrom-suite
 ```
 
-Start the suite with `trom-suite`.
-
-Already installed with Homebrew? Run `brew update && brew upgrade`.
+Then run `trom ui` to start the suite and [open Trom UI](#open-trom-ui).
 
 macOS may block the app on first run. Open System Settings, go to Privacy & Security and choose "Open Anyway".
 
 ### Open Trom UI
 
-With the suite running, open [http://localhost:10213](http://localhost:10213) in your browser. The same address works from your phone or tablet on your local network, using this computer's address in place of `localhost`.
+`trom ui` starts Trom API if it isn't running and opens Trom UI in your browser at [http://localhost:10213](http://localhost:10213). It also prints the addresses phones and tablets on the same network can use, such as `http://192.168.1.20:10213`. Add `--no-open` to print the addresses without opening the browser.
 
 ### Firmware
 
@@ -88,6 +88,19 @@ Banning a file or folder hides it from browsing, search and shuffle. The list st
 
 - **Trom UI:** manage your bans in Trom UI settings. Add an entry to ban it, and remove an entry to lift the ban.
 - **Trom Terminal:** `trom file ban "<path>"` bans a file, `trom file banned` lists the bans, and `trom file unban "<entry>"` lifts one.
+
+## Update
+
+`trom update` checks GitHub for a newer release and asks before it installs it. It downloads the release, checks its SHA-256, swaps in the new files, and restarts Trom API if it was running.
+
+- `trom update --check` only reports whether a newer release is out.
+- `trom update --yes` updates without asking.
+- A stable install updates to stable releases. A pre-release install, such as a beta, also updates to newer pre-releases.
+- On a Homebrew install, `trom update` runs Homebrew for you. `brew upgrade teensyrom-suite` works too.
+
+`trom` checks for a new release once a day and prints a line when one is out. The guided menu shows it under the logo, with an "Update to" entry for the new version. Turn the check off with `trom settings set update-check false`, or with Toggle Update Check in the guided menu's Settings.
+
+Your settings and library index live in `~/.teensyrom` (`%USERPROFILE%\.teensyrom` on Windows), outside the install folder, so updates keep them. Set `TEENSYROM_DATA_DIR` to keep them in another folder.
 
 ## Next
 

@@ -77,7 +77,7 @@ Build your own tools on it, from a quick script to a full app, in any language. 
 
 1. **Download** the suite for Windows, macOS or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac. Trom Agent can also install it for you.
 2. **Connect** your TeensyROM over USB or your network.
-3. **Play.** Open Trom UI at `http://localhost:10213`, run `trom`, or type `/trom` in Claude Code.
+3. **Play.** Run `trom ui` to open Trom UI in your browser, run `trom` for the guided menu, or type `/trom` in Claude Code.
 
 [Getting started](docs/getting-started.md) has the details, from your first download to a fully indexed library.
 

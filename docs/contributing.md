@@ -20,10 +20,10 @@ This page builds the suite from source. If you only want to use it, [get started
 4. Build the frontend into Trom API. Create the folder `apps/api/src/TeensyRom.Api/wwwroot` if it does not exist (it is git-ignored, so a fresh clone lacks it, and the build script fails without it), then run `pnpm run build:frontend` from `src`. Without this step Trom API starts but serves no Trom UI.
 5. Build `trom`, the Trom Terminal client, from `src`: `dotnet build apps/cli/TeensyRom.Cli.sln -c Release`.
 6. Put it on your PATH by running the built `trom` once with `path add`. Open a new terminal afterwards.
-7. Run `trom init` to start Trom API. It builds Trom API from the same checkout on first use, and Trom UI is served at [http://localhost:10213](http://localhost:10213).
+7. Run `trom ui`. It builds Trom API from the same checkout on first use, starts it, and opens Trom UI at [http://localhost:10213](http://localhost:10213).
 
-The installs and builds can take a few minutes, especially the first `trom init`.
-To update, `git pull` in both repos and repeat the build steps.
+The installs and builds can take a few minutes, especially the first `trom ui`.
+A source build updates through git, not `trom update`: `git pull` in both repos and repeat the build steps.
 
 ## Working on the code
 

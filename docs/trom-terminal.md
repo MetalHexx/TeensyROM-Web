@@ -24,6 +24,8 @@ New here? [Getting started](getting-started.md) covers installing the suite and 
 
 Run `trom` on its own and follow the prompts. The menu reaches everything above, and it prints a line whenever a transfer starts or ends, whether a watch folder or another app started it.
 
+"Open Trom UI" opens Trom UI in your browser and prints the addresses your phone or tablet can use. When a new release is out, the menu says so under the logo and adds an "Update to" entry for it.
+
 ## Stream Player
 
 The Stream Player plays through your library like a streaming service. Open it from Launch in the guided menu, or start it on a file with `--player`:
@@ -105,6 +107,19 @@ Commands pass files to each other, so scripts stay short. A `-` makes a command 
 ```bash
 trom file search commando --json | jq -r '.[0].path' | trom file launch -
 ```
+
+## Trom UI, Trom API and updates
+
+```bash
+trom ui
+trom api status
+trom update --check
+trom update
+```
+
+- **Trom UI:** `trom ui` starts Trom API if it isn't running, opens Trom UI in your browser, and prints the addresses your phone or tablet can use. `--no-open` prints them without opening the browser.
+- **Trom API:** `trom api start` starts it in the background, `trom api status` shows whether it is running, and `trom api stop` stops it. See [Trom API](trom-api.md#run-it).
+- **Updates:** `trom update` installs the newest release, and `--check` only reports it. `trom` checks once a day and prints a line when a new release is out. See [update](getting-started.md#update).
 
 ## Generate ASID presets for Chipsynth
 

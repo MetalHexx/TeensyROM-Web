@@ -2,6 +2,8 @@
 
 Trom UI is the web app of TeensyROM Suite. Browse your TeensyROM's SD and USB storage, launch games, demos, SID music and images on your C64 from any browser, and stream it all like a retro media service. It also copies files to your cart, watches folders on your computer, sets your C64's menu colors, and hosts the [DJ Mixer](dj-mixer.md).
 
+Run `trom ui` to open it in your browser at [http://localhost:10213](http://localhost:10213). It starts Trom API first if it isn't running.
+
 <img width="2502" height="1232" alt="Trom UI playing a SID" src="../.github/images/hero-screenshot.png" />
 
 <table>
@@ -86,7 +88,7 @@ Video is optional but recommended.
 - **Any screen:** works on everything from small phones to large desktop monitors.
 - **Touch friendly:** designed for touch screens as well as a mouse.
 - **Adaptive layouts:** the layout reorganizes itself for phone, tablet and desktop.
-- **No app install:** open Trom UI from any browser on your local network.
+- **No app install:** open Trom UI from any browser on your local network, at one of the addresses `trom ui` prints.
 
 <p align="center">
   <a href="https://www.youtube.com/shorts/hcfaokI_lHw" target="_blank">
