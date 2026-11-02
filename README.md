@@ -30,7 +30,7 @@ Browse your library from the couch, stream it like a music service, script it, a
 
 ## Trom Terminal
 
-**Your library from the command line, BBS-style.**
+**Your library from the command line: a BBS-style menu, plus one-line commands your scripts and other tools can call.**
 
 <p align="center">
   <img src=".github/images/trom-terminal-menu.png" alt="Trom Terminal's guided menu" width="49%">
