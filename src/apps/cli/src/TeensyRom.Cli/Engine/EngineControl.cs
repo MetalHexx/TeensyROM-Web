@@ -108,10 +108,10 @@ internal sealed class EngineControl(
             EngineProbeResult.Engine running => new EngineStatus(
                 true, running.Version, ownVersion, SameVersion(running.Version), address, null, TeensyRomHome.EngineLogsPath, NewestEngineLog()),
             EngineProbeResult.NotReady => NotRunning(address,
-                $"Trom API is listening on {address} but isn't answering yet — run `trom engine status` again in a moment."),
+                $"Trom API is listening on {address} but isn't answering yet — run `trom api status` again in a moment."),
             EngineProbeResult.Foreign foreign => NotRunning(address,
                 $"Something other than Trom API is using port {EngineAddress.Port} ({foreign.Reason}) — free the port and try again."),
-            _ => NotRunning(address, $"No Trom API is running at {address} — run `trom device list` to start one.")
+            _ => NotRunning(address, $"No Trom API is running at {address} — run `trom api start` to start one.")
         };
     }
 

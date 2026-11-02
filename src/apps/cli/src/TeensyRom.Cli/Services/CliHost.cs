@@ -19,6 +19,7 @@ using TeensyRom.Cli.Commands.PathCommands;
 using TeensyRom.Cli.Commands.Settings;
 using TeensyRom.Cli.Commands.ThemeCommands;
 using TeensyRom.Cli.Commands.Transfer;
+using TeensyRom.Cli.Commands.Ui;
 using TeensyRom.Cli.Commands.Wait;
 using TeensyRom.Cli.Commands.WatchFolder;
 using TeensyRom.Cli.Helpers;
@@ -33,6 +34,7 @@ using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Services;
 using TeensyRom.Cli.Tui;
+using TeensyRom.Cli.WebUi;
 using AssemblyExtensions = TeensyRom.Cli.Common.AssemblyExtensions;
 
 namespace TeensyRom.Cli.Services;
@@ -59,7 +61,7 @@ internal sealed record PublicVerb(string Name, Type Command, Type Settings, Acti
 }
 
 /// <summary>One noun of the public command tree and the verbs under it.</summary>
-internal sealed record PublicNoun(string Name, string Description, IReadOnlyList<PublicVerb> Verbs);
+internal sealed record PublicNoun(string Name, string Description, IReadOnlyList<PublicVerb> Verbs, IReadOnlyList<string>? Aliases = null);
 
 /// <summary>A command that sits beside the nouns, such as <c>trom init</c>.</summary>
 internal sealed record PublicCommand(string Name, string Description, Type Command, Type Settings, Action<IConfigurator> Configure)
@@ -84,11 +86,12 @@ internal static class CliHost
     /// </summary>
     internal static readonly PublicNoun[] PublicTree =
     [
-        new("engine", "Check on or stop Trom API.",
+        new("engine", "Start, check on or stop Trom API. `trom api` works the same.",
         [
-            PublicVerb.Of<EngineStatusCommand, EngineStatusSettings>("status", "Show whether Trom API is running and which version.", ["engine", "status"]),
-            PublicVerb.Of<EngineStopCommand, EngineStopSettings>("stop", "Stop Trom API and the Trom UI it serves.", ["engine", "stop"])
-        ]),
+            PublicVerb.Of<EngineStartCommand, EngineStartSettings>("start", "Start Trom API if it isn't running, then show its status. Exits 3 when it can't be started.", ["api", "start"]),
+            PublicVerb.Of<EngineStatusCommand, EngineStatusSettings>("status", "Show whether Trom API is running and which version.", ["api", "status"]),
+            PublicVerb.Of<EngineStopCommand, EngineStopSettings>("stop", "Stop Trom API and the Trom UI it serves.", ["api", "stop"])
+        ], Aliases: ["api"]),
         new("device", "List, reconnect, rename, forget, ping or reset TeensyROM devices.",
         [
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices Trom API already knows, and whether each storage is fully indexed (sdIndexed and usbIndexed in --json).", ["device", "list"]),
@@ -159,16 +162,19 @@ internal static class CliHost
         ])
     ];
 
-    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, and <c>trom wait</c>.</summary>
+    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, <c>trom ui</c> and <c>trom wait</c>.</summary>
     internal static readonly PublicCommand[] PublicCommands =
     [
         PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, Trom API, Trom UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when Trom API can't be made ready.", ["init"]),
+        PublicCommand.Of<UiCommand, UiSettings>("ui", "Open Trom UI in your browser, starting Trom API first if needed, and list the addresses it answers at on this computer and on your network. --no-open only lists them. Exits 1 when Trom API doesn't serve Trom UI.", ["ui"]),
         PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])
     ];
 
-    /// <summary>The nouns of the public command tree, each with the names of its verbs.</summary>
+    /// <summary>The nouns of the public command tree, each with the names of its verbs; an alias maps to the same verbs as its noun.</summary>
     public static IReadOnlyDictionary<string, string[]> PublicNouns { get; } =
-        PublicTree.ToDictionary(noun => noun.Name, noun => noun.Verbs.Select(verb => verb.Name).ToArray());
+        PublicTree
+            .SelectMany(noun => (noun.Aliases ?? []).Prepend(noun.Name), (noun, name) => (Name: name, Verbs: noun.Verbs.Select(verb => verb.Name).ToArray()))
+            .ToDictionary(entry => entry.Name, entry => entry.Verbs);
 
     /// <summary>
     /// Every command and settings type of the menu's private app that the public tree does not also run, with the
@@ -188,7 +194,8 @@ internal static class CliHost
         (typeof(WatchFoldersCommand), typeof(WatchFoldersSettings)),
         (typeof(ThemeScreenCommand), typeof(ThemeScreenSettings)),
         (typeof(SettingsCommand), typeof(SettingsCommandSettings)),
-        (typeof(CreditsCommand), typeof(CreditsSettings))
+        (typeof(CreditsCommand), typeof(CreditsSettings)),
+        (typeof(OpenWebUiFlowCommand), typeof(OpenWebUiSettings))
     ];
 
     /// <summary>
@@ -244,6 +251,8 @@ internal static class CliHost
         services.AddSingleton<IEngineClock>(clock);
         services.AddSingleton<IEngineLocator>(locator);
         services.AddSingleton<IWebUiProbe>(new WebUiProbe());
+        services.AddSingleton<IBrowserOpener>(new BrowserOpener());
+        services.AddSingleton<ILanAddresses>(new LanAddresses());
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
         services.AddSingleton<ICliOutput>(output);
@@ -283,6 +292,7 @@ internal static class CliHost
     internal static void RegisterCommands(IServiceCollection services)
     {
         services.TryAddSingleton(provider => PathRegistrar.CreateDefault(provider.GetRequiredService<ISettingsService>()));
+        services.TryAddSingleton<UiLauncher>();
 
         foreach (var verb in PublicTree.SelectMany(noun => noun.Verbs))
         {
@@ -340,12 +350,14 @@ internal static class CliHost
 
             foreach (var noun in PublicTree)
             {
-                config.AddBranch(noun.Name, branch =>
+                var configured = config.AddBranch(noun.Name, branch =>
                 {
                     branch.SetDescription(noun.Description);
 
                     foreach (var verb in noun.Verbs) verb.Configure(branch);
                 });
+
+                foreach (var alias in noun.Aliases ?? []) configured.WithAlias(alias);
             }
 
             foreach (var command in PublicCommands) command.Configure(config);
@@ -386,6 +398,7 @@ internal static class CliHost
             config.AddCommand<WatchFoldersCommand>("watch-folders").IsHidden();
             config.AddCommand<ThemeScreenCommand>("theme").IsHidden();
             config.AddCommand<CreditsCommand>("credits");
+            config.AddCommand<OpenWebUiFlowCommand>("ui");
         });
 
         return app;

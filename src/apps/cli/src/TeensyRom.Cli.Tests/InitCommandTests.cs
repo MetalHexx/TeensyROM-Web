@@ -151,7 +151,7 @@ public sealed class InitCommandTests
             var problem = Problems(Parse(host)).Should().ContainSingle().Subject;
             problem.Should().Contain(Path.Combine(api, "wwwroot")).And.Contain("no index.html")
                 .And.Contain("pnpm run build:frontend").And.Contain(Path.Combine(root, "src"))
-                .And.Contain("trom engine stop").And.Contain("trom init");
+                .And.Contain("trom api stop").And.Contain("trom api start");
         }
         finally
         {
@@ -174,7 +174,7 @@ public sealed class InitCommandTests
 
             await host.RunAsync("init", "--json");
 
-            Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("trom engine stop").And.NotContain("build:frontend");
+            Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("trom api stop").And.NotContain("build:frontend");
         }
         finally
         {

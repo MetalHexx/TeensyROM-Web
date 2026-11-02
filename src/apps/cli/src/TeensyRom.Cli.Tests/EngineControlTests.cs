@@ -539,7 +539,7 @@ public class EngineControlTests
         status.Version.Should().BeNull();
         status.Matches.Should().BeFalse();
         status.CliVersion.Should().Be(FakeEngineWorld.OwnVersion);
-        status.Problem.Should().Contain("No Trom API is running").And.Contain("trom device list");
+        status.Problem.Should().Contain("No Trom API is running").And.Contain("trom api start");
     }
 
     [Fact]

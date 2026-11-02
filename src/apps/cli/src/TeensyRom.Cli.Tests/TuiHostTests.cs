@@ -7,6 +7,7 @@ using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Themes;
+using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Tests;
 
@@ -16,12 +17,15 @@ namespace TeensyRom.Cli.Tests;
 [Collection(ConsoleCollection.Name)]
 public sealed class TuiHostTests : IDisposable
 {
-    private const int Credits = 6;
-    private const int Devices = 3;
-    private const int Theme = 4;
-    private const int Leave = 8;
+    private const int OpenWebUi = 1;
+    private const int Credits = 7;
+    private const int Devices = 4;
+    private const int Theme = 5;
+    private const int Leave = 9;
 
     private readonly IThemeService _themes = Substitute.For<IThemeService>();
+    private readonly IWebUiProbe _webUi = Substitute.For<IWebUiProbe>();
+    private readonly IEngineLocator _locator = Substitute.For<IEngineLocator>();
     private readonly TestHost _host;
 
     public TuiHostTests()
@@ -30,6 +34,8 @@ public sealed class TuiHostTests : IDisposable
         {
             services.AddSingleton(Substitute.For<IPlayerService>());
             services.AddSingleton(_themes);
+            services.AddSingleton(_webUi);
+            services.AddSingleton(_locator);
         });
         _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
     }
@@ -55,7 +61,7 @@ public sealed class TuiHostTests : IDisposable
 
         exitCode.Should().Be(0);
         var screen = Screen;
-        new[] { "Launch", "Watch Folders", "Index Files", "Devices", "Theme", "Generate ASID Patches", "Credits", "Settings", "Leave" }
+        new[] { "Launch", "Open Trom UI", "Watch Folders", "Index Files", "Devices", "Theme", "Generate ASID Patches", "Credits", "Settings", "Leave" }
             .Aggregate(-1, (previous, label) =>
             {
                 var at = screen.IndexOf(label, previous + 1, StringComparison.Ordinal);
@@ -177,6 +183,37 @@ public sealed class TuiHostTests : IDisposable
         exitCode.Should().Be(0);
         Screen.Should().Contain("Special thanks");
         await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+    }
+
+    [Fact]
+    public async Task OpenTromUi_ReadiesTheEngine_OpensTheBrowser_AndTheMenuReturns()
+    {
+        _webUi.IsServingAsync(Arg.Any<CancellationToken>()).Returns(true);
+        Pick(OpenWebUi);
+        Pick(Leave);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        await _host.Engine.Received(1).EnsureRunningAsync(Arg.Any<CancellationToken>());
+        _host.BrowserOpener.Opened.Should().Equal("http://localhost:10213");
+        Screen.Should().Contain("Opened in your browser").And.Contain("http://192.168.1.20:10213");
+        _host.Devices.DidNotReceive().Select(Arg.Any<DeviceSummary>());
+    }
+
+    [Fact]
+    public async Task OpenTromUi_WhenTheWebUiIsNotServed_ShowsTheProblem_AndOpensNothing()
+    {
+        _webUi.IsServingAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _locator.Locate().Returns(new EngineLookup(new EngineLocation(EngineMode.Packaged, "/install/api"), "/install/api"));
+        Pick(OpenWebUi);
+        Pick(Leave);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        Screen.Should().Contain("isn't serving Trom UI");
+        _host.BrowserOpener.Opened.Should().BeEmpty();
     }
 
     [Fact]

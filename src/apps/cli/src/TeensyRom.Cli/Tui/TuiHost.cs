@@ -17,9 +17,11 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
 {
     private sealed record MenuEntry(string Label, string Flow, bool NeedsEngine, bool NeedsDevice = true);
 
-    private static readonly MenuEntry[] Menu =
+    /// <summary>The entries above Leave, worked out on every pass of the menu so an entry can come and go while it is open.</summary>
+    private static MenuEntry[] Entries() =>
     [
         new("Launch", "launch", NeedsEngine: true),
+        new("Open Trom UI", "ui", NeedsEngine: true, NeedsDevice: false),
         new("Watch Folders", "watch-folders", NeedsEngine: true),
         new("Index Files", "index", NeedsEngine: true),
         new("Devices", "ports", NeedsEngine: true),
@@ -44,21 +46,20 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
         AnsiConsole.WriteLine();
         RadHelper.RenderLogo("TeensyROM", FontConstants.Logo);
 
-        var labels = Menu.Select(entry => entry.Label).Append(Leave).ToList();
-
         try
         {
             _ = StartLinesAsync();
 
             while (true)
             {
-                var choice = PromptHelper.ChoicePrompt("Choose wisely", labels);
+                var entries = Entries();
+                var choice = PromptHelper.ChoicePrompt("Choose wisely", entries.Select(entry => entry.Label).Append(Leave).ToList());
 
                 AnsiConsole.WriteLine();
 
                 if (choice == Leave) return 0;
 
-                var entry = Menu.Single(e => e.Label == choice);
+                var entry = entries.Single(e => e.Label == choice);
 
                 if (entry.NeedsEngine)
                 {

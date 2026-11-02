@@ -34,6 +34,8 @@ internal abstract class TromCommand<T>(ICliOutput output) : AsyncCommand<T> wher
 /// </summary>
 internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engine) : TromCommand<T>(output) where T : TromSettings
 {
+    protected IEngineControl Engine => engine;
+
     /// <exception cref="CliException"><see cref="CliExitCode.EngineUnavailable"/> when no engine could be made ready.</exception>
     protected override async Task PrepareAsync(T settings, CancellationToken ct)
     {

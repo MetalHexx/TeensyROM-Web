@@ -7,6 +7,7 @@ using TeensyRom.Cli.Commands.Device;
 using TeensyRom.Cli.Commands.Engine;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Launcher;
+using TeensyRom.Cli.Commands.Ui;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
@@ -33,7 +34,7 @@ public sealed class CliHostTests : IDisposable
     private void EngineAnswers(bool running = true, string? version = null) =>
         _host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(running
             ? new EngineStatus(true, version ?? "1.0.0", "1.0.0", (version ?? "1.0.0") == "1.0.0", "localhost:10213", null)
-            : new EngineStatus(false, null, "1.0.0", false, "localhost:10213", "No Trom API is running at localhost:10213 — run `trom device list` to start one."));
+            : new EngineStatus(false, null, "1.0.0", false, "localhost:10213", "No Trom API is running at localhost:10213 — run `trom api start` to start one."));
 
     // ---- help, version and the retired surface --------------------------------------------------------------------
 
@@ -63,7 +64,7 @@ public sealed class CliHostTests : IDisposable
     [Fact]
     public async Task EveryNounsAndVerbsHelp_GoesToStdout_AndStartsNothing()
     {
-        foreach (var args in new[] { new[] { "engine", "--help" }, ["engine", "status", "--help"], ["device", "list", "-h"], ["device", "discover", "--help"] })
+        foreach (var args in new[] { new[] { "engine", "--help" }, ["engine", "status", "--help"], ["api", "--help"], ["api", "start", "--help"], ["device", "list", "-h"], ["device", "discover", "--help"] })
         {
             (await _host.RunAsync(args)).Should().Be(0, string.Join(' ', args));
         }
@@ -114,7 +115,52 @@ public sealed class CliHostTests : IDisposable
         StdOut.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task ABareApi_IsAUsageError_LikeABareEngine_WithTheNounsHelpOnStderr()
+    {
+        var exitCode = await _host.RunAsync("api");
+
+        exitCode.Should().Be((int)CliExitCode.Usage);
+        StdErr.Should().Contain("`trom api` needs a command").And.Contain("start").And.Contain("status").And.Contain("stop");
+        StdOut.Should().BeEmpty();
+        await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+    }
+
+    [Fact]
+    public async Task ApiStartHelp_IsTheEngineStartHelp_AndStartsNothing()
+    {
+        var exitCode = await _host.RunAsync("api", "start", "--help");
+
+        exitCode.Should().Be(0);
+        StdOut.Should().Contain("--json");
+        StdErr.Should().BeEmpty();
+        await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+    }
+
     // ---- engine ------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ApiStatus_Json_RoutesToTheEngineStatusCommand()
+    {
+        EngineAnswers();
+
+        var exitCode = await _host.RunAsync("api", "status", "--json");
+
+        exitCode.Should().Be(0);
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("running").GetBoolean().Should().BeTrue();
+        await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+    }
+
+    [Fact]
+    public async Task ApiStop_RoutesToTheEngineStopCommand()
+    {
+        _host.Engine.StopAsync(Arg.Any<CancellationToken>()).Returns(EngineStopOutcome.Stopped);
+
+        var exitCode = await _host.RunAsync("api", "stop", "--json");
+
+        exitCode.Should().Be(0);
+        JsonDocument.Parse(StdOut).RootElement.GetProperty("outcome").GetString().Should().Be("stopped");
+    }
 
     [Fact]
     public async Task EngineStatus_WhenAnEngineAnswers_SucceedsAndStartsNothing()
@@ -391,7 +437,7 @@ public sealed class CliHostTests : IDisposable
     [Fact]
     public void PublicCommandsAndSettings_AreTransient_SoNoOptionValueSurvivesIntoTheNextRun()
     {
-        foreach (var command in new[] { typeof(EngineStatusCommand), typeof(EngineStopCommand), typeof(DeviceListCommand) })
+        foreach (var command in new[] { typeof(EngineStartCommand), typeof(EngineStatusCommand), typeof(EngineStopCommand), typeof(DeviceListCommand), typeof(UiCommand) })
         {
             LifetimeOf(command).Should().Be(ServiceLifetime.Transient, command.Name);
             LifetimeOf(SettingsOf(command)).Should().Be(ServiceLifetime.Transient, SettingsOf(command).Name);

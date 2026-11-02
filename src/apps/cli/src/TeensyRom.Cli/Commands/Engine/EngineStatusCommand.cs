@@ -30,7 +30,7 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
         return 0;
     }
 
-    private static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
+    internal static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
     {
         List<(string Label, string Value)> rows = status.Running
             ?

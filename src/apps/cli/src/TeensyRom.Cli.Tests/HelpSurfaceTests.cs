@@ -71,6 +71,20 @@ public sealed class HelpSurfaceTests
         await AssertNoEngineOrDeviceTouched(host);
     }
 
+    [Fact]
+    public async Task TheApiAlias_ShowsTheEngineNounsHelp_WithItsVerbs()
+    {
+        using var host = new TestHost();
+
+        var exitCode = await host.RunAsync("api", "--help");
+
+        exitCode.Should().Be(0);
+        host.Consoles.StdOut.Should().Contain("DESCRIPTION").And.Contain("USAGE").And.Contain("EXAMPLES").And.Contain("COMMANDS")
+            .And.Contain("start").And.Contain("status").And.Contain("stop");
+        host.Consoles.StdErr.Should().BeEmpty();
+        await AssertNoEngineOrDeviceTouched(host);
+    }
+
     [Theory]
     [MemberData(nameof(Verbs))]
     public async Task VerbHelp_HasADescription_UsageAndAnExample(string noun, string verb)

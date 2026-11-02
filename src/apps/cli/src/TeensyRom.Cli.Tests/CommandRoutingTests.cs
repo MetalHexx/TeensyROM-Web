@@ -7,7 +7,8 @@ public class CommandRoutingTests
 {
     private static readonly Dictionary<string, string[]> Nouns = new()
     {
-        ["engine"] = ["status", "stop"],
+        ["engine"] = ["start", "status", "stop"],
+        ["api"] = ["start", "status", "stop"],
         ["device"] = ["list"]
     };
 
@@ -33,6 +34,8 @@ public class CommandRoutingTests
 
     [Theory]
     [InlineData(new[] { "engine" }, "engine")]
+    [InlineData(new[] { "api" }, "api")]
+    [InlineData(new[] { "api", "--json" }, "api")]
     [InlineData(new[] { "device", "--json" }, "device")]
     [InlineData(new[] { "device", "--json", "-d" }, "device")]
     public void FindBareNoun_FindsAKnownNounWithNoVerb(string[] args, string expected)
@@ -56,6 +59,8 @@ public class CommandRoutingTests
     [Theory]
     [InlineData(new[] { "engine", "status", "--bogus" }, new[] { "engine", "status" })]
     [InlineData(new[] { "engine", "bogus" }, new[] { "engine" })]
+    [InlineData(new[] { "api", "start", "--bogus" }, new[] { "api", "start" })]
+    [InlineData(new[] { "api", "bogus" }, new[] { "api" })]
     [InlineData(new[] { "engine", "--bogus" }, new[] { "engine" })]
     [InlineData(new[] { "device" }, new[] { "device" })]
     [InlineData(new[] { "launch", "random" }, new string[0])]
