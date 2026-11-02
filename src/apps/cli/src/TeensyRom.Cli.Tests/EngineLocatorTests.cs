@@ -28,24 +28,33 @@ public sealed class EngineLocatorTests : IDisposable
     }
 
     [Fact]
-    public void Locate_WithTheEngineInTheFolderAboveTheCli_FindsThePackagedEngine()
+    public void Locate_WithTheEngineInTheApiFolderBesideTheCliFolder_FindsThePackagedEngine()
+    {
+        var api = Folder("install", "api");
+        Touch(api, EngineLocator.ExecutableName);
+
+        var found = new EngineLocator(Folder("install", "cli")).Locate();
+
+        found.Location.Should().Be(new EngineLocation(EngineMode.Packaged, api));
+    }
+
+    [Fact]
+    public void Locate_WithTheEngineBesideTheCliInsteadOfInApi_DoesNotTreatItAsPackaged()
     {
         var install = Folder("install");
         Touch(install, EngineLocator.ExecutableName);
 
-        var found = new EngineLocator(Folder("install", "cli")).Locate();
-
-        found.Location.Should().Be(new EngineLocation(EngineMode.Packaged, install));
+        new EngineLocator(Folder("install", "cli")).Locate().Location.Should().BeNull();
     }
 
     [Fact]
     public void Locate_FromInsideThePackagedCliFolderWithATrailingSeparator_StillFindsIt()
     {
-        var install = Folder("install");
-        Touch(install, EngineLocator.ExecutableName);
+        var api = Folder("install", "api");
+        Touch(api, EngineLocator.ExecutableName);
         var cli = Folder("install", "cli") + Path.DirectorySeparatorChar;
 
-        new EngineLocator(cli).Locate().Location!.Folder.Should().Be(install);
+        new EngineLocator(cli).Locate().Location!.Folder.Should().Be(api);
     }
 
     [Fact]
@@ -63,8 +72,8 @@ public sealed class EngineLocatorTests : IDisposable
     public void Locate_PrefersAPackagedEngineOverTheSource()
     {
         ApiProject("repo");
-        var cli = Folder("repo", "src", "apps", "cli");
-        Touch(cli, EngineLocator.ExecutableName);
+        var api = Folder("repo", "src", "apps", "cli", "api");
+        Touch(api, EngineLocator.ExecutableName);
         var bin = Folder("repo", "src", "apps", "cli", "bin");
 
         new EngineLocator(bin).Locate().Location!.Mode.Should().Be(EngineMode.Packaged);
@@ -79,7 +88,7 @@ public sealed class EngineLocatorTests : IDisposable
         var found = new EngineLocator(elsewhere).Locate();
 
         found.Location.Should().BeNull();
-        found.SearchedFolder.Should().Be(Path.GetFullPath(Path.Combine(elsewhere, "..")));
+        found.SearchedFolder.Should().Be(Path.GetFullPath(Path.Combine(elsewhere, "..", "api")));
     }
 
     [Fact]

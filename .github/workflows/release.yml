@@ -5,10 +5,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  NODE_VERSION: '20.x'
-  DOTNET_VERSION: '9.0.x'
-
 jobs:
   validate:
     name: Validate Release
@@ -18,6 +14,9 @@ jobs:
       is_prerelease: ${{ steps.extract.outputs.is_prerelease }}
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Extract version from tag
         id: extract
         run: |
@@ -46,148 +45,23 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "::notice::Building version $VERSION"
 
-  build:
-    name: Build ${{ matrix.rid }}
-    needs: validate
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - rid: win-x64
-            extension: zip
-          - rid: osx-x64
-            extension: tar.gz
-          - rid: osx-arm64
-            extension: tar.gz
-          - rid: linux-x64
-            extension: tar.gz
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-      
-      # `src/package.json` depends on @sidablist/core and @sidablist/asid via relative file:/link:
-      # paths (../../SIDablist/libs/{core,asid}), so a standalone checkout of this repo alone cannot
-      # resolve them. A tag is not a branch, so a release falls back to SIDablist's main.
-      - name: Determine SIDablist ref to check out
-        id: sidablist-ref
-        working-directory: ${{ github.workspace }}
+      - name: Check the tag matches Version.props
+        env:
+          VERSION: ${{ steps.extract.outputs.version }}
         run: |
-          BRANCH="${{ github.head_ref || github.ref_name }}"
-          if git ls-remote --exit-code --heads https://github.com/MetalHexx/SIDablist.git "$BRANCH" > /dev/null 2>&1; then
-            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=main" >> "$GITHUB_OUTPUT"
+          PROPS_VERSION=$(grep -o '<Version>[^<]*' src/apps/Version.props | head -n 1 | sed 's/<Version>//')
+          if [ "$PROPS_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag v$VERSION does not match src/apps/Version.props ($PROPS_VERSION). Update Version.props, then re-tag."
+            exit 1
           fi
 
-      # actions/checkout refuses a `path` outside $GITHUB_WORKSPACE, but package.json's relative
-      # dependency needs a true sibling of this checkout, not a nested directory — hence the move.
-      - name: Checkout SIDablist (sibling dependency)
-        uses: actions/checkout@v4
-        with:
-          repository: MetalHexx/SIDablist
-          ref: ${{ steps.sidablist-ref.outputs.ref }}
-          path: SIDablist
-
-      - name: Move SIDablist beside this checkout
-        working-directory: ${{ github.workspace }}
-        run: mv SIDablist ../SIDablist
-
-      - name: Build SIDablist packages
-        working-directory: ${{ github.workspace }}/../SIDablist
-        run: |
-          npx --yes pnpm@10.11.0 install --frozen-lockfile
-          npx --yes pnpm@10.11.0 run build
-
-      - name: Install frontend dependencies
-        run: |
-          cd src
-          pnpm install --frozen-lockfile
-      
-      - name: Build frontend (production)
-        run: |
-          cd src
-          pnpm nx build teensyrom-ui --configuration=production
-      
-      - name: Copy frontend to wwwroot
-        run: |
-          mkdir -p src/apps/api/src/TeensyRom.Api/wwwroot
-          rm -rf src/apps/api/src/TeensyRom.Api/wwwroot/*
-          cp -r src/dist/apps/teensyrom-ui/browser/* src/apps/api/src/TeensyRom.Api/wwwroot/
-      
-      - name: Restore .NET dependencies
-        run: |
-          dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
-            -p:OpenApiGenerateDocuments=false \
-            -p:OpenApiGenerateDocumentsOnBuild=false
-      
-      - name: Publish for ${{ matrix.rid }}
-        run: |
-          dotnet publish src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
-            -c Release \
-            -r ${{ matrix.rid }} \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:SkipBuildFrontend=true \
-            -p:OpenApiGenerateDocuments=false \
-            -p:OpenApiGenerateDocumentsOnBuild=false \
-            -o ./publish/${{ matrix.rid }}
-
-      # Self-contained but not single-file: the CLI resolves its fonts from its assembly location,
-      # which is empty in a single-file bundle. The subfolder keeps the two apps' runtimes apart.
-      - name: Publish CLI for ${{ matrix.rid }}
-        run: |
-          dotnet publish src/apps/cli/src/TeensyRom.Cli/TeensyRom.Cli.csproj \
-            -c Release \
-            -r ${{ matrix.rid }} \
-            --self-contained true \
-            -o ./publish/${{ matrix.rid }}/cli
-
-      - name: Unpack Assets (avoid runtime extraction in read-only directories)
-        run: |
-          cd publish/${{ matrix.rid }}/Assets
-          # Recursively unpack all zip files in place
-          find . -name "*.zip" -type f | while read zip; do
-            dir=$(dirname "$zip")
-            echo "Extracting $zip to $dir..."
-            unzip -o "$zip" -d "$dir"
-            rm "$zip"
-          done
-
-      - name: Package (zip)
-        if: matrix.extension == 'zip'
-        run: |
-          cd publish/${{ matrix.rid }}
-          zip -r ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.zip .
-      
-      - name: Package (tar.gz)
-        if: matrix.extension == 'tar.gz'
-        run: |
-          cd publish/${{ matrix.rid }}
-          chmod +x TeensyRom.Api cli/trom
-          tar -czvf ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.tar.gz .
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}
-          path: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.${{ matrix.extension }}
-          retention-days: 5
+  build:
+    name: Build packages
+    needs: validate
+    uses: ./.github/workflows/build-packages.yml
+    with:
+      version: ${{ needs.validate.outputs.version }}
+      retention-days: 5
 
   update-formula:
     name: Update Homebrew Formula
@@ -206,7 +80,7 @@ jobs:
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: TeensyROM-Web-*-osx-*
+          pattern: TeensyROM-Suite-*-osx-*
           path: artifacts
           merge-multiple: true
       
@@ -214,8 +88,8 @@ jobs:
         id: sha256
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
-          SHA_ARM64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-arm64.tar.gz | cut -d ' ' -f1)
-          SHA_X64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-x64.tar.gz | cut -d ' ' -f1)
+          SHA_ARM64=$(sha256sum artifacts/TeensyROM-Suite-${VERSION}-osx-arm64.tar.gz | cut -d ' ' -f1)
+          SHA_X64=$(sha256sum artifacts/TeensyROM-Suite-${VERSION}-osx-x64.tar.gz | cut -d ' ' -f1)
           echo "arm64=$SHA_ARM64" >> $GITHUB_OUTPUT
           echo "x64=$SHA_X64" >> $GITHUB_OUTPUT
           echo "ARM64 SHA256: $SHA_ARM64"
@@ -224,25 +98,18 @@ jobs:
       - name: Update Homebrew formula
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
-          FORMULA="Formula/teensyrom-web.rb"
-          
-          # Update version
-          sed -i 's/version ".*"/version "'$VERSION'"/' $FORMULA
-          
-          # Update ARM64 SHA256 (in on_arm block)
-          sed -i '/on_arm do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.arm64 }}"/' $FORMULA
-          
-          # Update x64 SHA256 (in on_intel block)  
-          sed -i '/on_intel do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.x64 }}"/' $FORMULA
-          
+          FORMULA="Formula/teensyrom-suite.rb"
+
+          bash .github/scripts/update-formula.sh "$FORMULA" "$VERSION" "${{ steps.sha256.outputs.arm64 }}" "${{ steps.sha256.outputs.x64 }}"
+
           echo "Updated formula:"
-          cat $FORMULA
-      
+          cat "$FORMULA"
+
       - name: Commit formula changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/teensyrom-web.rb
+          git add Formula/teensyrom-suite.rb
           git commit -m "chore: update Homebrew formula for v${{ needs.validate.outputs.version }}"
           git push origin HEAD:main
 
@@ -261,6 +128,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: TeensyROM-Suite-*
           path: artifacts
           merge-multiple: true
       
@@ -271,11 +139,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.validate.outputs.version }}
-          name: TeensyROM Web v${{ needs.validate.outputs.version }}
+          name: TeensyROM Suite v${{ needs.validate.outputs.version }}
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           files: |
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-win-x64.zip
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-linux-x64.tar.gz
+            artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-win-x64.zip
+            artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
+            artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
+            artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-linux-x64.tar.gz

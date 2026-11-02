@@ -65,7 +65,7 @@ internal sealed class DeviceChooser(IDeviceService devices, ICliOutput output) :
 
     private static string NoneMessage(DeviceScope scope) => scope == DeviceScope.Online
         ? "No TeensyROM is online. Connect one, then run `trom device discover`."
-        : "tr-web doesn't know any TeensyROM yet. Connect one, then run `trom device discover`.";
+        : "Trom API doesn't know any TeensyROM yet. Connect one, then run `trom device discover`.";
 
     private static DeviceSummary Requested(string requested, IReadOnlyList<DeviceSummary> known, List<DeviceSummary> candidates, DeviceScope scope)
     {

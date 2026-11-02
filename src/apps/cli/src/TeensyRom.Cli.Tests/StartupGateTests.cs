@@ -106,24 +106,24 @@ public sealed class StartupGateTests : IDisposable
     public async Task EnsureReady_WhenListingDevicesFails_ShowsItsMessageAndFails()
     {
         _devices.GetDevicesAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", 503)));
+            .Returns(Task.FromException<IReadOnlyList<DeviceSummary>>(new TeensyApiException("Trom API is busy listing devices — try again in a few seconds.", 503)));
 
         var ready = await _sut.EnsureReadyAsync();
 
         ready.Should().BeFalse();
-        _console.Output.Should().Contain("tr-web is busy listing devices — try again in a few seconds.");
+        _console.Output.Should().Contain("Trom API is busy listing devices — try again in a few seconds.");
     }
 
     [Fact]
     public async Task EnsureReady_WhenTheEngineIsNotReady_ShowsWhyAndNeverAsksForDevices()
     {
         _engine.EnsureRunningAsync(Arg.Any<CancellationToken>())
-            .Returns(EngineReady.Failed("The TeensyROM engine didn't start (it didn't answer within 180 seconds)."));
+            .Returns(EngineReady.Failed("Trom API didn't start (it didn't answer within 180 seconds)."));
 
         var ready = await _sut.EnsureReadyAsync();
 
         ready.Should().BeFalse();
-        _console.Output.Should().Contain("The TeensyROM engine didn't start");
+        _console.Output.Should().Contain("Trom API didn't start");
         await _devices.DidNotReceive().GetDevicesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -182,12 +182,12 @@ public sealed class StartupGateTests : IDisposable
     public async Task EnsureEngine_WhenTheEngineIsNotReady_ShowsWhyAndFails()
     {
         _engine.EnsureRunningAsync(Arg.Any<CancellationToken>())
-            .Returns(EngineReady.Failed("The TeensyROM engine didn't start (it didn't answer within 180 seconds)."));
+            .Returns(EngineReady.Failed("Trom API didn't start (it didn't answer within 180 seconds)."));
 
         var ready = await _sut.EnsureEngineAsync();
 
         ready.Should().BeFalse();
-        _console.Output.Should().Contain("The TeensyROM engine didn't start");
+        _console.Output.Should().Contain("Trom API didn't start");
     }
 
     [Fact]

@@ -8,7 +8,7 @@ internal interface IEngineLocator
 
 /// <summary>
 /// Finds the engine relative to the CLI's own location, never through PATH or a setting. A packaged CLI sits in a
-/// folder beside the engine's executable; a CLI run from source sits inside a tr-web checkout whose engine it builds.
+/// <c>cli</c> folder beside the engine's <c>api</c> folder; a CLI run from source sits inside a tr-web checkout whose engine it builds.
 /// </summary>
 /// <param name="baseDirectory">The CLI's own directory, <see cref="AppContext.BaseDirectory"/> in the real CLI.</param>
 internal sealed class EngineLocator(string baseDirectory) : IEngineLocator
@@ -19,7 +19,7 @@ internal sealed class EngineLocator(string baseDirectory) : IEngineLocator
 
     public EngineLookup Locate()
     {
-        var packagedFolder = Path.GetFullPath(Path.Combine(baseDirectory, ".."));
+        var packagedFolder = Path.GetFullPath(Path.Combine(baseDirectory, "..", "api"));
 
         if (File.Exists(Path.Combine(packagedFolder, ExecutableName)))
         {

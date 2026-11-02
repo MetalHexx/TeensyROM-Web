@@ -52,7 +52,7 @@ internal sealed class CliOutput(CliConsoles consoles) : ICliOutput
             return;
         }
 
-        var table = new Table().Border(TableBorder.Rounded).HideHeaders();
+        var table = new Table().BorderColor(RadHelper.Theme.Secondary.Color).Border(TableBorder.Rounded).HideHeaders();
         table.AddColumn(new TableColumn(string.Empty));
         table.AddColumn(new TableColumn(string.Empty));
 
@@ -104,5 +104,5 @@ internal sealed record CliErrorDocument(CliErrorBody Error)
 
 internal sealed record CliErrorBody(CliExitCode Code, int ExitCode, string Message, ErrorDetails? Details = null);
 
-/// <summary>The JSON notice object written to stderr under <c>--json</c>: <c>{ "notice": { "code", "message", "device", "deviceId", "storage", "fix" } }</c>.</summary>
+/// <summary>The JSON notice object written to stderr under <c>--json</c>: <c>{ "notice": { "code", "message", "device", "deviceId", "storage", "fix" } }</c>; the keys a notice has no value for are left out.</summary>
 internal sealed record CliNoticeDocument(CliNotice Notice);

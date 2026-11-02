@@ -100,29 +100,39 @@ public class CliOutputTests
     }
 
     [Fact]
+    public void Fields_OnATerminal_AreDrawnInTheThemeColor_LikeTheOtherTables()
+    {
+        _consoles.Out.EmitAnsiSequences();
+
+        Output(outIsTerminal: true).Fields([("Status", "launched")]);
+
+        _consoles.StdOut.Should().Contain("\u001b[", "the table's border takes the theme's secondary color, as the list tables do");
+    }
+
+    [Fact]
     public void Fields_WithAnHttpUrl_AreALinkOnATerminal_AndPlainTextWhenRedirected()
     {
         _consoles.Out.EmitAnsiSequences();
         const string url = "http://localhost:10213/";
 
-        Output(outIsTerminal: true).Fields([("Web UI address", url)]);
+        Output(outIsTerminal: true).Fields([("Trom UI address", url)]);
         var human = _consoles.StdOut;
 
         human.Should().Contain(url).And.Contain("\u001b]8;");
 
         var plain = new TestConsoles();
         plain.Out.EmitAnsiSequences();
-        new CliOutput(plain.With(false, false, false)).Fields([("Web UI address", url)]);
+        new CliOutput(plain.With(false, false, false)).Fields([("Trom UI address", url)]);
 
-        plain.StdOut.Should().Contain($"Web UI address: {url}").And.NotContain("\u001b");
+        plain.StdOut.Should().Contain($"Trom UI address: {url}").And.NotContain("\u001b");
     }
 
     [Fact]
     public void Notice_GoesToStderr_NotStdout()
     {
-        Output().Notice("Starting the TeensyROM engine…");
+        Output().Notice("Starting Trom API…");
 
-        _consoles.StdErr.Should().Contain("Starting the TeensyROM engine…");
+        _consoles.StdErr.Should().Contain("Starting Trom API…");
         _consoles.StdOut.Should().BeEmpty();
     }
 
@@ -132,9 +142,9 @@ public class CliOutputTests
         var output = Output(outIsTerminal: true, errIsTerminal: true);
         output.SetRunMode(CliRunMode.Tui);
 
-        output.Notice("Starting the TeensyROM engine…");
+        output.Notice("Starting Trom API…");
 
-        _consoles.StdOut.Should().Contain("Starting the TeensyROM engine…");
+        _consoles.StdOut.Should().Contain("Starting Trom API…");
         _consoles.StdErr.Should().BeEmpty();
     }
 
@@ -152,7 +162,7 @@ public class CliOutputTests
     {
         var output = Output();
         output.UseJson(true);
-        output.Notice("Starting the TeensyROM engine…");
+        output.Notice("Starting Trom API…");
 
         output.Error(new CliException(CliExitCode.NoDevice, "No TeensyROM is online."));
 
@@ -203,6 +213,19 @@ public class CliOutputTests
         notice.GetProperty("code").GetString().Should().Be("indexIncomplete");
         notice.GetProperty("fix").GetString().Should().Be("trom index build --device TR-1 --storage sd");
         _consoles.StdOut.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Notice_ThatIsNotAboutADevice_LeavesTheDeviceKeysOutOfTheJson()
+    {
+        var output = Output();
+        output.UseJson(true);
+
+        output.Notice(new CliNotice("updateAvailable", "TeensyROM Suite 1.0.0 is out.", Fix: "trom update"));
+
+        var lines = _consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        lines.Should().HaveCount(2);
+        JsonDocument.Parse(lines[1]).RootElement.GetProperty("notice").EnumerateObject().Select(p => p.Name).Should().Equal("code", "message", "fix");
     }
 
     [Fact]

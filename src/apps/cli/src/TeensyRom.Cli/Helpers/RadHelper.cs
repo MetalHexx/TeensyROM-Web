@@ -22,11 +22,9 @@ namespace TeensyRom.Cli.Helpers
         /// <summary>
         /// Renders the main cli logo
         /// </summary>
-        /// <param name="fontPath">Font to use for the logo</param>
-        public static void RenderLogo(string text, string fontPath)
+        /// <param name="font">Font to use for the logo</param>
+        public static void RenderLogo(string text, FigletFont font)
         {
-            var font = FigletFont.Load(fontPath.GetOsFriendlyPath());
-
             AnsiConsole.Write(new FigletText(font, text)
                 .Color(Theme.Primary.Color));
         }

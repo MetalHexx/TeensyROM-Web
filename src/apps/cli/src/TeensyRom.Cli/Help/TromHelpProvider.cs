@@ -18,7 +18,7 @@ internal sealed class TromHelpProvider(ICommandAppSettings settings) : HelpProvi
         (CliExitCode.Success, "success"),
         (CliExitCode.Failed, "the command failed"),
         (CliExitCode.Usage, "usage error: unknown command or option, or an invalid value"),
-        (CliExitCode.EngineUnavailable, "the TeensyROM engine is not running or did not answer"),
+        (CliExitCode.EngineUnavailable, "Trom API is not running or did not answer"),
         (CliExitCode.NoDevice, "no TeensyROM is online, or the one you named is offline"),
         (CliExitCode.NotFound, "the device, file or directory was not found"),
         (CliExitCode.DeviceBusy, "the TeensyROM is busy with a transfer: try again when it finishes")

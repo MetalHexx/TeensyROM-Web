@@ -34,6 +34,8 @@ internal abstract class TromCommand<T>(ICliOutput output) : AsyncCommand<T> wher
 /// </summary>
 internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engine) : TromCommand<T>(output) where T : TromSettings
 {
+    protected IEngineControl Engine => engine;
+
     /// <exception cref="CliException"><see cref="CliExitCode.EngineUnavailable"/> when no engine could be made ready.</exception>
     protected override async Task PrepareAsync(T settings, CancellationToken ct)
     {
@@ -43,7 +45,7 @@ internal abstract class EngineCommand<T>(ICliOutput output, IEngineControl engin
 
         if (!ready.Ok)
         {
-            throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "The TeensyROM engine isn't running.");
+            throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "Trom API isn't running.");
         }
     }
 }

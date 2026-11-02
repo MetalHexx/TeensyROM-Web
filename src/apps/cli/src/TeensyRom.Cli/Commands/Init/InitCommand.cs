@@ -8,6 +8,8 @@ using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Update;
+using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Commands.Init;
 
@@ -19,6 +21,13 @@ internal sealed record InitEngine(bool Running, string? Version, bool Matches, s
 
 internal sealed record InitWebUi(string Address, bool Available);
 
+/// <summary>Whether a newer release is out, as <c>trom update --check</c> reports it; <see cref="Latest"/> is absent when checking is off or the lookup failed.</summary>
+internal sealed record InitUpdate(string Installed, string? Latest, bool Available, InstallKind InstallKind, DateTimeOffset? CheckedAt)
+{
+    public static InitUpdate From(UpdateStatus status) =>
+        new(status.Installed, status.Latest, status.Available, status.InstallKind, status.CheckedAt);
+}
+
 internal sealed record InitCommandInfo(string Name, string Description);
 
 /// <summary>Everything <c>trom init</c> reports, in the shape of its <c>--json</c> output.</summary>
@@ -26,25 +35,30 @@ internal sealed record InitReport(
     InitTrom Trom,
     InitEngine Engine,
     InitWebUi WebUi,
+    InitUpdate Update,
     IReadOnlyList<DeviceSummary> Devices,
     IReadOnlyList<InitCommandInfo> Commands,
     IReadOnlyList<string> Capabilities,
     IReadOnlyList<string> Problems);
 
 /// <summary>
-/// <c>trom init</c>: one read-only report of versions, engine, web UI, devices, commands, capabilities and problems.
-/// It starts or replaces the engine like any engine command, but a failed start is part of the report, not an error
-/// raised first: the report is written and only then does the command exit 3. It never resets, reconnects, indexes
-/// or changes settings.
+/// <c>trom init</c>: one read-only report of versions, whether a newer release is out, engine, web UI, devices, commands,
+/// capabilities and problems. It starts or replaces the engine like any engine command, but a failed start is part of
+/// the report, not an error raised first: the report is written and only then does the command exit 3. It never resets,
+/// reconnects, indexes or changes settings. The release lookup runs while the engine starts and never holds the report
+/// up for more than a few seconds.
 /// </summary>
-internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi, IEngineLocator locator)
+internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi, IEngineLocator locator, IReleaseCheck releases)
     : TromCommand<InitSettings>(output)
 {
     private const string WebUiAddress = EngineAddress.BaseUrl + "/";
-    private const string EngineNotRunning = "No TeensyROM engine is running.";
+    private const string EngineNotRunning = "No Trom API is running.";
+
+    private static readonly TimeSpan ReleaseLookupBudget = TimeSpan.FromSeconds(3);
 
     protected override async Task<int> RunAsync(CommandContext context, InitSettings settings, CancellationToken ct)
     {
+        var release = releases.CurrentAsync(ReleaseLookupBudget, ct);
         var ready = await engine.EnsureRunningAsync(ct);
         var status = await engine.GetStatusAsync(ct);
         var problems = new List<string>();
@@ -57,7 +71,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         {
             if (ready.Ok && !status.Matches)
             {
-                problems.Add($"The running engine is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs the engine restarts it.");
+                problems.Add($"The running Trom API is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs Trom API restarts it.");
             }
             found = await FindDevicesAsync(problems, ct);
         }
@@ -68,11 +82,12 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
 
         var webUiAvailable = status.Running && await webUi.IsServingAsync(ct);
 
-        if (status.Running && !webUiAvailable) problems.Add(WebUiProblem());
+        if (status.Running && !webUiAvailable) problems.Add(WebUiDiagnosis.Problem(locator));
         var report = new InitReport(
             new InitTrom(status.CliVersion),
             new InitEngine(status.Running, status.Version, status.Matches, EngineAddress.BaseUrl),
             new InitWebUi(WebUiAddress, webUiAvailable),
+            InitUpdate.From(await release),
             found,
             Commands(),
             Capabilities(),
@@ -80,7 +95,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
 
         Write(report);
 
-        if (!ready.Ok) throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "The TeensyROM engine isn't running.");
+        if (!ready.Ok) throw new CliException(CliExitCode.EngineUnavailable, ready.FailureMessage ?? "Trom API isn't running.");
 
         return 0;
     }
@@ -98,23 +113,6 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         .. CliHost.PublicTree.SelectMany(noun => noun.Verbs.Select(verb => $"{noun.Name} {verb.Name}")),
         .. CliHost.PublicCommands.Select(command => command.Name)
     ];
-
-    /// <summary>Why a running engine isn't serving the web UI, and what to do about it.</summary>
-    private string WebUiProblem()
-    {
-        const string RestartAndCheck = "run `trom engine stop`, then `trom init`";
-
-        if (locator.Locate().Location is not { Mode: EngineMode.Source, ApiProject: { } apiProject } source)
-        {
-            return $"The engine is running but isn't serving the web UI at {WebUiAddress} — check its logs in {TeensyRomHome.EngineLogsPath}.";
-        }
-
-        var wwwroot = Path.Combine(Path.GetDirectoryName(apiProject)!, "wwwroot");
-
-        return System.IO.File.Exists(Path.Combine(wwwroot, "index.html"))
-            ? $"The engine is running but isn't serving the web UI at {WebUiAddress} although {wwwroot} holds a build — {RestartAndCheck} to restart it."
-            : $"The web UI isn't served because the front end isn't built: {wwwroot} has no index.html. Run `pnpm run build:frontend` from {Path.Combine(source.Folder, "src")}, then {RestartAndCheck}.";
-    }
 
     private async Task<IReadOnlyList<DeviceSummary>> FindDevicesAsync(List<string> problems, CancellationToken ct)
     {
@@ -149,6 +147,14 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         return $"{device.Name}'s {storage.ToUpperInvariant()} storage isn't fully indexed — run `trom index build --device {name} --storage {storage}`.";
     }
 
+    private static string DescribeUpdate(InitUpdate update) => update switch
+    {
+        { Available: true, Latest: { } latest } => $"{latest} is out — run `trom update`",
+        { Latest: not null } => "up to date",
+        { InstallKind: InstallKind.Source or InstallKind.Unknown } => "not checked",
+        _ => "unknown"
+    };
+
     private void Write(InitReport report)
     {
         if (Output.Mode == OutputMode.Json)
@@ -160,12 +166,13 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         List<(string Label, string Value)> fields =
         [
             ("TROM version", report.Trom.Version),
-            ("Engine", report.Engine.Running ? "running" : "not running"),
-            ("Engine address", report.Engine.Address),
-            ("Engine version", report.Engine.Version ?? string.Empty),
+            ("Trom API", report.Engine.Running ? "running" : "not running"),
+            ("Trom API address", report.Engine.Address),
+            ("Trom API version", report.Engine.Version ?? string.Empty),
             ("Version match", report.Engine.Running ? (report.Engine.Matches ? "yes" : "no") : string.Empty),
-            ("Web UI", report.WebUi.Available ? "available" : "not available"),
-            ("Web UI address", report.WebUi.Address)
+            ("Trom UI", report.WebUi.Available ? "available" : "not available"),
+            ("Trom UI address", report.WebUi.Address),
+            ("Update", DescribeUpdate(report.Update))
         ];
 
         if (Output.Mode == OutputMode.Plain)

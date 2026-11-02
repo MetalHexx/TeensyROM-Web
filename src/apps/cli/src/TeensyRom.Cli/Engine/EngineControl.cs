@@ -1,5 +1,6 @@
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Common;
+using TeensyRom.Cli.Update;
 
 namespace TeensyRom.Cli.Engine;
 
@@ -43,6 +44,8 @@ internal sealed class EngineControl(
     internal static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(180);
     internal static readonly TimeSpan LaunchFailFast = TimeSpan.FromSeconds(15);
     internal static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(45);
+
+    internal const string UpdatedWhileOpen = "TeensyROM Suite was updated while this trom was open — start trom again.";
 
     public async Task<EngineReady> EnsureRunningAsync(CancellationToken ct)
     {
@@ -108,10 +111,10 @@ internal sealed class EngineControl(
             EngineProbeResult.Engine running => new EngineStatus(
                 true, running.Version, ownVersion, SameVersion(running.Version), address, null, TeensyRomHome.EngineLogsPath, NewestEngineLog()),
             EngineProbeResult.NotReady => NotRunning(address,
-                $"An engine is listening on {address} but isn't answering yet — run `trom engine status` again in a moment."),
+                $"Trom API is listening on {address} but isn't answering yet — run `trom api status` again in a moment."),
             EngineProbeResult.Foreign foreign => NotRunning(address,
-                $"Something other than a TeensyROM engine is using port {EngineAddress.Port} ({foreign.Reason}) — free the port and try again."),
-            _ => NotRunning(address, $"No TeensyROM engine is running at {address} — run `trom device list` to start one.")
+                $"Something other than Trom API is using port {EngineAddress.Port} ({foreign.Reason}) — free the port and try again."),
+            _ => NotRunning(address, $"No Trom API is running at {address} — run `trom api start` to start one.")
         };
     }
 
@@ -136,9 +139,17 @@ internal sealed class EngineControl(
         }
     }
 
-    /// <summary>Reuses the running engine when it is this CLI's version and build; otherwise replaces it.</summary>
+    /// <summary>
+    /// Reuses the running engine when it is this CLI's version and build; otherwise replaces it. A packaged CLI never
+    /// replaces an engine that is newer than itself: an update installed while this CLI was open is not undone.
+    /// </summary>
     private async Task<EngineReady> EnsureCurrentAsync(EngineProbeResult.Engine running, Attempt attempt, CancellationToken ct)
     {
+        if (IsNewerThanThisCli(running.Version) && locator.Locate().Location is { Mode: EngineMode.Packaged })
+        {
+            return EngineReady.Failed(UpdatedWhileOpen);
+        }
+
         var notice = RestartNotice(running.Version);
 
         if (notice is null) return EngineReady.Ready;
@@ -150,7 +161,7 @@ internal sealed class EngineControl(
             EngineStopOutcome.Stopped => await StartAndWaitAsync(attempt, ct),
             EngineStopOutcome.NotRunning => await StartOrWaitAsync(attempt, ct),
             _ => EngineReady.Failed(
-                $"The running TeensyROM engine (version {Comparable(running.Version)}) can't be stopped from the CLI. Stop it where it was started, then try again.")
+                $"The running Trom API (version {Comparable(running.Version)}) can't be stopped from the CLI. Stop it where it was started, then try again.")
         };
     }
 
@@ -158,11 +169,11 @@ internal sealed class EngineControl(
     {
         if (!SameVersion(runningVersion))
         {
-            return $"The running TeensyROM engine is version {Comparable(runningVersion)}, this CLI is {Comparable(ownVersion)} — restarting it.";
+            return $"The running Trom API is version {Comparable(runningVersion)}, this CLI is {Comparable(ownVersion)} — restarting it.";
         }
 
         return locator.Locate().Location is { Mode: EngineMode.Source } source && IsStale(source)
-            ? "The running TeensyROM engine is out of date with this source tree — restarting it."
+            ? "The running Trom API is out of date with this source tree — restarting it."
             : null;
     }
 
@@ -190,13 +201,13 @@ internal sealed class EngineControl(
     /// <summary>Builds (from source) and launches an engine; returns the failure message, or null once launched.</summary>
     private async Task<string?> StartAsync(Attempt attempt, CancellationToken ct)
     {
-        notify("Starting the TeensyROM engine…");
+        notify("Starting Trom API…");
 
         var lookup = locator.Locate();
 
         if (lookup.Location is not { } location)
         {
-            return $"No TeensyROM engine was found beside this CLI (looked in {lookup.SearchedFolder}).";
+            return $"No Trom API was found beside this CLI (looked in {lookup.SearchedFolder}).";
         }
 
         attempt.Location = location;
@@ -207,7 +218,7 @@ internal sealed class EngineControl(
         if (location.Mode == EngineMode.Source)
         {
             attempt.SourceFingerprint = freshness.Current(location.Folder);
-            notify("Building the TeensyROM engine from source…");
+            notify("Building Trom API from source…");
 
             var build = await launcher.BuildAsync(location, ct);
 
@@ -228,7 +239,7 @@ internal sealed class EngineControl(
     /// </summary>
     private async Task<EngineReady> WaitAsync(Attempt attempt, CancellationToken ct)
     {
-        if (attempt.LaunchedAt is null) notify("Waiting for the TeensyROM engine to finish starting…");
+        if (attempt.LaunchedAt is null) notify("Waiting for Trom API to finish starting…");
 
         var deadline = (attempt.LaunchedAt ?? clock.UtcNow) + StartTimeout;
 
@@ -258,7 +269,7 @@ internal sealed class EngineControl(
                     }
                     else if (clock.UtcNow - attempt.LaunchedAt.Value >= LaunchFailFast)
                     {
-                        return EngineReady.Failed(StartFailed("the engine exited while starting", attempt));
+                        return EngineReady.Failed(StartFailed("it exited while starting", attempt));
                     }
                     break;
             }
@@ -275,9 +286,12 @@ internal sealed class EngineControl(
     private bool SameVersion(string version) =>
         string.Equals(Comparable(version), Comparable(ownVersion), StringComparison.Ordinal);
 
+    private bool IsNewerThanThisCli(string version) =>
+        SemVersion.TryParse(version, out var running) && SemVersion.TryParse(ownVersion, out var own) && running > own;
+
     private string StartFailed(string reason, Attempt attempt)
     {
-        var message = $"The TeensyROM engine didn't start ({reason}). Its logs are in {TeensyRomHome.EngineLogsPath}.";
+        var message = $"Trom API didn't start ({reason}). Its logs are in {TeensyRomHome.EngineLogsPath}.";
 
         return (attempt.Location ?? locator.Locate().Location) is { Mode: EngineMode.Source }
             ? $"{message} The build log is {TeensyRomHome.EngineBuildLogPath}."
@@ -285,7 +299,7 @@ internal sealed class EngineControl(
     }
 
     private static string ForeignMessage() =>
-        $"Something other than a TeensyROM engine is using port {EngineAddress.Port} — free the port and try again. The engine's logs are in {TeensyRomHome.EngineLogsPath}.";
+        $"Something other than Trom API is using port {EngineAddress.Port} — free the port and try again. Trom API's logs are in {TeensyRomHome.EngineLogsPath}.";
 
     private static string Comparable(string version)
     {

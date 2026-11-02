@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Testing;
@@ -10,6 +11,9 @@ using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
+using TeensyRom.Cli.Tests.Update;
+using TeensyRom.Cli.Update;
+using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Tests;
 
@@ -76,6 +80,27 @@ internal sealed class RecordingTransferLines : ITransferLineStream
     }
 }
 
+/// <summary>Stands in for the browser, so no test opens one; records the pages it was asked for.</summary>
+internal sealed class RecordingBrowserOpener : IBrowserOpener
+{
+    public List<string> Opened { get; } = [];
+
+    /// <summary>What every <see cref="OpenAsync"/> call returns.</summary>
+    public BrowserOpenResult Result { get; set; } = new(true);
+
+    public Task<BrowserOpenResult> OpenAsync(string url, CancellationToken ct = default)
+    {
+        Opened.Add(url);
+        return Task.FromResult(Result);
+    }
+}
+
+/// <summary>Stands in for the machine's adapters, so no test depends on the network it runs on.</summary>
+internal sealed class FixedLanAddresses(params string[] addresses) : ILanAddresses
+{
+    public IReadOnlyList<string> Find() => addresses;
+}
+
 /// <summary>
 /// The real public tree on test consoles, with the engine and the devices replaced by substitutes. The real settings
 /// and storage services run against the test home.
@@ -95,6 +120,15 @@ internal sealed class TestHost : IDisposable
     public CliLoggingService Logging { get; } = new();
 
     public RecordingTransferLines TransferLines { get; } = new();
+
+    /// <summary>The browser the host opens pages with, unless <c>configure</c> registered another.</summary>
+    public RecordingBrowserOpener BrowserOpener { get; } = new();
+
+    /// <summary>The release check of the host and its menu, unless <c>configure</c> registered another: a source build that never looked anything up.</summary>
+    public FakeReleaseCheck ReleaseCheck { get; } = new();
+
+    /// <summary>The updater the host runs, unless <c>configure</c> registered another; it answers nothing until a test scripts it.</summary>
+    public IUpdateRunner Updates { get; } = Substitute.For<IUpdateRunner>();
 
     public CliComposition Composition { get; }
 
@@ -118,9 +152,13 @@ internal sealed class TestHost : IDisposable
         Services.AddSingleton(Substitute.For<ITeensyRomApiClient>());
         Services.AddSingleton<IStorageService, StorageService>();
         configure?.Invoke(Services);
+        Services.TryAddSingleton<IBrowserOpener>(BrowserOpener);
+        Services.TryAddSingleton<ILanAddresses>(new FixedLanAddresses("192.168.1.20"));
+        Services.TryAddSingleton<IReleaseCheck>(ReleaseCheck);
+        Services.TryAddSingleton(Updates);
         CliHost.RegisterCommands(Services);
 
-        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services), TransferLines: TransferLines);
+        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services), TransferLines: TransferLines, ReleaseCheck: ReleaseCheck);
         Session = CliHost.CreateSession(Composition);
     }
 

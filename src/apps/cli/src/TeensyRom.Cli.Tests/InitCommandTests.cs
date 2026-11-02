@@ -6,6 +6,7 @@ using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Init;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Update;
 
 namespace TeensyRom.Cli.Tests;
 
@@ -151,7 +152,7 @@ public sealed class InitCommandTests
             var problem = Problems(Parse(host)).Should().ContainSingle().Subject;
             problem.Should().Contain(Path.Combine(api, "wwwroot")).And.Contain("no index.html")
                 .And.Contain("pnpm run build:frontend").And.Contain(Path.Combine(root, "src"))
-                .And.Contain("trom engine stop").And.Contain("trom init");
+                .And.Contain("trom api stop").And.Contain("trom api start");
         }
         finally
         {
@@ -174,7 +175,7 @@ public sealed class InitCommandTests
 
             await host.RunAsync("init", "--json");
 
-            Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("trom engine stop").And.NotContain("build:frontend");
+            Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("trom api stop").And.NotContain("build:frontend");
         }
         finally
         {
@@ -189,7 +190,7 @@ public sealed class InitCommandTests
 
         await host.RunAsync("init", "--json");
 
-        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("isn't serving the web UI").And.Contain("logs");
+        Problems(Parse(host)).Should().ContainSingle().Which.Should().Contain("isn't serving Trom UI").And.Contain("logs");
     }
 
     [Fact]
@@ -199,7 +200,7 @@ public sealed class InitCommandTests
 
         await host.RunAsync("init");
 
-        host.Consoles.StdOut.Should().Contain("isn't serving the web UI");
+        host.Consoles.StdOut.Should().Contain("isn't serving Trom UI");
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public sealed class InitCommandTests
     {
         using var host = NewHost();
         host.Devices.FindAsync(false, Arg.Any<CancellationToken>())
-            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", 503));
+            .Returns<IReadOnlyList<DeviceSummary>>(_ => throw new TeensyApiException("Trom API is busy listing devices — try again in a few seconds.", 503));
 
         var exitCode = await host.RunAsync("init", "--json");
 
@@ -252,7 +253,7 @@ public sealed class InitCommandTests
         var exitCode = await host.RunAsync("init");
 
         exitCode.Should().Be(0);
-        host.Consoles.StdOut.Should().Contain("Engine").And.Contain("Web UI").And.Contain("Bench").And.Contain("Problem").And.Contain("No TeensyROM is online.");
+        host.Consoles.StdOut.Should().Contain("Trom API").And.Contain("Trom UI").And.Contain("Bench").And.Contain("Problem").And.Contain("No TeensyROM is online.");
         await host.Engine.DidNotReceiveWithAnyArgs().StopAsync(default);
     }
 
@@ -264,7 +265,71 @@ public sealed class InitCommandTests
         var exitCode = await host.RunAsync("init");
 
         exitCode.Should().Be(0);
-        host.Consoles.StdOut.Should().Contain("Engine").And.Contain("Web UI").And.Contain("Bench");
+        host.Consoles.StdOut.Should().Contain("Trom API").And.Contain("Trom UI").And.Contain("Bench");
         host.Consoles.StdErr.Should().Contain("No TeensyROM is online.");
+    }
+
+    // ---- the update report ----------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Init_ReportsTheUpdateStatusRightAfterTheWebUi_LeavingOutWhatIsNotKnown()
+    {
+        using var host = NewHost(devices: Device());
+
+        await host.RunAsync("init", "--json");
+
+        var report = Parse(host);
+        report.EnumerateObject().Select(property => property.Name)
+            .Should().Equal("trom", "engine", "webUi", "update", "devices", "commands", "capabilities", "problems");
+        var update = report.GetProperty("update");
+        update.GetProperty("installKind").GetString().Should().Be("source");
+        update.GetProperty("available").GetBoolean().Should().BeFalse();
+        update.TryGetProperty("latest", out _).Should().BeFalse();
+        update.TryGetProperty("checkedAt", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Init_WhenANewerReleaseIsOut_ReportsItWithoutMakingItAProblem()
+    {
+        var checkedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        using var host = NewHost(devices: Device());
+        host.ReleaseCheck.CachedStatus = new UpdateStatus(CliVersion, "1.3.0", true, InstallKind.Release, checkedAt);
+
+        var exitCode = await host.RunAsync("init", "--json");
+
+        exitCode.Should().Be(0);
+        var report = Parse(host);
+        var update = report.GetProperty("update");
+        update.EnumerateObject().Select(property => property.Name).Should().Equal("installed", "latest", "available", "installKind", "checkedAt");
+        update.GetProperty("installed").GetString().Should().Be(CliVersion);
+        update.GetProperty("latest").GetString().Should().Be("1.3.0");
+        update.GetProperty("available").GetBoolean().Should().BeTrue();
+        update.GetProperty("installKind").GetString().Should().Be("release");
+        update.GetProperty("checkedAt").GetDateTimeOffset().Should().Be(checkedAt);
+        Problems(report).Should().BeEmpty();
+        host.ReleaseCheck.Refreshes.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Init_WhenTheEngineCannotStart_StillReportsTheUpdate()
+    {
+        using var host = NewHost(engineReady: false, failure: "The port is in use.", running: false);
+        host.ReleaseCheck.CachedStatus = new UpdateStatus(CliVersion, "1.3.0", true, InstallKind.Homebrew, null);
+
+        var exitCode = await host.RunAsync("init", "--json");
+
+        exitCode.Should().Be(3);
+        Parse(host).GetProperty("update").GetProperty("installKind").GetString().Should().Be("homebrew");
+    }
+
+    [Fact]
+    public async Task Init_Redirected_HasAnUpdateRowThatNamesTheCommand()
+    {
+        using var host = NewHost(devices: Device());
+        host.ReleaseCheck.CachedStatus = new UpdateStatus(CliVersion, "1.3.0", true, InstallKind.Release, null);
+
+        await host.RunAsync("init");
+
+        host.Consoles.StdOut.Should().Contain("Update: 1.3.0 is out — run `trom update`");
     }
 }

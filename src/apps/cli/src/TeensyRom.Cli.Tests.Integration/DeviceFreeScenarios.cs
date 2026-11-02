@@ -50,7 +50,7 @@ public sealed class DeviceFreeScenarios
             (await cli.RunAsync("--version")).Should().Be(0);
 
             cli.Output.Should().Contain("trom ").And.Contain("EXIT CODES");
-            cli.Error.Should().NotContain("Starting the TeensyROM engine").And.NotContain("No TeensyROM is online");
+            cli.Error.Should().NotContain("Starting Trom API").And.NotContain("No TeensyROM is online");
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
         }
         finally
@@ -99,7 +99,7 @@ public sealed class DeviceFreeScenarios
             (await cli.RunAsync("file", "random", "--player")).Should().Be(2);
 
             cli.Output.Should().BeEmpty();
-            cli.Error.Should().Contain("--player needs an interactive terminal.").And.NotContain("Starting the TeensyROM engine");
+            cli.Error.Should().Contain("--player needs an interactive terminal.").And.NotContain("Starting Trom API");
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
         }
         finally
@@ -131,7 +131,7 @@ public sealed class DeviceFreeScenarios
             (await cli.RunAsync("file", "launch", "a.prg")).Should().Be(2, "a local file is not on the TeensyROM");
 
             cli.Error.Should().Contain("--to is required").And.Contain("pass --yes").And.Contain("upload --launch a.prg");
-            cli.Error.Should().NotContain("Starting the TeensyROM engine");
+            cli.Error.Should().NotContain("Starting Trom API");
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
         }
         finally
@@ -162,7 +162,7 @@ public sealed class DeviceFreeScenarios
 
             File.Exists(Path.Combine(source, "ASID", "lead.fermatax")).Should().BeTrue();
             cli.Output.Should().Contain("storage: ");
-            cli.Error.Should().NotContain("Starting the TeensyROM engine");
+            cli.Error.Should().NotContain("Starting Trom API");
             (await new EngineProbe().ProbeAsync(bound.Token)).Should().BeOfType<EngineProbeResult.Unreachable>();
         }
         finally

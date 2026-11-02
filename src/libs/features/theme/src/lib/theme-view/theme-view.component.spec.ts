@@ -192,7 +192,7 @@ describe('ThemeViewComponent', () => {
     fixture.detectChanges();
 
     expect(card().subtitle()).toBe('Mine · Custom');
-    expect(card().infoText()).toContain('last applied from TeensyROM Web');
+    expect(card().infoText()).toContain('last applied from TeensyROM Suite');
   });
 });
 

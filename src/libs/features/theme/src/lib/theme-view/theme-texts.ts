@@ -32,7 +32,7 @@ export function recordInfoText(state: RecordStateText): string {
     case 'none':
       return 'No colors on record yet. Showing the TR Default factory colors.';
     case 'recorded':
-      return "Shows the colors last applied from TeensyROM Web. Colors changed on the C64's own menu are not seen.";
+      return "Shows the colors last applied from TeensyROM Suite. Colors changed on the C64's own menu are not seen.";
     case 'differ': {
       const shown = state.shownDeviceName;
       return state.deviceNames.length === 2

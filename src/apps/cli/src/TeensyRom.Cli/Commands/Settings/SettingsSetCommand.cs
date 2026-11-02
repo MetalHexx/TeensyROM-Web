@@ -13,7 +13,7 @@ namespace TeensyRom.Cli.Commands.Settings;
 internal sealed class SettingsSetSettings : TromSettings
 {
     [CommandArgument(0, "<KEY>")]
-    [Description("The setting to change: storage, always-prompt-storage or debug-logs.")]
+    [Description("The setting to change: storage, always-prompt-storage, debug-logs or update-check.")]
     public string Key { get; set; } = string.Empty;
 
     [CommandArgument(1, "<VALUE>")]
@@ -30,6 +30,7 @@ internal sealed class SettingsSetCommand(ICliOutput output, ISettingsService set
     private const string StorageKey = "storage";
     private const string AlwaysPromptKey = "always-prompt-storage";
     private const string DebugLogsKey = "debug-logs";
+    private const string UpdateCheckKey = "update-check";
 
     protected override Task<int> RunAsync(CommandContext context, SettingsSetSettings args, CancellationToken ct)
     {
@@ -67,9 +68,13 @@ internal sealed class SettingsSetCommand(ICliOutput output, ISettingsService set
                 settings.EnableDebugLogs = ParseBool(key, value);
                 return Bool(settings.EnableDebugLogs);
 
+            case UpdateCheckKey:
+                settings.UpdateCheck = ParseBool(key, value);
+                return Bool(settings.UpdateCheck);
+
             default:
                 throw new CliException(CliExitCode.Usage,
-                    $"Unknown setting '{key}'. Valid settings: {StorageKey} sd|usb, {AlwaysPromptKey} true|false, {DebugLogsKey} true|false.");
+                    $"Unknown setting '{key}'. Valid settings: {StorageKey} sd|usb, {AlwaysPromptKey} true|false, {DebugLogsKey} true|false, {UpdateCheckKey} true|false.");
         }
     }
 

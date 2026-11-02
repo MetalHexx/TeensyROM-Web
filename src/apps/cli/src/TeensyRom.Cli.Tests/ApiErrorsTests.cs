@@ -92,7 +92,7 @@ public class ApiErrorsTests
     {
         var failure = await Failure(HttpStatusCode.InternalServerError, body);
 
-        failure.Message.Should().Be("tr-web couldn't complete that request (HTTP 500).");
+        failure.Message.Should().Be("Trom API couldn't complete that request (HTTP 500).");
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class ApiErrorsTests
         var act = () => ApiErrors.Call(() => client.GetVersionAsync());
 
         var failure = (await act.Should().ThrowAsync<TeensyApiException>()).Which;
-        failure.Message.Should().Be("tr-web stopped answering at localhost:10213 — start it and try again.");
+        failure.Message.Should().Be("Trom API stopped answering at localhost:10213 — start it and try again.");
         failure.StatusCode.Should().BeNull();
     }
 
@@ -119,7 +119,7 @@ public class ApiErrorsTests
     [Fact]
     public void ToMessage_WithoutABody_UsesTheStatusFallback()
     {
-        ApiErrors.ToMessage(ApiFailure(503, null)).Should().Be("tr-web couldn't complete that request (HTTP 503).");
+        ApiErrors.ToMessage(ApiFailure(503, null)).Should().Be("Trom API couldn't complete that request (HTTP 503).");
     }
 
     [Fact]

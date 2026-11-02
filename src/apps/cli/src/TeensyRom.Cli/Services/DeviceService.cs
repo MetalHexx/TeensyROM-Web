@@ -22,7 +22,7 @@ internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
         }
         catch (TeensyApiException ex) when (ex.StatusCode == 503)
         {
-            throw new TeensyApiException("tr-web is busy listing devices — try again in a few seconds.", ex.StatusCode, ex);
+            throw new TeensyApiException("Trom API is busy listing devices — try again in a few seconds.", ex.StatusCode, ex);
         }
     }
 

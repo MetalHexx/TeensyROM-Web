@@ -5,15 +5,6 @@ namespace TeensyRom.Cli.Common
 
     public static class AssemblyExtensions
     {
-        /// <summary>
-        /// Get the full path of the assembly
-        /// </summary>
-        public static string GetPath(this Assembly assembly) 
-        {                         
-            var location = assembly.Location;
-            return Path.GetDirectoryName(location) ?? string.Empty;
-        }
-
         public static string GetVersion(this Assembly assembly)
         {
             string version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Unknown version";

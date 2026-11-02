@@ -30,6 +30,9 @@ namespace TeensyRom.Cli.Settings
         /// <summary>The folders <c>trom path add</c> put on the Windows user PATH, which <c>remove</c> takes off again.</summary>
         public List<string> PathEntriesAdded { get; set; } = [];
 
+        /// <summary>Look up the newest release once a day and mention it when it is newer than this install.</summary>
+        public bool UpdateCheck { get; set; } = true;
+
         public void InitializeDefaults()
         {
             FileTargets.AddRange(new List<TeensyTarget>

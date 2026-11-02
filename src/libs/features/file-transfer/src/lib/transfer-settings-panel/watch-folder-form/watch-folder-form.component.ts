@@ -71,7 +71,7 @@ export class WatchFolderFormComponent {
   private readonly deviceId = controlValue<string>(this.formGroup, 'device');
 
   protected readonly folderTooltip: TooltipConfig = {
-    body: 'A folder on the computer running the engine; new files in it are copied.',
+    body: 'A folder on the computer running Trom API; new files in it are copied.',
     position: TooltipPosition.Top,
   };
   protected readonly deviceTooltip: TooltipConfig = {

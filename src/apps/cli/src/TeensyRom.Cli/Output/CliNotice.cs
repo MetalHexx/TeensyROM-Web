@@ -5,8 +5,8 @@ namespace TeensyRom.Cli.Output;
 /// </summary>
 /// <param name="Code">A stable name for the kind of notice, for example <c>indexIncomplete</c>.</param>
 /// <param name="Message">The sentence shown on stderr.</param>
-/// <param name="Device">The name of the device the notice is about.</param>
+/// <param name="Device">The name of the device the notice is about; null for a notice that isn't about a device.</param>
 /// <param name="DeviceId">The id of that device.</param>
 /// <param name="Storage">The storage the notice is about, <c>sd</c> or <c>usb</c>.</param>
-/// <param name="Fix">The exact <c>trom</c> command that resolves it.</param>
-internal sealed record CliNotice(string Code, string Message, string Device, string DeviceId, string Storage, string Fix);
+/// <param name="Fix">The exact <c>trom</c> command that resolves it, when one does.</param>
+internal sealed record CliNotice(string Code, string Message, string? Device = null, string? DeviceId = null, string? Storage = null, string? Fix = null);

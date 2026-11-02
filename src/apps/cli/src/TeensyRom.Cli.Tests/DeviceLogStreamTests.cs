@@ -118,7 +118,7 @@ public class DeviceLogStreamTests
         var dispose = async () => await following.DisposeAsync();
 
         await dispose.Should().NotThrowAsync();
-        log.Received(1).InternalError(Arg.Is<string>(message => message.StartsWith("Couldn't stop following tr-web's log")));
+        log.Received(1).InternalError(Arg.Is<string>(message => message.StartsWith("Couldn't stop following Trom API's log")));
     }
 
     [Fact]

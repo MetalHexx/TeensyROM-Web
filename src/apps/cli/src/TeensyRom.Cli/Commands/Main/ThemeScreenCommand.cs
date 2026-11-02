@@ -95,7 +95,7 @@ internal class ThemeScreenCommand(IThemeService themes, IDeviceService devices) 
 
         if (fallback is null)
         {
-            RadHelper.WriteError("tr-web has no themes to show.");
+            RadHelper.WriteError("Trom API has no themes to show.");
             return null;
         }
         return new ScreenState(ThemeColors.From(fallback.Parts.Device), fallback);

@@ -21,23 +21,23 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
         if (Output.Mode == OutputMode.Json) Output.Json(status);
         else Output.Fields(Describe(status));
 
-        if (!status.Running) throw new CliException(CliExitCode.EngineUnavailable, status.Problem ?? "No TeensyROM engine is running.");
+        if (!status.Running) throw new CliException(CliExitCode.EngineUnavailable, status.Problem ?? "No Trom API is running.");
 
         if (!status.Matches)
         {
-            Output.Notice($"The running engine is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs the engine restarts it.");
+            Output.Notice($"The running Trom API is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs Trom API restarts it.");
         }
         return 0;
     }
 
-    private static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
+    internal static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
     {
         List<(string Label, string Value)> rows = status.Running
             ?
             [
                 ("Status", "running"),
                 ("Address", status.Address),
-                ("Engine version", status.Version ?? string.Empty),
+                ("Trom API version", status.Version ?? string.Empty),
                 ("CLI version", status.CliVersion),
                 ("Version match", status.Matches ? "yes" : "no")
             ]

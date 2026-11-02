@@ -70,7 +70,7 @@ internal sealed class EngineLauncher : IEngineLauncher
     {
         var launch = Resolve(location, Configuration);
 
-        if (launch is null) return EngineStep.Fail("no built engine was found");
+        if (launch is null) return EngineStep.Fail("no built Trom API was found");
 
         TeensyRomHome.ExportToProcess();
 
@@ -80,7 +80,7 @@ internal sealed class EngineLauncher : IEngineLauncher
         try
         {
             using var process = Process.Start(ShellStartInfo(command, logPath, launch.WorkingDirectory, detached: true, OperatingSystem.IsWindows()))
-                ?? throw new Win32Exception("the engine process did not start");
+                ?? throw new Win32Exception("the Trom API process did not start");
 
             if (OperatingSystem.IsWindows()) return EngineStep.Success;
 

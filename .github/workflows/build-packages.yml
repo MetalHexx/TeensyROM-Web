@@ -1,0 +1,138 @@
+name: Build Packages
+
+# Builds Trom UI once, then one TeensyROM-Suite-<version>-<rid> package per runtime identifier.
+# Called by release.yml and package-test.yml.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Package version, without the leading v'
+        type: string
+        required: true
+      rids:
+        description: 'JSON array of runtime identifiers to package'
+        type: string
+        required: false
+        default: '["win-x64","osx-x64","osx-arm64","linux-x64"]'
+      retention-days:
+        description: 'Days to keep the package artifacts'
+        type: number
+        required: false
+        default: 5
+
+env:
+  NODE_VERSION: '20.x'
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  frontend:
+    name: Build Trom UI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # `src/package.json` depends on the @sidablist/* libraries via relative file:/link: paths
+      # (../../SIDablist/libs/*), so a standalone checkout of this repo alone cannot resolve them.
+      # SIDablist's root build builds every library. A tag is not a branch, so a release falls back
+      # to SIDablist's main.
+      - name: Determine SIDablist ref to check out
+        id: sidablist-ref
+        working-directory: ${{ github.workspace }}
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/MetalHexx/SIDablist.git "$BRANCH" > /dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      # actions/checkout refuses a `path` outside $GITHUB_WORKSPACE, but package.json's relative
+      # dependency needs a true sibling of this checkout, not a nested directory — hence the move.
+      - name: Checkout SIDablist (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: MetalHexx/SIDablist
+          ref: ${{ steps.sidablist-ref.outputs.ref }}
+          path: SIDablist
+
+      - name: Move SIDablist beside this checkout
+        working-directory: ${{ github.workspace }}
+        run: mv SIDablist ../SIDablist
+
+      - name: Build SIDablist packages
+        working-directory: ${{ github.workspace }}/../SIDablist
+        run: |
+          npx --yes pnpm@10.11.0 install --frozen-lockfile
+          npx --yes pnpm@10.11.0 run build
+
+      - name: Install frontend dependencies
+        working-directory: src
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend (production)
+        working-directory: src
+        run: pnpm nx build teensyrom-ui --configuration=production
+
+      - name: Upload wwwroot
+        uses: actions/upload-artifact@v4
+        with:
+          name: trom-ui-wwwroot
+          path: src/dist/apps/teensyrom-ui/browser
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package ${{ matrix.rid }}
+    needs: frontend
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: ${{ fromJSON(inputs.rids) }}
+
+    env:
+      VERSION: ${{ inputs.version }}
+      RID: ${{ matrix.rid }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Download wwwroot
+        uses: actions/download-artifact@v4
+        with:
+          name: trom-ui-wwwroot
+          path: src/apps/api/src/TeensyRom.Api/wwwroot
+
+      - name: Publish ${{ matrix.rid }}
+        run: bash .github/scripts/package.sh publish "$RID" "$VERSION" "$RUNNER_TEMP/publish/$RID"
+
+      - name: Assemble package
+        run: bash .github/scripts/package.sh assemble "$RID" "$VERSION" "$RUNNER_TEMP/publish/$RID" "$RUNNER_TEMP/out"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeensyROM-Suite-${{ inputs.version }}-${{ matrix.rid }}
+          path: ${{ runner.temp }}/out/TeensyROM-Suite-${{ inputs.version }}-${{ matrix.rid }}.*
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}

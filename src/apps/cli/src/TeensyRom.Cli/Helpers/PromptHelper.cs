@@ -93,18 +93,20 @@ namespace TeensyRom.Cli.Helpers
         /// <param name="message">The message to display</param>
         /// <param name="choices">The choices to show the user</param>
         /// <param name="theme">Allows an override of the default theme for special cases</param>
+        /// <param name="pageSize">How many choices show at once; Spectre's default (10) when null</param>
         /// <returns>Selected choice</returns>
-        public static string ChoicePrompt(string message, List<string> choices)
+        public static string ChoicePrompt(string message, List<string> choices, int? pageSize = null)
         {
             var theme = RadHelper.Theme;
 
-            var selection = AnsiConsole.Prompt
-            (
-                new SelectionPrompt<string>()
-                    .Title($"[{theme.Primary}]{message}: [/]")                    
-                    .HighlightStyle(theme.Secondary.ToString())
-                    .AddChoices(choices)
-            );
+            var prompt = new SelectionPrompt<string>()
+                .Title($"[{theme.Primary}]{message}: [/]")
+                .HighlightStyle(theme.Secondary.ToString())
+                .AddChoices(choices);
+
+            if (pageSize is { } rows) prompt.PageSize = rows;
+
+            var selection = AnsiConsole.Prompt(prompt);
 
             AnsiConsole.MarkupLine($"[{theme.Primary}]{message}: [/][{theme.Secondary}]{selection}[/]");
 

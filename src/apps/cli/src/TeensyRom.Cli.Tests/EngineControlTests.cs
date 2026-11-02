@@ -24,7 +24,7 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Calls.Should().Equal("launch");
-        _world.Notices.Should().ContainSingle().Which.Should().Be("Starting the TeensyROM engine…");
+        _world.Notices.Should().ContainSingle().Which.Should().Be("Starting Trom API…");
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Calls.Should().BeEmpty();
-        _world.Notices.Should().ContainSingle().Which.Should().Be("Waiting for the TeensyROM engine to finish starting…");
+        _world.Notices.Should().ContainSingle().Which.Should().Be("Waiting for Trom API to finish starting…");
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Calls.Should().Equal("launch");
-        _world.Notices.Should().Equal("Waiting for the TeensyROM engine to finish starting…", "Starting the TeensyROM engine…");
+        _world.Notices.Should().Equal("Waiting for Trom API to finish starting…", "Starting Trom API…");
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeFalse();
-        ready.FailureMessage.Should().Be(@"No TeensyROM engine was found beside this CLI (looked in C:\apps\teensyrom).");
+        ready.FailureMessage.Should().Be(@"No Trom API was found beside this CLI (looked in C:\apps\teensyrom).");
         _world.Calls.Should().BeEmpty();
     }
 
@@ -191,7 +191,7 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Calls.Should().Equal("stop", "launch");
-        _world.Notices.First().Should().Be($"The running TeensyROM engine is version 0.9.0, this CLI is {FakeEngineWorld.OwnVersion} — restarting it.");
+        _world.Notices.First().Should().Be($"The running Trom API is version 0.9.0, this CLI is {FakeEngineWorld.OwnVersion} — restarting it.");
     }
 
     [Theory]
@@ -205,7 +205,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeFalse();
-        ready.FailureMessage.Should().Be("The running TeensyROM engine (version 0.9.0) can't be stopped from the CLI. Stop it where it was started, then try again.");
+        ready.FailureMessage.Should().Be("The running Trom API (version 0.9.0) can't be stopped from the CLI. Stop it where it was started, then try again.");
         _world.Calls.Should().Equal("stop");
     }
 
@@ -217,7 +217,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeFalse();
-        ready.FailureMessage.Should().StartWith("Something other than a TeensyROM engine is using port 10213").And.Contain(TeensyRomHome.EngineLogsPath);
+        ready.FailureMessage.Should().StartWith("Something other than Trom API is using port 10213").And.Contain(TeensyRomHome.EngineLogsPath);
         _world.Calls.Should().BeEmpty();
     }
 
@@ -234,7 +234,7 @@ public class EngineControlTests
 
         ready.Ok.Should().BeTrue();
         _world.Calls.Should().Equal("build", "launch", "record:head:before|Release");
-        _world.Notices.Should().Equal("Starting the TeensyROM engine…", "Building the TeensyROM engine from source…");
+        _world.Notices.Should().Equal("Starting Trom API…", "Building Trom API from source…");
         _world.CliLogsExistedAtBuild.Should().BeTrue();
     }
 
@@ -278,7 +278,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeTrue();
-        _world.Notices.First().Should().Be("The running TeensyROM engine is out of date with this source tree — restarting it.");
+        _world.Notices.First().Should().Be("The running Trom API is out of date with this source tree — restarting it.");
         _world.Calls.Should().Equal("stop", "build", "launch", "record:head:now|Release");
     }
 
@@ -293,7 +293,7 @@ public class EngineControlTests
         var ready = await _sut.EnsureRunningAsync(default);
 
         ready.Ok.Should().BeTrue();
-        _world.Notices.First().Should().Be("The running TeensyROM engine is out of date with this source tree — restarting it.");
+        _world.Notices.First().Should().Be("The running Trom API is out of date with this source tree — restarting it.");
         _world.Calls.Should().Equal("stop", "build", "launch", "record:head:same|Release");
     }
 
@@ -356,6 +356,58 @@ public class EngineControlTests
 
         _world.FingerprintReads.Should().Be(0);
         _world.Calls.Should().Equal("launch");
+    }
+
+    // ---- an engine newer than this CLI ----------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("1.0.0-beta.1")]
+    [InlineData("1.0.0")]
+    [InlineData("2.3.4+abc123")]
+    public async Task EnsureRunning_WhenAPackagedEngineIsNewerThanThisCli_AsksForANewStart_AndLeavesItRunning(string runningVersion)
+    {
+        _world.Answer = new EngineProbeResult.Engine(runningVersion);
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeFalse();
+        ready.FailureMessage.Should().Be("TeensyROM Suite was updated while this trom was open — start trom again.");
+        _world.Calls.Should().BeEmpty("a newer engine is never stopped");
+        _world.Notices.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EnsureRunning_WhenAPackagedEngineIsOlderThanThisCli_StillReplacesIt()
+    {
+        _world.Answer = new EngineProbeResult.Engine("1.0.0-alpha.7");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Should().Equal("stop", "launch");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_WhenAnEnginesVersionIsNotSemVer_FallsBackToReplacingIt()
+    {
+        _world.Answer = new EngineProbeResult.Engine("not-a-version");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Should().Equal("stop", "launch");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_FromSource_StillReplacesANewerEngine()
+    {
+        _world.Location = Source;
+        _world.Answer = new EngineProbeResult.Engine("9.0.0");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Take(3).Should().Equal("stop", "build", "launch");
     }
 
     // ---- stopping -------------------------------------------------------------------------------------------
@@ -539,7 +591,7 @@ public class EngineControlTests
         status.Version.Should().BeNull();
         status.Matches.Should().BeFalse();
         status.CliVersion.Should().Be(FakeEngineWorld.OwnVersion);
-        status.Problem.Should().Contain("No TeensyROM engine is running").And.Contain("trom device list");
+        status.Problem.Should().Contain("No Trom API is running").And.Contain("trom api start");
     }
 
     [Fact]

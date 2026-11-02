@@ -284,7 +284,7 @@ public sealed class ThemeCommandTests : IDisposable
         var exitCode = await host.RunAsync("theme", "apply", "--border", "blue");
 
         exitCode.Should().Be(0);
-        host.Consoles.StdErr.Should().Contain("Alpha's colors reached the C64, but tr-web couldn't record them");
+        host.Consoles.StdErr.Should().Contain("Alpha's colors reached the C64, but Trom API couldn't record them");
     }
 
     // ---- save --------------------------------------------------------------------------------------------------------
@@ -588,7 +588,7 @@ public sealed class ThemeCommandTests : IDisposable
 
         var human = NewHost(terminal: true);
         (await human.RunAsync("theme", "show")).Should().Be(0);
-        human.Consoles.StdErr.Should().Contain("tr-web doesn't know any TeensyROM yet.");
+        human.Consoles.StdErr.Should().Contain("Trom API doesn't know any TeensyROM yet.");
     }
 
     [Fact]

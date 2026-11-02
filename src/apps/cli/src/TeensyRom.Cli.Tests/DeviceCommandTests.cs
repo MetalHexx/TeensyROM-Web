@@ -71,13 +71,13 @@ public sealed class DeviceCommandTests : IDisposable
     [Fact]
     public async Task AnEngineCommand_WhenNoEngineCanBeReadied_FailsWithEngineUnavailable_AndNeverRuns()
     {
-        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("The TeensyROM engine didn't start."));
+        _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Failed("Trom API didn't start."));
 
         var act = () => _probeApp.RunAsync(["probe", "engine"]);
 
         var error = (await act.Should().ThrowAsync<CliException>()).Which;
         error.Code.Should().Be(CliExitCode.EngineUnavailable);
-        error.Message.Should().Be("The TeensyROM engine didn't start.");
+        error.Message.Should().Be("Trom API didn't start.");
         _probe.Ran.Should().Be(0);
     }
 

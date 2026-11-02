@@ -21,7 +21,7 @@ public sealed class StartupScenarios(SharedApiFixture api)
 
         var ready = await cli.StartAsync();
 
-        cli.Output.Should().NotContain("Starting the TeensyROM engine").And.NotContain("restarting");
+        cli.Output.Should().NotContain("Starting Trom API").And.NotContain("restarting");
 
         if (online.Count == 0)
         {

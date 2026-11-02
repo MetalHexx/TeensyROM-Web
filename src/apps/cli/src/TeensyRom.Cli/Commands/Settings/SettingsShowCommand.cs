@@ -10,12 +10,13 @@ namespace TeensyRom.Cli.Commands.Settings;
 internal sealed class SettingsShowSettings : TromSettings;
 
 /// <summary>The CLI's own settings as the settings verbs write them: <c>storage</c> as <c>sd</c> or <c>usb</c>.</summary>
-internal sealed record SettingsView(string Storage, bool AlwaysPromptStorage, bool DebugLogs)
+internal sealed record SettingsView(string Storage, bool AlwaysPromptStorage, bool DebugLogs, bool UpdateCheck)
 {
     public static SettingsView From(TeensySettings settings) => new(
         settings.StorageType.ToString().ToLowerInvariant(),
         settings.AlwaysPromptStorage,
-        settings.EnableDebugLogs);
+        settings.EnableDebugLogs,
+        settings.UpdateCheck);
 }
 
 /// <summary>
@@ -46,7 +47,8 @@ internal sealed class SettingsShowCommand(ICliOutput output, ISettingsService se
     [
         ("storage", view.Storage),
         ("alwaysPromptStorage", Bool(view.AlwaysPromptStorage)),
-        ("debugLogs", Bool(view.DebugLogs))
+        ("debugLogs", Bool(view.DebugLogs)),
+        ("updateCheck", Bool(view.UpdateCheck))
     ];
 
     private static Table ToTable(SettingsView view)
@@ -59,6 +61,7 @@ internal sealed class SettingsShowCommand(ICliOutput output, ISettingsService se
         table.AddRow(new Text("Storage Device"), new Text(view.Storage), new Text("Default value to use for your selected storage device."));
         table.AddRow(new Text("Always Prompt Storage"), new Text(Bool(view.AlwaysPromptStorage)), new Text("Determines if you're always prompted to select the storage device."));
         table.AddRow(new Text("Debug Logs Enabled"), new Text(Bool(view.DebugLogs)), new Text("Enables verbose logs for debugging."));
+        table.AddRow(new Text("Update Check"), new Text(Bool(view.UpdateCheck)), new Text("Looks up the newest release once a day and mentions it when one is out."));
 
         return table;
     }
