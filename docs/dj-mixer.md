@@ -72,7 +72,7 @@ You can adjust the key for playing track on either deck to help make tunes harmo
 
 ## Cue by Hand or Scratch
 
-If you have a pitch bend touch trip like on the [Arturia Minilab 3](https://www.arturia.com/store/midi-controllers-sequencers/minilab-3), cueing up a new track by hand is as easy as it is on vinyl or CDJ hardware.  Hold the track and let go and the record is thrown back up to the deck's speed (with adjustable grip). Yeah, you can even scratch with it!
+If you have a pitch bend touch trip like on the [Arturia Minilab 3](https://www.arturia.com/store/midi-controllers-sequencers/minilab-3), cueing up a new track by hand is as easy as it is on vinyl or CDJ hardware.  Hold, back cue, forward cue or even "throw" the tune and it will settle back to the deck's speed just like vinyl would on a real turntable. Yeah, you can even scratch with it!
 
 ## Controllers
 
