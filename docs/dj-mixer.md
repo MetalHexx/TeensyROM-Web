@@ -68,7 +68,7 @@ A set is an ordered list of tunes for a performance.
 
 ## Key match
 
-A light between the decks shows how well the keys of the two loaded tunes fit, from a full match through close and possible to a clash. It is unlit when a deck's tune has no key. Use it to judge a mix before you bring a tune in. Show keys as Camelot codes or as note names.
+You can adjust the key for playing track on either deck to help make tunes harmonically compatible for mixing. A light between the decks shows how well the keys of the two loaded tunes fit, from a full match through close and possible to a clash. It is unlit when a deck's tune has no key. Use it to judge a mix before you bring a tune in. Show keys as Camelot codes or as note names.
 
 ## Scratch
 
