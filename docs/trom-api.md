@@ -1,6 +1,6 @@
 # Trom API
 
-Trom API is the server at the heart of TeensyROM Suite. It talks to your carts, and [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) both work through it. You can also run it on its own, without the UI, to build your own client or automation.
+Trom API is the server at the heart of TeensyROM Suite. It talks to your carts, and [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) both work through it. A full database behind it tracks your files and their file and scene metadata, and powers search. You can also run it on its own, without the UI, to build your own client or automation.
 
 ## Run it
 

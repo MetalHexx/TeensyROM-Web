@@ -62,7 +62,7 @@ Plugins for other AI coding agents are coming soon.
 
 ## Trom API
 
-**Drive your cart from your own code:** launch files, search your library, copy files and set themes. It's the same API Trom UI and Trom Terminal use.
+**Drive your cart from your own code:** launch files, search your library, copy files and set themes. It's the same API Trom UI and Trom Terminal use. A full database behind it tracks your files and their file and scene metadata, and powers search.
 
 Build your own tools on it, from a quick script to a full app, in any language. Call it over HTTP, or generate a client from its OpenAPI spec.
 
