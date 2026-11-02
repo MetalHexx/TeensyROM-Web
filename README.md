@@ -66,6 +66,7 @@ Plugins for other AI coding agents are coming soon.
 
 <p align="center">
   <img src=".github/images/trom-api-docs.png" alt="Trom API documentation page" width="49%">
+  <img src=".github/images/trom-api-files.png" alt="Trom API Search Files endpoint" width="49%">
 </p>
 
 [Explore Trom API →](docs/trom-api.md)
