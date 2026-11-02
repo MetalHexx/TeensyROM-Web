@@ -1,0 +1,214 @@
+name: Package Test
+
+# Builds the release packages and installs them: through a real Homebrew install on macOS (arm64 and x64),
+# and from the tarball on Linux. Publishes nothing and needs no secrets.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/build-packages.yml'
+      - '.github/workflows/package-test.yml'
+      - '.github/workflows/release.yml'
+      - '.github/scripts/**'
+      - 'Formula/**'
+      - 'src/apps/cli/**'
+      - 'src/apps/api/src/TeensyRom.Api/**'
+      - 'src/apps/Version.props'
+      - 'src/apps/packaging/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Read version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read Version.props
+        id: read
+        run: |
+          VERSION=$(grep -o '<Version>[^<]*' src/apps/Version.props | head -n 1 | sed 's/<Version>//')
+          if [ -z "$VERSION" ]; then
+            echo "::error::No <Version> in src/apps/Version.props"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build packages
+    needs: version
+    uses: ./.github/workflows/build-packages.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      rids: '["osx-arm64","osx-x64","linux-x64"]'
+      retention-days: 1
+
+  macos:
+    name: Homebrew install (${{ matrix.rid }})
+    needs: [version, build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            rid: osx-arm64
+          - runner: macos-15-intel
+            rid: osx-x64
+
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
+      NEXT_VERSION: '999.0.0'
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      HOMEBREW_NO_ANALYTICS: '1'
+      TROM_RELEASES_URL: http://127.0.0.1:8765/releases.json
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: TeensyROM-Suite-${{ needs.version.outputs.version }}-${{ matrix.rid }}
+          path: ${{ runner.temp }}/pkg
+
+      - name: Start the fake release feed
+        run: |
+          echo "TEENSYROM_DATA_DIR=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+          FEED="$RUNNER_TEMP/feed"
+          mkdir -p "$FEED"
+          echo fake > "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.tar.gz"
+          python3 .github/scripts/fake_release_feed.py "$FEED" "$NEXT_VERSION" "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.tar.gz"
+          nohup python3 -m http.server 8765 --bind 127.0.0.1 --directory "$FEED" > "$RUNNER_TEMP/feed.log" 2>&1 &
+          curl -fsS --retry 10 --retry-delay 1 --retry-connrefused "$TROM_RELEASES_URL" > /dev/null
+
+      - name: Create a local tap with the formula
+        run: |
+          brew tap-new --no-git local/trom
+          cp Formula/teensyrom-suite.rb "$(brew --repository local/trom)/Formula/"
+
+      - name: Point the formula at the built package
+        run: |
+          ARCHIVE="$RUNNER_TEMP/pkg/TeensyROM-Suite-$VERSION-$RID.tar.gz"
+          SHA=$(shasum -a 256 "$ARCHIVE" | cut -d ' ' -f1)
+          bash .github/scripts/update-formula.sh "$(brew --repository local/trom)/Formula/teensyrom-suite.rb" \
+            "$VERSION" "$SHA" "$SHA" "file://$ARCHIVE" "file://$ARCHIVE"
+
+      - name: brew install
+        run: brew install local/trom/teensyrom-suite
+
+      - name: Smoke test the installed trom
+        run: |
+          SMOKE_NEXT_VERSION="$NEXT_VERSION" \
+            bash .github/scripts/package-smoke.sh "$(brew --prefix)/bin/trom" "$VERSION" homebrew
+
+      - name: brew test
+        run: brew test local/trom/teensyrom-suite
+
+      - name: Collect logs
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs"
+          cp -R "$TEENSYROM_DATA_DIR" "$RUNNER_TEMP/logs/home" || true
+          cp -R "$(brew --prefix)"/Cellar/teensyrom-suite/*/libexec/api/Assets/System/Logs "$RUNNER_TEMP/logs/engine-logs" || true
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-test-logs-${{ matrix.rid }}
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: ignore
+
+  linux:
+    name: Tarball install (linux-x64)
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: linux-x64
+      NEXT_VERSION: '999.0.0'
+      TROM_RELEASES_URL: http://127.0.0.1:8765/releases.json
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: TeensyROM-Suite-${{ needs.version.outputs.version }}-linux-x64
+          path: ${{ runner.temp }}/pkg
+
+      - name: Unpack package
+        run: |
+          mkdir -p "$RUNNER_TEMP/suite"
+          tar -xzf "$RUNNER_TEMP/pkg/TeensyROM-Suite-$VERSION-$RID.tar.gz" -C "$RUNNER_TEMP/suite"
+          ls -la "$RUNNER_TEMP/suite" "$RUNNER_TEMP/suite/cli"
+
+      - name: Start the fake release feed
+        run: |
+          echo "TEENSYROM_DATA_DIR=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+          FEED="$RUNNER_TEMP/feed"
+          mkdir -p "$FEED"
+          echo fake > "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.tar.gz"
+          python3 .github/scripts/fake_release_feed.py "$FEED" "$NEXT_VERSION" "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.tar.gz"
+          nohup python3 -m http.server 8765 --bind 127.0.0.1 --directory "$FEED" > "$RUNNER_TEMP/feed.log" 2>&1 &
+          curl -fsS --retry 10 --retry-delay 1 --retry-connrefused "$TROM_RELEASES_URL" > /dev/null
+
+      - name: Smoke test cli/trom
+        run: |
+          SMOKE_NEXT_VERSION="$NEXT_VERSION" \
+            bash .github/scripts/package-smoke.sh "$RUNNER_TEMP/suite/cli/trom" "$VERSION" release
+
+      - name: trom path add, status and remove
+        run: |
+          TROM="$RUNNER_TEMP/suite/cli/trom"
+          CLI_DIR="$RUNNER_TEMP/suite/cli"
+          FAKE_HOME="$RUNNER_TEMP/pathhome"
+          mkdir -p "$FAKE_HOME"
+          printf '# existing profile\nexport EXISTING=1\n' > "$FAKE_HOME/.bashrc"
+          cp "$FAKE_HOME/.bashrc" "$RUNNER_TEMP/bashrc.before"
+
+          HOME="$FAKE_HOME" SHELL=/bin/bash "$TROM" path add
+          grep -F "$CLI_DIR" "$FAKE_HOME/.bashrc"
+
+          STATUS=$(HOME="$FAKE_HOME" SHELL=/bin/bash PATH="$CLI_DIR:$PATH" "$TROM" path status --json)
+          echo "$STATUS"
+          python3 -I -c 'import sys, json; d = json.loads(sys.argv[1]); cli = sys.argv[2]; sys.exit(0 if d["onPath"] is True and any(e["folder"] == cli and not e["stale"] for e in d["entries"]) else 1)' "$STATUS" "$CLI_DIR"
+
+          HOME="$FAKE_HOME" SHELL=/bin/bash "$TROM" path remove
+          diff "$RUNNER_TEMP/bashrc.before" "$FAKE_HOME/.bashrc"
+
+      - name: Collect logs
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs"
+          cp -R "$TEENSYROM_DATA_DIR" "$RUNNER_TEMP/logs/home" || true
+          cp -R "$RUNNER_TEMP/suite/api/Assets/System/Logs" "$RUNNER_TEMP/logs/engine-logs" || true
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-test-logs-linux-x64
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: ignore
