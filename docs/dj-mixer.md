@@ -8,10 +8,22 @@ The DJ Mixer is part of Trom UI.
 
 <img width="2501" height="1227" alt="DJ Mixer with a tune loaded on each deck" src="../.github/images/dj-mixer.png" />
 
-<p align="center">
-  <a href="https://youtu.be/PjhqYkmsScg"><img src="https://img.youtube.com/vi/PjhqYkmsScg/maxresdefault.jpg" alt="SID DJ on Commodore 64 (ft. TeensyROM) - Mix Preview" width="49%"></a>
-  <a href="https://youtu.be/xoJBOEPB5IY"><img src="https://img.youtube.com/vi/xoJBOEPB5IY/maxresdefault.jpg" alt="SID DJ on Commodore 64 (ft. TeensyROM) - Scratch / Beat Juggle Preview" width="49%"></a>
-</p>
+### ▶️ Watch it on YouTube
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://youtu.be/PjhqYkmsScg"><img src="https://img.youtube.com/vi/PjhqYkmsScg/maxresdefault.jpg" alt="SID DJ on Commodore 64 (ft. TeensyROM) - Mix Preview" width="100%"></a>
+      <br>
+      <a href="https://youtu.be/PjhqYkmsScg">▶️ Mix Preview</a>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://youtu.be/xoJBOEPB5IY"><img src="https://img.youtube.com/vi/xoJBOEPB5IY/maxresdefault.jpg" alt="SID DJ on Commodore 64 (ft. TeensyROM) - Scratch / Beat Juggle Preview" width="100%"></a>
+      <br>
+      <a href="https://youtu.be/xoJBOEPB5IY">▶️ Scratch / Beat Juggle Preview</a>
+    </td>
+  </tr>
+</table>
 
 ## What you need
 
