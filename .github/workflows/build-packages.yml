@@ -44,9 +44,10 @@ jobs:
         with:
           version: 9
 
-      # `src/package.json` depends on @sidablist/core and @sidablist/asid via relative file:/link:
-      # paths (../../SIDablist/libs/{core,asid}), so a standalone checkout of this repo alone cannot
-      # resolve them. A tag is not a branch, so a release falls back to SIDablist's main.
+      # `src/package.json` depends on the @sidablist/* libraries via relative file:/link: paths
+      # (../../SIDablist/libs/*), so a standalone checkout of this repo alone cannot resolve them.
+      # SIDablist's root build builds every library. A tag is not a branch, so a release falls back
+      # to SIDablist's main.
       - name: Determine SIDablist ref to check out
         id: sidablist-ref
         working-directory: ${{ github.workspace }}
