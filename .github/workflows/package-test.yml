@@ -1,7 +1,7 @@
 name: Package Test
 
 # Builds the release packages and installs them: through a real Homebrew install on macOS (arm64 and x64),
-# and from the tarball on Linux. Publishes nothing and needs no secrets.
+# from the tarball on Linux and from the zip on Windows. Publishes nothing and needs no secrets.
 
 on:
   pull_request:
@@ -52,7 +52,7 @@ jobs:
     uses: ./.github/workflows/build-packages.yml
     with:
       version: ${{ needs.version.outputs.version }}
-      rids: '["osx-arm64","osx-x64","linux-x64"]'
+      rids: '["win-x64","osx-arm64","osx-x64","linux-x64"]'
       retention-days: 1
 
   macos:
@@ -210,5 +210,123 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: package-test-logs-linux-x64
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: ignore
+
+  windows:
+    name: Zip install (win-x64)
+    needs: [version, build]
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: win-x64
+      NEXT_VERSION: '999.0.0'
+      TROM_RELEASES_URL: http://127.0.0.1:8765/releases.json
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: TeensyROM-Suite-${{ needs.version.outputs.version }}-win-x64
+          path: ${{ runner.temp }}/pkg
+
+      - name: Unpack package
+        shell: pwsh
+        run: |
+          $suite = Join-Path $env:RUNNER_TEMP 'suite'
+          Expand-Archive -Path (Join-Path $env:RUNNER_TEMP "pkg\TeensyROM-Suite-${env:VERSION}-win-x64.zip") -DestinationPath $suite
+          Get-ChildItem $suite, (Join-Path $suite 'cli')
+          foreach ($exe in 'api\TeensyRom.Api.exe', 'cli\trom.exe') {
+            if (-not (Test-Path (Join-Path $suite $exe))) { throw "$exe is missing from the package" }
+          }
+          $dataDir = Join-Path $env:RUNNER_TEMP 'home'
+          New-Item -ItemType Directory -Force $dataDir | Out-Null
+          "TEENSYROM_DATA_DIR=$dataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # The feed server and the smoke test share one step: a background process does not reliably outlive its step on Windows.
+      - name: Smoke test cli/trom.exe against the fake release feed
+        shell: bash
+        run: |
+          PY=""
+          for candidate in python3 python; do
+            if command -v "$candidate" > /dev/null 2>&1 \
+              && "$candidate" -c 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)' > /dev/null 2>&1; then
+              PY=$candidate
+              break
+            fi
+          done
+          [ -n "$PY" ] || { echo "::error::No working Python 3"; exit 1; }
+
+          FEED="$RUNNER_TEMP/feed"
+          mkdir -p "$FEED"
+          echo fake > "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.zip"
+          "$PY" .github/scripts/fake_release_feed.py "$FEED" "$NEXT_VERSION" "$FEED/TeensyROM-Suite-$NEXT_VERSION-$RID.zip"
+
+          "$PY" -m http.server 8765 --bind 127.0.0.1 --directory "$FEED" > "$RUNNER_TEMP/feed.log" 2>&1 &
+          FEED_PID=$!
+          trap 'kill -f "$FEED_PID" > /dev/null 2>&1 || true' EXIT
+
+          curl -fsS --retry 10 --retry-delay 1 --retry-connrefused "$TROM_RELEASES_URL" > /dev/null
+
+          SMOKE_NEXT_VERSION="$NEXT_VERSION" \
+            bash .github/scripts/package-smoke.sh "$RUNNER_TEMP/suite/cli/trom.exe" "$VERSION" release
+
+      - name: trom path add, status and remove
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cli = Join-Path $env:RUNNER_TEMP 'suite\cli'
+          $trom = Join-Path $cli 'trom.exe'
+
+          function Invoke-Trom {
+            & $trom @args
+            if ($LASTEXITCODE -ne 0) { throw "trom $args exited with $LASTEXITCODE" }
+          }
+          function Get-UserPath {
+            $value = [Environment]::GetEnvironmentVariable('Path', 'User')
+            if ($null -eq $value) { '' } else { $value }
+          }
+          function Test-Folder($folder) { $folder.TrimEnd('\') -ieq $cli.TrimEnd('\') }
+
+          $before = Get-UserPath
+          Write-Host "User PATH before: $before"
+
+          Invoke-Trom path add
+          $afterAdd = Get-UserPath
+          Write-Host "User PATH after add: $afterAdd"
+          if (-not ($afterAdd -split ';' | Where-Object { $_ -and (Test-Folder $_) })) { throw "$cli is not on the user PATH after path add" }
+
+          $env:Path = "$cli;$env:Path"
+          $json = (Invoke-Trom path status --json) -join "`n"
+          Write-Host $json
+          $status = $json | ConvertFrom-Json
+          if ($status.onPath -ne $true) { throw 'path status: onPath is not true' }
+          if (-not ($status.entries | Where-Object { (Test-Folder $_.folder) -and -not $_.stale })) { throw "path status: no fresh entry for $cli" }
+
+          Invoke-Trom path remove
+          $afterRemove = Get-UserPath
+          Write-Host "User PATH after remove: $afterRemove"
+          if ($afterRemove -cne $before) { throw 'The user PATH differs from its value before path add' }
+
+      - name: Collect logs
+        if: failure()
+        shell: pwsh
+        run: |
+          $logs = Join-Path $env:RUNNER_TEMP 'logs'
+          New-Item -ItemType Directory -Force $logs | Out-Null
+          Copy-Item -Recurse -ErrorAction SilentlyContinue $env:TEENSYROM_DATA_DIR (Join-Path $logs 'home')
+          Copy-Item -Recurse -ErrorAction SilentlyContinue (Join-Path $env:RUNNER_TEMP 'suite\api\Assets\System\Logs') (Join-Path $logs 'engine-logs')
+          Copy-Item -ErrorAction SilentlyContinue (Join-Path $env:RUNNER_TEMP 'feed.log') $logs
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-test-logs-win-x64
           path: ${{ runner.temp }}/logs
           if-no-files-found: ignore

@@ -7,6 +7,7 @@
 # TROM_RELEASES_URL must point at a feed (fake_release_feed.py) so `update --check` has one to read;
 # SMOKE_NEXT_VERSION, when set, is the version that feed offers.
 # TEENSYROM_DATA_DIR should point at a scratch folder.
+# Also runs under Git Bash on Windows, with <trom> the path to trom.exe.
 set -euo pipefail
 
 [[ $# -ge 2 && $# -le 3 ]] || { sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 2; }
@@ -29,6 +30,8 @@ for candidate in python3 python; do
   fi
 done
 [[ -n "$py" ]] || { echo "Python 3 is required." >&2; exit 2; }
+# Windows Python decodes stdin with the ANSI code page unless told otherwise.
+export PYTHONUTF8=1
 
 stopped=false
 cleanup() {
@@ -40,6 +43,9 @@ trap cleanup EXIT
 
 step() { echo; echo "== $*"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# trom <args>, with the CR that trom.exe writes before each LF removed.
+trom_out() { "$trom" "$@" | tr -d '\015'; }
 
 # json_assert <json> <python expression over d> <description>
 json_assert() {
@@ -54,14 +60,14 @@ else
 fi
 
 step "trom --version"
-output="$("$trom" --version)"
+output="$(trom_out --version)"
 first="${output%%$'\n'*}"
 first="${first%$'\r'}"
 echo "$first"
 [[ "$first" == "trom $version" ]] || fail "--version printed '$first', expected 'trom $version'"
 
 step "trom api start --json"
-out="$("$trom" api start --json)"
+out="$(trom_out api start --json)"
 echo "$out"
 json_assert "$out" "d['running'] is True and d['version'] == '$version' and d['matches'] is True" "Trom API did not start at $version"
 
@@ -76,18 +82,18 @@ echo "$headers"
 printf '%s' "$headers" | grep -qi '^content-type:.*text/html' || fail "Trom UI was not served as text/html"
 
 step "trom ui --no-open --json"
-out="$("$trom" ui --no-open --json)"
+out="$(trom_out ui --no-open --json)"
 echo "$out"
 json_assert "$out" "d['available'] is True and d['opened'] is False" "Trom UI is not available"
 
 step "trom init --json"
-out="$("$trom" init --json)"
+out="$(trom_out init --json)"
 echo "$out"
 json_assert "$out" "d['engine']['running'] is True and d['webUi']['available'] is True" "init does not show Trom API and Trom UI up"
 json_assert "$out" "d['update']['installed'] == '$version' and d['update']['installKind'] in $kinds" "init reports the wrong install"
 
 step "trom update --check --json"
-out="$("$trom" update --check --json)"
+out="$(trom_out update --check --json)"
 echo "$out"
 json_assert "$out" "d['installed'] == '$version' and d['available'] is True and d['installKind'] in $kinds" "update --check did not find the fake release"
 if [[ -n "${SMOKE_NEXT_VERSION:-}" ]]; then
@@ -95,12 +101,12 @@ if [[ -n "${SMOKE_NEXT_VERSION:-}" ]]; then
 fi
 
 step "trom api status --json"
-out="$("$trom" api status --json)"
+out="$(trom_out api status --json)"
 echo "$out"
 json_assert "$out" "d['running'] is True" "Trom API is not running"
 
 step "trom api stop --json"
-out="$("$trom" api stop --json)"
+out="$(trom_out api stop --json)"
 echo "$out"
 stopped=true
 json_assert "$out" "d['outcome'] == 'stopped'" "Trom API did not stop"
