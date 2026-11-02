@@ -70,9 +70,9 @@ A set is an ordered list of tunes for a performance.
 
 You can adjust the key for playing track on either deck to help make tunes harmonically compatible for mixing. A light between the decks shows how well the keys of the two loaded tunes fit, from a full match through close and possible to a clash. It is unlit when a deck's tune has no key. Use it to judge a mix before you bring a tune in. Show keys as Camelot codes or as note names.
 
-## Scratch
+## Cue by Hand or Scratch
 
-Scratch a deck's record from your MIDI controller. Let go and the record is thrown back up to the deck's speed.
+If you have a pitch bend touch trip like on the [Arturia Minilab 3](https://www.arturia.com/store/midi-controllers-sequencers/minilab-3), cueing up a new track by hand is as easy as it is on vinyl or CDJ hardware.  Hold the track and let go and the record is thrown back up to the deck's speed (with adjustable grip). Yeah, you can even scratch with it!
 
 ## Controllers
 
