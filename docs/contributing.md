@@ -23,7 +23,7 @@ This page builds the suite from source. If you only want to use it, [get started
 7. Run `trom ui`. It builds Trom API from the same checkout on first use, starts it, and opens Trom UI at [http://localhost:10213](http://localhost:10213).
 
 The installs and builds can take a few minutes, especially the first `trom ui`.
-A source build updates through git, not `trom update`: `git pull` in both repos and repeat the build steps.
+To update a source build, `git pull` in both repos and repeat the build steps.
 
 ## Working on the code
 

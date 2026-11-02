@@ -73,8 +73,8 @@ class TeensyromSuite < Formula
 
       Trom UI and Trom Terminal keep their data in ~/.teensyrom.
 
-      Note: First launch may require granting permissions in
-      System Preferences > Privacy & Security.
+      macOS may block the first launch: open System Settings >
+      Privacy & Security and choose Open Anyway.
     EOS
   end
 

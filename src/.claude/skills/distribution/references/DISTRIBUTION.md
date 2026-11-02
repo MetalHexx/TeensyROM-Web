@@ -101,7 +101,7 @@ cli/
 
 ## 🔄 Updating
 
-`trom update` runs inside `trom` (`CLI/Update/`); there is no second updater executable. `--check` only looks, `--yes` skips the confirmation (without a terminal, `--yes` is required).
+`trom update` runs inside `trom` (`src/apps/cli/src/TeensyRom.Cli/Update/`); there is no second updater executable. `--check` only looks, `--yes` skips the confirmation (without a terminal, `--yes` is required).
 
 **Release feed**: `https://api.github.com/repos/MetalHexx/TeensyROM-Suite/releases?per_page=30`, sent with `User-Agent: trom/<version>`. Drafts and non-SemVer tags are dropped. The hidden env var `TROM_RELEASES_URL` replaces the URL, and plain `http` is accepted only through it (the fake feed in package-test and `release-local`). A rate limit (403 with none left, or 429) is reported as such.
 
@@ -116,8 +116,9 @@ cli/
 | Release (packaged, outside a Homebrew `Cellar`) | Replaces the install in place, as below |
 | Homebrew (packaged, path has a `/Cellar/` segment) | Stops the engine, runs `<prefix>/bin/brew update` and `brew upgrade teensyrom-suite`, verifies `<prefix>/bin/trom --version`, restarts the engine. Says so when Homebrew doesn't offer the new version yet |
 | Source | Refused, pointing to `docs/contributing.md` |
+| Unknown (no packaged or source engine found) | Refused, pointing to the releases page |
 
-**Release install, in order**: take `.trom-update/update.lock`; check disk space; download and verify into `<root>/.trom-update/`; extract to `staging/` (zip-slip refused; tar links and devices refused) and check `README.txt`, `api/<exe>`, `api/appsettings.json`, `api/wwwroot/index.html`, `cli/<trom>`; probe `staging/cli/trom --version` (must print `trom <release version>`); stop the engine (an engine started by another app that can't be stopped from the CLI refuses the update); swap (it targets the install's CLI folder; before anything new is written, `ApplyAsync` runs `Recover` on any earlier half-finished update), then restart the engine through the new `<root>/cli/trom` if it was running. The working folder is on the same volume as the install so moves are renames.
+**Release install, in order**: take `.trom-update/update.lock`; `Recover` any earlier half-finished update and clear the old `download/`, `staging/`, `backup/` and journal (`UpdateRunner.PrepareUpdateFolder`), before anything new is written; check disk space (`EnsureSpace`, in `StageAsync`); download and verify into `<root>/.trom-update/`; extract to `staging/` (zip-slip refused; tar links and devices refused) and check `README.txt`, `api/<exe>`, `api/appsettings.json`, `api/wwwroot/index.html`, `cli/<trom>`; probe `staging/cli/trom --version` (must print `trom <release version>`); stop the engine (an engine started by another app that can't be stopped from the CLI refuses the update); swap (it targets the install's CLI folder), then restart the engine through the new `<root>/cli/trom` if it was running. The working folder is on the same volume as the install so moves are renames.
 
 **The swap** is journaled (`.trom-update/journal.json`, flushed after every step): `api/` and `README.txt` move to `backup/`, the running `trom` is renamed to `trom[.exe].old` (Windows will not overwrite a running exe), staged entries move in, then commit. Moves retry with backoff for about 15 s (Defender, the search indexer). Any failure rolls back in reverse, restarts the old engine if it was running and throws. After a crash, the next `trom` run finishes the rollback from an uncommitted journal, and removes leftovers (`backup/`, `staging/`, `download/`, `cli/*.old`) quietly.
 
@@ -537,7 +538,7 @@ Approximate sizes of the single-file `trom` (self-contained, uncompressed):
 The engine and the archives have not been re-measured since the layout change, so no figures are given for them; measure a package from `package.sh assemble` or a release when you need them. Most of the engine is the bundled .NET 9 runtime, plus the Angular build, application assemblies and embedded assets (SID database, images).
 
 **Compression**:
-- Single-file publish of the engine uses compression (`EnableCompressionInSingleFile`); the CLI's single file is not compressed
+- The engine's single file is compressed (`EnableCompressionInSingleFile`) on every RID except `osx-*`, where the engine is not published as a single file; the CLI's single file is not compressed
 - Archive formats use standard compression (gzip for tar.gz, deflate for zip)
 
 ### Archive Contents
@@ -632,7 +633,7 @@ https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-
 
 ### How do I test changes locally before creating a release?
 
-Follow the **Local Testing** section above. Build frontend, run API, test publish command for your platform.
+Use the `release-local` skill.
 
 ### Can I create a release without updating the Homebrew formula?
 
@@ -641,7 +642,7 @@ Not with the current workflow. The `update-formula` job has no `if:`, so every t
 ### What if the workflow fails?
 
 1. Check job logs in GitHub Actions
-2. Test locally using publish commands from **Local Testing** section
+2. Test locally with the `release-local` skill
 3. Common issues: frontend build errors, missing dependencies, version mismatches
 4. Fix issues, delete failed tag, push corrected tag
 

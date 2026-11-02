@@ -60,7 +60,7 @@ If `init` shows no engine or no device online, go straight to `references/doctor
 - DJ Mixer, two SID decks played live: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/dj-mixer.md
 - Trom Terminal, the command line and its menu: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-terminal.md
 - Trom Agent, this companion: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-agent.md
-- Trom API, running it on its own: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-api.md
+- Trom API, to start and stop it and build your own tools on it: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/trom-api.md
 - Contributing, to build from source: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md
 - The TeensyROM community on Discord, for support and chat with real people: https://discord.com/invite/ubSAb74S5U
 

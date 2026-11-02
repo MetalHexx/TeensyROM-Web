@@ -263,14 +263,12 @@ pnpm nx build teensyrom-ui --configuration=production
 ## Project-Specific Notes
 
 ### Known Limitations
-- **Windows Only**: Currently Windows-exclusive (future: cross-platform)
 - **Code Signing**: Unsigned executable causes security warnings
 - **Hardware Required**: Full functionality requires TeensyROM hardware
 - **Large Collections**: HVSC indexing performance with massive libraries
 
 ### Future Roadmap
 - **Cross-platform Support**: macOS and Linux compatibility
-- **Auto-updater**: Seamless application updates
 - **Plugin Architecture**: Extensible third-party integrations
 - **Mobile Companion**: Remote control capabilities
 - **Enhanced Metadata**: Expanded content information

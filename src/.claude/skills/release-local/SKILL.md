@@ -177,7 +177,7 @@ cd <unpacked>/api
    - `trom update --check --json` reports `{installed, latest, available, installKind, checkedAt}` with `available: true`, and changes nothing.
    - `trom update --json` with no terminal and no `--yes` exits 2.
    - A feed with `--digest wrong` or `none`: the update is refused (exit 1) and the install is unchanged.
-   - `trom update --yes --json`: the engine is stopped, `api/`, `cli/` and `README.txt` are swapped, and the new `trom` restarts the engine if it was running. The output carries `updated: true`, `from`, `to`, `engineWasRunning` and `engineRestarted`. On Windows the running exe is renamed to `trom.exe.old` and removed by the next `trom` run; `<root>/.trom-update/` is gone afterwards.
+   - `trom update --yes --json`: the engine is stopped, `api/`, `cli/` and `README.txt` are swapped, and the new `trom` restarts the engine if it was running. The output carries `updated: true`, `from`, `to`, `engineWasRunning` and `engineRestarted`. The running `trom` is renamed aside on every platform (`trom.exe.old` on Windows, `trom.old` on macOS and Linux; `.<n>.old` if that name is taken) and removed by the next `trom` run; `<root>/.trom-update/` is gone afterwards.
    - Holding a file in `api/` open with `FileShare.None` makes the swap fail; it rolls back and the old engine runs again.
 6. Afterwards `trom --version` shows the newer version and `trom api status` agrees. Finish with `trom api stop`, stop the feed server and delete the scratch folders.
 

@@ -12,7 +12,7 @@ The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-term
 
 1. Unpack the archive into a folder. It holds `api/` (Trom API and Trom UI) and `cli/` (`trom`).
 2. Run `cli/trom ui` (`cli\trom ui` on Windows) to start the suite and [open Trom UI](#open-trom-ui).
-3. Run `cli/trom path add` once (`cli\trom path add` on Windows) to put `trom` on your PATH, then open a new terminal.
+3. Say yes when `trom` offers to put itself on your PATH, then open a new terminal. `cli/trom path add` (`cli\trom path add` on Windows) does the same later.
 
 Windows may show a security warning the first time: choose "More info", then "Run anyway". Windows Firewall asks the first time Trom API starts: allow Private networks so phones and tablets can connect.
 

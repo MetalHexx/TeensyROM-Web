@@ -6,15 +6,15 @@ Start
   and prints the addresses other devices on your network can use.
 
 Put trom on your PATH
-  cli/trom path add
-  Open a new terminal afterwards.
+  Say yes when trom offers to put itself on your PATH, then open a
+  new terminal. cli/trom path add does the same later.
 
 Commands
-  trom                     guided menu
-  trom ui                  open Trom UI
-  trom api status|stop     check on or stop Trom API
-  trom update              update to the newest release
-  trom --help              every command
+  trom                         guided menu
+  trom ui                      open Trom UI
+  trom api start|status|stop   start, check on or stop Trom API
+  trom update                  update to the newest release
+  trom --help                  every command
 
 Folders
   api/   Trom API (TeensyRom.Api), appsettings.json, Trom UI (wwwroot), Assets

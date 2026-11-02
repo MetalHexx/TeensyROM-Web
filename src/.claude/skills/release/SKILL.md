@@ -19,7 +19,7 @@ This skill automates the TeensyROM Suite release process by bumping the version,
 
 - The GitHub repo is named `TeensyROM-Suite`. The formula, the docs and `trom update` all read `MetalHexx/TeensyROM-Suite`, so rename before the first suite release.
 - The release PR is merged to `main` (for `1.0.0-beta.1`, PR #93).
-- The `Package Test` workflow (`.github/workflows/package-test.yml`) is green on the commit being tagged. It builds the packages and installs them: a real Homebrew install on macOS (arm64 and x64) and a tarball install on Linux, both smoke-tested with `.github/scripts/package-smoke.sh`.
+- The `Package Test` workflow (`.github/workflows/package-test.yml`) is green on the commit being tagged. It builds the packages and installs them: a real Homebrew install on macOS (arm64 and x64) and a tarball install on Linux, both smoke-tested with `.github/scripts/package-smoke.sh`. It runs only on `pull_request` and `workflow_dispatch`, so after the version bump lands on main, run `gh workflow run package-test.yml --ref main` and wait for it to pass before tagging.
 - The tag equals `<Version>` in `src/apps/Version.props`. The `validate` job of `release.yml` fails otherwise.
 
 ## Process

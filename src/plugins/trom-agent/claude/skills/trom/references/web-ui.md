@@ -7,6 +7,7 @@ The web UI is the visual front of the same engine `trom` talks to. Whatever the 
 1. When `capabilities` lists `ui`, run `trom ui --json`. It starts Trom API if needed, opens the web UI in the browser and reports `address`, `networkAddresses`, `available`, `opened`, `problem` and `openFailure`. Say `address` in your reply so the user can reuse it.
    - `opened` false with an `openFailure` (no browser on this machine, a remote session): give the user `address` to open themselves. Exit 0.
    - `available` false (exit 1): go to "When it isn't served" below.
+   - Exit 3: Trom API couldn't start. Relay the error and go to `references/doctor.md`.
 2. Without `ui` in `capabilities`: check `init`'s `webUi.available`. When it is false, go to "When it isn't served" below. Otherwise open `webUi.address` with the OS opener (`start` / `open` / `xdg-open`) and say the address in your reply.
 3. Offer the tour once: "Want a quick tour of what it can do?" Don't recite it unasked.
 
@@ -25,7 +26,7 @@ Give the headline list below, one line each, then ask which one the user wants m
 
 ## When it isn't served
 
-`init`'s `problems` names the cause; relay it in plain words. Then classify the install the way "Update" in `references/install.md` does:
+The cause is in `problems` from `init`, or `problem` from `trom ui --json`; relay it in plain words. Then classify the install by `installKind` from `trom update --check --json`. For a `trom` without `update`, classify it the way "Manual update" step 1 in `references/install.md` does:
 
 - **Release or Homebrew install:** the web UI ships inside the suite, so a missing one means a damaged or partial install. Relay the problem, then offer the reinstall or update from `references/install.md`. Afterwards run `trom engine stop`, then `trom init --json`, and check `webUi.available` again.
 - **Source build:** point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md and change nothing.

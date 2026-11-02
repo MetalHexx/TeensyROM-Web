@@ -24,7 +24,7 @@ New here? [Getting started](getting-started.md) covers installing the suite and 
 
 Run `trom` on its own and follow the prompts. The menu reaches everything above, and it prints a line whenever a transfer starts or ends, whether a watch folder or another app started it.
 
-"Open Trom UI" opens Trom UI in your browser and prints the addresses your phone or tablet can use. When a new release is out, the menu says so under the logo and adds an "Update to" entry for it.
+"Open Trom UI" does what [`trom ui`](#trom-ui-trom-api-and-updates) does. When a new release is out, the menu says so under the logo and adds an "Update to" entry for it.
 
 ## Stream Player
 
@@ -136,4 +136,4 @@ Read more in the [TeensyROM ASID player documentation](https://github.com/Sensor
 
 - [Trom UI](trom-ui.md): the same library in your browser.
 - [Trom Agent](trom-agent.md): ask for all of this in plain words from Claude Code.
-- [Trom API](trom-api.md): run the API without the UI.
+- [Trom API](trom-api.md): start and stop Trom API, and build your own tools on it.
