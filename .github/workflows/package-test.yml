@@ -311,7 +311,9 @@ jobs:
           Invoke-Trom path remove
           $afterRemove = Get-UserPath
           Write-Host "User PATH after remove: $afterRemove"
-          if ($afterRemove -cne $before) { throw 'The user PATH differs from its value before path add' }
+          # Empty entries (a trailing ';') mean nothing to Windows and aren't kept, so compare the real entries.
+          function Get-Entries($value) { ($value -split ';' | Where-Object { $_ -ne '' }) -join ';' }
+          if ((Get-Entries $afterRemove) -cne (Get-Entries $before)) { throw 'The user PATH entries differ from their value before path add' }
 
       - name: Collect logs
         if: failure()
