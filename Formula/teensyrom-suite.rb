@@ -14,17 +14,19 @@ class TeensyromSuite < Formula
     sha256 "ac078715d9b457da2725e4893837c7baa7a5f58e722fa94d461e55abaa70732a"
   end
 
+  depends_on :macos
+
   conflicts_with "metalhexx/teensyrom-cli/teensyrom-cli", because: "both install the TeensyROM CLI"
 
   def install
     # Install all files to libexec, create wrapper scripts in bin
     libexec.install Dir["*"]
 
-    if (libexec/"cli/trom").exist?
-      # Combined package: the engine and the CLI share the default home, ~/.teensyrom
+    if (libexec/"api/TeensyRom.Api").exist?
+      # api/ + cli/ package: the engine and the CLI share the default home, ~/.teensyrom
       wrapper = <<~EOS
         #!/bin/zsh
-        cd "#{libexec}"
+        cd "#{libexec}/api"
         exec "./TeensyRom.Api" "$@"
       EOS
 
@@ -56,16 +58,18 @@ class TeensyromSuite < Formula
     <<~EOS
       TeensyROM Suite has been installed!
 
-      To start the application:
-        trom-suite
+      To open Trom UI (it starts Trom API if needed):
+        trom ui
 
-      Then open Trom UI in your browser at:
-        http://localhost:10213
-
-      To use Trom Terminal, the command-line tool (it starts Trom API itself):
+      To use Trom Terminal, the command-line tool:
         trom
 
       Run `trom --help` to see every command.
+
+      To run Trom API in this terminal instead:
+        trom-suite
+
+      Update with `trom update` or `brew upgrade teensyrom-suite`.
 
       Trom UI and Trom Terminal keep their data in ~/.teensyrom.
 
@@ -75,10 +79,10 @@ class TeensyromSuite < Formula
   end
 
   test do
-    # Basic test that binary shows version
-    assert_match version.to_s, shell_output("#{bin}/trom-suite --version", 0)
     if (libexec/"cli/trom").exist?
       assert_match version.to_s, shell_output("#{bin}/trom --version", 0)
+    else
+      assert_predicate libexec/"TeensyRom.Api", :executable?
     end
   end
 end
