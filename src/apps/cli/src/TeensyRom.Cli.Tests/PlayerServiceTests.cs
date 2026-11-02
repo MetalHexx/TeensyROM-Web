@@ -1690,6 +1690,7 @@ namespace TeensyRom.Cli.Tests
             var currentFile = CreateFile<SongItem>("/music/2.sid");
             SeedStorageDirectory([CreateFile<SongItem>("/music/1.sid"), currentFile, CreateFile<SongItem>("/music/3.sid")]);
             var playerService = _fixture.Create<PlayerService>();
+            playerService.AnnounceBusyRefusals = true;
             playerService.SetDirectoryMode("/music/");
             await playerService.LaunchFromDirectory(currentFile.Path);
             _launchService.ClearReceivedCalls();

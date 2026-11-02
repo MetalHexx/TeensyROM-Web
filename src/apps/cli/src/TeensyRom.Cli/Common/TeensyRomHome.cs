@@ -44,6 +44,9 @@ internal static class TeensyRomHome
     /// <summary>What each device last launched and how its player was set, so one <c>trom</c> run can carry on from the last.</summary>
     public static string LastLaunchPath => Path.Combine(CliPath, "last-launch.json");
 
+    /// <summary>The newest release the last lookup found, and when it was looked up and announced.</summary>
+    public static string ReleaseCheckPath => Path.Combine(CliPath, "release-check.json");
+
     /// <summary>
     /// Pins a relative <c>TEENSYROM_DATA_DIR</c> to its absolute path in this process, so an engine started from
     /// another working directory resolves the same home and lock. Does nothing when the variable is unset.
