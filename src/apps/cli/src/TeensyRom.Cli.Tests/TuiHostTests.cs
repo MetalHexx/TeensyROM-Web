@@ -1,12 +1,16 @@
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Spectre.Console;
+using NSubstitute.ExceptionExtensions;
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Engine;
+using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Tests.Update;
 using TeensyRom.Cli.Themes;
+using TeensyRom.Cli.Update;
 using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Tests;
@@ -22,6 +26,8 @@ public sealed class TuiHostTests : IDisposable
     private const int Devices = 4;
     private const int Theme = 5;
     private const int Leave = 9;
+    private const int UpdateEntry = 9;
+    private const int LeaveAfterUpdateEntry = 10;
 
     private readonly IThemeService _themes = Substitute.For<IThemeService>();
     private readonly IWebUiProbe _webUi = Substitute.For<IWebUiProbe>();
@@ -68,7 +74,105 @@ public sealed class TuiHostTests : IDisposable
                 at.Should().BeGreaterThan(previous, $"{label} comes after the entry before it");
                 return at;
             });
-        screen.Should().NotContain("Stop Engine");
+        screen.Should().NotContain("Stop Engine").And.NotContain("Update to").And.NotContain("`trom update`");
+    }
+
+    // ---- the update entry -----------------------------------------------------------------------------------
+
+    private static readonly UpdateStatus NewerRelease = new("1.0.0-beta.1", "1.0.0-beta.2", true, InstallKind.Release, null);
+
+    private void ANewerReleaseWasFound()
+    {
+        _host.ReleaseCheck.CachedStatus = NewerRelease;
+        _host.Updates.CheckAsync(Arg.Any<CancellationToken>()).Returns(new UpdateCheckResult(
+            NewerRelease,
+            ReleaseSelectorTests.Release("v1.0.0-beta.2", true, "win-x64"),
+            new ReleaseAsset("TeensyROM-Suite-1.0.0-beta.2-win-x64.zip", "https://example.test/a.zip", 1000, "sha256:" + new string('a', 64))));
+    }
+
+    private void TheUpdateAnswers(UpdateApplied applied) =>
+        _host.Updates.ApplyAsync(Arg.Any<UpdateCheckResult>(), Arg.Any<Action<string>>(), Arg.Any<IProgress<DownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns(applied);
+
+    [Fact]
+    public async Task WhenANewerReleaseIsKnown_TheLogoLineAndTheEntryJustBeforeLeaveAppear_WithoutLookingAnythingUp()
+    {
+        ANewerReleaseWasFound();
+        Pick(LeaveAfterUpdateEntry);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        var screen = Screen;
+        var sentence = screen.IndexOf("TeensyROM Suite 1.0.0-beta.2 is out (you have 1.0.0-beta.1). Run `trom update`.", StringComparison.Ordinal);
+        sentence.Should().BeGreaterThan(-1);
+        sentence.Should().BeLessThan(screen.IndexOf("Choose wisely", StringComparison.Ordinal), "the line sits under the logo, above the first prompt");
+        screen.IndexOf("Update to 1.0.0-beta.2", StringComparison.Ordinal).Should().BeInRange(screen.IndexOf("Settings", StringComparison.Ordinal), screen.IndexOf("Leave", StringComparison.Ordinal));
+        _host.ReleaseCheck.Refreshes.Should().Be(0, "the menu draws from what is cached and never waits for the network");
+    }
+
+    [Fact]
+    public async Task TheUpdateEntry_AsksFirst_Installs_AndClosesTheMenuWithoutAnEngine()
+    {
+        ANewerReleaseWasFound();
+        TheUpdateAnswers(new UpdateApplied("1.0.0-beta.1", "1.0.0-beta.2", false, false, null));
+        Pick(UpdateEntry);
+        Pick(0);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0, _host.Consoles.StdErr);
+        await _host.Updates.Received(1).ApplyAsync(Arg.Any<UpdateCheckResult>(), Arg.Any<Action<string>>(), Arg.Any<IProgress<DownloadProgress>?>(), Arg.Any<CancellationToken>());
+        Screen.Should().Contain("Update TeensyROM Suite from 1.0.0-beta.1 to 1.0.0-beta.2?").And.Contain("Updated TeensyROM Suite from 1.0.0-beta.1 to 1.0.0-beta.2.")
+            .And.Contain("run `trom` again to use TeensyROM Suite 1.0.0-beta.2");
+        await _host.Engine.DidNotReceiveWithAnyArgs().EnsureRunningAsync(default);
+        _host.TransferLines.Disposals.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TheUpdateEntry_WhenDeclined_InstallsNothing_AndTheMenuStaysOpen()
+    {
+        ANewerReleaseWasFound();
+        Pick(UpdateEntry);
+        Pick(1);
+        Pick(LeaveAfterUpdateEntry);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        await _host.Updates.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default!, default, default);
+        Screen.Should().Contain("Cancelled; nothing was changed.");
+    }
+
+    [Fact]
+    public async Task TheUpdateEntry_WhenTheUpdateFails_ShowsWhy_AndTheMenuStaysOpen()
+    {
+        ANewerReleaseWasFound();
+        _host.Updates.ApplyAsync(Arg.Any<UpdateCheckResult>(), Arg.Any<Action<string>>(), Arg.Any<IProgress<DownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new CliException(CliExitCode.Failed, "Another trom update is already running."));
+        Pick(UpdateEntry);
+        Pick(0);
+        Pick(LeaveAfterUpdateEntry);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        Screen.Should().Contain("Another trom update is already running.");
+    }
+
+    [Fact]
+    public async Task TheUpdateEntry_WhenTheLookupNowFindsNothing_SaysSo_AndTheMenuStaysOpen()
+    {
+        ANewerReleaseWasFound();
+        _host.Updates.CheckAsync(Arg.Any<CancellationToken>()).Returns(new UpdateCheckResult(NewerRelease with { Latest = "1.0.0-beta.1", Available = false }, null, null));
+        Pick(UpdateEntry);
+        Pick(LeaveAfterUpdateEntry);
+
+        var exitCode = await RunMenu();
+
+        exitCode.Should().Be(0);
+        Screen.Should().Contain("TeensyROM Suite 1.0.0-beta.1 is the newest release.");
+        await _host.Updates.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default!, default, default);
     }
 
     private static ThemeDto FactoryTheme() => new()

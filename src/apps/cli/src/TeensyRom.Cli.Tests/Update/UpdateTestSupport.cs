@@ -216,6 +216,7 @@ internal sealed class FakeProcessRunner(Func<string, IReadOnlyList<string>, Proc
     public static ProcessResult Ok(string stdout = "") => new(0, stdout, string.Empty);
 }
 
+/// <summary>A release check that has never looked anything up, on a source build: <see cref="CachedStatus"/> is what it knows.</summary>
 internal sealed class FakeReleaseCheck : IReleaseCheck
 {
     public UpdateStatus? CachedStatus { get; set; }
@@ -243,7 +244,7 @@ internal sealed class FakeReleaseCheck : IReleaseCheck
     public async Task<UpdateStatus> CurrentAsync(TimeSpan timeout, CancellationToken ct = default)
     {
         await RefreshAsync(timeout, ct);
-        return CachedStatus ?? new UpdateStatus("0.0.0", null, false, InstallKind.Release, null);
+        return CachedStatus ?? new UpdateStatus("0.0.0", null, false, InstallKind.Source, null);
     }
 
     public void Record(IReadOnlyList<ReleaseInfo> releases) => Recorded.Add(releases);

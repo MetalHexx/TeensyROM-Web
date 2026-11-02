@@ -11,6 +11,8 @@ using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Player;
 using TeensyRom.Cli.Services;
 using TeensyRom.Cli.Settings;
+using TeensyRom.Cli.Tests.Update;
+using TeensyRom.Cli.Update;
 using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Tests;
@@ -122,6 +124,12 @@ internal sealed class TestHost : IDisposable
     /// <summary>The browser the host opens pages with, unless <c>configure</c> registered another.</summary>
     public RecordingBrowserOpener BrowserOpener { get; } = new();
 
+    /// <summary>The release check of the host and its menu, unless <c>configure</c> registered another: a source build that never looked anything up.</summary>
+    public FakeReleaseCheck ReleaseCheck { get; } = new();
+
+    /// <summary>The updater the host runs, unless <c>configure</c> registered another; it answers nothing until a test scripts it.</summary>
+    public IUpdateRunner Updates { get; } = Substitute.For<IUpdateRunner>();
+
     public CliComposition Composition { get; }
 
     public CliSession Session { get; }
@@ -146,9 +154,11 @@ internal sealed class TestHost : IDisposable
         configure?.Invoke(Services);
         Services.TryAddSingleton<IBrowserOpener>(BrowserOpener);
         Services.TryAddSingleton<ILanAddresses>(new FixedLanAddresses("192.168.1.20"));
+        Services.TryAddSingleton<IReleaseCheck>(ReleaseCheck);
+        Services.TryAddSingleton(Updates);
         CliHost.RegisterCommands(Services);
 
-        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services), TransferLines: TransferLines);
+        Composition = new CliComposition(Services, new StartupGate(Engine, Devices, new DeviceChooser(Devices, output)), Consoles.Consoles, output, new TypeRegistrar(Services), TransferLines: TransferLines, ReleaseCheck: ReleaseCheck);
         Session = CliHost.CreateSession(Composition);
     }
 

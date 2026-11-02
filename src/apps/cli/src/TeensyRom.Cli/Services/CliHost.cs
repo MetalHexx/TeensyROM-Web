@@ -20,6 +20,7 @@ using TeensyRom.Cli.Commands.Settings;
 using TeensyRom.Cli.Commands.ThemeCommands;
 using TeensyRom.Cli.Commands.Transfer;
 using TeensyRom.Cli.Commands.Ui;
+using TeensyRom.Cli.Commands.Update;
 using TeensyRom.Cli.Commands.Wait;
 using TeensyRom.Cli.Commands.WatchFolder;
 using TeensyRom.Cli.Helpers;
@@ -34,6 +35,7 @@ using TeensyRom.Cli.Progress;
 using TeensyRom.Cli.Settings;
 using TeensyRom.Cli.Storage.Services;
 using TeensyRom.Cli.Tui;
+using TeensyRom.Cli.Update;
 using TeensyRom.Cli.WebUi;
 using AssemblyExtensions = TeensyRom.Cli.Common.AssemblyExtensions;
 
@@ -43,7 +45,20 @@ namespace TeensyRom.Cli.Services;
 /// The CLI's service registrations, the registrar both command apps share, and the gate that readies the engine and
 /// a device before a menu flow that needs them.
 /// </summary>
-internal sealed record CliComposition(ServiceCollection Services, StartupGate Gate, CliConsoles Consoles, ICliOutput Output, TypeRegistrar Registrar, PathOffer? PathOffer = null, ITransferLineStream? TransferLines = null);
+/// <param name="ReleaseCheck">The daily release lookup the menu reads its update entry from.</param>
+/// <param name="Notifier">Mentions a newer release when a run ends.</param>
+/// <param name="Leftovers">Tidies up after an earlier update when a run starts.</param>
+internal sealed record CliComposition(
+    ServiceCollection Services,
+    StartupGate Gate,
+    CliConsoles Consoles,
+    ICliOutput Output,
+    TypeRegistrar Registrar,
+    PathOffer? PathOffer = null,
+    ITransferLineStream? TransferLines = null,
+    IReleaseCheck? ReleaseCheck = null,
+    UpdateNotifier? Notifier = null,
+    UpdateLeftovers? Leftovers = null);
 
 /// <summary>
 /// One verb of the public command tree. <see cref="Command"/> and <see cref="Settings"/> are what the verb needs
@@ -162,11 +177,12 @@ internal static class CliHost
         ])
     ];
 
-    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, <c>trom ui</c> and <c>trom wait</c>.</summary>
+    /// <summary>Commands that sit beside the nouns: <c>trom init</c>, <c>trom ui</c>, <c>trom update</c> and <c>trom wait</c>.</summary>
     internal static readonly PublicCommand[] PublicCommands =
     [
-        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, Trom API, Trom UI, devices, storage and index state, commands and problems. Changes nothing; exits 3 only when Trom API can't be made ready.", ["init"]),
+        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, whether a newer release is out, Trom API, Trom UI, devices, storage and index state, commands and problems. Changes nothing on your devices or settings; exits 3 only when Trom API can't be made ready.", ["init"]),
         PublicCommand.Of<UiCommand, UiSettings>("ui", "Open Trom UI in your browser, starting Trom API first if needed, and list the addresses it answers at on this computer and on your network. --no-open only lists them. Exits 1 when Trom API doesn't serve Trom UI.", ["ui"]),
+        PublicCommand.Of<UpdateCommand, UpdateSettings>("update", "Install the newest TeensyROM Suite release, restarting Trom API if it was running; --check only looks for one. Homebrew installs update through brew, source builds through git.", ["update", "--check"]),
         PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])
     ];
 
@@ -195,7 +211,8 @@ internal static class CliHost
         (typeof(ThemeScreenCommand), typeof(ThemeScreenSettings)),
         (typeof(SettingsCommand), typeof(SettingsCommandSettings)),
         (typeof(CreditsCommand), typeof(CreditsSettings)),
-        (typeof(OpenWebUiFlowCommand), typeof(OpenWebUiSettings))
+        (typeof(OpenWebUiFlowCommand), typeof(OpenWebUiSettings)),
+        (typeof(UpdateFlowCommand), typeof(UpdateFlowSettings))
     ];
 
     /// <summary>
@@ -231,6 +248,7 @@ internal static class CliHost
         var deviceService = new DeviceService(apiClient);
         var clock = new SystemEngineClock();
         var locator = new EngineLocator(AppContext.BaseDirectory);
+        var version = AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly());
         var engine = new EngineControl(
             new EngineProbe(),
             new EngineLock(),
@@ -238,12 +256,37 @@ internal static class CliHost
             new EngineLauncher(),
             new SourceFingerprint(),
             clock,
-            AssemblyExtensions.GetVersion(Assembly.GetExecutingAssembly()),
+            version,
             output.Notice);
         var chooser = new DeviceChooser(deviceService, output);
         var gate = new StartupGate(engine, deviceService, chooser);
         var pathRegistrar = PathRegistrar.CreateDefault(settingsService);
         var transferLines = new TransferLineStream(alertService, deviceService, logService, httpClient.BaseAddress!);
+
+        var inspector = new InstallInspector(locator, AppContext.BaseDirectory);
+        var rid = PlatformRid.Current;
+        var physical = new PhysicalFileOps();
+        var retrying = new RetryingFileOps(physical);
+        var processes = new ProcessRunner();
+        var releaseClient = new ReleaseClient(ReleaseFeed.FromEnvironment(), version);
+        var releaseCheck = new ReleaseCheck(inspector, releaseClient, settingsService, TimeProvider.System, version, rid);
+        var updates = new UpdateRunner(
+            inspector,
+            releaseClient,
+            releaseCheck,
+            new PackageStager(releaseClient, processes, retrying),
+            new PackageSwapper(retrying),
+            new BrewUpdater(processes),
+            new SuiteStarter(processes),
+            engine,
+            retrying,
+            TimeProvider.System,
+            version,
+            rid,
+            Environment.ProcessPath);
+        // Startup tidying must never hold up the command the user typed, so it doesn't retry a file that is in use.
+        var leftovers = new UpdateLeftovers(inspector, new PackageSwapper(physical), physical);
+        var notifier = new UpdateNotifier(releaseCheck, output, TimeProvider.System);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);
         services.AddSingleton<IDeviceService>(deviceService);
@@ -253,6 +296,8 @@ internal static class CliHost
         services.AddSingleton<IWebUiProbe>(new WebUiProbe());
         services.AddSingleton<IBrowserOpener>(new BrowserOpener());
         services.AddSingleton<ILanAddresses>(new LanAddresses());
+        services.AddSingleton<IReleaseCheck>(releaseCheck);
+        services.AddSingleton<IUpdateRunner>(updates);
         services.AddSingleton(gate);
         services.AddSingleton(consoles);
         services.AddSingleton<ICliOutput>(output);
@@ -282,7 +327,7 @@ internal static class CliHost
         RegisterCommands(services);
 
         return new CliComposition(services, gate, consoles, output, new TypeRegistrar(services),
-            new PathOffer(output, settingsService, locator, pathRegistrar), transferLines);
+            new PathOffer(output, settingsService, locator, pathRegistrar), transferLines, releaseCheck, notifier, leftovers);
     }
 
     /// <summary>
@@ -322,7 +367,7 @@ internal static class CliHost
 
     /// <summary>Builds the interactive menu on the composition's registrar and consoles.</summary>
     public static TuiHost CreateTui(CliComposition host) =>
-        new(CreateTuiApp(host.Registrar), host.Gate, host.Output, host.Consoles, host.TransferLines);
+        new(CreateTuiApp(host.Registrar), host.Gate, host.Output, host.Consoles, host.TransferLines, host.ReleaseCheck);
 
     /// <summary>
     /// The public app: the <c>trom &lt;noun&gt; &lt;verb&gt;</c> tree and the top-level commands, nothing else. Help and the version are written to
@@ -399,6 +444,7 @@ internal static class CliHost
             config.AddCommand<ThemeScreenCommand>("theme").IsHidden();
             config.AddCommand<CreditsCommand>("credits");
             config.AddCommand<OpenWebUiFlowCommand>("ui");
+            config.AddCommand<UpdateFlowCommand>("update");
         });
 
         return app;

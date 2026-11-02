@@ -8,6 +8,7 @@ using TeensyRom.Cli.Commands.Engine;
 using TeensyRom.Cli.Commands.Main;
 using TeensyRom.Cli.Commands.Main.Launcher;
 using TeensyRom.Cli.Commands.Ui;
+using TeensyRom.Cli.Commands.Update;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
@@ -437,7 +438,7 @@ public sealed class CliHostTests : IDisposable
     [Fact]
     public void PublicCommandsAndSettings_AreTransient_SoNoOptionValueSurvivesIntoTheNextRun()
     {
-        foreach (var command in new[] { typeof(EngineStartCommand), typeof(EngineStatusCommand), typeof(EngineStopCommand), typeof(DeviceListCommand), typeof(UiCommand) })
+        foreach (var command in new[] { typeof(EngineStartCommand), typeof(EngineStatusCommand), typeof(EngineStopCommand), typeof(DeviceListCommand), typeof(UiCommand), typeof(UpdateCommand) })
         {
             LifetimeOf(command).Should().Be(ServiceLifetime.Transient, command.Name);
             LifetimeOf(SettingsOf(command)).Should().Be(ServiceLifetime.Transient, SettingsOf(command).Name);

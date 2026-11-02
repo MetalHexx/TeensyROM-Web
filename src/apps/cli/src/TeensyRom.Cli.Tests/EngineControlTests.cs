@@ -358,6 +358,58 @@ public class EngineControlTests
         _world.Calls.Should().Equal("launch");
     }
 
+    // ---- an engine newer than this CLI ----------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("1.0.0-beta.1")]
+    [InlineData("1.0.0")]
+    [InlineData("2.3.4+abc123")]
+    public async Task EnsureRunning_WhenAPackagedEngineIsNewerThanThisCli_AsksForANewStart_AndLeavesItRunning(string runningVersion)
+    {
+        _world.Answer = new EngineProbeResult.Engine(runningVersion);
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeFalse();
+        ready.FailureMessage.Should().Be("TeensyROM Suite was updated while this trom was open — start trom again.");
+        _world.Calls.Should().BeEmpty("a newer engine is never stopped");
+        _world.Notices.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EnsureRunning_WhenAPackagedEngineIsOlderThanThisCli_StillReplacesIt()
+    {
+        _world.Answer = new EngineProbeResult.Engine("1.0.0-alpha.7");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Should().Equal("stop", "launch");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_WhenAnEnginesVersionIsNotSemVer_FallsBackToReplacingIt()
+    {
+        _world.Answer = new EngineProbeResult.Engine("not-a-version");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Should().Equal("stop", "launch");
+    }
+
+    [Fact]
+    public async Task EnsureRunning_FromSource_StillReplacesANewerEngine()
+    {
+        _world.Location = Source;
+        _world.Answer = new EngineProbeResult.Engine("9.0.0");
+
+        var ready = await _sut.EnsureRunningAsync(default);
+
+        ready.Ok.Should().BeTrue();
+        _world.Calls.Take(3).Should().Equal("stop", "build", "launch");
+    }
+
     // ---- stopping -------------------------------------------------------------------------------------------
 
     [Fact]

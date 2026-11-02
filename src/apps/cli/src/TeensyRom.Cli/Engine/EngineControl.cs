@@ -1,5 +1,6 @@
 using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Common;
+using TeensyRom.Cli.Update;
 
 namespace TeensyRom.Cli.Engine;
 
@@ -43,6 +44,8 @@ internal sealed class EngineControl(
     internal static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(180);
     internal static readonly TimeSpan LaunchFailFast = TimeSpan.FromSeconds(15);
     internal static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(45);
+
+    internal const string UpdatedWhileOpen = "TeensyROM Suite was updated while this trom was open — start trom again.";
 
     public async Task<EngineReady> EnsureRunningAsync(CancellationToken ct)
     {
@@ -136,9 +139,17 @@ internal sealed class EngineControl(
         }
     }
 
-    /// <summary>Reuses the running engine when it is this CLI's version and build; otherwise replaces it.</summary>
+    /// <summary>
+    /// Reuses the running engine when it is this CLI's version and build; otherwise replaces it. A packaged CLI never
+    /// replaces an engine that is newer than itself: an update installed while this CLI was open is not undone.
+    /// </summary>
     private async Task<EngineReady> EnsureCurrentAsync(EngineProbeResult.Engine running, Attempt attempt, CancellationToken ct)
     {
+        if (IsNewerThanThisCli(running.Version) && locator.Locate().Location is { Mode: EngineMode.Packaged })
+        {
+            return EngineReady.Failed(UpdatedWhileOpen);
+        }
+
         var notice = RestartNotice(running.Version);
 
         if (notice is null) return EngineReady.Ready;
@@ -274,6 +285,9 @@ internal sealed class EngineControl(
 
     private bool SameVersion(string version) =>
         string.Equals(Comparable(version), Comparable(ownVersion), StringComparison.Ordinal);
+
+    private bool IsNewerThanThisCli(string version) =>
+        SemVersion.TryParse(version, out var running) && SemVersion.TryParse(ownVersion, out var own) && running > own;
 
     private string StartFailed(string reason, Attempt attempt)
     {

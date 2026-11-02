@@ -216,6 +216,19 @@ public class CliOutputTests
     }
 
     [Fact]
+    public void Notice_ThatIsNotAboutADevice_LeavesTheDeviceKeysOutOfTheJson()
+    {
+        var output = Output();
+        output.UseJson(true);
+
+        output.Notice(new CliNotice("updateAvailable", "TeensyROM Suite 1.0.0 is out.", Fix: "trom update"));
+
+        var lines = _consoles.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        lines.Should().HaveCount(2);
+        JsonDocument.Parse(lines[1]).RootElement.GetProperty("notice").EnumerateObject().Select(p => p.Name).Should().Equal("code", "message", "fix");
+    }
+
+    [Fact]
     public void Notice_WithoutJson_IsOnlyTheSentenceOnStderr()
     {
         Output().Notice(new CliNotice("indexIncomplete", "TR-1 is not indexed.", "TR-1", "1", "sd", "trom index build"));

@@ -26,10 +26,11 @@ namespace TeensyRom.Cli.Commands.Main
                 [
                     ["Storage Device", settings.StorageType.ToString(), "Default value to use for your selected storage device."],
                     ["Always Prompt Storage", settings.AlwaysPromptStorage.ToString(), "Determines if you're always prompted to select the storage device."],
-                    ["Debug Logs Enabled", logService.Enabled.ToString(), "Enables verbose logs for debugging." ]
+                    ["Debug Logs Enabled", logService.Enabled.ToString(), "Enables verbose logs for debugging." ],
+                    ["Update Check", settings.UpdateCheck.ToString(), "Looks up the newest release once a day and mentions it when one is out."]
                 ]);
 
-                choice = PromptHelper.ChoicePrompt("Choose wisely", new List<string> { "Storage Device", "Always Prompt Storage", "Toggle Debug Logs", "Leave Settings" });
+                choice = PromptHelper.ChoicePrompt("Choose wisely", new List<string> { "Storage Device", "Always Prompt Storage", "Toggle Debug Logs", "Toggle Update Check", "Leave Settings" });
 
                 switch (choice)
                 {
@@ -44,6 +45,10 @@ namespace TeensyRom.Cli.Commands.Main
                     case "Toggle Debug Logs":
                         settings.EnableDebugLogs = !settings.EnableDebugLogs;
                         logService.Enabled = settings.EnableDebugLogs;
+                        break;
+
+                    case "Toggle Update Check":
+                        settings.UpdateCheck = !settings.UpdateCheck;
                         break;
                 }
                 if (choice != "Leave Settings")

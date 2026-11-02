@@ -12,6 +12,8 @@ internal interface IUpdateRunner
     /// <summary>
     /// Installs the release <paramref name="check"/> found: stops Trom API, swaps the package in (or has Homebrew do it),
     /// and starts Trom API again when it was running. <paramref name="notify"/> receives each step as a sentence.
+    /// For a release install, cancelling works while the package downloads and unpacks; once it is staged the update runs
+    /// to its end, and a cancelled start of Trom API is reported in the result.
     /// </summary>
     /// <exception cref="Errors.CliException">When the update is refused or fails; a failed swap leaves the previous version in place.</exception>
     Task<UpdateApplied> ApplyAsync(UpdateCheckResult check, Action<string> notify, IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
@@ -111,7 +113,8 @@ internal sealed class UpdateRunner(
             notify($"Downloading TeensyROM Suite {release.Version}…");
             await stager.StageAsync(root, release, asset, platform, progress, ct);
 
-            wasRunning = await StopEngineAsync(notify, ct);
+            // The package is ready: from here the update runs to its end, so the stop is not cancellable (the swap takes no token).
+            wasRunning = await StopEngineAsync(notify, CancellationToken.None);
             LeaveApiFolder(root);
 
             notify("Installing…");
@@ -253,7 +256,15 @@ internal sealed class UpdateRunner(
     {
         notify("Starting Trom API…");
 
-        return await starter.StartEngineAsync(trom, ct);
+        try
+        {
+            return await starter.StartEngineAsync(trom, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // The new version is installed by now; the cancelled start is part of the result, not a reason to say nothing changed.
+            return new SuiteStart(false, "the start was cancelled.");
+        }
     }
 
     private static string WithRestartProblem(string message, bool wasRunning, SuiteStart start) =>

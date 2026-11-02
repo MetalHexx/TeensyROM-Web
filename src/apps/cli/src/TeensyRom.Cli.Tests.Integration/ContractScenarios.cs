@@ -94,9 +94,10 @@ public sealed class ContractScenarios(SharedApiFixture api)
         using var report = JsonDocument.Parse(cli.Output);
         var root = report.RootElement;
         root.EnumerateObject().Select(property => property.Name)
-            .Should().BeEquivalentTo(["trom", "engine", "webUi", "devices", "commands", "capabilities", "problems"], "agents read these top-level keys");
+            .Should().BeEquivalentTo(["trom", "engine", "webUi", "update", "devices", "commands", "capabilities", "problems"], "agents read these top-level keys");
         root.GetProperty("engine").GetProperty("running").GetBoolean().Should().BeTrue();
         root.GetProperty("webUi").GetProperty("available").ValueKind.Should().BeOneOf(JsonValueKind.True, JsonValueKind.False);
+        root.GetProperty("update").GetProperty("installKind").GetString().Should().Be("source", "the test host runs from the source tree, which never looks for releases");
         root.GetProperty("problems").ValueKind.Should().Be(JsonValueKind.Array);
         root.GetProperty("commands").EnumerateArray().Select(command => command.GetProperty("name").GetString())
             .Should().Contain(["file", "init"]);

@@ -66,7 +66,7 @@ internal sealed class UpdateNotifier(IReleaseCheck check, ICliOutput output, Tim
 
             if (check.NotifiedAt() is { } last && last <= now && now - last < NoticeInterval) return;
 
-            output.Notice(Sentence(latest, status.Installed));
+            output.Notice(new CliNotice("updateAvailable", Sentence(latest, status.Installed), Fix: "trom update"));
             check.MarkNotified();
         }
         catch (Exception)

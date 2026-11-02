@@ -8,6 +8,7 @@ using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Output;
 using TeensyRom.Cli.Services;
+using TeensyRom.Cli.Update;
 using TeensyRom.Cli.WebUi;
 
 namespace TeensyRom.Cli.Commands.Init;
@@ -20,6 +21,13 @@ internal sealed record InitEngine(bool Running, string? Version, bool Matches, s
 
 internal sealed record InitWebUi(string Address, bool Available);
 
+/// <summary>Whether a newer release is out, as <c>trom update --check</c> reports it; <see cref="Latest"/> is absent when checking is off or the lookup failed.</summary>
+internal sealed record InitUpdate(string Installed, string? Latest, bool Available, InstallKind InstallKind, DateTimeOffset? CheckedAt)
+{
+    public static InitUpdate From(UpdateStatus status) =>
+        new(status.Installed, status.Latest, status.Available, status.InstallKind, status.CheckedAt);
+}
+
 internal sealed record InitCommandInfo(string Name, string Description);
 
 /// <summary>Everything <c>trom init</c> reports, in the shape of its <c>--json</c> output.</summary>
@@ -27,25 +35,30 @@ internal sealed record InitReport(
     InitTrom Trom,
     InitEngine Engine,
     InitWebUi WebUi,
+    InitUpdate Update,
     IReadOnlyList<DeviceSummary> Devices,
     IReadOnlyList<InitCommandInfo> Commands,
     IReadOnlyList<string> Capabilities,
     IReadOnlyList<string> Problems);
 
 /// <summary>
-/// <c>trom init</c>: one read-only report of versions, engine, web UI, devices, commands, capabilities and problems.
-/// It starts or replaces the engine like any engine command, but a failed start is part of the report, not an error
-/// raised first: the report is written and only then does the command exit 3. It never resets, reconnects, indexes
-/// or changes settings.
+/// <c>trom init</c>: one read-only report of versions, whether a newer release is out, engine, web UI, devices, commands,
+/// capabilities and problems. It starts or replaces the engine like any engine command, but a failed start is part of
+/// the report, not an error raised first: the report is written and only then does the command exit 3. It never resets,
+/// reconnects, indexes or changes settings. The release lookup runs while the engine starts and never holds the report
+/// up for more than a few seconds.
 /// </summary>
-internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi, IEngineLocator locator)
+internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDeviceService devices, IWebUiProbe webUi, IEngineLocator locator, IReleaseCheck releases)
     : TromCommand<InitSettings>(output)
 {
     private const string WebUiAddress = EngineAddress.BaseUrl + "/";
     private const string EngineNotRunning = "No Trom API is running.";
 
+    private static readonly TimeSpan ReleaseLookupBudget = TimeSpan.FromSeconds(3);
+
     protected override async Task<int> RunAsync(CommandContext context, InitSettings settings, CancellationToken ct)
     {
+        var release = releases.CurrentAsync(ReleaseLookupBudget, ct);
         var ready = await engine.EnsureRunningAsync(ct);
         var status = await engine.GetStatusAsync(ct);
         var problems = new List<string>();
@@ -74,6 +87,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
             new InitTrom(status.CliVersion),
             new InitEngine(status.Running, status.Version, status.Matches, EngineAddress.BaseUrl),
             new InitWebUi(WebUiAddress, webUiAvailable),
+            InitUpdate.From(await release),
             found,
             Commands(),
             Capabilities(),
@@ -133,6 +147,14 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         return $"{device.Name}'s {storage.ToUpperInvariant()} storage isn't fully indexed — run `trom index build --device {name} --storage {storage}`.";
     }
 
+    private static string DescribeUpdate(InitUpdate update) => update switch
+    {
+        { Available: true, Latest: { } latest } => $"{latest} is out — run `trom update`",
+        { Latest: not null } => "up to date",
+        { InstallKind: InstallKind.Source or InstallKind.Unknown } => "not checked",
+        _ => "unknown"
+    };
+
     private void Write(InitReport report)
     {
         if (Output.Mode == OutputMode.Json)
@@ -149,7 +171,8 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
             ("Trom API version", report.Engine.Version ?? string.Empty),
             ("Version match", report.Engine.Running ? (report.Engine.Matches ? "yes" : "no") : string.Empty),
             ("Trom UI", report.WebUi.Available ? "available" : "not available"),
-            ("Trom UI address", report.WebUi.Address)
+            ("Trom UI address", report.WebUi.Address),
+            ("Update", DescribeUpdate(report.Update))
         ];
 
         if (Output.Mode == OutputMode.Plain)

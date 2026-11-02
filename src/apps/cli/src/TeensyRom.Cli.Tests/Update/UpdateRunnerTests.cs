@@ -51,6 +51,8 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Exception? ReleasesFailure { get; set; }
     public Exception? StageFailure { get; set; }
     public Action? OnStage { get; set; }
+    public Action? OnStop { get; set; }
+    public Action? OnSwap { get; set; }
     public SwapFailedException? SwapFailure { get; set; }
     public SwapFailedException? RecoverFailure { get; set; }
     public bool EngineRunning { get; set; } = true;
@@ -111,6 +113,7 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public void Swap(string root, string cliFolder, string? runningExecutable)
     {
         Calls.Add("swap");
+        OnSwap?.Invoke();
 
         if (SwapFailure is not null) throw SwapFailure;
     }
@@ -142,6 +145,7 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Task<SuiteStart> StartEngineAsync(string tromPath, CancellationToken ct = default)
     {
         Calls.Add($"start:{tromPath}");
+        ct.ThrowIfCancellationRequested();
         return Task.FromResult(StartResult);
     }
 
@@ -156,6 +160,8 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Task<EngineStopOutcome> StopAsync(CancellationToken ct)
     {
         Calls.Add("stop");
+        OnStop?.Invoke();
+        ct.ThrowIfCancellationRequested();
         return Task.FromResult(StopOutcome);
     }
 
@@ -485,6 +491,25 @@ public sealed class UpdateRunnerTests : IDisposable
 
         await apply.Should().ThrowAsync<OperationCanceledException>();
         _world.Calls.Should().NotContain(["stop", "swap"]);
+        _world.UpdateFolderExists.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("stop")]
+    [InlineData("swap")]
+    public async Task Apply_WhenCancelledOnceThePackageIsStaged_FinishesTheSwap_AndReportsTheEngineNotStarted(string cancelledDuring)
+    {
+        using var cts = new CancellationTokenSource();
+        if (cancelledDuring == "stop") _world.OnStop = cts.Cancel;
+        else _world.OnSwap = cts.Cancel;
+
+        var applied = await _world.Apply(ct: cts.Token);
+
+        _world.Calls.Should().ContainInOrder("stage", "stop", "swap");
+        applied.To.Should().Be("1.0.0-beta.2");
+        applied.EngineWasRunning.Should().BeTrue();
+        applied.EngineRestarted.Should().BeFalse();
+        applied.RestartProblem.Should().Contain("cancelled");
         _world.UpdateFolderExists.Should().BeFalse();
     }
 
