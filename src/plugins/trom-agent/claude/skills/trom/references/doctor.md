@@ -18,10 +18,10 @@ Run the six checks in order. For each, report fine, fixed, or what to try. Ask b
 
 1. **`trom` is installed and matches this agent.** `trom --version` prints three lines; take the first and strip the `trom ` prefix. Missing: offer `references/install.md`, in your own voice, since an install is not a Travis job. Otherwise compare it with the agent version in `SKILL.md`'s `## Version` section, as SemVer with pre-release ordering (`1.0.0-alpha.10` is newer than `1.0.0-alpha.9`):
    - Suite newer: the agent is behind. Give the plugin steps from `references/install.md` (install step 8).
-   - Agent newer: offer the suite update from `references/install.md`.
+   - Agent newer: offer the suite update from `references/install.md` (`trom update` when `capabilities` lists `update`).
    - Equal: nothing to say.
 2. **Engine running and matching.** `trom engine status --json`.
-   - Not running (`engine status` exits 3): relay the matching entry of `init`'s `problems`. It carries the reason the engine could not start (no engine beside the CLI, a failed source build and its log, the port in use). Then retry with `trom init --json`, which starts the engine.
+   - Not running (`engine status` exits 3): relay the matching entry of `init`'s `problems`. It carries the reason the engine could not start (no engine beside the CLI, a failed source build and its log, the port in use). Then retry with `trom api start` when `capabilities` lists `engine start`, otherwise `trom init --json`; both start the engine. `trom api start --json` exits 3 with the reason when it still can't start.
    - Mismatched versions: the next engine command restarts the engine, so `trom init --json` fixes it.
 3. **Web UI served.** `webUi.available` in `trom init --json`.
    - Not served: relay the web UI entry in `init`'s `problems` and follow "When it isn't served" in `references/web-ui.md`.

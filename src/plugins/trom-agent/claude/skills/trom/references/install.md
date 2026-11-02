@@ -40,7 +40,7 @@ Nothing here needs admin rights, a compiler or developer tools. The library, set
 5. **Unpack.**
    - Agree on a folder. Suggest `%LOCALAPPDATA%\Programs\TeensyROM Suite` on Windows and `~/.local/share/teensyrom-suite` on Linux. Never use the data home `~/.teensyrom`.
    - Unpack with the OS's own tools: `Expand-Archive` on Windows, `tar -xzf` on Linux.
-   - The folder then holds `TeensyRom.Api[.exe]` and `cli/`.
+   - The folder then holds `README.txt`, `api/` (Trom API and the web UI) and `cli/` (`trom`).
 6. **PATH.** Run `<folder>/cli/trom path add`. Use the full path to `trom` for the rest of the session, or open a new terminal.
 7. **Verify.** Run `trom init --json`. `engine.running` and `webUi.available` must be true.
    - `webUi.available` false: follow "When it isn't served" in `references/web-ui.md`.
@@ -52,21 +52,34 @@ Nothing here needs admin rights, a compiler or developer tools. The library, set
 
 ## Update
 
-Runs when asked, or when `init` exits 2 with an unknown-command error.
+Runs when asked, when `init` reports `update.available` and the user agrees (see `SKILL.md`), or when `init` exits 2 with an unknown-command error.
+
+1. **Check.** Run `trom update --check --json`. It prints `installed`, `latest`, `available`, `installKind` (`release`, `homebrew`, `source` or `unknown`) and `checkedAt`, exits 0 when the lookup worked, and changes nothing.
+   - Exit 2 with an unknown-command error: this `trom` predates `trom update`. Use "Manual update" below.
+   - **Source build** (`installKind` is `source`, or the `trom` path runs through a `bin/Release` or `bin/Debug` folder of a source checkout): say so, point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md, and change nothing.
+   - `available` false: say it's current and stop.
+   - `installKind` `unknown`: `trom update` won't install; relay the download link it gives and change nothing.
+2. **Confirm.** Name the installed and the new version and say what happens: Trom API stops, the install is replaced in place, and Trom API starts again if it was running. A Homebrew install runs `brew upgrade` instead. Wait for a yes.
+3. **Update.** Run `trom update --yes --json` with a long timeout or as a background command. It prints `updated`, `from`, `to`, `engineWasRunning` and `engineRestarted`. A failure (exit 1) leaves the old install working: relay the message and do not retry until the user says so. `updated` true with `engineRestarted` false: Trom API did not start again; relay `restartProblem` and offer `trom api start`.
+4. **Verify.** Run `trom --version` (the new version), then `trom init --json`, then give the plugin steps (install step 8).
+
+Say plainly that the library, settings and themes in `~/.teensyrom` aren't touched.
+
+### Manual update
+
+Only for a `trom` without `update`.
 
 1. **Find where `trom` runs.** `Get-Command trom` on Windows, `command -v trom` elsewhere, following symlinks. Then classify it:
    - **Homebrew** (resolve the `trom` symlink, then check that the path is under `brew --prefix`): `brew update`, then `brew upgrade teensyrom-suite`. Verify with `trom init --json`, then give the plugin steps (install step 8).
-   - **Release install:** the parent of the `cli` folder holds `TeensyRom.Api[.exe]`. Continue below.
+   - **Release install:** the parent of the `cli` folder holds `api/TeensyRom.Api[.exe]`, or in an older layout `TeensyRom.Api[.exe]` itself. Continue below.
    - **Source build:** the path runs through a `bin/Release` or `bin/Debug` folder of a source checkout. Say it's a source build, point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md, and change nothing.
 2. **Release install.**
    - Read the installed version from `trom --version`. It prints three lines (`trom {version}`, the OS, the architecture). Take the first line and strip the `trom ` prefix.
    - Look up the newest release (install step 3). Compare the installed version with its `tag_name` without the leading `v`. Equal: say it's current and stop.
    - Otherwise download and verify (install steps 3 and 4).
-   - Run `trom engine stop`, because Windows won't replace a running program. If it says the engine can't be stopped from the CLI, relay that and wait for the user.
-   - Replace the folder's contents with the new archive's. Keep the same folder so the PATH entry stays valid.
-   - Verify with `trom init --json`, then give the plugin steps (install step 8).
-
-Say plainly that the library, settings and themes in `~/.teensyrom` aren't touched.
+   - Run `trom engine stop` (a `trom` without `update` has no `api` alias), because Windows won't replace a running program. If it says the engine can't be stopped from the CLI, relay that and wait for the user.
+   - Empty the install folder, then unpack the new archive into the same folder. Keep the folder so the PATH entry stays valid. Never touch `~/.teensyrom`.
+   - Verify with `trom init --json`, then give the plugin steps (install step 8). From here `trom update` handles later updates.
 
 ## Long steps
 
