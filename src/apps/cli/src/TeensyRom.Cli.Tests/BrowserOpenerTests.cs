@@ -7,8 +7,9 @@ public sealed class BrowserOpenerTests
 {
     private const string Url = "http://localhost:10213";
 
+    /// <summary>The opener and address each launch hands the shell that runs it: the arguments after <c>-c</c> and its script.</summary>
     private static string[] Launches(BrowserPlatform platform) =>
-        BrowserOpener.StartInfos(Url, platform).Select(info => $"{info.FileName} {string.Join(' ', info.ArgumentList)}".TrimEnd()).ToArray();
+        BrowserOpener.StartInfos(Url, platform).Select(info => string.Join(' ', info.ArgumentList.Skip(2))).ToArray();
 
     [Fact]
     public void Windows_ShellExecutesTheUrl()
@@ -28,15 +29,31 @@ public sealed class BrowserOpenerTests
     [Fact]
     public void Wsl_TriesWslviewThenXdgOpen() => Launches(BrowserPlatform.Wsl).Should().Equal($"wslview {Url}", $"xdg-open {Url}");
 
-    [Fact]
-    public void NonWindowsOpeners_AreDirectProcesses_WhoseOutputStaysOffTheTerminal()
+    [Theory]
+    [InlineData(nameof(BrowserPlatform.MacOS))]
+    [InlineData(nameof(BrowserPlatform.Linux))]
+    [InlineData(nameof(BrowserPlatform.Wsl))]
+    public void NonWindowsOpeners_RunUnderTheShell_WhichSendsTheirOutputToDevNull_RatherThanThroughPipesNobodyReads(string platform)
     {
-        foreach (var info in BrowserOpener.StartInfos(Url, BrowserPlatform.Wsl))
+        foreach (var info in BrowserOpener.StartInfos(Url, Enum.Parse<BrowserPlatform>(platform)))
         {
+            info.FileName.Should().Be("/bin/sh");
+            info.ArgumentList[0].Should().Be("-c");
+            info.ArgumentList[1].Should().Contain(">/dev/null 2>&1");
             info.UseShellExecute.Should().BeFalse();
-            info.RedirectStandardOutput.Should().BeTrue();
-            info.RedirectStandardError.Should().BeTrue();
+            info.RedirectStandardOutput.Should().BeFalse();
+            info.RedirectStandardError.Should().BeFalse();
+            info.RedirectStandardInput.Should().BeFalse();
         }
+    }
+
+    [Fact]
+    public void TheOpenerAndTheAddress_ArePassedAsArguments_NotBuiltIntoTheScript()
+    {
+        var info = BrowserOpener.StartInfos("http://localhost:10213/?a=b&c='d'", BrowserPlatform.Linux).Single();
+
+        info.ArgumentList[1].Should().NotContain("localhost").And.NotContain("xdg-open");
+        info.ArgumentList.Skip(2).Should().Equal("xdg-open", "http://localhost:10213/?a=b&c='d'");
     }
 
     [Theory]

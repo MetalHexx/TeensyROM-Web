@@ -87,4 +87,75 @@ public sealed class InstallInspectorTests
         info.Kind.Should().Be(InstallKind.Release);
         info.Root.Should().Be(Path.GetDirectoryName(Cli));
     }
+
+    // ---- an update that was killed with api/ out of place ----------------------------------------------------
+
+    private static InstallInfo InspectTree(Scratch tree, string cliFolder) =>
+        new InstallInspector(new EngineLocator(tree.At(cliFolder)), tree.At(cliFolder)).Inspect();
+
+    private static string Journal(bool committed = false, bool rolledBack = false) =>
+        $$"""{"committed":{{committed.ToString().ToLowerInvariant()}},"rolledBack":{{rolledBack.ToString().ToLowerInvariant()}},"moves":[{"from":"api","to":".trom-update/backup/api"}]}""";
+
+    [Fact]
+    public void AnUnfinishedSwapJournalBesideTheCliFolder_MakesItAReleaseEvenWithNoApiFolder()
+    {
+        using var tree = new Scratch();
+        tree.Write("suite/cli/trom.exe");
+        tree.Write("suite/.trom-update/journal.json", Journal());
+
+        var info = InspectTree(tree, "suite/cli");
+
+        info.Kind.Should().Be(InstallKind.Release);
+        info.Root.Should().Be(tree.At("suite"));
+        info.CliFolder.Should().Be(tree.At("suite/cli"));
+    }
+
+    [Fact]
+    public void WithNoJournal_AMissingApiFolderStaysUnknown()
+    {
+        using var tree = new Scratch();
+        tree.Write("suite/cli/trom.exe");
+        tree.Write("suite/.trom-update/download/package.zip");
+
+        InspectTree(tree, "suite/cli").Kind.Should().Be(InstallKind.Unknown);
+    }
+
+    [Theory]
+    [InlineData("committed")]
+    [InlineData("rolledBack")]
+    [InlineData("unreadable")]
+    public void AJournalThatHasNothingToRecover_DoesNotMakeItARelease(string journal)
+    {
+        using var tree = new Scratch();
+        tree.Write("suite/cli/trom.exe");
+        tree.Write("suite/.trom-update/journal.json", journal switch
+        {
+            "committed" => Journal(committed: true),
+            "rolledBack" => Journal(rolledBack: true),
+            _ => "{ not json"
+        });
+
+        InspectTree(tree, "suite/cli").Kind.Should().Be(InstallKind.Unknown);
+    }
+
+    [Fact]
+    public void AJournalBesideAFolderNotNamedCli_DoesNotMakeItARelease()
+    {
+        using var tree = new Scratch();
+        tree.Write("suite/tools/trom.exe");
+        tree.Write("suite/.trom-update/journal.json", Journal());
+
+        InspectTree(tree, "suite/tools").Kind.Should().Be(InstallKind.Unknown);
+    }
+
+    [Fact]
+    public void WhenTheEngineIsThere_TheJournalChangesNothing()
+    {
+        using var tree = new Scratch();
+        tree.Write("suite/cli/trom.exe");
+        tree.Write($"suite/api/{EngineLocator.ExecutableName}");
+        tree.Write("suite/.trom-update/journal.json", Journal());
+
+        InspectTree(tree, "suite/cli").Kind.Should().Be(InstallKind.Release);
+    }
 }

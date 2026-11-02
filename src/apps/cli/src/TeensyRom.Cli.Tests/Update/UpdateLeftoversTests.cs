@@ -1,3 +1,4 @@
+using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Update;
 
 namespace TeensyRom.Cli.Tests.Update;
@@ -10,9 +11,9 @@ public sealed class UpdateLeftoversTests : IDisposable
 
     public void Dispose() => _sandbox.Dispose();
 
-    private UpdateLeftovers Leftovers(InstallKind kind = InstallKind.Release) =>
+    private UpdateLeftovers Leftovers(InstallKind kind = InstallKind.Release, Action<string>? warn = null) =>
         new(new StubInspector(new InstallInfo(kind, _sandbox.CliFolder, kind == InstallKind.Release ? _sandbox.Root : null, null)),
-            new PackageSwapper(_files), _files);
+            new PackageSwapper(_files), _files, warn);
 
     private bool Exists(string relative) => File.Exists(_sandbox.Scratch.At(relative)) || Directory.Exists(_sandbox.Scratch.At(relative));
 
@@ -61,18 +62,50 @@ public sealed class UpdateLeftoversTests : IDisposable
         Exists("install/.trom-update").Should().BeFalse();
     }
 
+    // The real inspector and engine locator: with api/ moved out of place no engine is found, which a stub inspector hides.
     [Fact]
-    public void AnUpdateThatCantBeUndone_KeepsEveryBackupAndTheOldExecutable()
+    public void AnUpdateKilledWhileApiWasOutOfPlace_IsUndoneEvenThoughNoEngineCanBeFound()
+    {
+        var installed = _sandbox.Installed();
+        var swap = () => _sandbox.Swap(new FailingMoves(new PhysicalFileOps(), failFrom: 2, persistent: true));
+        swap.Should().Throw<SwapFailedException>().Which.RolledBack.Should().BeFalse();
+        Exists("install/api").Should().BeFalse();
+        Exists("install/.trom-update/backup/api").Should().BeTrue();
+        Exists("install/.trom-update/staging/api").Should().BeTrue();
+        var inspector = new InstallInspector(new EngineLocator(_sandbox.CliFolder), _sandbox.CliFolder);
+
+        inspector.Inspect().Kind.Should().Be(InstallKind.Release);
+        new UpdateLeftovers(inspector, new PackageSwapper(_files), _files).CleanQuietly();
+
+        _sandbox.Installed().Should().Equal(installed);
+        Exists("install/.trom-update").Should().BeFalse();
+    }
+
+    [Fact]
+    public void AnUpdateThatCantBeUndone_KeepsEveryBackupAndTheOldExecutable_AndSaysWhereTheBackupIs()
     {
         var swap = () => _sandbox.Swap(new FailingMoves(new PhysicalFileOps(), failFrom: 7, persistent: true));
         swap.Should().Throw<SwapFailedException>();
         File.WriteAllText(_sandbox.Journal, "{ not json");
+        var said = new List<string>();
 
-        var clean = () => Leftovers().CleanQuietly();
+        var clean = () => Leftovers(warn: said.Add).CleanQuietly();
 
         clean.Should().NotThrow();
         Exists("install/.trom-update/backup/api").Should().BeTrue();
         Exists("install/cli/trom.exe.old").Should().BeTrue();
+        said.Should().ContainSingle().Which.Should().Contain(_sandbox.Scratch.At("install/.trom-update/backup")).And.Contain("by hand");
+    }
+
+    [Fact]
+    public void AnUpdateThatDidNotFail_SaysNothing()
+    {
+        _sandbox.Swap(_files);
+        var said = new List<string>();
+
+        Leftovers(warn: said.Add).CleanQuietly();
+
+        said.Should().BeEmpty();
     }
 
     [Fact]

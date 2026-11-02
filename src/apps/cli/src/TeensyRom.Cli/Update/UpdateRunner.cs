@@ -12,13 +12,16 @@ internal interface IUpdateRunner
     /// <summary>
     /// Installs the release <paramref name="check"/> found: stops Trom API, swaps the package in (or has Homebrew do it),
     /// and starts Trom API again when it was running. <paramref name="notify"/> receives each step as a sentence.
-    /// For a release install, cancelling works while the package downloads and unpacks; once it is staged the update runs
-    /// to its end, and a cancelled start of Trom API is reported in the result.
+    /// For a release install, cancelling works while the package downloads and unpacks; once it is staged (and
+    /// <paramref name="notify"/> says so) the update runs to its end, and a cancelled start of Trom API is reported in the
+    /// result. For Homebrew, cancelling stops brew, and Trom API is started again if it was running.
     /// </summary>
     /// <exception cref="Errors.CliException">When the update is refused or fails; a failed swap leaves the previous version in place.</exception>
     Task<UpdateApplied> ApplyAsync(UpdateCheckResult check, Action<string> notify, IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
 }
 
+/// <param name="files">Retries what another process briefly holds; used up to and including the swap.</param>
+/// <param name="quickFiles">Does not retry; clears the update folder once the new version is in and Trom API is starting again, when waiting would only delay it.</param>
 /// <param name="installedVersion">This trom's version.</param>
 /// <param name="rid">This platform's runtime identifier; null when the suite has no package for it.</param>
 /// <param name="runningExecutable">The running trom, which a swap renames aside instead of moving.</param>
@@ -32,6 +35,7 @@ internal sealed class UpdateRunner(
     ISuiteStarter starter,
     IEngineControl engine,
     IFileOps files,
+    IFileOps quickFiles,
     TimeProvider time,
     string installedVersion,
     string? rid,
@@ -42,6 +46,9 @@ internal sealed class UpdateRunner(
     internal const string ReleasesPage = "https://github.com/MetalHexx/TeensyROM-Suite/releases";
 
     private const string NoPackage = "There is no TeensyROM Suite package for this platform.";
+
+    /// <summary>Said once the package is staged, so a Ctrl+C that no longer stops anything is explained.</summary>
+    internal const string NotCancellable = "The package is staged; from here the update can't be cancelled.";
 
     public async Task<UpdateCheckResult> CheckAsync(CancellationToken ct = default)
     {
@@ -102,6 +109,8 @@ internal sealed class UpdateRunner(
         var held = TakeLock(updateFolder, root);
         var wasRunning = false;
         var keepUpdateFolder = false;
+        var swapped = false;
+        SuiteStart start;
 
         try
         {
@@ -114,6 +123,7 @@ internal sealed class UpdateRunner(
             await stager.StageAsync(root, release, asset, platform, progress, ct);
 
             // The package is ready: from here the update runs to its end, so the stop is not cancellable (the swap takes no token).
+            notify(NotCancellable);
             wasRunning = await StopEngineAsync(notify, CancellationToken.None);
             LeaveApiFolder(root);
 
@@ -127,19 +137,22 @@ internal sealed class UpdateRunner(
             {
                 keepUpdateFolder = !ex.RolledBack;
 
-                if (wasRunning && ex.RolledBack) await RestartPreviousAsync(notify, ct);
+                if (wasRunning && ex.RolledBack) await RestartPreviousAsync(notify);
 
                 throw UpdateFailure.Failed(ex.Message);
             }
+
+            swapped = true;
+
+            // The lock is held until the update folder is gone, so a trom the restart runs doesn't tidy up under this one.
+            start = wasRunning ? await RestartAsync(Path.Combine(install.CliFolder, PlatformRid.TromExecutable(platform)), notify, ct) : new SuiteStart(true, null);
         }
         finally
         {
             held.Dispose();
 
-            if (!keepUpdateFolder) DeleteUpdateFolder(updateFolder);
+            if (!keepUpdateFolder) DeleteUpdateFolder(updateFolder, swapped ? quickFiles : files);
         }
-
-        var start = wasRunning ? await RestartAsync(Path.Combine(install.CliFolder, PlatformRid.TromExecutable(platform)), notify, ct) : new SuiteStart(true, null);
 
         return new UpdateApplied(installed.ToString(), release.Version.ToString(), wasRunning, wasRunning && start.Ok, wasRunning ? start.Problem : null);
     }
@@ -147,15 +160,33 @@ internal sealed class UpdateRunner(
     private async Task<UpdateApplied> ApplyHomebrewAsync(InstallInfo install, SemVersion installed, ReleaseInfo release, Action<string> notify, CancellationToken ct)
     {
         var prefix = install.BrewPrefix!;
-        var wasRunning = await StopEngineAsync(notify, ct);
 
-        notify("Updating with Homebrew…");
+        // Stopping Trom API is the point of no return, so like the swap of a release it is not cancellable.
+        var wasRunning = await StopEngineAsync(notify, CancellationToken.None);
+        var start = new SuiteStart(true, null);
+        var finished = false;
+        BrewResult upgrade;
+        SemVersion? now;
 
-        var upgrade = await brew.UpgradeAsync(prefix, notify, ct);
-        var now = upgrade.Ok ? await brew.InstalledVersionAsync(prefix, ct) : null;
+        try
+        {
+            notify("Updating with Homebrew…");
 
-        // Homebrew has linked whatever it left installed, so that trom starts Trom API again whatever happened.
-        var start = wasRunning ? await RestartAsync(Path.Combine(prefix, "bin", "trom"), notify, ct) : new SuiteStart(true, null);
+            upgrade = await brew.UpgradeAsync(prefix, notify, ct);
+            now = upgrade.Ok ? await brew.InstalledVersionAsync(prefix, ct) : null;
+            finished = true;
+        }
+        finally
+        {
+            // Homebrew has linked whatever it left installed, so that trom starts Trom API again whatever happened, and
+            // when brew was cancelled or threw, that is a restart of what was running, not something to cancel in turn.
+            if (wasRunning)
+            {
+                start = await RestartAsync(Path.Combine(prefix, "bin", "trom"), notify, ct.IsCancellationRequested ? CancellationToken.None : ct);
+
+                if (!finished && !start.Ok) notify($"Trom API didn't start again: {start.Problem}");
+            }
+        }
 
         if (!upgrade.Ok) throw UpdateFailure.Failed(WithRestartProblem(upgrade.Problem!, wasRunning, start));
 
@@ -243,11 +274,12 @@ internal sealed class UpdateRunner(
             || full.StartsWith(parent + Path.DirectorySeparatorChar, PackageSwapper.PathComparison);
     }
 
-    private async Task RestartPreviousAsync(Action<string> notify, CancellationToken ct)
+    // Not cancellable: it brings back what was running, and a Ctrl+C here would hide the failure that led to it.
+    private async Task RestartPreviousAsync(Action<string> notify)
     {
         notify("Restarting Trom API…");
 
-        var ready = await engine.EnsureRunningAsync(ct);
+        var ready = await engine.EnsureRunningAsync(CancellationToken.None);
 
         if (!ready.Ok) notify($"Trom API didn't start again: {ready.FailureMessage}");
     }
@@ -270,11 +302,11 @@ internal sealed class UpdateRunner(
     private static string WithRestartProblem(string message, bool wasRunning, SuiteStart start) =>
         wasRunning && !start.Ok ? $"{message} Trom API didn't start again: {start.Problem}" : message;
 
-    private void DeleteUpdateFolder(string updateFolder)
+    private static void DeleteUpdateFolder(string updateFolder, IFileOps from)
     {
         try
         {
-            files.DeleteDirectory(updateFolder);
+            from.DeleteDirectory(updateFolder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

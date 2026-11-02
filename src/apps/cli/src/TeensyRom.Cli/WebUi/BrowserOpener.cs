@@ -16,10 +16,14 @@ internal interface IBrowserOpener
 
 /// <summary>
 /// Opens a page with the platform's own opener: the shell on Windows, <c>open</c> on macOS, <c>xdg-open</c> on Linux, and
-/// <c>wslview</c> then <c>xdg-open</c> inside WSL. An opener that is missing or fails hands over to the next one.
+/// <c>wslview</c> then <c>xdg-open</c> inside WSL. An opener that is missing or fails hands over to the next one. Outside
+/// Windows an opener runs under <c>/bin/sh</c> with its output sent to <c>/dev/null</c>.
 /// </summary>
 internal sealed class BrowserOpener : IBrowserOpener
 {
+    /// <summary>The exit code a shell gives for a program it can't find.</summary>
+    private const int NotFound = 127;
+
     /// <summary>How long a non-Windows opener is waited for; one still running then has most likely started a browser in the foreground.</summary>
     public static readonly TimeSpan OpenerWait = TimeSpan.FromSeconds(5);
 
@@ -57,7 +61,7 @@ internal sealed class BrowserOpener : IBrowserOpener
             }
             catch (Win32Exception ex)
             {
-                failure = $"{info.FileName} couldn't start: {ex.Message}";
+                failure = $"{NameOf(info)} couldn't start: {ex.Message}";
             }
         }
         return new BrowserOpenResult(false, failure ?? "No browser opener is available.");
@@ -81,24 +85,29 @@ internal sealed class BrowserOpener : IBrowserOpener
             return new BrowserOpenResult(true);
         }
 
-        if (process.ExitCode == 0) return new BrowserOpenResult(true);
-
-        var error = (await process.StandardError.ReadToEndAsync(ct)).Trim().Split('\n')[0].Trim();
-
-        return new BrowserOpenResult(false, error.Length > 0
-            ? $"{info.FileName} failed: {error}"
-            : $"{info.FileName} exited with code {process.ExitCode}.");
+        return process.ExitCode switch
+        {
+            0 => new BrowserOpenResult(true),
+            NotFound => new BrowserOpenResult(false, $"{NameOf(info)} isn't installed."),
+            var code => new BrowserOpenResult(false, $"{NameOf(info)} exited with code {code}.")
+        };
     }
 
+    /// <summary>The opener to name in a failure: the program the shell runs, or the address a Windows shell opens.</summary>
+    private static string NameOf(ProcessStartInfo info) => info.UseShellExecute ? info.FileName : info.ArgumentList[^2];
+
+    // The opener's output goes to /dev/null inside the shell: redirected pipes that nobody reads would stall it, or kill a
+    // browser it starts that outlives trom once the pipes close. Its exit code still says whether it worked.
     private static ProcessStartInfo Opener(string file, string url)
     {
-        var info = new ProcessStartInfo(file)
+        var info = new ProcessStartInfo("/bin/sh")
         {
             UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            CreateNoWindow = true
         };
+        info.ArgumentList.Add("-c");
+        info.ArgumentList.Add("\"$0\" \"$1\" >/dev/null 2>&1");
+        info.ArgumentList.Add(file);
         info.ArgumentList.Add(url);
         return info;
     }

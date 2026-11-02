@@ -31,13 +31,17 @@ internal interface IProcessRunner
     /// Runs <paramref name="file"/> with <paramref name="args"/> and waits for it, with no console input.
     /// <paramref name="onLine"/> receives each line of standard output and standard error as it arrives.
     /// </summary>
-    Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default);
+    /// <param name="killProcessTree">
+    /// What a timeout or cancellation kills: the process and everything it started, or with false only the process itself,
+    /// for one whose children are meant to outlive it.
+    /// </param>
+    Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default, bool killProcessTree = true);
 }
 
-/// <summary>Runs child processes for real, killing the whole process tree of one that outlives its timeout.</summary>
+/// <summary>Runs child processes for real, killing the process, and by default its whole tree, when it outlives its timeout.</summary>
 internal sealed class ProcessRunner : IProcessRunner
 {
-    public async Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default)
+    public async Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default, bool killProcessTree = true)
     {
         var start = new ProcessStartInfo(file)
         {
@@ -86,7 +90,7 @@ internal sealed class ProcessRunner : IProcessRunner
             }
             catch (OperationCanceledException)
             {
-                process.Kill(entireProcessTree: true);
+                process.Kill(entireProcessTree: killProcessTree);
                 await process.WaitForExitAsync(CancellationToken.None);
 
                 if (ct.IsCancellationRequested) throw;

@@ -25,7 +25,8 @@ internal sealed class SuiteStarter(IProcessRunner runner) : ISuiteStarter
 
     public async Task<SuiteStart> StartEngineAsync(string tromPath, CancellationToken ct = default)
     {
-        var result = await runner.RunAsync(tromPath, Arguments, Timeout, null, ct);
+        // Only the child is killed on a timeout or Ctrl+C: its tree can hold the detached engine it has just started.
+        var result = await runner.RunAsync(tromPath, Arguments, Timeout, null, ct, killProcessTree: false);
 
         return result.Succeeded ? new SuiteStart(true, null) : new SuiteStart(false, Problem(result));
     }

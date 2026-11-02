@@ -19,6 +19,7 @@ Commands
 Folders
   api/   Trom API (TeensyRom.Api), appsettings.json, Trom UI (wwwroot), Assets
   cli/   trom, the command-line tool
+  trom update replaces both folders; your data stays in ~/.teensyrom
 
 Run Trom API in a terminal instead
   cd api

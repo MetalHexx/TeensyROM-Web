@@ -29,7 +29,7 @@ namespace TeensyRom.Cli.Commands.Main
                 return 1;
             }
 
-            if (!PromptHelper.Confirm($"Update TeensyROM Suite from {status.Installed} to {status.Latest}? Trom API stops and starts again if it is running.", defaultValue: true))
+            if (!PromptHelper.Confirm($"Update TeensyROM Suite from {status.Installed} to {status.Latest}? Trom API stops during the update, which ends any transfer or playback. It starts again if it was running.", defaultValue: true))
             {
                 RadHelper.WriteLine("Cancelled; nothing was changed.");
                 return 1;

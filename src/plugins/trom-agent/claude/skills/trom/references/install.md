@@ -60,7 +60,7 @@ Runs when asked, when `init` reports `update.available` and the user agrees (see
    - **Source build** (`installKind` is `source`, or the `trom` path runs through a `bin/Release` or `bin/Debug` folder of a source checkout): say so, point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/contributing.md, and change nothing.
    - `available` false: say it's current and stop.
    - `installKind` `unknown`: `trom update` won't install here. Point to https://github.com/MetalHexx/TeensyROM-Suite/releases and change nothing.
-2. **Confirm.** Skip the question when the user just agreed to this same `latest` in the opening. Otherwise name the installed and the new version and say what happens: Trom API stops, the install is replaced in place, and Trom API starts again if it was running. A Homebrew install runs `brew upgrade` instead. Wait for a yes.
+2. **Confirm.** Skip the question when the user just agreed to this same `latest` in the opening. Otherwise name the installed and the new version and say what happens: Trom API stops (ending any transfer or playback), the install is replaced in place, and Trom API starts again if it was running. A Homebrew install runs `brew upgrade` instead. Wait for a yes.
 3. **Update.** Run `trom update --yes --json` with a long timeout or as a background command. It prints `updated`, `from`, `to`, `engineWasRunning` and `engineRestarted`. A failure (exit 1) leaves the old install working: relay the message and do not retry until the user says so. `updated` true with `engineRestarted` false: Trom API did not start again; relay `restartProblem` and offer `trom api start`.
 4. **Verify.** Run `trom --version` (the new version), then `trom init --json`, then give the plugin steps (install step 8).
 

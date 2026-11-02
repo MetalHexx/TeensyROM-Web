@@ -21,6 +21,16 @@ public sealed class ChildProcessTests
     }
 
     [Fact]
+    public async Task SuiteStarter_OnATimeoutOrCancel_AsksForOnlyTheChildTromToBeKilled()
+    {
+        var runner = new FakeProcessRunner((_, _) => FakeProcessRunner.Ok("{}"));
+
+        await new SuiteStarter(runner).StartEngineAsync("trom");
+
+        runner.KillProcessTree.Should().Equal(false);
+    }
+
+    [Fact]
     public async Task SuiteStarter_WhenItFails_ReportsTheMessageOfTheJsonErrorObject()
     {
         const string stderr = "Starting the TeensyROM engine…\nThe TeensyROM engine didn't start (it exited while starting).\n"
@@ -186,6 +196,86 @@ public sealed class ChildProcessTests
         var run = () => new ProcessRunner().RunAsync(file, args, TimeSpan.FromMinutes(5), null, cts.Token);
 
         await run.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    // A program that starts a long-running child of its own and prints "child:<pid>".
+    private static (string File, string[] Args) ParentWithAChild() => OperatingSystem.IsWindows()
+        ? ("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+            "$p = Start-Process ping -ArgumentList '-n','120','127.0.0.1' -PassThru -WindowStyle Hidden; Write-Output ('child:' + $p.Id); Start-Sleep 120"])
+        : ("sh", ["-c", "sleep 120 >/dev/null 2>&1 & echo \"child:$!\"; wait"]);
+
+    /// <summary>Runs <see cref="ParentWithAChild"/> and cancels the run as soon as it names its child; returns the child's process id.</summary>
+    private static async Task<int> CancelOnceTheChildIsRunning(bool killProcessTree)
+    {
+        var (file, args) = ParentWithAChild();
+        var child = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var run = () => new ProcessRunner().RunAsync(file, args, TimeSpan.FromMinutes(5), line =>
+        {
+            if (line.StartsWith("child:", StringComparison.Ordinal) && int.TryParse(line[6..], out var pid) && child.TrySetResult(pid)) _ = cts.CancelAsync();
+        }, cts.Token, killProcessTree);
+
+        await run.Should().ThrowAsync<OperationCanceledException>();
+
+        child.Task.IsCompleted.Should().BeTrue("the program names its child before the run is cancelled");
+        return child.Task.Result;
+    }
+
+    private static bool IsRunning(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static void Kill(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            process.Kill();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { }
+    }
+
+    [Fact]
+    public async Task ProcessRunner_WithoutKillProcessTree_KillsTheProgramAndLeavesWhatItStarted()
+    {
+        var child = await CancelOnceTheChildIsRunning(killProcessTree: false);
+
+        try
+        {
+            IsRunning(child).Should().BeTrue();
+        }
+        finally
+        {
+            Kill(child);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessRunner_ByDefault_KillsWhatTheProgramStartedToo()
+    {
+        // Elsewhere a killed child that nobody reaps lingers as a zombie that still looks alive.
+        if (!OperatingSystem.IsWindows()) return;
+
+        var child = await CancelOnceTheChildIsRunning(killProcessTree: true);
+
+        try
+        {
+            SpinWait.SpinUntil(() => !IsRunning(child), TimeSpan.FromSeconds(10)).Should().BeTrue();
+        }
+        finally
+        {
+            Kill(child);
+        }
     }
 
     [Theory]

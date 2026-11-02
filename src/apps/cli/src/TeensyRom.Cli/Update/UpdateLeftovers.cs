@@ -5,11 +5,13 @@ namespace TeensyRom.Cli.Update;
 /// deletes the backups, the unpacked package and the <c>.old</c> executable the update renamed aside.
 /// </summary>
 /// <param name="files">Should not retry: this runs before the command the user typed and must never hold it up.</param>
-internal sealed class UpdateLeftovers(IInstallInspector inspector, IPackageSwapper swapper, IFileOps files)
+/// <param name="warn">Receives the one line said when an interrupted update can't be undone; stderr in the real CLI.</param>
+internal sealed class UpdateLeftovers(IInstallInspector inspector, IPackageSwapper swapper, IFileOps files, Action<string>? warn = null)
 {
     /// <summary>
     /// Does the tidying for a release install and nothing for any other. Never throws and never waits: what is still
-    /// in use, such as the old executable of an update that is only now ending, is left for the next run.
+    /// in use, such as the old executable of an update that is only now ending, is left for the next run. The one thing
+    /// it says is that an interrupted update couldn't be undone, because that leaves the install broken.
     /// </summary>
     public void CleanQuietly()
     {
@@ -31,15 +33,23 @@ internal sealed class UpdateLeftovers(IInstallInspector inspector, IPackageSwapp
         }
     }
 
-    /// <summary>False when an update is running: its files, and the <c>.old</c> executable it made, aren't ours to touch.</summary>
+    /// <summary>False when an update is running, or one couldn't be undone: their files, and the <c>.old</c> executable, aren't ours to touch.</summary>
     private bool CleanUpdateFolder(string updateFolder, string root)
     {
         using var held = UpdateLock.TryAcquire(updateFolder);
 
         if (held is null) return false;
 
-        // When the previous version can't be put back this throws, and the backups and the .old file stay.
-        swapper.Recover(updateFolder, root);
+        // When the previous version can't be put back, the backups and the .old file stay.
+        try
+        {
+            swapper.Recover(updateFolder, root);
+        }
+        catch (SwapFailedException)
+        {
+            warn?.Invoke($"An earlier update didn't finish and couldn't be undone. The files it replaced are in {UpdateFolder.Backup(updateFolder)}; move them back into {root} by hand.");
+            return false;
+        }
 
         TryDelete(() => files.DeleteDirectory(UpdateFolder.Backup(updateFolder)));
         TryDelete(() => files.DeleteDirectory(UpdateFolder.Staging(updateFolder)));

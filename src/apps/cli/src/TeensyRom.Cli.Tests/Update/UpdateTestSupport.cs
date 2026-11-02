@@ -127,6 +127,8 @@ internal class DecoratedFileOps(IFileOps inner) : IFileOps
 
     public virtual void Move(string source, string destination) => inner.Move(source, destination);
 
+    public virtual void WriteFile(string path, byte[] content) => inner.WriteFile(path, content);
+
     public virtual void DeleteFile(string path) => inner.DeleteFile(path);
 
     public virtual void DeleteDirectory(string path) => inner.DeleteDirectory(path);
@@ -154,6 +156,45 @@ internal sealed class FailingMoves(IFileOps inner, int failFrom = int.MaxValue, 
         if (Moves == failFrom || (persistent && Moves > failFrom)) throw new IOException($"simulated failure on move {Moves}");
 
         base.Move(source, destination);
+    }
+}
+
+/// <summary>Notes every move in the order it is made.</summary>
+internal sealed class RecordingMoves(IFileOps inner) : DecoratedFileOps(inner)
+{
+    public List<(string Source, string Destination)> Moves { get; } = [];
+
+    public override void Move(string source, string destination)
+    {
+        Moves.Add((source, destination));
+        base.Move(source, destination);
+    }
+}
+
+/// <summary>Fails the <paramref name="failFrom"/>th write; with <paramref name="persistent"/>, every write after it too. The journal is the only thing the swap writes.</summary>
+internal sealed class FailingWrites(IFileOps inner, int failFrom = int.MaxValue, bool persistent = false) : DecoratedFileOps(inner)
+{
+    public int Writes { get; private set; }
+
+    public override void WriteFile(string path, byte[] content)
+    {
+        Writes++;
+
+        if (Writes == failFrom || (persistent && Writes > failFrom)) throw new IOException($"simulated failure on write {Writes}");
+
+        base.WriteFile(path, content);
+    }
+}
+
+/// <summary>Notes the folders deleted through it.</summary>
+internal sealed class RecordingDeletes(IFileOps inner) : DecoratedFileOps(inner)
+{
+    public List<string> DeletedDirectories { get; } = [];
+
+    public override void DeleteDirectory(string path)
+    {
+        DeletedDirectories.Add(path);
+        base.DeleteDirectory(path);
     }
 }
 
@@ -202,9 +243,13 @@ internal sealed class FakeProcessRunner(Func<string, IReadOnlyList<string>, Proc
 {
     public List<(string File, string[] Args, TimeSpan Timeout)> Calls { get; } = [];
 
-    public Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default)
+    /// <summary>Whether each call, in the order of <see cref="Calls"/>, asked for the whole process tree to be killed.</summary>
+    public List<bool> KillProcessTree { get; } = [];
+
+    public Task<ProcessResult> RunAsync(string file, IReadOnlyList<string> args, TimeSpan timeout, Action<string>? onLine, CancellationToken ct = default, bool killProcessTree = true)
     {
         Calls.Add((file, [.. args], timeout));
+        KillProcessTree.Add(killProcessTree);
 
         var result = answer(file, args);
 
@@ -288,7 +333,8 @@ internal static class PackageBuilder
     }
 
     /// <param name="prefix">What GNU <c>tar -C dir .</c> puts before every name.</param>
-    public static void WriteTarGz(string path, IEnumerable<(string Name, string Content)> entries, string prefix = "./")
+    /// <param name="more">Writes further entries after <paramref name="entries"/>, for ones a package must not hold.</param>
+    public static void WriteTarGz(string path, IEnumerable<(string Name, string Content)> entries, string prefix = "./", Action<TarWriter>? more = null)
     {
         using var file = File.Create(path);
         using var gzip = new GZipStream(file, CompressionLevel.Fastest);
@@ -305,5 +351,7 @@ internal static class PackageBuilder
             };
             tar.WriteEntry(entry);
         }
+
+        more?.Invoke(tar);
     }
 }

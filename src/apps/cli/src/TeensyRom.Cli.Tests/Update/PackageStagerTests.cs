@@ -1,3 +1,4 @@
+using System.Formats.Tar;
 using TeensyRom.Cli.Errors;
 using TeensyRom.Cli.Update;
 
@@ -76,7 +77,7 @@ public sealed class PackageStagerTests : IDisposable
         runner.Calls.Should().ContainSingle().Which.Should().Match<(string File, string[] Args, TimeSpan Timeout)>(
             call => call.File == Path.Combine(staging, "cli", PlatformRid.TromExecutable(rid))
                 && call.Args.SequenceEqual(new[] { "--version" })
-                && call.Timeout == TimeSpan.FromSeconds(10));
+                && call.Timeout == TimeSpan.FromSeconds(60));
     }
 
     [Fact]
@@ -151,6 +152,22 @@ public sealed class PackageStagerTests : IDisposable
 
         (await stage.Should().ThrowAsync<CliException>()).Which.Message.Should().Contain("outside");
         File.Exists(Path.Combine(Root, "evil.txt")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(nameof(TarEntryType.SymbolicLink))]
+    [InlineData(nameof(TarEntryType.HardLink))]
+    public async Task Stage_RefusesATarThatHoldsALink(string kind)
+    {
+        var path = _scratch.At(PlatformRid.AssetName(SemVersionTests.V("1.0.0-beta.2"), "linux-x64"));
+        PackageBuilder.WriteTarGz(path, PackageBuilder.Entries("linux-x64"), more: tar =>
+            tar.WriteEntry(new PaxTarEntry(Enum.Parse<TarEntryType>(kind), "./api/link") { LinkName = "./api/appsettings.json" }));
+        var runner = Trom("trom 1.0.0-beta.2");
+
+        var stage = () => Stage("linux-x64", path, runner);
+
+        (await stage.Should().ThrowAsync<CliException>()).Which.Message.Should().Contain("unexpected kind").And.Contain(kind).And.Contain("nothing was changed");
+        runner.Calls.Should().BeEmpty();
     }
 
     [Theory]

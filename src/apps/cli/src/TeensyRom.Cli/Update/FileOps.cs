@@ -18,6 +18,12 @@ internal interface IFileOps
     /// <summary>Renames a file or a folder; the destination must not exist.</summary>
     void Move(string source, string destination);
 
+    /// <summary>
+    /// Writes <paramref name="content"/> to <paramref name="path"/>, replacing what is there in one rename, so a crash leaves
+    /// the old file or the new one whole. The bytes are on disk when it returns.
+    /// </summary>
+    void WriteFile(string path, byte[] content);
+
     /// <summary>Deletes a file; a missing file is fine.</summary>
     void DeleteFile(string path);
 
@@ -49,6 +55,20 @@ internal sealed class PhysicalFileOps : IFileOps
     {
         if (Directory.Exists(source)) Directory.Move(source, destination);
         else File.Move(source, destination);
+    }
+
+    public void WriteFile(string path, byte[] content)
+    {
+        var temp = $"{path}.tmp";
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            stream.Write(content);
+            stream.Flush(flushToDisk: true);
+        }
+        File.Move(temp, path, overwrite: true);
     }
 
     public void DeleteFile(string path) => File.Delete(path);
@@ -120,6 +140,8 @@ internal sealed class RetryingFileOps(IFileOps inner, IReadOnlyList<TimeSpan>? b
     public void CreateDirectory(string path) => Retry(() => inner.CreateDirectory(path));
 
     public void Move(string source, string destination) => Retry(() => inner.Move(source, destination));
+
+    public void WriteFile(string path, byte[] content) => Retry(() => inner.WriteFile(path, content));
 
     public void DeleteFile(string path) => Retry(() => inner.DeleteFile(path));
 

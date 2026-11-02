@@ -7,14 +7,15 @@ internal interface IPackageSwapper
 {
     /// <summary>
     /// Swaps the package unpacked in the update folder's <c>staging</c> in for <c>api/</c>, <c>README.txt</c> and the
-    /// contents of <paramref name="cliFolder"/>, keeping what it replaced in <c>backup</c>. A failure puts everything back.
+    /// contents of <paramref name="cliFolder"/>, keeping what it replaced in <c>backup</c>. A failure puts everything back,
+    /// except one writing the journal's final mark after every move was made: that swap is whole and stays.
     /// </summary>
     /// <param name="root">The release root, which holds <c>api/</c> and the CLI folder.</param>
     /// <param name="runningExecutable">The running trom, which is renamed aside rather than moved out; null when it isn't in <paramref name="cliFolder"/>.</param>
     /// <exception cref="SwapFailedException">When a step failed; <see cref="SwapFailedException.RolledBack"/> says whether the old install is back.</exception>
     void Swap(string root, string cliFolder, string? runningExecutable);
 
-    /// <summary>Undoes a swap that began and never committed. Returns false when there was nothing to undo.</summary>
+    /// <summary>Undoes a swap that began and never committed. Returns false when there was nothing to undo, which includes a swap that was already undone.</summary>
     /// <exception cref="SwapFailedException">When it couldn't be undone, or the journal can't be read.</exception>
     bool Recover(string updateFolder, string root);
 }
@@ -28,7 +29,7 @@ internal sealed class SwapFailedException(string message, bool rolledBack, Excep
 /// <summary>
 /// Every move of the swap is written to a journal first, so a swap that is interrupted, or fails, can be undone by
 /// moving each recorded destination back in reverse. Undoing looks at the disk rather than trusting the journal: a
-/// move that was recorded but never happened is skipped.
+/// move that was recorded but never happened, or that an earlier undo already reversed, is skipped.
 /// </summary>
 internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
 {
@@ -40,48 +41,45 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
         var journalPath = UpdateFolder.Journal(updateFolder);
         var journal = new SwapJournal();
 
-        void Move(string from, string to)
+        // All the moves are recorded before the first is made, so nothing but the moves lies between them.
+        void MoveAll(params (string From, string To)[] moves)
         {
-            journal.Moves.Add(new JournalMove(Relative(root, from), Relative(root, to)));
-            journal.Save(journalPath);
-            files.CreateDirectory(Path.GetDirectoryName(to)!);
-            files.Move(from, to);
+            foreach (var (from, to) in moves) journal.Moves.Add(new JournalMove(Relative(root, from), Relative(root, to)));
+
+            journal.Save(files, journalPath);
+
+            foreach (var (from, to) in moves)
+            {
+                files.CreateDirectory(Path.GetDirectoryName(to)!);
+                files.Move(from, to);
+            }
         }
+
+        void Move(string from, string to) => MoveAll((from, to));
 
         try
         {
-            journal.Save(journalPath);
+            journal.Save(files, journalPath);
 
-            Replace(Path.Combine(root, "api"),Path.Combine(staging, "api"), Path.Combine(backup, "api"), Move);
+            Replace(Path.Combine(root, "api"), Path.Combine(staging, "api"), Path.Combine(backup, "api"), Move);
             Replace(Path.Combine(root, "README.txt"), Path.Combine(staging, "README.txt"), Path.Combine(backup, "README.txt"), Move);
 
-            foreach (var entry in files.Entries(cliFolder))
-            {
-                if (entry.EndsWith(".old", StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (IsSamePath(entry, runningExecutable)) Move(entry, FreeOldName(entry));
-                else Move(entry, Path.Combine(backup, "cli", Path.GetFileName(entry)));
-            }
-
-            foreach (var entry in files.Entries(Path.Combine(staging, "cli")))
-            {
-                Move(entry, Path.Combine(cliFolder, Path.GetFileName(entry)));
-            }
-
-            journal.Committed = true;
-            journal.Save(journalPath);
+            SwapCli(cliFolder, Path.Combine(staging, "cli"), Path.Combine(backup, "cli"), runningExecutable, Move, MoveAll);
         }
         catch (Exception ex)
         {
-            throw RollBack(root, journal, ex);
+            throw RollBack(root, journal, journalPath, ex);
         }
+
+        Commit(journal, journalPath);
     }
 
     public bool Recover(string updateFolder, string root)
     {
-        var journal = SwapJournal.Load(UpdateFolder.Journal(updateFolder));
+        var journalPath = UpdateFolder.Journal(updateFolder);
+        var journal = SwapJournal.Load(journalPath);
 
-        if (journal is null || journal.Committed) return false;
+        if (journal is null || journal.Committed || journal.RolledBack) return false;
 
         try
         {
@@ -94,7 +92,8 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
                 rolledBack: false, ex);
         }
 
-        files.DeleteFile(UpdateFolder.Journal(updateFolder));
+        MarkRolledBack(journal, journalPath);
+        TryDeleteJournal(journalPath);
         return true;
     }
 
@@ -105,7 +104,58 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
         move(staged, installed);
     }
 
-    private SwapFailedException RollBack(string root, SwapJournal journal, Exception failure)
+    // On Windows the running trom can't be moved out, only renamed, and until the new one is in there is no trom at all:
+    // the other entries go first, and the rename and the move of the new trom are made back to back.
+    private void SwapCli(
+        string cliFolder, string stagedCli, string backedUpCli, string? runningExecutable,
+        Action<string, string> move, Action<(string From, string To)[]> moveAll)
+    {
+        var installed = files.Entries(cliFolder).Where(entry => !entry.EndsWith(".old", StringComparison.OrdinalIgnoreCase)).ToList();
+        var staged = files.Entries(stagedCli);
+        var running = installed.FirstOrDefault(entry => IsSamePath(entry, runningExecutable));
+
+        foreach (var entry in installed.Where(entry => entry != running))
+        {
+            move(entry, Path.Combine(backedUpCli, Path.GetFileName(entry)));
+        }
+
+        var replacement = running is null
+            ? null
+            : staged.FirstOrDefault(entry => IsSamePath(Path.Combine(cliFolder, Path.GetFileName(entry)), running));
+
+        if (running is not null && replacement is not null)
+        {
+            moveAll([(running, FreeOldName(running)), (replacement, running)]);
+        }
+        else if (running is not null)
+        {
+            move(running, FreeOldName(running));
+        }
+
+        foreach (var entry in staged.Where(entry => entry != replacement))
+        {
+            move(entry, Path.Combine(cliFolder, Path.GetFileName(entry)));
+        }
+    }
+
+    // Every move has been made, so a journal that can't be marked committed must not undo a swap that is whole: it is
+    // deleted instead, which is the same as committed. If even that fails the journal stays uncommitted, and the next
+    // run's recovery reverts the update: a whole old install, not a broken one.
+    private void Commit(SwapJournal journal, string journalPath)
+    {
+        journal.Committed = true;
+
+        try
+        {
+            journal.Save(files, journalPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            TryDeleteJournal(journalPath);
+        }
+    }
+
+    private SwapFailedException RollBack(string root, SwapJournal journal, string journalPath, Exception failure)
     {
         var reason = failure.Message.TrimEnd('.');
 
@@ -120,9 +170,38 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
                 rolledBack: false, failure);
         }
 
+        MarkRolledBack(journal, journalPath);
+
         return new SwapFailedException(
             $"The update failed ({reason}); the previous version is back in place. Close anything using TeensyROM Suite's files and try again.",
             rolledBack: true, failure);
+    }
+
+    // The journal outlives the update folder's cleanup when a delete fails; marked, a later Recover leaves the tree alone.
+    private void MarkRolledBack(SwapJournal journal, string journalPath)
+    {
+        journal.RolledBack = true;
+
+        try
+        {
+            journal.Save(files, journalPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Undo recognises moves it has already reversed, so an unmarked journal is still safe to run again.
+        }
+    }
+
+    private void TryDeleteJournal(string journalPath)
+    {
+        try
+        {
+            files.DeleteFile(journalPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The update folder's cleanup retries it.
+        }
     }
 
     private void Undo(string root, SwapJournal journal)
@@ -132,7 +211,7 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
             var from = Resolve(root, journal.Moves[i].From);
             var to = Resolve(root, journal.Moves[i].To);
 
-            if (!Exists(to)) continue;
+            if (!Exists(to) || OriginalIsBack(root, journal, i)) continue;
 
             if (Exists(from)) throw new IOException($"{from} and {to} both exist");
 
@@ -140,6 +219,11 @@ internal sealed class PackageSwapper(IFileOps files) : IPackageSwapper
             files.Move(to, from);
         }
     }
+
+    // A move into a path that an earlier move emptied has been undone when that earlier move has been too: the path holds
+    // the original again, and moving it out would lose it.
+    private bool OriginalIsBack(string root, SwapJournal journal, int index) =>
+        journal.Moves.Take(index).Any(earlier => earlier.From == journal.Moves[index].To && !Exists(Resolve(root, earlier.To)));
 
     private bool Exists(string path) => files.FileExists(path) || files.DirectoryExists(path);
 
@@ -170,6 +254,9 @@ internal sealed class SwapJournal
 
     public bool Committed { get; set; }
 
+    /// <summary>The moves were all undone; there is nothing left for <see cref="IPackageSwapper.Recover"/> to do.</summary>
+    public bool RolledBack { get; set; }
+
     public List<JournalMove> Moves { get; set; } = [];
 
     /// <summary>The journal at <paramref name="path"/>; null when there is none.</summary>
@@ -191,20 +278,9 @@ internal sealed class SwapJournal
         }
     }
 
-    /// <summary>Writes the journal to disk before returning, replacing the last one in a single rename so a crash leaves one whole file.</summary>
-    public void Save(string path)
-    {
-        var temp = $"{path}.tmp";
-
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
-        using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            JsonSerializer.Serialize(stream, this, JsonSerializerOptions.Web);
-            stream.Flush(flushToDisk: true);
-        }
-        File.Move(temp, path, overwrite: true);
-    }
+    /// <summary>Writes the journal to disk before returning, through <paramref name="files"/> so a file another process briefly holds is retried like a move.</summary>
+    public void Save(IFileOps files, string path) =>
+        files.WriteFile(path, JsonSerializer.SerializeToUtf8Bytes(this, JsonSerializerOptions.Web));
 }
 
 /// <summary>One rename of the swap: <see cref="From"/> became <see cref="To"/>, both relative to the release root with <c>/</c> separators.</summary>

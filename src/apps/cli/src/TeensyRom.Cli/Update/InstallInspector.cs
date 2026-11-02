@@ -17,13 +17,41 @@ internal interface IInstallInspector
 /// <summary>
 /// Classifies the install from what the engine locator found, so the layout is decided in one place: a source tree is a
 /// source build, a packaged engine is a release unpacked anywhere or, under a Homebrew <c>Cellar</c>, a Homebrew install.
+/// An update that was killed while <c>api/</c> was out of place leaves no engine to find, so an unfinished swap journal
+/// beside the CLI folder also marks a release: the one install that has something to recover.
 /// </summary>
 /// <param name="cliFolder">The folder the running trom is in, <see cref="AppContext.BaseDirectory"/> in the real CLI.</param>
 internal sealed class InstallInspector(IEngineLocator locator, string cliFolder) : IInstallInspector
 {
     private const string Cellar = "/Cellar/";
 
-    public InstallInfo Inspect() => Classify(locator.Locate().Location, cliFolder, OperatingSystem.IsWindows());
+    private const string CliFolderName = "cli";
+
+    public InstallInfo Inspect()
+    {
+        var info = Classify(locator.Locate().Location, cliFolder, OperatingSystem.IsWindows());
+
+        return info.Kind == InstallKind.Unknown && InterruptedSwapRoot(info.CliFolder) is { } root
+            ? new InstallInfo(InstallKind.Release, info.CliFolder, root, null)
+            : info;
+    }
+
+    /// <summary>The release root above <paramref name="folder"/> when it is a <c>cli</c> folder whose root holds a journal of a swap that began and was never finished or undone; otherwise null.</summary>
+    private static string? InterruptedSwapRoot(string folder)
+    {
+        if (!string.Equals(Path.GetFileName(folder), CliFolderName, StringComparison.OrdinalIgnoreCase)) return null;
+
+        if (Path.GetDirectoryName(folder) is not { } root) return null;
+
+        try
+        {
+            return SwapJournal.Load(UpdateFolder.Journal(UpdateFolder.For(root))) is { Committed: false, RolledBack: false } ? root : null;
+        }
+        catch (SwapFailedException)
+        {
+            return null;
+        }
+    }
 
     /// <param name="engine">What the engine locator found; null when it found no engine at all.</param>
     internal static InstallInfo Classify(EngineLocation? engine, string cliFolder, bool windows)

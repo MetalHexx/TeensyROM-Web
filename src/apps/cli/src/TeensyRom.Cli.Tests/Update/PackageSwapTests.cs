@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using TeensyRom.Cli.Update;
 
@@ -118,6 +119,22 @@ public sealed class PackageSwapTests : IDisposable
         File.Exists(_sandbox.Journal + ".tmp").Should().BeFalse();
     }
 
+    [Fact]
+    public void Swap_MovesTheNewTromInTheMomentTheRunningOneIsRenamedAside_WhateverElseTheCliFolderHolds()
+    {
+        _sandbox.Scratch.Write("install/cli/zeta.txt", "sorts after trom.exe");
+        _sandbox.Scratch.Write("install/.trom-update/staging/cli/extra.txt", "staged beside trom");
+        var moves = new RecordingMoves(new PhysicalFileOps());
+
+        _sandbox.Swap(moves);
+
+        var aside = moves.Moves.FindIndex(move => move.Source == _sandbox.RunningExecutable);
+        aside.Should().BeGreaterThanOrEqualTo(0);
+        moves.Moves[aside + 1].Should().Be((_sandbox.Scratch.At("install/.trom-update/staging/cli/trom.exe"), _sandbox.RunningExecutable));
+        _sandbox.Read("install/.trom-update/backup/cli/zeta.txt").Should().Be("sorts after trom.exe");
+        _sandbox.Read("install/cli/extra.txt").Should().Be("staged beside trom");
+    }
+
     // ---- failure and rollback ------------------------------------------------------------------------------
 
     [Fact]
@@ -175,7 +192,90 @@ public sealed class PackageSwapTests : IDisposable
         File.Exists(_sandbox.Journal).Should().BeFalse();
     }
 
+    [Fact]
+    public void Swap_WhenTheJournalIsBrieflyHeld_RetriesTheWriteLikeAMove()
+    {
+        var sleeps = new List<TimeSpan>();
+        var flaky = new FailingWrites(new PhysicalFileOps(), failFrom: 3);
+        var files = new RetryingFileOps(flaky, [TimeSpan.FromMilliseconds(1)], sleeps.Add);
+
+        _sandbox.Swap(files);
+
+        sleeps.Should().ContainSingle();
+        _sandbox.Read("install/api/TeensyRom.Api.exe").Should().Be("new api");
+        JsonSerializer.Deserialize<SwapJournal>(File.ReadAllText(_sandbox.Journal), JsonSerializerOptions.Web)!.Committed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Swap_WhenOnlyTheCommitMarkCantBeWritten_KeepsTheCompleteSwapAndLeavesNoJournalToUndoIt()
+    {
+        var clean = new FailingWrites(new PhysicalFileOps());
+        using (var probe = new SwapSandbox()) probe.Swap(clean);
+
+        var swap = () => _sandbox.Swap(new FailingWrites(new PhysicalFileOps(), failFrom: clean.Writes, persistent: true));
+
+        swap.Should().NotThrow();
+        var swapped = _sandbox.Installed();
+        _sandbox.Read("install/api/TeensyRom.Api.exe").Should().Be("new api");
+        _sandbox.Read("install/cli/trom.exe").Should().Be("new trom");
+        File.Exists(_sandbox.Journal).Should().BeFalse("an uncommitted journal would have the next run undo a swap that is whole");
+
+        new PackageSwapper(new PhysicalFileOps()).Recover(_sandbox.UpdateFolder, _sandbox.Root).Should().BeFalse();
+        _sandbox.Installed().Should().Equal(swapped);
+    }
+
     // ---- recovery ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Recover_AfterARollbackThatWorked_LeavesTheRestoredTreeAlone()
+    {
+        var installed = _sandbox.Installed();
+        var staged = _sandbox.Staged();
+        var swap = () => _sandbox.Swap(new FailingMoves(new PhysicalFileOps(), failFrom: 5));
+        swap.Should().Throw<SwapFailedException>().Which.RolledBack.Should().BeTrue();
+        File.Exists(_sandbox.Journal).Should().BeTrue("a failed delete of the update folder is what leaves it for Recover");
+
+        var recover = () => new PackageSwapper(new PhysicalFileOps()).Recover(_sandbox.UpdateFolder, _sandbox.Root);
+
+        recover.Should().NotThrow().Which.Should().BeFalse();
+        _sandbox.Installed().Should().Equal(installed);
+        _sandbox.Staged().Should().Equal(staged);
+    }
+
+    /// <summary>Takes the mark that a rollback has finished, so a journal is left as it was before the mark existed.</summary>
+    private sealed class RefusesTheRolledBackMark(IFileOps inner) : DecoratedFileOps(inner)
+    {
+        public override void WriteFile(string path, byte[] content)
+        {
+            if (Encoding.UTF8.GetString(content).Contains("\"rolledBack\":true", StringComparison.Ordinal)) throw new IOException("held");
+
+            base.WriteFile(path, content);
+        }
+    }
+
+    [Fact]
+    public void Recover_AfterARollbackWhoseJournalCouldNotBeMarked_StillLeavesTheRestoredTreeAlone()
+    {
+        var clean = new FailingMoves(new PhysicalFileOps());
+        using (var probe = new SwapSandbox()) probe.Swap(clean);
+
+        for (var failing = 1; failing <= clean.Moves; failing++)
+        {
+            using var sandbox = new SwapSandbox();
+            var installed = sandbox.Installed();
+
+            var swap = () => sandbox.Swap(new FailingMoves(new RefusesTheRolledBackMark(new PhysicalFileOps()), failing));
+            swap.Should().Throw<SwapFailedException>($"move {failing} fails").Which.RolledBack.Should().BeTrue();
+
+            // The folder is half cleared too: the staged package is gone, the journal that would undo it is not.
+            Directory.Delete(sandbox.Staging, recursive: true);
+
+            var recover = () => new PackageSwapper(new PhysicalFileOps()).Recover(sandbox.UpdateFolder, sandbox.Root);
+
+            recover.Should().NotThrow($"move {failing} fails");
+            sandbox.Installed().Should().Equal(installed, $"move {failing} fails");
+        }
+    }
 
     [Fact]
     public void Recover_WithNoJournalOrACommittedOne_DoesNothing()
@@ -195,7 +295,7 @@ public sealed class PackageSwapTests : IDisposable
     public void Recover_SkipsAMoveThatWasRecordedButNeverHappened()
     {
         var installed = _sandbox.Installed();
-        new SwapJournal { Moves = [new JournalMove("api", ".trom-update/backup/api")] }.Save(_sandbox.Journal);
+        new SwapJournal { Moves = [new JournalMove("api", ".trom-update/backup/api")] }.Save(new PhysicalFileOps(), _sandbox.Journal);
 
         new PackageSwapper(new PhysicalFileOps()).Recover(_sandbox.UpdateFolder, _sandbox.Root).Should().BeTrue();
 

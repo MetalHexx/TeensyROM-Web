@@ -17,7 +17,9 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public FakeUpdateWorld()
     {
         Install = new InstallInfo(InstallKind.Release, CliFolder, Root, null);
-        Files = new ScriptedFileOps(new PhysicalFileOps());
+        DeletesWithRetry = new RecordingDeletes(new PhysicalFileOps());
+        DeletesWithoutRetry = new RecordingDeletes(new PhysicalFileOps());
+        Files = new ScriptedFileOps(DeletesWithRetry);
         Files.CurrentDirectory = _scratch.Folder;
     }
 
@@ -29,7 +31,13 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
 
     public string TromExe => Path.Combine(CliFolder, "trom.exe");
 
+    /// <summary>What the runner changes the disk through up to the end of the swap, the way the real one retries.</summary>
     public ScriptedFileOps Files { get; }
+
+    public RecordingDeletes DeletesWithRetry { get; }
+
+    /// <summary>What the runner clears the update folder through once the new version is in.</summary>
+    public RecordingDeletes DeletesWithoutRetry { get; }
 
     public FakeReleaseCheck Check { get; } = new();
 
@@ -45,6 +53,11 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public bool JournalExistedAtStage { get; private set; }
     public IProgress<DownloadProgress>? ProgressSeenByStager { get; private set; }
 
+    // What was true when the new engine was started.
+    public bool UpdateFolderExistedAtStart { get; private set; }
+    public bool LockHeldAtStart { get; private set; }
+    public bool StartWasCancelled { get; private set; }
+
     // What the world answers.
     public InstallInfo Install { get; set; }
     public List<ReleaseInfo> Releases { get; set; } = [ReleaseSelectorTests.Release("v1.0.0-beta.2", true, "win-x64", "linux-x64")];
@@ -53,6 +66,7 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Action? OnStage { get; set; }
     public Action? OnStop { get; set; }
     public Action? OnSwap { get; set; }
+    public Action? OnBrew { get; set; }
     public SwapFailedException? SwapFailure { get; set; }
     public SwapFailedException? RecoverFailure { get; set; }
     public bool EngineRunning { get; set; } = true;
@@ -64,7 +78,7 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public List<string> BrewOutput { get; set; } = ["==> Upgrading teensyrom-suite"];
 
     public UpdateRunner Runner(string installed = "1.0.0-beta.1", string? rid = "win-x64") =>
-        new(this, this, Check, this, this, this, this, this, Files, Time, installed, rid, TromExe);
+        new(this, this, Check, this, this, this, this, this, Files, DeletesWithoutRetry, Time, installed, rid, TromExe);
 
     public async Task<UpdateApplied> Apply(string installed = "1.0.0-beta.1", string? rid = "win-x64", IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
     {
@@ -130,9 +144,11 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Task<BrewResult> UpgradeAsync(string prefix, Action<string> onLine, CancellationToken ct = default)
     {
         Calls.Add($"brew:{prefix}");
+        OnBrew?.Invoke();
 
         foreach (var line in BrewOutput) onLine(line);
 
+        ct.ThrowIfCancellationRequested();
         return Task.FromResult(BrewResult);
     }
 
@@ -145,6 +161,15 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Task<SuiteStart> StartEngineAsync(string tromPath, CancellationToken ct = default)
     {
         Calls.Add($"start:{tromPath}");
+        UpdateFolderExistedAtStart = Directory.Exists(UpdateFolder);
+
+        // Probing a folder that isn't there would create it.
+        if (UpdateFolderExistedAtStart)
+        {
+            using var other = UpdateLock.TryAcquire(UpdateFolder);
+            LockHeldAtStart = other is null;
+        }
+        StartWasCancelled = ct.IsCancellationRequested;
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(StartResult);
     }
@@ -154,6 +179,7 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public Task<EngineReady> EnsureRunningAsync(CancellationToken ct)
     {
         Calls.Add("ensure-running");
+        ct.ThrowIfCancellationRequested();
         return Task.FromResult(EnsureResult);
     }
 
@@ -332,7 +358,30 @@ public sealed class UpdateRunnerTests : IDisposable
 
         _world.Calls.Should().Equal("releases", "recover", "stage", "status", "stop", "swap", $"start:{_world.TromExe}");
         applied.Should().Be(new UpdateApplied("1.0.0-beta.1", "1.0.0-beta.2", EngineWasRunning: true, EngineRestarted: true, RestartProblem: null));
-        _world.Notices.Should().Equal("Downloading TeensyROM Suite 1.0.0-beta.2…", "Stopping Trom API…", "Installing…", "Starting Trom API…");
+        _world.Notices.Should().Equal("Downloading TeensyROM Suite 1.0.0-beta.2…", UpdateRunner.NotCancellable, "Stopping Trom API…", "Installing…", "Starting Trom API…");
+    }
+
+    [Fact]
+    public async Task Apply_WhenStagingFails_NeverSaysTheUpdateCantBeCancelled()
+    {
+        _world.StageFailure = new CliException(CliExitCode.Failed, "doesn't match the checksum");
+
+        var apply = () => _world.Apply();
+
+        await apply.Should().ThrowAsync<CliException>();
+        _world.Notices.Should().NotContain(UpdateRunner.NotCancellable);
+    }
+
+    [Fact]
+    public async Task Apply_StartsTheNewEngineBeforeClearingTheUpdateFolder_ThenClearsItWithoutRetrying()
+    {
+        await _world.Apply();
+
+        _world.UpdateFolderExistedAtStart.Should().BeTrue();
+        _world.LockHeldAtStart.Should().BeTrue("a trom the restart runs must not tidy up under the update");
+        _world.DeletesWithoutRetry.DeletedDirectories.Should().Contain(_world.UpdateFolder);
+        _world.DeletesWithRetry.DeletedDirectories.Should().NotContain(_world.UpdateFolder);
+        _world.UpdateFolderExists.Should().BeFalse();
     }
 
     [Fact]
@@ -416,6 +465,19 @@ public sealed class UpdateRunnerTests : IDisposable
         _world.Calls.Should().EndWith(new[] { "swap", "ensure-running" });
         _world.Calls.Should().NotContain(call => call.StartsWith("start:"));
         _world.UpdateFolderExists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Apply_WhenCancelledDuringASwapThatRollsBack_StillRestartsTheOldEngineAndReportsTheRealFailure()
+    {
+        using var cts = new CancellationTokenSource();
+        _world.OnSwap = cts.Cancel;
+        _world.SwapFailure = new SwapFailedException("The update failed (in use); the previous version is back in place.", rolledBack: true);
+
+        var apply = () => _world.Apply(ct: cts.Token);
+
+        (await apply.Should().ThrowAsync<CliException>()).Which.Message.Should().Be(_world.SwapFailure.Message);
+        _world.Calls.Should().EndWith(new[] { "swap", "ensure-running" });
     }
 
     [Fact]
@@ -617,6 +679,53 @@ public sealed class UpdateRunnerTests : IDisposable
         message.Should().Contain("`brew upgrade teensyrom-suite` failed").And.Contain("Trom API didn't start again: the engine didn't start");
         _world.Calls.Should().NotContain("brew-version");
         _world.Calls.Should().EndWith($"start:{Brewed("trom")}");
+    }
+
+    [Theory]
+    [InlineData("stop")]
+    [InlineData("brew")]
+    public async Task Homebrew_WhenCancelled_StillStartsTheEngineAgainWhichWasRunning(string cancelledDuring)
+    {
+        UseHomebrew();
+        using var cts = new CancellationTokenSource();
+        if (cancelledDuring == "stop") _world.OnStop = cts.Cancel;
+        else _world.OnBrew = cts.Cancel;
+
+        var apply = () => _world.Apply(ct: cts.Token);
+
+        await apply.Should().ThrowAsync<OperationCanceledException>();
+        _world.Calls.Should().EndWith($"start:{Brewed("trom")}");
+        _world.StartWasCancelled.Should().BeFalse("it brings back what was running, whatever Ctrl+C was pressed");
+        _world.Calls.Should().NotContain("brew-version");
+    }
+
+    [Fact]
+    public async Task Homebrew_WhenCancelledAndTheEngineWontStartAgain_SaysSo()
+    {
+        UseHomebrew();
+        using var cts = new CancellationTokenSource();
+        _world.OnBrew = cts.Cancel;
+        _world.StartResult = new SuiteStart(false, "the engine didn't start");
+
+        var apply = () => _world.Apply(ct: cts.Token);
+
+        await apply.Should().ThrowAsync<OperationCanceledException>();
+        _world.Notices.Should().Contain("Trom API didn't start again: the engine didn't start");
+    }
+
+    [Fact]
+    public async Task Homebrew_WhenCancelledAndTheEngineWasNotRunning_StartsNothing()
+    {
+        UseHomebrew();
+        _world.EngineRunning = false;
+        _world.StopOutcome = EngineStopOutcome.NotRunning;
+        using var cts = new CancellationTokenSource();
+        _world.OnBrew = cts.Cancel;
+
+        var apply = () => _world.Apply(ct: cts.Token);
+
+        await apply.Should().ThrowAsync<OperationCanceledException>();
+        _world.Calls.Should().NotContain(call => call.StartsWith("start:"));
     }
 
     [Fact]

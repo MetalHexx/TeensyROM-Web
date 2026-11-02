@@ -280,12 +280,13 @@ internal static class CliHost
             new SuiteStarter(processes),
             engine,
             retrying,
+            physical,
             TimeProvider.System,
             version,
             rid,
             Environment.ProcessPath);
         // Startup tidying must never hold up the command the user typed, so it doesn't retry a file that is in use.
-        var leftovers = new UpdateLeftovers(inspector, new PackageSwapper(physical), physical);
+        var leftovers = new UpdateLeftovers(inspector, new PackageSwapper(physical), physical, output.Notice);
         var notifier = new UpdateNotifier(releaseCheck, output, TimeProvider.System);
 
         services.AddSingleton<ITeensyRomApiClient>(apiClient);

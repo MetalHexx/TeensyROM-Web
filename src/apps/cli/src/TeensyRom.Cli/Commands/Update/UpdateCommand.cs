@@ -14,7 +14,7 @@ internal sealed class UpdateSettings : TromSettings
     [CommandOption("--check")]
     public bool Check { get; set; }
 
-    [Description("Install without asking. Required when there is no terminal to ask in.")]
+    [Description("Install without asking. Trom API stops during the update, which ends any transfer or playback. Required when there is no terminal to ask in.")]
     [CommandOption("-y|--yes")]
     public bool Yes { get; set; }
 }
@@ -104,7 +104,7 @@ internal sealed class UpdateCommand(ICliOutput output, IUpdateRunner updates) : 
     {
         if (!Output.CanPrompt) throw new CliException(CliExitCode.Usage, "Pass --yes to update without a terminal to confirm it.");
 
-        var question = $"Update TeensyROM Suite from {status.Installed} to {status.Latest}? Trom API stops and starts again if it is running.";
+        var question = $"Update TeensyROM Suite from {status.Installed} to {status.Latest}? Trom API stops during the update, which ends any transfer or playback. It starts again if it was running.";
 
         if (!Output.Err.Confirm(Markup.Escape(question), defaultValue: true))
         {

@@ -19,7 +19,8 @@ internal sealed class PackageStager(IReleaseClient client, IProcessRunner runner
     /// <summary>Free space wanted, as a multiple of the package: the download, the unpacked files and the backup of what they replace.</summary>
     internal const int SpaceFactor = 4;
 
-    public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(10);
+    /// <summary>Long because the first run of a freshly written ~100 MB executable can wait on Defender's scan of it.</summary>
+    public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(60);
 
     public async Task<string> StageAsync(string root, ReleaseInfo release, ReleaseAsset asset, string rid, IProgress<DownloadProgress>? progress, CancellationToken ct)
     {
