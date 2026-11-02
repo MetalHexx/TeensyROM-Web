@@ -178,7 +178,8 @@ cd <unpacked>/api
    - `trom update --json` with no terminal and no `--yes` exits 2.
    - A feed with `--digest wrong` or `none`: the update is refused (exit 1) and the install is unchanged.
    - `trom update --yes --json`: the engine is stopped, `api/`, `cli/` and `README.txt` are swapped, and the new `trom` restarts the engine if it was running. The output carries `updated: true`, `from`, `to`, `engineWasRunning` and `engineRestarted`. The running `trom` is renamed aside on every platform (`trom.exe.old` on Windows, `trom.old` on macOS and Linux; `.<n>.old` if that name is taken) and removed by the next `trom` run; `<root>/.trom-update/` is gone afterwards.
-   - Holding a file in `api/` open with `FileShare.None` makes the swap fail; it rolls back and the old engine runs again.
+   - Holding a file in `api/` open with `FileShare.None` makes the swap fail; it rolls back and the old engine runs again. Hold a file the engine doesn't read at start (`api/wwwroot/index.html`): holding `appsettings.json` also rolls back, but the old engine can't start again until the file is released.
+   - Linux under WSL: run scripts with `wsl -d <distro> --exec bash <script>` (from Git Bash, prefix `MSYS_NO_PATHCONV=1`), run the feed server inside WSL, and do the whole flow in one script. WSL in NAT mode can't discover carts; seed `<home>/api/Assets/System/Config/ConnectionRecords.json` with each cart's `ChipId`, `TcpEndpoint` (`ip:2112`) and `TransportInUse: 1` before the first start.
 6. Afterwards `trom --version` shows the newer version and `trom api status` agrees. Finish with `trom api stop`, stop the feed server and delete the scratch folders.
 
 ### Step 6: Report Output Location
