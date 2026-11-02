@@ -42,7 +42,7 @@ internal sealed class TuiHost(CommandApp flows, StartupGate gate, ICliOutput out
         AnsiConsole.Console = consoles.Out;
 
         AnsiConsole.WriteLine();
-        RadHelper.RenderLogo("TeensyROM", FontConstants.FontPath);
+        RadHelper.RenderLogo("TeensyROM", FontConstants.Logo);
 
         var labels = Menu.Select(entry => entry.Label).Append(Leave).ToList();
 
