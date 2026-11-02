@@ -11,9 +11,9 @@ public sealed class UpdateLeftoversTests : IDisposable
 
     public void Dispose() => _sandbox.Dispose();
 
-    private UpdateLeftovers Leftovers(InstallKind kind = InstallKind.Release, Action<string>? warn = null) =>
+    private UpdateLeftovers Leftovers(InstallKind kind = InstallKind.Release, Action<string>? warn = null, IFileOps? files = null) =>
         new(new StubInspector(new InstallInfo(kind, _sandbox.CliFolder, kind == InstallKind.Release ? _sandbox.Root : null, null)),
-            new PackageSwapper(_files), _files, warn);
+            new PackageSwapper(files ?? _files), files ?? _files, warn);
 
     private bool Exists(string relative) => File.Exists(_sandbox.Scratch.At(relative)) || Directory.Exists(_sandbox.Scratch.At(relative));
 
@@ -135,12 +135,44 @@ public sealed class UpdateLeftoversTests : IDisposable
     }
 
     [Fact]
-    public void WithNothingToTidy_DoesNotCreateTheWorkFolder()
+    public void WithNothingToTidy_DoesNotCreateTheWorkFolder_OrTouchAnything()
     {
         Directory.Delete(_sandbox.UpdateFolder, recursive: true);
+        var deletes = new RecordingDeletes(_files, _sandbox.UpdateFolder);
 
-        Leftovers().CleanQuietly();
+        Leftovers(files: deletes).CleanQuietly();
 
+        Exists("install/.trom-update").Should().BeFalse();
+        deletes.Deletes.Should().BeEmpty("a run with nothing to tidy must not even take the lock");
+    }
+
+    [Fact]
+    public void WithOnlyAnOldExecutableLeft_DeletesItWhileHoldingTheLock_AndLeavesNoWorkFolder()
+    {
+        _sandbox.Swap(_files);
+        Directory.Delete(_sandbox.UpdateFolder, recursive: true);
+        var deletes = new RecordingDeletes(_files, _sandbox.UpdateFolder);
+
+        Leftovers(files: deletes).CleanQuietly();
+
+        Exists("install/cli/trom.exe.old").Should().BeFalse();
+        Exists("install/.trom-update").Should().BeFalse();
+        deletes.Deletes.Should().Contain(delete => delete.Path.EndsWith("trom.exe.old", StringComparison.Ordinal) && delete.LockHeld);
+    }
+
+    [Fact]
+    public void EverythingIsDeletedWhileHoldingTheLock_AndTheFolderOnlyAfterLettingGo()
+    {
+        _sandbox.Swap(_files);
+        _sandbox.Scratch.Write("install/.trom-update/download/package.zip", "zip");
+        var deletes = new RecordingDeletes(_files, _sandbox.UpdateFolder);
+
+        Leftovers(files: deletes).CleanQuietly();
+
+        deletes.Deletes.Should().Contain(delete => delete.Path.EndsWith("trom.exe.old", StringComparison.Ordinal));
+        deletes.Deletes.Should().Contain(delete => delete.Path.EndsWith("backup", StringComparison.Ordinal));
+        deletes.Deletes.Where(delete => delete.Path != _sandbox.UpdateFolder).Should().OnlyContain(delete => delete.LockHeld);
+        deletes.Deletes.Should().ContainSingle(delete => delete.Path == _sandbox.UpdateFolder).Which.LockHeld.Should().BeFalse();
         Exists("install/.trom-update").Should().BeFalse();
     }
 

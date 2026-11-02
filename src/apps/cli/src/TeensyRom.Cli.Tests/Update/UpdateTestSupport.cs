@@ -133,6 +133,8 @@ internal class DecoratedFileOps(IFileOps inner) : IFileOps
 
     public virtual void DeleteDirectory(string path) => inner.DeleteDirectory(path);
 
+    public virtual void DeleteEmptyDirectory(string path) => inner.DeleteEmptyDirectory(path);
+
     public virtual long? FreeSpace(string path) => inner.FreeSpace(path);
 
     public virtual void MakeExecutable(string path) => inner.MakeExecutable(path);
@@ -186,15 +188,44 @@ internal sealed class FailingWrites(IFileOps inner, int failFrom = int.MaxValue,
     }
 }
 
-/// <summary>Notes the folders deleted through it.</summary>
-internal sealed class RecordingDeletes(IFileOps inner) : DecoratedFileOps(inner)
+/// <summary>
+/// Notes what is deleted through it. With <paramref name="updateFolder"/>, notes for each delete whether the update lock
+/// was held at that moment, by trying to take it.
+/// </summary>
+internal sealed class RecordingDeletes(IFileOps inner, string? updateFolder = null) : DecoratedFileOps(inner)
 {
+    /// <summary>Every delete, in order, whatever it deleted.</summary>
+    public List<(string Path, bool LockHeld)> Deletes { get; } = [];
+
     public List<string> DeletedDirectories { get; } = [];
+
+    public List<string> DeletedEmptyDirectories { get; } = [];
+
+    public override void DeleteFile(string path)
+    {
+        Record(path);
+        base.DeleteFile(path);
+    }
 
     public override void DeleteDirectory(string path)
     {
         DeletedDirectories.Add(path);
+        Record(path);
         base.DeleteDirectory(path);
+    }
+
+    public override void DeleteEmptyDirectory(string path)
+    {
+        DeletedEmptyDirectories.Add(path);
+        Record(path);
+        base.DeleteEmptyDirectory(path);
+    }
+
+    private void Record(string path)
+    {
+        using var probe = updateFolder is null ? null : UpdateLock.TryAcquire(updateFolder);
+
+        Deletes.Add((path, updateFolder is not null && probe is null));
     }
 }
 

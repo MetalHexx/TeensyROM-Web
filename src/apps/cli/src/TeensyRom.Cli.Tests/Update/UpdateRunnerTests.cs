@@ -17,8 +17,8 @@ internal sealed class FakeUpdateWorld : IInstallInspector, IReleaseClient, IPack
     public FakeUpdateWorld()
     {
         Install = new InstallInfo(InstallKind.Release, CliFolder, Root, null);
-        DeletesWithRetry = new RecordingDeletes(new PhysicalFileOps());
-        DeletesWithoutRetry = new RecordingDeletes(new PhysicalFileOps());
+        DeletesWithRetry = new RecordingDeletes(new PhysicalFileOps(), UpdateFolder);
+        DeletesWithoutRetry = new RecordingDeletes(new PhysicalFileOps(), UpdateFolder);
         Files = new ScriptedFileOps(DeletesWithRetry);
         Files.CurrentDirectory = _scratch.Folder;
     }
@@ -379,9 +379,34 @@ public sealed class UpdateRunnerTests : IDisposable
 
         _world.UpdateFolderExistedAtStart.Should().BeTrue();
         _world.LockHeldAtStart.Should().BeTrue("a trom the restart runs must not tidy up under the update");
-        _world.DeletesWithoutRetry.DeletedDirectories.Should().Contain(_world.UpdateFolder);
-        _world.DeletesWithRetry.DeletedDirectories.Should().NotContain(_world.UpdateFolder);
+        _world.DeletesWithoutRetry.DeletedDirectories.Should().Contain(Path.Combine(_world.UpdateFolder, "staging"));
+        _world.DeletesWithoutRetry.DeletedEmptyDirectories.Should().Contain(_world.UpdateFolder);
+        _world.DeletesWithRetry.DeletedEmptyDirectories.Should().BeEmpty();
         _world.UpdateFolderExists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Apply_ClearsTheUpdateFolderWhileHoldingTheLock_AndRemovesTheFolderOnlyAfterLettingGo()
+    {
+        await _world.Apply();
+
+        var deletes = _world.DeletesWithoutRetry.Deletes;
+        deletes.Should().Contain(delete => delete.Path.EndsWith("staging", StringComparison.Ordinal));
+        deletes.Where(delete => delete.Path != _world.UpdateFolder).Should().OnlyContain(delete => delete.LockHeld);
+        deletes.Should().ContainSingle(delete => delete.Path == _world.UpdateFolder).Which.LockHeld.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Apply_WhenStagingFails_ClearsTheUpdateFolderWithRetriesAndWhileHoldingTheLock()
+    {
+        _world.StageFailure = new CliException(CliExitCode.Failed, "doesn't match the checksum");
+
+        var apply = () => _world.Apply();
+
+        await apply.Should().ThrowAsync<CliException>();
+        _world.DeletesWithoutRetry.Deletes.Should().BeEmpty();
+        _world.DeletesWithRetry.DeletedEmptyDirectories.Should().Contain(_world.UpdateFolder);
+        _world.DeletesWithRetry.Deletes.Where(delete => delete.Path != _world.UpdateFolder).Should().OnlyContain(delete => delete.LockHeld);
     }
 
     [Fact]

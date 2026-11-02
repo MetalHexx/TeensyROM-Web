@@ -144,14 +144,13 @@ internal sealed class UpdateRunner(
 
             swapped = true;
 
-            // The lock is held until the update folder is gone, so a trom the restart runs doesn't tidy up under this one.
+            // The lock stays held through the restart, so a trom the restart runs doesn't tidy up under this one.
             start = wasRunning ? await RestartAsync(Path.Combine(install.CliFolder, PlatformRid.TromExecutable(platform)), notify, ct) : new SuiteStart(true, null);
         }
         finally
         {
-            held.Dispose();
-
-            if (!keepUpdateFolder) DeleteUpdateFolder(updateFolder, swapped ? quickFiles : files);
+            if (keepUpdateFolder) held.Dispose();
+            else held.ClearAndRelease(swapped ? quickFiles : files);
         }
 
         return new UpdateApplied(installed.ToString(), release.Version.ToString(), wasRunning, wasRunning && start.Ok, wasRunning ? start.Problem : null);
@@ -301,16 +300,4 @@ internal sealed class UpdateRunner(
 
     private static string WithRestartProblem(string message, bool wasRunning, SuiteStart start) =>
         wasRunning && !start.Ok ? $"{message} Trom API didn't start again: {start.Problem}" : message;
-
-    private static void DeleteUpdateFolder(string updateFolder, IFileOps from)
-    {
-        try
-        {
-            from.DeleteDirectory(updateFolder);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Left for UpdateLeftovers to clear at the next start.
-        }
-    }
 }

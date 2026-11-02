@@ -61,6 +61,19 @@ public sealed class RetryingFileOpsTests
     }
 
     [Fact]
+    public void DeleteEmptyDirectory_IsNotRetried_BecauseAFolderWithFilesInItWontEmptyByWaiting()
+    {
+        using var scratch = new Scratch();
+        scratch.Write("folder/file.txt");
+        var sleeps = new List<TimeSpan>();
+
+        var delete = () => new RetryingFileOps(new PhysicalFileOps(), Backoff, sleeps.Add).DeleteEmptyDirectory(scratch.At("folder"));
+
+        delete.Should().Throw<IOException>();
+        sleeps.Should().BeEmpty();
+    }
+
+    [Fact]
     public void ByDefault_ItWaitsAboutFifteenSecondsInAll()
     {
         RetryingFileOps.DefaultBackoff.Aggregate(TimeSpan.Zero, (total, wait) => total + wait)

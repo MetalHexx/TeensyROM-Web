@@ -30,7 +30,10 @@ internal interface IFileOps
     /// <summary>Deletes a folder and everything in it; a missing folder is fine.</summary>
     void DeleteDirectory(string path);
 
-    /// <summary>The bytes free on the volume holding <paramref name="path"/>; null when that can't be told.</summary>
+    /// <summary>Deletes a folder that has nothing in it; a missing folder is fine. Anything in it makes it fail with an <see cref="IOException"/>.</summary>
+    void DeleteEmptyDirectory(string path);
+
+    /// <summary>The bytes free on the volume holding <paramref name="path"/>, or the nearest folder above it that exists; null when that can't be told.</summary>
     long? FreeSpace(string path);
 
     /// <summary>Lets the owner, group and others run the file. Does nothing on Windows.</summary>
@@ -78,16 +81,31 @@ internal sealed class PhysicalFileOps : IFileOps
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
     }
 
+    public void DeleteEmptyDirectory(string path)
+    {
+        if (Directory.Exists(path)) Directory.Delete(path, recursive: false);
+    }
+
     public long? FreeSpace(string path)
     {
         try
         {
-            return new DriveInfo(Path.GetPathRoot(Path.GetFullPath(path))!).AvailableFreeSpace;
+            var full = Path.GetFullPath(path);
+
+            // On Unix the path root is always "/", whatever volume the path is on; DriveInfo asks the file system about the path it is given.
+            return new DriveInfo(OperatingSystem.IsWindows() ? Path.GetPathRoot(full)! : NearestExisting(full)).AvailableFreeSpace;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    private static string NearestExisting(string path)
+    {
+        while (!Directory.Exists(path) && Path.GetDirectoryName(path) is { } parent) path = parent;
+
+        return path;
     }
 
     public void MakeExecutable(string path)
@@ -130,6 +148,9 @@ internal sealed class RetryingFileOps(IFileOps inner, IReadOnlyList<TimeSpan>? b
     public long? FreeSpace(string path) => inner.FreeSpace(path);
 
     public void MakeExecutable(string path) => inner.MakeExecutable(path);
+
+    // Not retried: a folder that isn't empty belongs to another update, and waiting won't change that.
+    public void DeleteEmptyDirectory(string path) => inner.DeleteEmptyDirectory(path);
 
     public string CurrentDirectory
     {
