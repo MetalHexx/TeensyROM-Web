@@ -35,7 +35,7 @@ trom file random --filter music --player
 
 Skip to the next or previous file, pause and resume, favorite or ban what is playing, and share it. Shape the stream with a mode, a filter, a play timer or a pinned folder. A timer moves games, demos and images along by themselves.
 
-> 🖼️ **Image placeholder:** Stream Player
+<img width="1465" height="1167" alt="Trom Terminal's Stream Player playing Chordian by Jens-Christian Huus" src="../.github/images/trom-terminal-stream-player.png" />
 
 ## One-line commands
 
