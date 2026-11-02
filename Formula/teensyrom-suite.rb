@@ -55,6 +55,24 @@ class TeensyromSuite < Formula
   end
 
   def caveats
+    unless (libexec/"cli/trom").exist?
+      # Older package (no cli/): the old instructions and data folder
+      return <<~EOS
+        TeensyROM Suite has been installed!
+
+        To start the application:
+          trom-suite
+
+        Then open Trom UI in your browser at:
+          http://localhost:10213
+
+        Your data is kept in ~/Library/Application Support/TeensyROM-Web.
+
+        macOS may block the first launch: open System Settings >
+        Privacy & Security and choose Open Anyway.
+      EOS
+    end
+
     <<~EOS
       TeensyROM Suite has been installed!
 
