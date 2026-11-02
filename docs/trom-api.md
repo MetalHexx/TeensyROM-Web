@@ -9,6 +9,10 @@ Trom API is the server at the heart of TeensyROM Suite. It talks to your carts, 
 
 It listens on port `10213`.
 
+## Build your own tools
+
+Your tools can do what Trom UI and Trom Terminal do: launch files, browse and search your library, copy files, manage favorites and bans, and set themes. Call it over HTTP from any language, or generate a client from its OpenAPI spec at [http://localhost:10213/openapi/v1.json](http://localhost:10213/openapi/v1.json).
+
 ## API docs
 
 With Trom API running, its API documentation is at [http://localhost:10213/scalar/v1](http://localhost:10213/scalar/v1).
