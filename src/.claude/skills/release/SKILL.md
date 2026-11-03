@@ -128,7 +128,7 @@ bash .github/scripts/changelog-section.sh {version} > notes.md && gh release edi
 
 ### Step 7: Publish Trom Agent to tr-plugin-marketplace
 
-Run this after the release, whenever the plugin changed or its version moved with the suite. The marketplace repo is `MetalHexx/tr-plugin-marketplace` (local clone `C:\dev\src\tr-plugin-marketplace`). Its `main` changes only by pull request.
+Run this after every release: Trom Agent's version moves in lockstep with the suite. The marketplace repo is `MetalHexx/tr-plugin-marketplace` (local clone `C:\dev\src\tr-plugin-marketplace`). Its `main` changes only by pull request.
 
 1. In the clone: `git fetch`, then `git switch -c publish/trom-agent-{version} origin/main`.
 2. Make `plugins/trom-agent/claude/` identical to this repo's `src/plugins/trom-agent/claude/` at the release tag: copy it over and delete files the source no longer has. `.claude-plugin/plugin.json` and the `Agent version:` marker in `skills/trom/SKILL.md` already carry the release version.
