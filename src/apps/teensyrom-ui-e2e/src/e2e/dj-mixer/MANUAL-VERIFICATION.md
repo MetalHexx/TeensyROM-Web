@@ -1005,3 +1005,30 @@ The operator listens throughout and records the verdict in their words.
 ### Verdict
 
 Pending: the operator's, from the bench, with both cartridges connected.
+
+## Set row drag and the bench checklist (ASID-DJ-19, 2026-11-03)
+
+Not run. The whole set row except its remove key now starts the drag that reorders the set and
+drops onto a deck, the same drag as the grip. A pending row cannot be dragged, and a plain click
+still selects the row. The automated checks cover the wiring with synthetic events, which skip the
+browser's own drop rules; whether a real browser starts the drag from a row's title, number, decks
+and length, and how the drag ghost looks, needs a bench.
+
+### Bench checklist (operator, real hardware)
+
+- [ ] The play and play-now keys feel immediate from the mouse, on the tiles and the selected row,
+  early and deep in a long tune.
+- [ ] A press-to-port measurement of a play-now, per the `asid-dj-diagnostics` protocol, to judge
+  the parked engine item.
+- [ ] A loop started from its tile, then edited.
+- [ ] A running loop duplicated: silent takeover, live edits, and the original kept.
+- [ ] Kill/Punch and nudge pads lit from a controller.
+- [ ] The speed display read against frame B.
+- [ ] Set rows dragged from their body, both to reorder the set and onto a deck.
+- [ ] A long name typed in the rename field.
+- [ ] The "Loop N" and "Cue N" labels.
+- [ ] Playback timing per the `asid-dj-diagnostics` protocol, inside the Performance log's numbers.
+
+### Verdict
+
+Pending: the operator's, from the bench.

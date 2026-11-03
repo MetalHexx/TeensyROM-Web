@@ -11,10 +11,11 @@ const meta: Meta<SetRowComponent> = {
         component:
           'One tune in the set card: a drag handle (focusable, where Alt+ArrowUp and Alt+ArrowDown ' +
           'move the row), its number, title and author, a detail line, the A and B deck lights, its ' +
-          'length and a remove key. The detail is the loop and cue counts, an indeterminate bar ' +
-          'while the tune is fetched or analysed, or the reason it is unavailable in the dimmed ' +
-          'warning colour. The selected row carries `aria-current` and the knob’s highlight; a ' +
-          'pending row has no handle or remove key and cannot be selected.',
+          'length and a remove key. The rest of the row, except the remove key, drags the same way ' +
+          'as the handle. The detail is the loop and cue counts, an indeterminate bar while the ' +
+          'tune is fetched or analysed, or the reason it is unavailable in the dimmed warning ' +
+          'colour. The selected row carries `aria-current` and the knob’s highlight; a pending row ' +
+          'has no handle or remove key and cannot be selected or dragged.',
       },
     },
   },
@@ -23,6 +24,9 @@ const meta: Meta<SetRowComponent> = {
     selectRow: { description: 'The row was pressed.' },
     remove: { description: 'The remove key was pressed.' },
     moveBy: { description: 'Alt+ArrowUp (-1) or Alt+ArrowDown (1) was pressed on the handle.' },
+    dragStarted: {
+      description: 'A drag from the handle or the row body started; the host sets the drag image.',
+    },
   },
   render: (args) => ({
     props: args,

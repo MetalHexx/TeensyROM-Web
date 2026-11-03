@@ -38,7 +38,7 @@ export interface SetRowModel {
   readonly decks: readonly SetRowDeckMarker[];
   /** The knob's selection: draws the highlight and `aria-current`. */
   readonly selected: boolean;
-  /** Still being fetched or analysed: no handle, no remove key, and it cannot be selected. */
+  /** Still being fetched or analysed: no handle, no remove key, it cannot be selected or dragged. */
   readonly pending: boolean;
   /** Names the row's select button with its place, tune, loops, length and decks in words. */
   readonly accessibleName: string;
@@ -53,8 +53,9 @@ const DETAIL_WORDS = { fetching: 'Fetching', analyzing: 'Analyzing' } as const;
  * One tune in the set card: a drag handle (also focusable, where Alt+ArrowUp and Alt+ArrowDown
  * move the row), its number, title and author, a detail line (loop and cue counts, or a progress
  * bar while it is fetched or analysed, or why it is unavailable), the A and B deck lights, its
- * length and a remove key. The selected row carries `aria-current` and the knob's highlight. A
- * pending row has no handle or remove key and cannot be selected. Purely presentational.
+ * length and a remove key. The rest of the row, except the remove key, drags the same way as the
+ * handle. The selected row carries `aria-current` and the knob's highlight. A pending row has no
+ * handle or remove key, and it cannot be selected or dragged. Purely presentational.
  *
  * @example
  * ```html
@@ -90,7 +91,10 @@ export class SetRowComponent {
   readonly remove = output<void>();
   /** Emits -1 or 1 when Alt+ArrowUp or Alt+ArrowDown is pressed on the handle. */
   readonly moveBy = output<-1 | 1>();
-  /** Emits when the handle's drag starts, with the event so the host can set the drag image. */
+  /**
+   * Emits when a drag from the handle or the row body starts, with the event so the host can set
+   * the drag image.
+   */
   readonly dragStarted = output<DragEvent>();
 
   protected readonly dragging = signal(false);
@@ -103,9 +107,9 @@ export class SetRowComponent {
   });
 
   /**
-   * Starts a row drag: the payload carries only the row's id, under the card's own type. `copyMove`
-   * lets both the card (a move) and a deck (a copy) accept it. The drag image is left to the host,
-   * which sets it from the emitted event.
+   * Starts a row drag from the handle or the row body: the payload carries only the row's id, under
+   * the card's own type. `copyMove` lets both the card (a move) and a deck (a copy) accept it. The
+   * drag image is left to the host, which sets it from the emitted event.
    */
   protected onDragStart(event: DragEvent): void {
     const { dataTransfer } = event;
