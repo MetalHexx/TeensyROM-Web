@@ -226,7 +226,8 @@ export class LoopSelectedRowComponent {
   /** Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction. */
   readonly moveEdge = output<LoopEdgeMove>();
   /** Emits the new name with the id of the marker the edit was opened on, even if the selection has
-   *  since moved; an empty name returns the marker to its place name. */
+   *  since moved; an empty name returns the marker to its place name. Emits nothing when the name is
+   *  the one the edit opened with. */
   readonly rename = output<{ id: string; name: string }>();
 
   private readonly editor = viewChild(InlineEditTitleComponent);
@@ -234,18 +235,25 @@ export class LoopSelectedRowComponent {
   /** Whether the name editor is open; derived from the editor so it cannot drift from it. */
   protected readonly renaming = computed(() => this.editor()?.isEditing() ?? false);
 
-  private renameTargetId: string | null = null;
+  /** The marker and name the open editor was seeded with. The editor judges "changed" against the
+   *  current model's name, which a selection move under the open field replaces. */
+  private renameTarget: { id: string; name: string } | null = null;
 
   constructor() {
     effect(() => {
-      this.renameTargetId = this.renaming() ? untracked(() => this.model().id) : null;
+      this.renameTarget = this.renaming() ? untracked(() => this.openedOn()) : null;
     });
   }
 
+  private openedOn(): { id: string; name: string } | null {
+    const { id, name } = this.model();
+    return id === null ? null : { id, name };
+  }
+
   protected onCommit(name: string): void {
-    const id = this.renameTargetId ?? this.model().id;
-    if (id !== null) {
-      this.rename.emit({ id, name });
+    const target = this.renameTarget ?? this.openedOn();
+    if (target !== null && name !== target.name) {
+      this.rename.emit({ id: target.id, name });
     }
   }
 

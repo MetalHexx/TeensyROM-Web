@@ -650,6 +650,37 @@ describe('DjDeckColumnComponent', () => {
       expect(deckService.renameMarker).toHaveBeenCalledWith('B', 'm1', 'Drop');
     });
 
+    it('renames nothing when a tile press moves the selection under an untouched editor', () => {
+      const { fixture, deckService, loopsSummary } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem({ selected: true }), loopItem({ id: 'm2', name: 'Loop 2' })],
+          selected: selection(),
+        },
+      });
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelector<HTMLButtonElement>('lib-loop-selected-row lib-inline-edit-title button')?.click();
+      fixture.detectChanges();
+      const field = el.querySelector('lib-loop-selected-row input[type="text"]') as HTMLInputElement;
+
+      el.querySelector<HTMLButtonElement>(
+        'lib-loop-tile-grid button[aria-label="Trigger Loop 2 deck B"]'
+      )?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      loopsSummary.set(
+        emptyLoopsSummary({
+          hasTune: true,
+          items: [loopItem(), loopItem({ id: 'm2', name: 'Loop 2', selected: true })],
+          selected: selection({ id: 'm2', name: 'Loop 2' }),
+        })
+      );
+      fixture.detectChanges();
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      fixture.detectChanges();
+
+      expect(deckService.toggleMarker).toHaveBeenCalledWith('B', 'm2');
+      expect(deckService.renameMarker).not.toHaveBeenCalled();
+    });
+
     it('fills the selected row and applies the disabled rules', () => {
       const { fixture, loopsSummary } = render(DECK_B, {
         loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },

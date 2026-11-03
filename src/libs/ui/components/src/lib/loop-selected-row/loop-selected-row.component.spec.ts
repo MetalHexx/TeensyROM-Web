@@ -74,6 +74,11 @@ const loop: LoopSelectedRowModel = {
   nameMaxLength: 48,
 };
 
+// jsdom has no `PointerEvent` constructor — a `MouseEvent` carries the `button` the key reads.
+function pointerDown(button: number): Event {
+  return new MouseEvent('pointerdown', { bubbles: true, button });
+}
+
 const cue: Partial<LoopSelectedRowModel> = {
   kindLabel: 'CUE',
   clearEndDisabled: true,
@@ -134,6 +139,40 @@ describe('LoopSelectedRowComponent', () => {
       'clearEnd',
       'delete',
     ]);
+  });
+
+  describe('the play and play-now keys press on pointer down', () => {
+    const cases = [
+      ['trigger', 'loop-toggle'],
+      ['playNow', 'loop-play-now'],
+    ] as const;
+
+    for (const [output, control] of cases) {
+      it(`emits ${output} once on a primary pointer down, and not again for the click after it`, () => {
+        let emitted = 0;
+        fixture.componentInstance[output].subscribe(() => emitted++);
+
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(0));
+        expect(emitted).toBe(1);
+
+        button(`[data-control="${control}"]`).dispatchEvent(
+          new MouseEvent('click', { bubbles: true, detail: 1 })
+        );
+        expect(emitted).toBe(1);
+      });
+
+      it(`never emits ${output} on a secondary-button pointer down or while disabled`, () => {
+        let emitted = 0;
+        fixture.componentInstance[output].subscribe(() => emitted++);
+
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(2));
+        expect(emitted).toBe(0);
+
+        setModel({ triggerDisabled: true, playNowDisabled: true });
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(0));
+        expect(emitted).toBe(0);
+      });
+    }
   });
 
   it('relays the In and Out keys, each from its own boundary', () => {
@@ -396,6 +435,32 @@ describe('LoopSelectedRowComponent', () => {
         field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
         expect(renames).toEqual([{ id: 'm3', name: 'Chorus drop' }]);
+      });
+
+      it('commits an emptied name to the marker the edit was opened on', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().value = '';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+        expect(renames).toEqual([{ id: 'm3', name: '' }]);
+      });
+
+      it('emits nothing for an untouched draft when the selection moved under the open editor', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().dispatchEvent(new Event('blur'));
+        fixture.detectChanges();
+
+        expect(renames).toEqual([]);
+        expect(renaming()).toBe(false);
       });
     });
 

@@ -64,6 +64,32 @@ describe('LoopTileComponent', () => {
     expect([triggers, playNows, selects]).toEqual([1, 1, 1]);
   });
 
+  describe('the play and play-now keys press on pointer down', () => {
+    // jsdom has no `PointerEvent` constructor — a `MouseEvent` carries the `button` the key reads.
+    const pointerDown = (button: number): Event =>
+      new MouseEvent('pointerdown', { bubbles: true, button });
+    const keys: [string, () => HTMLButtonElement, () => number][] = [
+      ['trigger', triggerButton, () => triggers],
+      ['playNow', playNowButton, () => playNows],
+    ];
+
+    for (const [output, key, emitted] of keys) {
+      it(`emits ${output} once on a primary pointer down, and not again for the click after it`, () => {
+        key().dispatchEvent(pointerDown(0));
+        expect(emitted()).toBe(1);
+
+        key().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+        expect(emitted()).toBe(1);
+        expect(selects).toBe(0);
+      });
+
+      it(`never emits ${output} on a secondary-button pointer down`, () => {
+        key().dispatchEvent(pointerDown(2));
+        expect(emitted()).toBe(0);
+      });
+    }
+  });
+
   it('names the three buttons from the model', () => {
     expect(playNowButton().getAttribute('aria-label')).toBe('Play now Loop 3');
     expect(triggerButton().getAttribute('aria-label')).toBe('Trigger Loop 3');
