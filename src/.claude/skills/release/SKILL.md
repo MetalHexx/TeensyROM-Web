@@ -1,13 +1,13 @@
 ---
 name: release
-description: Automate the TeensyROM Suite release process with version bumping, tagging, and GitHub Release management
+description: Release TeensyROM Suite - version bump, CHANGELOG notes, Package Test, tag, GitHub Release checks, and publishing Trom Agent to tr-plugin-marketplace
 user-invocable: true
 disable-model-invocation: true
 ---
 
 # Release TeensyROM Suite
 
-This skill automates the TeensyROM Suite release process by bumping the version, creating a git tag, and managing GitHub releases.
+This skill releases TeensyROM Suite: it bumps the version, writes the release notes, tests the packages, tags the release, checks what the release workflow published, and publishes Trom Agent to `tr-plugin-marketplace`.
 
 ## Prerequisites
 
@@ -17,15 +17,16 @@ This skill automates the TeensyROM Suite release process by bumping the version,
 
 ## Pre-flight
 
-- The GitHub repo is named `TeensyROM-Suite`. The formula, the docs and `trom update` all read `MetalHexx/TeensyROM-Suite`, so rename before the first suite release.
-- The release PR is merged to `main` (for `1.0.0-beta.1`, PR #93).
-- The `Package Test` workflow (`.github/workflows/package-test.yml`) is green on the commit being tagged. It builds the packages and installs them: a real Homebrew install on macOS (arm64 and x64) and a tarball install on Linux, both smoke-tested with `.github/scripts/package-smoke.sh`. It runs only on `pull_request` and `workflow_dispatch`, so after the version bump lands on main, run `gh workflow run package-test.yml --ref main` and wait for it to pass before tagging.
+- Everything going into the release is merged to `main`.
 - The tag equals `<Version>` in `src/apps/Version.props`. The `validate` job of `release.yml` fails otherwise.
 - `CHANGELOG.md` has a section for the version (Step 1). `release.yml` publishes it as the release notes; the `validate` job fails when it is missing or empty.
+- `Package Test` is green on the commit being tagged (Step 2).
 
 ## Process
 
-### Step 1: Bump Version
+### Step 1: Bump Version and Write the Notes
+
+When `Version.props`, the plugin version and the `CHANGELOG.md` section already carry the version (as for `1.0.0-beta.1`), go to Step 2.
 
 Ask the user for the new version number, then update the `<Version>` element in the shared version file. It stamps both the engine (`TeensyRom.Api`) and the CLI (`TeensyRom.Cli`), so there is one place to bump:
 
@@ -35,7 +36,7 @@ Ask the user for the new version number, then update the `<Version>` element in 
 <Version>NEW_VERSION_HERE</Version>
 ```
 
-The `trom-agent` plugin is versioned with the tool suite, so the same version goes in two more places in this repo: `"version"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the line `Agent version: NEW_VERSION_HERE` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (the agent version marker). In the `tr-plugin-marketplace` repo set `plugins/trom-agent/claude/.claude-plugin/plugin.json` and the `trom-agent` entry of `.claude-plugin/marketplace.json`, and set the marker in `plugins/trom-agent/claude/skills/trom/SKILL.md` to match too: that copy normally arrives by republishing the plugin source. A CLI test covers the manifest and the marker and fails when either drifts from `Version.props`.
+The `trom-agent` plugin is versioned with the tool suite, so the same version goes in two more places in this repo: `"version"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the line `Agent version: NEW_VERSION_HERE` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (the agent version marker). A CLI test covers the manifest and the marker and fails when either drifts from `Version.props`. The copy in `tr-plugin-marketplace` moves to the new version in Step 7, after the release is out.
 
 Example versions:
 - Stable release: `1.0.0`, `1.2.3`, `2.0.0`
@@ -71,24 +72,40 @@ git commit -m "chore: bump version to {version}"
 git push origin main
 ```
 
-### Step 2: Create Git Tag
+### Step 2: Run Package Test on main
 
-Create and push a git tag with the `v` prefix to trigger the release workflow:
+`Package Test` (`.github/workflows/package-test.yml`) builds the packages and installs them: through a real Homebrew install on macOS (arm64 and x64), from the tarball on Linux and from the zip on Windows, each smoke-tested with `.github/scripts/package-smoke.sh`. It runs on pull requests that touch packaging, and on demand. Run it on `main`:
 
 ```bash
-git tag v{version}
+git fetch origin && git rev-parse origin/main    # {sha}, the commit to release
+gh workflow run package-test.yml -R MetalHexx/TeensyROM-Suite --ref main
+gh run list -R MetalHexx/TeensyROM-Suite --workflow package-test.yml --event workflow_dispatch --commit {sha} -L 1 --json databaseId,status,createdAt
+gh run watch <run-id> -R MetalHexx/TeensyROM-Suite --exit-status
+```
+
+The new run takes a few seconds to appear; until then the list is empty or shows an earlier run at the same commit (its `createdAt` is before the dispatch). Tag `{sha}` only when the new run passes.
+
+### Step 3: Create Git Tag
+
+Tag the commit Package Test passed on, then push the tag to trigger the release workflow:
+
+```bash
+git tag v{version} {sha}
 git push origin v{version}
 ```
 
-### Step 3: Monitor Release Workflow
+### Step 4: Watch the Release Workflow
 
-Inform the user that the release workflow has been triggered and provide them with:
-- GitHub Actions workflow URL: `https://github.com/MetalHexx/TeensyROM-Suite/actions`
-- Expected completion time: ~15-20 minutes for all 4 platform builds
+The workflow builds the 4 packages, commits the Homebrew formula to `main`, and creates the GitHub Release. It takes about 15-20 minutes. Give the user the run's URL, `https://github.com/MetalHexx/TeensyROM-Suite/actions/runs/<run-id>`.
 
-Tell them: "The release workflow is now running. It will build TeensyROM Suite for all 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64) and create a GitHub Release with the artifacts. This typically takes 15-20 minutes. I'll wait for you to confirm when the release has been created."
+```bash
+gh run list -R MetalHexx/TeensyROM-Suite --workflow release.yml --branch v{version} --commit {sha} -L 1 --json databaseId,status,createdAt
+gh run watch <run-id> -R MetalHexx/TeensyROM-Suite --exit-status
+```
 
-### Step 4: Check the Release
+A tag push runs with the tag as its branch. Wait for the run to appear; after a retry, the newest run is the one to watch.
+
+### Step 5: Check the Release
 
 Once the workflow finishes, `gh release view v{version}` shows:
 - Title: `TeensyROM Suite v{version}`
@@ -103,23 +120,24 @@ To change the notes afterwards, edit `CHANGELOG.md` on `main`, then republish th
 bash .github/scripts/changelog-section.sh {version} > notes.md && gh release edit v{version} --notes-file notes.md && rm notes.md
 ```
 
-### Step 5: Post-Release Checks
+### Step 6: Post-Release Checks
 
 1. `gh release view v{version} --json assets`: exactly the 4 assets, each with a `digest` (`sha256:<hex>`).
-2. The `chore: update Homebrew formula for v{version}` commit is on `main`, with the version and both `sha256` values set.
+2. The `chore: update Homebrew formula for v{version}` commit is on `main`, with the version, both `sha256` values and `TeensyROM-Suite` URLs set. The `release` job runs even when `update-formula` fails, so check it every time.
 3. Download one package from the release page and smoke-test it. Point `TEENSYROM_DATA_DIR` at a temp folder, unpack, run `cli/trom --version` (prints `trom {version}`) and `cli/trom ui --no-open --json`, then `cli/trom api stop`.
-4. From an older install, `trom update --check` reports the new release.
+4. From an older install, `trom update --check` reports the new release. On `1.0.0-beta.1`, the first release with `trom update`, run it on the new install instead: it reports current.
 5. On a Mac with Homebrew: `brew update && brew upgrade teensyrom-suite`, then `trom --version`.
 
-### Step 6: Publish Trom Agent to tr-plugin-marketplace
+### Step 7: Publish Trom Agent to tr-plugin-marketplace
 
-Run this after the release, whenever the plugin changed or its version moved with the suite. The marketplace repo is `MetalHexx/tr-plugin-marketplace` (local clone `C:\dev\src\tr-plugin-marketplace`). `main` is protected, so publish by pull request.
+Run this after every release: Trom Agent's version moves in lockstep with the suite. The marketplace repo is `MetalHexx/tr-plugin-marketplace` (local clone `C:\dev\src\tr-plugin-marketplace`). Its `main` changes only by pull request.
 
-1. In the clone: `git fetch`, then branch from `origin/main`.
-2. Make `plugins/trom-agent/claude/` identical to this repo's `src/plugins/trom-agent/claude/`: copy it over and delete files the source no longer has. `.claude-plugin/plugin.json` and the `Agent version:` marker in `skills/trom/SKILL.md` already carry the release version.
-3. Set `"version"` on the `trom-agent` entry of `.claude-plugin/marketplace.json` to the release version.
-4. Update both READMEs: the root `README.md` (the *Needs* cell of the plugins table) and `plugins/trom-agent/README.md` (the *Install from source* bullet and *Where the source lives*). Link `https://github.com/MetalHexx/TeensyROM-Suite` instead of `TeensyROM-Web`, and drop the build-from-source text: the skill installs and updates `trom` from releases and Homebrew.
+1. In the clone: `git fetch`, then `git switch -c publish/trom-agent-{version} origin/main`.
+2. Make `plugins/trom-agent/claude/` identical to this repo's `src/plugins/trom-agent/claude/` at the release tag: copy it over and delete files the source no longer has. `.claude-plugin/plugin.json` and the `Agent version:` marker in `skills/trom/SKILL.md` already carry the release version.
+3. In `.claude-plugin/marketplace.json`, set `"version"` on the `trom-agent` entry to the release version.
+4. Bring the descriptions up to date with `docs/trom-agent.md`: the `description` in `marketplace.json`, the plugins table in the root `README.md`, and *What it does*, *How it works* and *Where the source lives* in `plugins/trom-agent/README.md`. Name the products as the docs do (Trom UI, Trom API, Trom Terminal), link `https://github.com/MetalHexx/TeensyROM-Suite`, and drop any build-from-source text: the skill installs and updates the suite from releases and Homebrew.
 5. Commit, push the branch and open a PR. Merge after review.
+6. After the merge, in Claude Code: `/plugin marketplace update tr-plugin-marketplace`, update or reinstall `trom-agent@tr-plugin-marketplace` from `/plugin`, and restart the session. `/plugin` then lists `trom-agent` at the release version.
 
 ## Example Workflow
 
@@ -130,15 +148,18 @@ User: 1.2.0
 Agent: [Updates src/apps/Version.props and the plugin version, drafts the 1.2.0 section of CHANGELOG.md]
 Agent: Here are the release notes for 1.2.0. Anything to change?
 User: Looks good.
-Agent: [Commits, pushes, creates tag v1.2.0, pushes it]
-Agent: Version bumped to 1.2.0 and tag v1.2.0 pushed. The release workflow is running at https://github.com/MetalHexx/TeensyROM-Suite/actions and takes about 15-20 minutes.
+Agent: [Commits and pushes, runs Package Test on main and waits for it]
+Agent: Package Test passed on abc1234. Tag v1.2.0 there?
+User: Yes.
+Agent: [Creates and pushes tag v1.2.0, watches the release workflow]
 Agent: [Release published with the CHANGELOG.md notes] https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
+Agent: [Runs the post-release checks, then opens the tr-plugin-marketplace PR for trom-agent 1.2.0]
 ```
 
 ## Important Notes
 
 - The version in `src/apps/Version.props` MUST match the git tag version (without the `v` prefix)
-- The plugin version (`plugin.json`, the agent version marker in `plugins/trom-agent/claude/skills/trom/SKILL.md`, and their marketplace copies in `tr-plugin-marketplace`) MUST match `Version.props`
+- The plugin version (`plugin.json` and the agent version marker in `plugins/trom-agent/claude/skills/trom/SKILL.md`) MUST match `Version.props`. The marketplace copies catch up in Step 7
 - Pre-release versions (containing `-`) are automatically marked as pre-release in GitHub
 - The workflow builds self-contained executables - no .NET SDK required to run them
 - Every artifact holds `README.txt`, `api/` (the engine: `TeensyRom.Api[.exe]`, `appsettings.json`, `wwwroot/`, `Assets/`) and `cli/` (`trom[.exe]`, one file). The CLI finds the engine at `../api/TeensyRom.Api[.exe]`
@@ -158,13 +179,14 @@ If the version bump fails, tag creation fails, or workflow fails:
 4. Check GitHub Actions logs for build errors
 
 If you need to retry:
-1. Delete the tag: `git tag -d v{version}` and `git push origin :refs/tags/v{version}`
-2. Fix the issue
-3. Recreate the tag and push
+1. If the release was created, delete it first (ask the user): `gh release delete v{version} -R MetalHexx/TeensyROM-Suite --yes`
+2. Delete the tag: `git tag -d v{version}` and `git push origin :refs/tags/v{version}`
+3. Fix the issue
+4. Recreate the tag and push
 
 ## Technical Details
 
-- Workflow file: `.github/workflows/release.yml` (jobs `validate`, `build`, `update-formula`, `release`). `build` calls the reusable `.github/workflows/build-packages.yml`, which builds Trom UI once and then one package per platform with `.github/scripts/package.sh`
+- Workflow file: `.github/workflows/release.yml` (jobs `validate`, `build`, `update-formula`, `release`). `build` calls the reusable `.github/workflows/build-packages.yml`, which builds Trom UI once and then one package per platform with `.github/scripts/package.sh`. `update-formula` runs `.github/scripts/update-formula.sh`, which sets the version and checksums and points the URLs at `TeensyROM-Suite`
 - Version source: `src/apps/Version.props` (imported by the engine and the CLI projects)
 - Build platforms: win-x64, osx-x64, osx-arm64, linux-x64
 - Build time: ~15-20 minutes (parallel matrix builds)
@@ -174,3 +196,4 @@ If you need to retry:
 ## Related
 
 - **Local test release** (no tagging/CI): the `release-local` skill (`.claude/skills/release-local/SKILL.md`)
+- **Packaging, the formula and the workflows in depth**: the `distribution` skill
