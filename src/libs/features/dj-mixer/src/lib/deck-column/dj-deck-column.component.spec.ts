@@ -80,7 +80,7 @@ function emptyLoopsSummary(overrides: Partial<DeckLoopsSummary> = {}): DeckLoops
 function loopItem(overrides: Partial<LoopItemSummary> = {}): LoopItemSummary {
   return {
     id: 'm1',
-    name: 'Item 1',
+    name: 'Loop 1',
     kind: 'loop',
     lengthText: '7.8s',
     activity: 'idle',
@@ -105,7 +105,7 @@ function boundarySummary(overrides: Partial<LoopSelectionSummary['start']> = {})
 function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelectionSummary {
   return {
     id: 'm1',
-    name: 'Item 1',
+    name: 'Loop 1',
     kind: 'loop',
     activity: 'idle',
     ready: true,
@@ -156,6 +156,7 @@ function createDeckServiceStub() {
     setNudge: vi.fn(),
     tap: vi.fn(),
     addMarker: vi.fn(),
+    duplicateMarker: vi.fn(),
     stopMarkerLoop: vi.fn(),
     toggleMarker: vi.fn().mockResolvedValue(undefined),
     playMarkerNow: vi.fn().mockResolvedValue(undefined),
@@ -440,6 +441,17 @@ describe('DjDeckColumnComponent', () => {
       expect([model.addDisabled, model.stopDisabled]).toEqual([false, true]);
     });
 
+    it('names the Duplicate key for the deck and enables it only when the summary allows', () => {
+      const { fixture, loopsSummary } = render(DECK_B);
+      expect(plate(fixture).model().duplicateAccessibleName).toBe('Duplicate deck B');
+      expect(plate(fixture).model().duplicateDisabled).toBe(true);
+
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, canDuplicate: true }));
+      fixture.detectChanges();
+
+      expect(plate(fixture).model().duplicateDisabled).toBe(false);
+    });
+
     it('builds tiles with their spelled-out names from the summary', () => {
       const { fixture } = render(DECK_B, {
         loops: {
@@ -450,12 +462,12 @@ describe('DjDeckColumnComponent', () => {
             loopItem({ activity: 'running', selected: true }),
             loopItem({
               id: 'm2',
-              name: 'Item 2',
+              name: 'Cue 2',
               kind: 'cue',
               lengthText: 'CUE',
               endPercent: null,
             }),
-            loopItem({ id: 'm3', name: 'Item 3', activity: 'queued', ready: false }),
+            loopItem({ id: 'm3', name: 'Loop 3', activity: 'queued', ready: false }),
           ],
           selected: selection(),
         },
@@ -463,14 +475,14 @@ describe('DjDeckColumnComponent', () => {
       const model = plate(fixture).model();
 
       expect(model.tiles.map((t) => t.triggerAccessibleName)).toEqual([
-        'Trigger Item 1 deck B',
-        'Trigger Item 2 deck B',
-        'Trigger Item 3 deck B',
+        'Trigger Loop 1 deck B',
+        'Trigger Cue 2 deck B',
+        'Trigger Loop 3 deck B',
       ]);
       expect(model.tiles.map((t) => t.selectAccessibleName)).toEqual([
-        'Item 1, loop, 7.8s, running, deck B',
-        'Item 2, cue, deck B',
-        'Item 3, loop, 7.8s, queued and not ready, deck B',
+        'Loop 1, loop, 7.8s, running, deck B',
+        'Cue 2, cue, deck B',
+        'Loop 3, loop, 7.8s, queued and not ready, deck B',
       ]);
       expect(model.tiles.map((t) => t.selected)).toEqual([true, false, false]);
       expect(model.stopDisabled).toBe(false);
@@ -492,8 +504,8 @@ describe('DjDeckColumnComponent', () => {
         false,
       ]);
       expect([row.playNowAccessibleName, row.globalAccessibleName]).toEqual([
-        'Play now Item 1 deck B',
-        'GBL Item 1 deck B',
+        'Play now Loop 1 deck B',
+        'GBL Loop 1 deck B',
       ]);
 
       loopsSummary.set(emptyLoopsSummary({ hasTune: true, items: [loopItem()] }));
@@ -520,7 +532,7 @@ describe('DjDeckColumnComponent', () => {
       expect([row.wraps, row.wrapDisabled, row.wrapAccessibleName]).toEqual([
         true,
         false,
-        'WRAP Item 1 deck B',
+        'WRAP Loop 1 deck B',
       ]);
 
       loopsSummary.set(
@@ -544,17 +556,17 @@ describe('DjDeckColumnComponent', () => {
       const { fixture } = render(DECK_B, {
         loops: {
           hasTune: true,
-          items: [loopItem(), loopItem({ id: 'm2', name: 'Item 2', ownSettings: true })],
+          items: [loopItem(), loopItem({ id: 'm2', name: 'Loop 2', ownSettings: true })],
         },
       });
       const { tiles } = plate(fixture).model();
 
       expect(tiles.map((t) => t.ownSettings)).toEqual([false, true]);
       expect(tiles.map((t) => t.playNowAccessibleName)).toEqual([
-        'Play now Item 1 deck B',
-        'Play now Item 2 deck B',
+        'Play now Loop 1 deck B',
+        'Play now Loop 2 deck B',
       ]);
-      expect(tiles[1].selectAccessibleName).toBe('Item 2, loop, 7.8s, own settings, deck B');
+      expect(tiles[1].selectAccessibleName).toBe('Loop 2, loop, 7.8s, own settings, deck B');
     });
 
     it('makes the selected marker renameable, and not when nothing is selected', () => {
@@ -565,7 +577,7 @@ describe('DjDeckColumnComponent', () => {
 
       expect([row.renameDisabled, row.renameLabel, row.nameMaxLength]).toEqual([
         false,
-        'Rename Item 1',
+        'Rename Loop 1',
         MARKER_NAME_MAX_LENGTH,
       ]);
 
@@ -586,17 +598,56 @@ describe('DjDeckColumnComponent', () => {
         },
       });
 
-      plate(fixture).rename.emit('Drop');
+      plate(fixture).rename.emit({ id: 'm7', name: 'Drop' });
 
       expect(deckService.renameMarker).toHaveBeenCalledWith('B', 'm7', 'Drop');
     });
 
-    it('renames nothing when no marker is selected', () => {
-      const { fixture, deckService } = render(DECK_B);
+    it('fills the selected row with the selected marker id, and null with nothing selected', () => {
+      const { fixture, loopsSummary } = render(DECK_B, {
+        loops: { hasTune: true, items: [loopItem()], selected: selection({ id: 'm7' }) },
+      });
+      expect(plate(fixture).model().selected.id).toBe('m7');
 
-      plate(fixture).rename.emit('Drop');
+      loopsSummary.set(emptyLoopsSummary({ hasTune: true, items: [loopItem()] }));
+      fixture.detectChanges();
 
-      expect(deckService.renameMarker).not.toHaveBeenCalled();
+      expect(plate(fixture).model().selected.id).toBeNull();
+    });
+
+    it('commits a rename to the marker it was opened on when a tile press moves the selection', () => {
+      const { fixture, deckService, loopsSummary } = render(DECK_B, {
+        loops: {
+          hasTune: true,
+          items: [loopItem({ selected: true }), loopItem({ id: 'm2', name: 'Loop 2' })],
+          selected: selection(),
+        },
+      });
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelector<HTMLButtonElement>('lib-loop-selected-row lib-inline-edit-title button')?.click();
+      fixture.detectChanges();
+      const field = el.querySelector('lib-loop-selected-row input[type="text"]') as HTMLInputElement;
+      field.value = 'Drop';
+      field.dispatchEvent(new Event('input'));
+
+      // Pointer down on Loop 2's play key selects it, as the application layer does on press.
+      const tileKey = el.querySelector<HTMLButtonElement>(
+        'lib-loop-tile-grid button[aria-label="Trigger Loop 2 deck B"]'
+      );
+      tileKey?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      loopsSummary.set(
+        emptyLoopsSummary({
+          hasTune: true,
+          items: [loopItem(), loopItem({ id: 'm2', name: 'Loop 2', selected: true })],
+          selected: selection({ id: 'm2', name: 'Loop 2' }),
+        })
+      );
+      fixture.detectChanges();
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+      expect(deckService.toggleMarker).toHaveBeenCalledWith('B', 'm2');
+      expect(deckService.renameMarker).toHaveBeenCalledTimes(1);
+      expect(deckService.renameMarker).toHaveBeenCalledWith('B', 'm1', 'Drop');
     });
 
     it('fills the selected row and applies the disabled rules', () => {
@@ -607,7 +658,7 @@ describe('DjDeckColumnComponent', () => {
 
       expect([row.empty, row.name, row.kindLabel, row.spanText]).toEqual([
         false,
-        'Item 1',
+        'Loop 1',
         'LOOP',
         '00:01.0–00:08.8',
       ]);
@@ -618,7 +669,7 @@ describe('DjDeckColumnComponent', () => {
         false,
       ]);
       expect(row.start.nudgeAccessibleName).toBe('Nudge start deck B');
-      expect(row.triggerAccessibleName).toBe('Trigger Item 1 deck B');
+      expect(row.triggerAccessibleName).toBe('Trigger Loop 1 deck B');
 
       loopsSummary.set(
         emptyLoopsSummary({
@@ -648,16 +699,16 @@ describe('DjDeckColumnComponent', () => {
       expect([row.start.key.label, row.start.key.control, row.start.key.accessibleName]).toEqual([
         'In',
         'loop-in',
-        'Loop in Item 1 deck B',
+        'Loop in Loop 1 deck B',
       ]);
       expect([row.end.key.label, row.end.key.control, row.end.key.accessibleName]).toEqual([
         'Out',
         'loop-set-end',
-        'Loop out Item 1 deck B',
+        'Loop out Loop 1 deck B',
       ]);
       expect([row.start.earlierAccessibleName, row.end.laterAccessibleName]).toEqual([
-        'Move start of Item 1 earlier deck B',
-        'Move end of Item 1 later deck B',
+        'Move start of Loop 1 earlier deck B',
+        'Move end of Loop 1 later deck B',
       ]);
       expect(row.length).toEqual({
         text: '16 BEATS',
@@ -665,15 +716,15 @@ describe('DjDeckColumnComponent', () => {
           { beats: 8, label: '8 BEATS', selected: false },
           { beats: 16, label: '16 BEATS', selected: true },
         ],
-        halveAccessibleName: 'Halve Item 1 deck B',
-        doubleAccessibleName: 'Double Item 1 deck B',
-        pickAccessibleName: 'Loop length Item 1 deck B',
+        halveAccessibleName: 'Halve Loop 1 deck B',
+        doubleAccessibleName: 'Double Loop 1 deck B',
+        pickAccessibleName: 'Loop length Loop 1 deck B',
       });
       expect(row.move).toEqual({
         stepText: '1 BEAT',
         options: MOVE_STEP_OPTIONS,
-        earlierAccessibleName: 'Move Item 1 earlier deck B',
-        laterAccessibleName: 'Move Item 1 later deck B',
+        earlierAccessibleName: 'Move Loop 1 earlier deck B',
+        laterAccessibleName: 'Move Loop 1 later deck B',
         pickAccessibleName: 'Move step deck B',
       });
     });
@@ -718,6 +769,7 @@ describe('DjDeckColumnComponent', () => {
 
     it.each([
       ['addMarker', 'addMarker', undefined, ['B']],
+      ['duplicateMarker', 'duplicateMarker', undefined, ['B']],
       ['stopLoop', 'stopMarkerLoop', undefined, ['B']],
       ['toggleSelected', 'toggleMarker', undefined, ['B']],
       ['triggerTile', 'toggleMarker', 'm2', ['B', 'm2']],
@@ -1105,13 +1157,13 @@ describe('DjDeckColumnComponent', () => {
         accessibleName: 'Settings in play deck B: Main',
       });
 
-      settingsInPlay.set({ markerId: 'm2', name: 'Item 2' });
+      settingsInPlay.set({ markerId: 'm2', name: 'Loop 2' });
       fixture.detectChanges();
 
       expect(strip(fixture).model().settingsSign).toEqual({
-        text: 'Item 2',
+        text: 'Loop 2',
         own: true,
-        accessibleName: 'Settings in play deck B: Item 2',
+        accessibleName: 'Settings in play deck B: Loop 2',
       });
     });
 

@@ -34,10 +34,10 @@ describe('DeckSettingsSignComponent', () => {
 
   it('marks the host with data-own only while a marker owns the settings', () => {
     expect(el().hasAttribute('data-own')).toBe(false);
-    setModel({ text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' });
+    setModel({ text: 'Loop 2', own: true, accessibleName: 'Settings in play deck A: Loop 2' });
     expect(el().hasAttribute('data-own')).toBe(true);
-    expect(el().textContent?.trim()).toBe('Item 2');
-    expect(el().getAttribute('aria-label')).toBe('Settings in play deck A: Item 2');
+    expect(el().textContent?.trim()).toBe('Loop 2');
+    expect(el().getAttribute('aria-label')).toBe('Settings in play deck A: Loop 2');
   });
 
   it('hides the decorative dot from assistive tech', () => {

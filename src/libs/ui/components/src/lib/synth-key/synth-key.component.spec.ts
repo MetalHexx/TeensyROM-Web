@@ -2,6 +2,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SynthKeyComponent } from './synth-key.component';
 
+// jsdom has no `PointerEvent` constructor — a `MouseEvent` carries the `button` the component reads.
+function pointerDown(button: number): PointerEvent {
+  return new MouseEvent('pointerdown', { bubbles: true, button }) as unknown as PointerEvent;
+}
+
 describe('SynthKeyComponent', () => {
   let fixture: ComponentFixture<SynthKeyComponent>;
   let presses: number;
@@ -81,5 +86,42 @@ describe('SynthKeyComponent', () => {
   it('omits the label element when the label is empty', () => {
     set('label', '');
     expect(fixture.nativeElement.querySelector('.text')).toBeNull();
+  });
+
+  describe('pressOn="down"', () => {
+    beforeEach(() => set('pressOn', 'down'));
+
+    it('emits once on a primary pointer down, and ignores the click that follows it', () => {
+      button().dispatchEvent(pointerDown(0));
+      expect(presses).toBe(1);
+      button().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      expect(presses).toBe(1);
+    });
+
+    it('ignores a secondary-button pointer down', () => {
+      button().dispatchEvent(pointerDown(2));
+      expect(presses).toBe(0);
+    });
+
+    it('emits once on a keyboard click, which carries no click count', () => {
+      button().click();
+      expect(presses).toBe(1);
+    });
+
+    it('never emits while disabled', () => {
+      set('disabled', true);
+      button().dispatchEvent(pointerDown(0));
+      button().click();
+      expect(presses).toBe(0);
+    });
+  });
+
+  describe('default pressOn', () => {
+    it('emits on click and not on pointer down', () => {
+      button().dispatchEvent(pointerDown(0));
+      expect(presses).toBe(0);
+      button().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      expect(presses).toBe(1);
+    });
   });
 });

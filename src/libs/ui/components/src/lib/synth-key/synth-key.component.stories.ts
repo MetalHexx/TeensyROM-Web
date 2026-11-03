@@ -38,7 +38,11 @@ const meta: Meta<SynthKeyComponent> = {
       description:
         "'key' is the standard 26px key; 'pill' is the 44×22 pill the hold pads use, for secondary actions.",
     },
-    press: { description: 'Emits on click, or Enter / Space.' },
+    pressOn: {
+      description:
+        "'release' (default) presses on click. 'down' presses on primary pointer down, and Enter / Space still press once.",
+    },
+    press: { description: 'Emits once per press: on click, or on pointer down with `pressOn="down"`.' },
   },
 };
 
@@ -57,6 +61,7 @@ const render: Story['render'] = (args) => ({
       [lit]="lit"
       [stateLight]="stateLight"
       [shape]="shape"
+      [pressOn]="pressOn"
     />
   `,
 });
@@ -70,10 +75,18 @@ const base = {
   lit: null,
   stateLight: null,
   shape: 'key' as const,
+  pressOn: 'release' as const,
 };
+
 
 /** A one-shot key: no light. */
 export const OneShot: Story = { args: base, render };
+
+/** Fires the moment the pointer goes down, as the loop keys do; the trailing click is ignored. */
+export const PressOnDown: Story = {
+  args: { ...base, label: 'Play', icon: 'play_arrow', accessibleName: 'Play deck A', pressOn: 'down' },
+  render,
+};
 
 /** The pill: the hold pad's 44×22 size and shape, for secondary actions such as the speed jumps. */
 export const Pill: Story = {

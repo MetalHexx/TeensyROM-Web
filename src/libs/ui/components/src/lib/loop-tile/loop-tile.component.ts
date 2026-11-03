@@ -16,7 +16,7 @@ export type LoopTileActivity = 'idle' | 'queued' | 'running';
 /** One loop or cue tile's caller-composed state. */
 export interface LoopTileModel {
   readonly id: string;
-  /** e.g. 'Item 3'. */
+  /** e.g. 'Loop 3'. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
   /** e.g. '7.8s', or 'CUE'. */

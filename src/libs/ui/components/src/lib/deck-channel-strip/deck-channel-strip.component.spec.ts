@@ -100,11 +100,11 @@ describe('DeckChannelStripComponent', () => {
 
   it('renders the settings sign at the top of the voice section, above V1', () => {
     setModel({
-      settingsSign: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' },
+      settingsSign: { text: 'Loop 2', own: true, accessibleName: 'Settings in play deck A: Loop 2' },
     });
     const voices = q('section.voices');
     const sign = voices.querySelector('lib-deck-settings-sign') as HTMLElement;
-    expect(sign.getAttribute('aria-label')).toBe('Settings in play deck A: Item 2');
+    expect(sign.getAttribute('aria-label')).toBe('Settings in play deck A: Loop 2');
     expect(sign.hasAttribute('data-own')).toBe(true);
     const first = voices.querySelector('[data-voice="1"]') as HTMLElement;
     expect(sign.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

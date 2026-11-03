@@ -6,7 +6,8 @@
   [attr.data-lit]="isLit() ? '' : null"
   [attr.data-state-light]="stateLight()"
   [disabled]="disabled()"
-  (click)="press.emit()"
+  (pointerdown)="onPointerDown($event)"
+  (click)="onClick($event)"
 >
   @if (stateLight() !== null) {
   <span class="state-light" aria-hidden="true"></span>

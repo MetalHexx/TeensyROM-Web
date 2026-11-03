@@ -48,7 +48,10 @@ const meta: Meta<LoopSelectedRowComponent> = {
     deleteMarker: { description: 'Emits when Delete is pressed.' },
     nudgeInput: { description: 'Fires on every nudge drag tick, tagged with the boundary.' },
     nudgeCommit: { description: 'Fires when a nudge is released, tagged with the boundary.' },
-    rename: { description: 'Emits the new name when the name is renamed in place; empty is allowed.' },
+    rename: {
+      description:
+        'Emits the new name with the id of the marker the edit was opened on, when the name is renamed in place; empty is allowed.',
+    },
   },
   render: (args) => ({
     props: args,
@@ -73,7 +76,7 @@ function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = 
   return {
     key: {
       label: isStart ? 'In' : 'Out',
-      accessibleName: isStart ? 'Loop in Item 3' : 'Loop out Item 3',
+      accessibleName: isStart ? 'Loop in Loop 3' : 'Loop out Loop 3',
       control: isStart ? 'loop-in' : 'loop-set-end',
       disabled: false,
     },
@@ -82,9 +85,9 @@ function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = 
     offsetFrames: 0,
     rangeFrames: 50,
     tickPercents: [15, 42, 77],
-    nudgeAccessibleName: `Nudge ${side} of Item 3`,
-    earlierAccessibleName: `Move ${side} of Item 3 earlier`,
-    laterAccessibleName: `Move ${side} of Item 3 later`,
+    nudgeAccessibleName: `Nudge ${side} of Loop 3`,
+    earlierAccessibleName: `Move ${side} of Loop 3 earlier`,
+    laterAccessibleName: `Move ${side} of Loop 3 later`,
     ...overrides,
   };
 }
@@ -107,8 +110,9 @@ const moveStepOptions = [
 ];
 
 const loop: LoopSelectedRowModel = {
+  id: 'm3',
   empty: false,
-  name: 'Item 3',
+  name: 'Loop 3',
   kindLabel: 'LOOP',
   spanText: '02:39.4–02:47.5',
   activity: 'idle',
@@ -121,35 +125,36 @@ const loop: LoopSelectedRowModel = {
   length: {
     text: '16 BEATS',
     options: lengthOptions,
-    halveAccessibleName: 'Halve Item 3',
-    doubleAccessibleName: 'Double Item 3',
-    pickAccessibleName: 'Loop length Item 3',
+    halveAccessibleName: 'Halve Loop 3',
+    doubleAccessibleName: 'Double Loop 3',
+    pickAccessibleName: 'Loop length Loop 3',
   },
   move: {
     stepText: '1 BEAT',
     options: moveStepOptions,
-    earlierAccessibleName: 'Move Item 3 earlier',
-    laterAccessibleName: 'Move Item 3 later',
+    earlierAccessibleName: 'Move Loop 3 earlier',
+    laterAccessibleName: 'Move Loop 3 later',
     pickAccessibleName: 'Move step',
   },
-  triggerAccessibleName: 'Trigger Item 3',
-  clearEndAccessibleName: 'Clear the end of Item 3, making it a cue',
-  deleteAccessibleName: 'Delete Item 3',
+  triggerAccessibleName: 'Trigger Loop 3',
+  clearEndAccessibleName: 'Clear the end of Loop 3, making it a cue',
+  deleteAccessibleName: 'Delete Loop 3',
   playNowDisabled: false,
-  playNowAccessibleName: 'Play now Item 3',
+  playNowAccessibleName: 'Play now Loop 3',
   sharesGlobal: true,
   globalDisabled: false,
-  globalAccessibleName: 'GBL Item 3',
+  globalAccessibleName: 'GBL Loop 3',
   wraps: false,
   wrapDisabled: false,
-  wrapAccessibleName: 'WRAP Item 3',
+  wrapAccessibleName: 'WRAP Loop 3',
   renameDisabled: false,
-  renameLabel: 'Rename Item 3',
+  renameLabel: 'Rename Loop 3',
   nameMaxLength: 48,
 };
 
 const none: LoopSelectedRowModel = {
   ...loop,
+  id: null,
   empty: true,
   name: '',
   kindLabel: '',
@@ -176,18 +181,19 @@ const none: LoopSelectedRowModel = {
 
 const cue: LoopSelectedRowModel = {
   ...loop,
-  name: 'Item 4',
+  id: 'm4',
+  name: 'Cue 4',
   kindLabel: 'CUE',
   spanText: '02:43.2',
   clearEndDisabled: true,
   wrapDisabled: true,
   end: boundary('End', { empty: true, tickPercents: [] }),
   length: { ...loop.length, text: 'NO END', options: [] },
-  renameLabel: 'Rename Item 4',
-  triggerAccessibleName: 'Trigger Item 4',
-  playNowAccessibleName: 'Play now Item 4',
-  globalAccessibleName: 'GBL Item 4',
-  wrapAccessibleName: 'WRAP Item 4',
+  renameLabel: 'Rename Cue 4',
+  triggerAccessibleName: 'Trigger Cue 4',
+  playNowAccessibleName: 'Play now Cue 4',
+  globalAccessibleName: 'GBL Cue 4',
+  wrapAccessibleName: 'WRAP Cue 4',
 };
 
 /** A selected loop sharing the main track's settings: GBL lit with a ringed-dot lamp, both boundaries nudged. */
@@ -259,6 +265,14 @@ export const Named: Story = {
     model: { ...loop, name: 'Chorus drop', renameLabel: 'Rename Chorus drop' },
     startDragOffset: null,
     endDragOffset: null,
+  },
+};
+
+/** Mid-rename: the field spans the display, the kind and span step aside, and the counter sits at its right edge. */
+export const Renaming: Story = {
+  args: { model: loop, startDragOffset: null, endDragOffset: null },
+  play: async ({ canvasElement }) => {
+    canvasElement.querySelector<HTMLButtonElement>('lib-inline-edit-title button')?.click();
   },
 };
 

@@ -142,9 +142,9 @@ export const OwnSettingsSign: Story = {
     model: {
       ...baseModel(),
       settingsSign: {
-        text: 'Item 2',
+        text: 'Loop 2',
         own: true,
-        accessibleName: 'Settings in play deck A: Item 2',
+        accessibleName: 'Settings in play deck A: Loop 2',
       },
     },
   },

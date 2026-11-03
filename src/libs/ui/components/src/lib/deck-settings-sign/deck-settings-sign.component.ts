@@ -2,11 +2,11 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /** What a deck's settings sign says. The caller decides it; the sign draws it. */
 export interface DeckSettingsSignModel {
-  /** 'Main', or the marker's name, e.g. 'Item 2'. */
+  /** 'Main', or the marker's name, e.g. 'Loop 2'. */
   readonly text: string;
   /** A marker's own settings are in play: drawn lit. */
   readonly own: boolean;
-  /** e.g. 'Settings in play deck A: Item 2'. */
+  /** e.g. 'Settings in play deck A: Loop 2'. */
   readonly accessibleName: string;
 }
 
@@ -18,7 +18,7 @@ export interface DeckSettingsSignModel {
  *
  * @example
  * ```html
- * <lib-deck-settings-sign [model]="{ text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' }" />
+ * <lib-deck-settings-sign [model]="{ text: 'Loop 2', own: true, accessibleName: 'Settings in play deck A: Loop 2' }" />
  * ```
  */
 @Component({

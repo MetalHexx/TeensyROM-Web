@@ -44,20 +44,20 @@ export default meta;
 type Story = StoryObj<LoopBoundaryComponent>;
 
 const base: LoopBoundaryModel = {
-  key: { label: 'In', accessibleName: 'Loop in Item 3', control: 'loop-in', disabled: false },
+  key: { label: 'In', accessibleName: 'Loop in Loop 3', control: 'loop-in', disabled: false },
   empty: false,
   disabled: false,
   offsetFrames: 0,
   rangeFrames: 50,
   tickPercents: [],
-  nudgeAccessibleName: 'Nudge start of Item 3',
-  earlierAccessibleName: 'Move start of Item 3 earlier',
-  laterAccessibleName: 'Move start of Item 3 later',
+  nudgeAccessibleName: 'Nudge start of Loop 3',
+  earlierAccessibleName: 'Move start of Loop 3 earlier',
+  laterAccessibleName: 'Move start of Loop 3 later',
 };
 
 const outKey: LoopBoundaryModel['key'] = {
   label: 'Out',
-  accessibleName: 'Loop out Item 3',
+  accessibleName: 'Loop out Loop 3',
   control: 'loop-set-end',
   disabled: false,
 };

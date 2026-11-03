@@ -6,6 +6,7 @@
     [accessibleName]="model().triggerAccessibleName"
     [stateLight]="stateLight()"
     [disabled]="model().empty || model().triggerDisabled"
+    pressOn="down"
     (press)="trigger.emit()"
   />
   <lib-synth-key
@@ -14,9 +15,15 @@
     icon="bolt"
     [accessibleName]="model().playNowAccessibleName"
     [disabled]="model().empty || model().playNowDisabled"
+    pressOn="down"
     (press)="playNow.emit()"
   />
-  <div class="display" role="group" [attr.aria-label]="displayText()">
+  <div
+    class="display"
+    role="group"
+    [attr.aria-label]="displayText()"
+    [attr.data-renaming]="renaming() ? '' : null"
+  >
     @if (!model().empty) {
     <span class="name">
       @if (model().renameDisabled) {
@@ -26,7 +33,7 @@
         [value]="model().name"
         [maxLength]="model().nameMaxLength"
         [editLabel]="model().renameLabel"
-        (commit)="rename.emit($event)"
+        (commit)="onCommit($event)"
       />
       }
     </span>

@@ -162,7 +162,7 @@ const SELECTED_CUE: DeckLoopsSummary = {
   items: [
     {
       id: 'm1',
-      name: 'Item 1',
+      name: 'Loop 1',
       kind: 'cue',
       lengthText: '',
       activity: 'idle',
@@ -175,7 +175,7 @@ const SELECTED_CUE: DeckLoopsSummary = {
   ],
   selected: {
     id: 'm1',
-    name: 'Item 1',
+    name: 'Loop 1',
     kind: 'cue',
     activity: 'idle',
     ready: true,
@@ -1311,7 +1311,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(176);
+      expect(ALL_IDENTITIES).toHaveLength(178);
       expect(mismatched).toEqual([]);
     });
 

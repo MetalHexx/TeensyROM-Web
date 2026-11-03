@@ -55,16 +55,16 @@ type Story = StoryObj<LoopTileComponent & ProgressArgs>;
 
 const base: LoopTileModel = {
   id: 'loop-3',
-  name: 'Item 3',
+  name: 'Loop 3',
   kind: 'loop',
   lengthText: '7.8s',
   activity: 'idle',
   selected: false,
   ready: true,
-  triggerAccessibleName: 'Trigger Item 3',
-  selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, idle',
+  triggerAccessibleName: 'Trigger Loop 3',
+  selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds, idle',
   ownSettings: false,
-  playNowAccessibleName: 'Play now Item 3',
+  playNowAccessibleName: 'Play now Loop 3',
 };
 
 /** An idle loop. */
@@ -76,7 +76,7 @@ export const OwnSettings: Story = {
     model: {
       ...base,
       ownSettings: true,
-      selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, own settings',
+      selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds, own settings',
     },
     progressPercent: 0,
   },
@@ -124,7 +124,7 @@ export const Queued: Story = {
     model: {
       ...base,
       activity: 'queued',
-      selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, queued',
+      selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds, queued',
     },
     progressPercent: 0,
   },
@@ -137,7 +137,7 @@ export const Running: Story = {
       ...base,
       activity: 'running',
       selected: true,
-      selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, running',
+      selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds, running',
     },
     progressPercent: 53,
   },
@@ -149,7 +149,7 @@ export const NotReady: Story = {
     model: {
       ...base,
       ready: false,
-      selectAccessibleName: 'Select Item 3, loop, 7.8 seconds, not ready',
+      selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds, not ready',
     },
     progressPercent: 0,
   },
@@ -161,11 +161,11 @@ export const Cue: Story = {
     model: {
       ...base,
       id: 'cue-4',
-      name: 'Item 4',
+      name: 'Cue 4',
       kind: 'cue',
       lengthText: 'CUE',
-      triggerAccessibleName: 'Trigger Item 4',
-      selectAccessibleName: 'Select Item 4, cue, idle',
+      triggerAccessibleName: 'Trigger Cue 4',
+      selectAccessibleName: 'Select Cue 4, cue, idle',
     },
     progressPercent: 0,
   },

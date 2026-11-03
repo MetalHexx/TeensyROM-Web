@@ -12,6 +12,14 @@
           (press)="addMarker.emit()"
         />
         <lib-synth-key
+          data-control="loop-duplicate"
+          label="Dup"
+          icon="content_copy"
+          [accessibleName]="model().duplicateAccessibleName"
+          [disabled]="model().duplicateDisabled"
+          (press)="duplicateMarker.emit()"
+        />
+        <lib-synth-key
           data-control="loop-stop"
           label="Stop"
           icon="stop"

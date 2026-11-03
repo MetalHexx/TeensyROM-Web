@@ -56,8 +56,27 @@ export class SynthKeyComponent {
   /** `key` is the standard 26px key; `pill` is the 44×22 pill the hold pads use, for secondary
    *  actions such as the speed jumps. Defaults to `key`. */
   readonly shape = input<'key' | 'pill'>('key');
-  /** Emits when the key is clicked, or pressed with Enter or Space. */
+  /** `release` (default) presses on click. `down` presses the moment a primary pointer goes down
+   *  and ignores the click that follows it, so a held key shows its effect before release; Enter and
+   *  Space still press once. */
+  readonly pressOn = input<'release' | 'down'>('release');
+  /** Emits once per press: on click, or in `pressOn="down"` mode on pointer down (a click from
+   *  Enter or Space still emits). */
   readonly press = output<void>();
+
+  /** Presses on pointer down in `down` mode; a secondary button or a disabled key does nothing. */
+  protected onPointerDown(event: PointerEvent): void {
+    if (this.pressOn() === 'down' && event.button === 0 && !this.disabled()) {
+      this.press.emit();
+    }
+  }
+
+  /** Presses on click, except in `down` mode where only a keyboard click (`detail` 0) counts. */
+  protected onClick(event: MouseEvent): void {
+    if (this.pressOn() === 'release' || event.detail === 0) {
+      this.press.emit();
+    }
+  }
 
   /** Whether the key's light is on: off for a non-latching key, else `lit` or the latch. */
   protected readonly isLit = computed(() => {
