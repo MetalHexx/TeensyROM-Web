@@ -231,7 +231,7 @@ The formula is updated for **every** tag: the `update-formula` job has no `if:`,
 </PropertyGroup>
 ```
 
-The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `Version.props`, and so does the agent version marker, the line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (a CLI test covers the manifest and the marker and fails on drift). `tr-plugin-marketplace` mirrors them in its copy of `plugin.json`, in the `trom-agent` entry of `.claude-plugin/marketplace.json`, and in its copy of the `SKILL.md` marker, which must match too.
+The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agent/claude/.claude-plugin/plugin.json` carries the same version as `Version.props`, and so does the agent version marker, the line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md` (a CLI test covers the manifest and the marker and fails on drift). `tr-plugin-marketplace` mirrors them in its copy of `plugin.json`, in the `trom-agent` entry of `.claude-plugin/marketplace.json`, and in its copy of the `SKILL.md` marker. They move to the new version by pull request after the release is out (the `release` skill's Step 7).
 
 **Tag check**: `validate` fails when the tag differs from `Version.props`. After it passes, `package.sh publish` still passes the version as `-p:Version=`, which equals `Version.props`, so:
 - Version displayed in UI matches release tag
@@ -239,6 +239,8 @@ The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agen
 - `assemble` checks `cli/trom --version` against it on a matching host
 
 ### Creating a Release
+
+The `release` skill (`src/.claude/skills/release/SKILL.md`) runs these steps, plus Package Test on `main` before the tag and publishing Trom Agent to `tr-plugin-marketplace` after the release. Follow it for a real release; this section is the reference behind it.
 
 #### Step 1: Update Version in Code
 
@@ -249,7 +251,9 @@ The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agen
 </PropertyGroup>
 ```
 
-**Plugin version** (same value): `"version": "1.2.0"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the marker line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md`; then in `tr-plugin-marketplace` update `plugins/trom-agent/claude/.claude-plugin/plugin.json`, the `trom-agent` entry in `.claude-plugin/marketplace.json`, and the `Agent version:` marker in `plugins/trom-agent/claude/skills/trom/SKILL.md`. That copy normally arrives by republishing the plugin source, so the marker must match there too.
+**Plugin version** (same value): `"version": "1.2.0"` in `src/plugins/trom-agent/claude/.claude-plugin/plugin.json`, and the marker line `Agent version: 1.2.0` under `## Version` in `src/plugins/trom-agent/claude/skills/trom/SKILL.md`. The `tr-plugin-marketplace` copy moves after the release.
+
+**Release notes**: a `## [1.2.0](https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0) - YYYY-MM-DD` section at the top of `CHANGELOG.md`. `validate` fails without it, and `release` publishes it as the release body (`.github/scripts/changelog-section.sh` extracts it).
 
 **Verify frontend displays version**:
 - Version shown in header (from `/api/version` endpoint)
@@ -258,12 +262,14 @@ The `trom-agent` plugin is versioned with the tool suite: `src/plugins/trom-agen
 #### Step 2: Commit and Push
 
 ```bash
-git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md CHANGELOG.md
 git commit -m "chore: bump version to 1.2.0"
 git push origin main
 ```
 
 #### Step 3: Create and Push Tag
+
+Tag only after `Package Test` passes on `main` (`gh workflow run package-test.yml --ref main`).
 
 **Stable release**:
 ```bash
