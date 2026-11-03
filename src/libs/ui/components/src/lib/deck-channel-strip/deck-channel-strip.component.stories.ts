@@ -59,6 +59,7 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
     voices: [1, 2, 3].map((n) => ({
       label: `V${n}`,
       muted: false,
+      held: false,
       holdLabel: 'Kill',
       muteAccessibleName: `Mute voice ${n} deck ${deck}`,
       holdAccessibleName: `Kill voice ${n} deck ${deck}`,
@@ -79,6 +80,8 @@ function baseModel(deck: 'A' | 'B' = 'A'): DeckChannelStripModel {
     nudge: {
       downAccessibleName: `Nudge speed down deck ${deck}`,
       upAccessibleName: `Nudge speed up deck ${deck}`,
+      downHeld: false,
+      upHeld: false,
     },
     jumpButtons: [
       { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${deck}` },
@@ -99,27 +102,50 @@ const pressWithEnter = (canvasElement: HTMLElement, name: string): void => {
 
 export const AtRest: Story = { args: { model: baseModel() } };
 
-/** The BPM line under the percent is set live by a painter, not by the model. */
-export const WithBpm: Story = {
-  args: { model: baseModel() },
-  play: async ({ canvasElement }) => {
-    const bpm = canvasElement.querySelector('.bpm');
-    if (bpm) {
-      bpm.textContent = '125.31 BPM';
-    }
-  },
+/** Sets the BPM figure the way a painter does: the figure only, and the no-beat dimming off. */
+const showBpm = (canvasElement: HTMLElement, figure: string): void => {
+  const text = canvasElement.querySelector('.figure');
+  if (text) {
+    text.textContent = figure;
+  }
+  canvasElement.querySelector('.bpm')?.removeAttribute('data-none');
 };
 
-/** The speed display and the Tap key take the nudge's magenta while the deck is tapping. */
-export const Tapping: Story = { args: { model: { ...baseModel(), tapping: true } } };
+/** The BPM line under the percent is set live by a painter, not by the model. A beat is matched. */
+export const WithBpm: Story = {
+  args: { model: baseModel() },
+  play: async ({ canvasElement }) => showBpm(canvasElement, '125.31'),
+};
+
+/** The speed display and the Tap key take the nudge's magenta while the deck is tapping; the unit
+ *  keeps its dim colour. */
+export const Tapping: Story = {
+  args: { model: { ...baseModel(), tapping: true } },
+  play: async ({ canvasElement }) => showBpm(canvasElement, '125.31'),
+};
 
 /** The speed display tints magenta while a nudge is in effect; the fader does not move. */
 export const Nudging: Story = {
   args: { model: { ...baseModel(), nudging: true, speedText: '+4.00%' } },
+  play: async ({ canvasElement }) => showBpm(canvasElement, '125.31'),
 };
 
-/** Deck B holding a Kill pad and nudge plus. */
+/** Deck B with a Kill pad and nudge plus lit from the deck's held state, with no pointer. */
 export const Held: Story = {
+  args: {
+    model: {
+      ...baseModel('B'),
+      nudging: true,
+      speedText: '+4.00%',
+      voices: baseModel('B').voices.map((voice, i) => ({ ...voice, held: i === 1 })),
+      nudge: { ...baseModel('B').nudge, upHeld: true },
+    },
+  },
+  play: async ({ canvasElement }) => showBpm(canvasElement, '125.31'),
+};
+
+/** A pointer or key hold on the screen lights the pad at once. */
+export const HeldOnScreen: Story = {
   args: { model: { ...baseModel('B'), nudging: true, speedText: '+4.00%' } },
   play: async ({ canvasElement }) => {
     pressWithEnter(canvasElement, 'Kill voice 2 deck B');

@@ -44,6 +44,27 @@ describe('HoldPadComponent', () => {
     expect(button().hasAttribute('data-held')).toBe(false);
   });
 
+  it('lights from the held input with no pointer and emits nothing', () => {
+    fixture.componentRef.setInput('held', true);
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-pressed')).toBe('true');
+    expect(button().hasAttribute('data-held')).toBe(true);
+    expect(emitted).toEqual([]);
+
+    fixture.componentRef.setInput('held', false);
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-pressed')).toBe('false');
+    expect(button().hasAttribute('data-held')).toBe(false);
+  });
+
+  it('stays lit by the held input after its own hold is released', () => {
+    fixture.componentRef.setInput('held', true);
+    key('keydown');
+    key('keyup');
+    expect(button().hasAttribute('data-held')).toBe(true);
+    expect(emitted).toEqual([true, false]);
+  });
+
   it('emits one release when disabled mid-hold', () => {
     key('keydown');
     fixture.componentRef.setInput('disabled', true);

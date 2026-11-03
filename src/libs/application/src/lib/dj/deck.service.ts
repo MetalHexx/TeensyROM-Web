@@ -719,11 +719,14 @@ export class DeckService {
     const { tempo, voices } = this.runtime.snapshot(slot);
     const faderSpeed = this.deckSpeed.faderValue(slot);
     const nudging = this.deckSpeed.isNudging(slot);
+    const nudgeHeld = this.deckSpeed.nudgeHeld(slot);
     const deck = this.store.deck(slot)();
     if (
       deck.speed !== tempo.multiplier ||
       deck.faderSpeed !== faderSpeed ||
       deck.nudging !== nudging ||
+      deck.nudgeHeld.up !== nudgeHeld.up ||
+      deck.nudgeHeld.down !== nudgeHeld.down ||
       deck.varispeed !== tempo.varispeed ||
       !sameVoices(deck.voices, voices)
     ) {
@@ -732,6 +735,7 @@ export class DeckService {
         speed: tempo.multiplier,
         faderSpeed,
         nudging,
+        nudgeHeld,
         varispeed: tempo.varispeed,
         voices,
       });

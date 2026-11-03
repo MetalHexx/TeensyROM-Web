@@ -388,6 +388,7 @@ describe('SidWaveFeed', () => {
         speed: 1,
         faderSpeed: 1,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed,
         voices: store.decks().A.voices,
       });

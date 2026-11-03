@@ -323,6 +323,7 @@ describe('MixerService', () => {
         speed: 1.25,
         faderSpeed: 1.25,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: [
           { muted: true, held: false },

@@ -144,6 +144,8 @@ export interface DeckState {
   faderSpeed: number;
   /** True while either nudge is held. The speed display tints magenta while this is set. */
   nudging: boolean;
+  /** Which nudge pads are held, so the pads can light for a hold made on a controller. */
+  nudgeHeld: { readonly up: boolean; readonly down: boolean };
   /** Microseconds per play call for the loaded tune, or null while nothing is loaded. Converts
    *  the deck's playhead (`DjState.positions`, in play calls) to time. */
   playCallIntervalUs: number | null;
@@ -317,6 +319,7 @@ const initialDeckState: DeckState = {
   speed: 1,
   faderSpeed: 1,
   nudging: false,
+  nudgeHeld: { up: false, down: false },
   playCallIntervalUs: null,
   voices: [
     { muted: false, held: false },

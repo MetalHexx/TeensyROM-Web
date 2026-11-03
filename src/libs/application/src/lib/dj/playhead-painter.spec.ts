@@ -371,6 +371,7 @@ describe('PlayheadPainter', () => {
         speed,
         faderSpeed: speed,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: store.decks().A.voices,
       });
@@ -527,6 +528,7 @@ describe('PlayheadPainter', () => {
         speed: 1,
         faderSpeed: 1,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed,
         voices: store.decks().A.voices,
       });

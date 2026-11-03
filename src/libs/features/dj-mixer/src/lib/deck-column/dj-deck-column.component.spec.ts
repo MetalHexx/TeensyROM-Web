@@ -230,6 +230,7 @@ function render(deck: DeckRef, options: RenderOptions = {}) {
     speed: 1,
     faderSpeed: 1,
     nudging: false,
+    nudgeHeld: { up: false, down: false },
     tapping: false,
     lengthFrames: null as number | null,
     playCallIntervalUs: null as number | null,
@@ -1205,6 +1206,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.75,
         faderSpeed: 0.75,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: store.decks().B.voices,
       });
@@ -1228,6 +1230,8 @@ describe('DjDeckColumnComponent', () => {
       expect(model.nudge).toEqual({
         downAccessibleName: 'Nudge down deck B',
         upAccessibleName: 'Nudge up deck B',
+        downHeld: false,
+        upHeld: false,
       });
       expect(model.jumpButtons.map((b) => b.id)).toEqual(['up', 'home', 'down']);
       expect(model.jumpButtons.map((b) => b.accessibleName)).toEqual([
@@ -1246,6 +1250,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.7,
         faderSpeed: 1.7,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices,
       });
@@ -1258,6 +1263,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 0.3,
         faderSpeed: 0.3,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices,
       });
@@ -1275,6 +1281,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.05,
         faderSpeed: 1,
         nudging: true,
+        nudgeHeld: { up: true, down: false },
         varispeed: false,
         voices: store.decks().B.voices,
       });
@@ -1377,6 +1384,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1,
         faderSpeed: 1,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: [
           { muted: true, held: false },
@@ -1390,6 +1398,32 @@ describe('DjDeckColumnComponent', () => {
       expect(rows().map((r) => r.holdLabel)).toEqual(['Punch', 'Kill', 'Kill']);
       expect(rows()[0].holdAccessibleName).toBe('Punch voice 1 deck B');
       expect(rows()[1].holdAccessibleName).toBe('Kill voice 2 deck B');
+    });
+
+    it("carries the voices' held state and the nudge directions into the strip model", () => {
+      const { fixture, store } = renderLive(DECK_B);
+      const model = () => strip(fixture).model();
+
+      expect(model().voices.map((v) => v.held)).toEqual([false, false, false]);
+      expect([model().nudge.downHeld, model().nudge.upHeld]).toEqual([false, false]);
+
+      store.setDeckEngineControls({
+        slot: 'B',
+        speed: 1.05,
+        faderSpeed: 1,
+        nudging: true,
+        nudgeHeld: { up: true, down: false },
+        varispeed: false,
+        voices: [
+          { muted: false, held: false },
+          { muted: false, held: true },
+          { muted: false, held: false },
+        ],
+      });
+      fixture.detectChanges();
+
+      expect(model().voices.map((v) => v.held)).toEqual([false, true, false]);
+      expect([model().nudge.downHeld, model().nudge.upHeld]).toEqual([false, true]);
     });
 
     it("dispatches mute and hold with this deck's slot", () => {
@@ -1429,6 +1463,7 @@ describe('DjDeckColumnComponent', () => {
         speed: 1.2,
         faderSpeed: 1.2,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: [
           { muted: true, held: false },

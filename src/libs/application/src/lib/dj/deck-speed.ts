@@ -126,6 +126,12 @@ export class DeckSpeed {
     return up !== null || down !== null;
   }
 
+  /** Which nudge pads are held. */
+  nudgeHeld(slot: Slot): { readonly up: boolean; readonly down: boolean } {
+    const { up, down } = this.tempos[slot].layers;
+    return { up: up !== null, down: down !== null };
+  }
+
   /** The one tempo function: the fader's value plus the held up amount minus the held down
    *  amount, within the hard span. Called after every change. */
   private apply(slot: Slot): void {

@@ -6,7 +6,9 @@ import { HoldPressDirective } from '../hold-press/hold-press.directive';
  * Punch on a voice, or the speed nudge '−' and '+'. It is a native button using `libHoldPress`,
  * so a hold works by pointer or by Enter/Space, and `heldChange` reports both the press (`true`)
  * and the release (`false`), including a release forced by blur, pointer cancel, becoming
- * disabled or being removed mid-hold. The held state is reflected as `aria-pressed`.
+ * disabled or being removed mid-hold. The pad glows while held from either the screen or the
+ * caller's state (`held`), so a hold made elsewhere, such as on a controller, lights it too. The
+ * lit state is reflected as `aria-pressed`.
  *
  * @example
  * ```html
@@ -36,6 +38,9 @@ export class HoldPadComponent {
   readonly shape = input<'pill' | 'round'>('pill');
   /** Disables the pad. Becoming disabled mid-hold emits `heldChange(false)` once. Defaults to false. */
   readonly disabled = input<boolean>(false);
+  /** Lights the pad for a hold the caller knows of, such as one made on a controller. The pad's own
+   *  pointer and keyboard hold lights it regardless. Defaults to false. */
+  readonly held = input<boolean>(false);
   /** Emits `true` on press and `false` on release or cancel. Momentary; both are meaningful. */
   readonly heldChange = output<boolean>();
 }

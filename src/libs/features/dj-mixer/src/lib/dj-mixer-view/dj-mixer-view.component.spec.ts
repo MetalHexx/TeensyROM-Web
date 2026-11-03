@@ -248,6 +248,7 @@ function createDjStoreStub(
     deck: () =>
       signal({
         speed: 1,
+        nudgeHeld: { up: false, down: false },
         voices: [
           { muted: false, held: false },
           { muted: false, held: false },

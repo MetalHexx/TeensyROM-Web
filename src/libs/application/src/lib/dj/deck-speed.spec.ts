@@ -174,6 +174,24 @@ describe('DeckSpeed', () => {
     });
   });
 
+  describe('nudgeHeld', () => {
+    it('reports which pads are held, per deck', () => {
+      expect(speed.nudgeHeld('A')).toEqual({ up: false, down: false });
+
+      speed.setNudge('A', 'up', true, NUDGE);
+      expect(speed.nudgeHeld('A')).toEqual({ up: true, down: false });
+      expect(speed.nudgeHeld('B')).toEqual({ up: false, down: false });
+
+      speed.setNudge('A', 'up', false, NUDGE);
+      speed.setNudge('A', 'down', true, NUDGE);
+      expect(speed.nudgeHeld('A')).toEqual({ up: false, down: true });
+
+      speed.setNudge('A', 'up', true, NUDGE);
+      expect(speed.nudgeHeld('A')).toEqual({ up: true, down: true });
+      expect(speed.isNudging('A')).toBe(true);
+    });
+  });
+
   describe('setNudge', () => {
     it('adds the amount on top of the fader while held and lands on the fader exactly on release', () => {
       speed.setFader('A', 1.012);

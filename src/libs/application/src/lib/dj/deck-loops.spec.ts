@@ -260,6 +260,7 @@ describe('DeckLoops', () => {
         speed: tempo.multiplier,
         faderSpeed: deck.faderSpeed,
         nudging: deck.nudging,
+        nudgeHeld: deck.nudgeHeld,
         varispeed: false,
         voices,
       });

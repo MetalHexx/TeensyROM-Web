@@ -1035,6 +1035,31 @@ describe('DeckService', () => {
           expect(store.deck('A')().nudging).toBe(false);
         });
 
+        it('mirrors which pads are held, writing on a direction change only', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 0.9);
+          const controlsSpy = vi.spyOn(store, 'setDeckEngineControls');
+
+          service.setNudge('A', 'up', true);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: true, down: false });
+          expect(controlsSpy).toHaveBeenCalledTimes(1);
+
+          // Both held: the tempo and `nudging` are unchanged, but the direction is not.
+          service.setNudge('A', 'down', true);
+          expect(store.deck('A')().speed).toBe(0.9);
+          expect(store.deck('A')().nudging).toBe(true);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: true, down: true });
+          expect(controlsSpy).toHaveBeenCalledTimes(2);
+
+          // A repeated press of a held pad changes nothing the store holds.
+          service.setNudge('A', 'down', true);
+          expect(controlsSpy).toHaveBeenCalledTimes(2);
+
+          service.setNudge('A', 'up', false);
+          service.setNudge('A', 'down', false);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: false, down: false });
+        });
+
         it('follows the fader while held, and releases onto the moved fader', async () => {
           await loadAndWait('A', register(makeFixture()));
           service.setNudge('A', 'up', true);
@@ -1777,6 +1802,7 @@ describe('DeckService', () => {
           speed: 1,
           faderSpeed: 1,
           nudging: false,
+          nudgeHeld: { up: false, down: false },
           varispeed,
           voices: store.decks().A.voices,
         });

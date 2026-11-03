@@ -335,17 +335,18 @@ export class DjDeckColumnComponent {
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
-    const { speed, faderSpeed, nudging, tapping, voices } = this.deckState();
+    const { speed, faderSpeed, nudging, nudgeHeld, tapping, voices } = this.deckState();
     return {
       settingsSign: settingsSignModel(this.deck(), this.settingsInPlay()),
       voiceAccessibleName: `Voice deck ${letter}`,
       speedAccessibleName: `Speed deck ${letter}`,
-      voices: voices.map(({ muted }, i) => {
+      voices: voices.map(({ muted, held }, i) => {
         const n = i + 1;
         const holdLabel = muted ? 'Punch' : 'Kill';
         return {
           label: `V${n}`,
           muted,
+          held,
           holdLabel,
           muteAccessibleName: `Mute voice ${n} deck ${letter}`,
           holdAccessibleName: `${holdLabel} voice ${n} deck ${letter}`,
@@ -367,6 +368,8 @@ export class DjDeckColumnComponent {
       nudge: {
         downAccessibleName: `Nudge down deck ${letter}`,
         upAccessibleName: `Nudge up deck ${letter}`,
+        downHeld: nudgeHeld.down,
+        upHeld: nudgeHeld.up,
       },
       jumpButtons: [
         { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${letter}` },
