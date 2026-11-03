@@ -17,7 +17,7 @@ In Claude Code, add the marketplace and install the plugin:
 /plugin install trom-agent@tr-plugin-marketplace
 ```
 
-Then start a session by typing `/trom`. Trom Agent greets you, picks your cart and offers a quick tour. If the suite isn't installed, it offers to install it first, and asks before it runs anything.
+Then start a session by typing `/trom`. Trom Agent greets you, picks your cart, resets it to its menu (which stops whatever is running) and offers a quick tour. If the suite isn't installed, it offers to install it first, and asks before it runs anything.
 
 ## What you can ask
 

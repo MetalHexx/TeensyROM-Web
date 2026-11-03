@@ -53,13 +53,13 @@ Everything under it, up to the next `## [` heading, becomes the GitHub release b
 ### Update
 - Already on a suite release: `trom update` (`trom update --check` only looks).
 - Installed with Homebrew: `brew update && brew upgrade teensyrom-suite`.
-- Fresh install: download the package for your platform below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
+- Fresh install on a Mac: `brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite`, then `brew install teensyrom-suite` and `trom ui`.
+- Fresh install on Windows or Linux: download the package below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
 
 ### Downloads
 - Windows x64: `TeensyROM-Suite-{version}-win-x64.zip`
-- macOS Apple silicon: `TeensyROM-Suite-{version}-osx-arm64.tar.gz`
-- macOS Intel: `TeensyROM-Suite-{version}-osx-x64.tar.gz`
 - Linux x64: `TeensyROM-Suite-{version}-linux-x64.tar.gz`
+- macOS: install with Homebrew, above. The `osx-arm64` and `osx-x64` packages are the ones Homebrew installs.
 
 Docs: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
 ````

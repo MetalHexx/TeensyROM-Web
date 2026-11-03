@@ -4,7 +4,7 @@ Install TeensyROM Suite, connect your cart, and get your library ready to search
 
 ## Install
 
-Let Trom Agent install the suite for you, or download the package for your platform from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases). There is one download each for Windows, macOS and Linux.
+Let Trom Agent install the suite for you, or install it yourself: download it for Windows or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac.
 
 The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) in one package. [Trom Agent](trom-agent.md) is a Claude Code plugin, installed separately.
 

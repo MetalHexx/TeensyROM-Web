@@ -100,7 +100,7 @@ Your TeensyROM's own menu can wear new colors now.
 
 ### 🤖 Trom Agent
 
-A companion for your C64, inside Claude Code. Type `/trom` and ask in plain words; it works through Trom Terminal and asks before it changes anything.
+A companion for your C64, inside Claude Code. Type `/trom` and ask in plain words. It works through Trom Terminal, and asks before it copies files, changes your setup or installs anything. Starting a session resets your cart to its menu, so it stops what's running.
 
 - **Installs the suite for you**: Homebrew on a Mac (Homebrew too, if you need it), or the newest release on Windows and Linux, checked against its SHA-256 before it's unpacked and put on your PATH. When a new release is out, it tells you and updates once you agree
 - **Play and shuffle**: "play me some Rob Hubbard", "show me demos from 1989", and it tells you a little about what's playing
@@ -153,13 +153,13 @@ A companion for your C64, inside Claude Code. Type `/trom` and ask in plain word
 - With Trom Agent: type `/trom` in Claude Code. It installs the suite if it's missing, or offers the update.
 - Already on a suite release: `trom update` (`trom update --check` only looks).
 - Installed with Homebrew: `brew update && brew upgrade teensyrom-suite`.
-- Fresh install: download the package for your platform below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
+- Fresh install on a Mac: `brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite`, then `brew install teensyrom-suite` and `trom ui`.
+- Fresh install on Windows or Linux: download the package below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
 
 ### Downloads
 - Windows x64: `TeensyROM-Suite-1.0.0-beta.1-win-x64.zip`
-- macOS Apple silicon: `TeensyROM-Suite-1.0.0-beta.1-osx-arm64.tar.gz`
-- macOS Intel: `TeensyROM-Suite-1.0.0-beta.1-osx-x64.tar.gz`
 - Linux x64: `TeensyROM-Suite-1.0.0-beta.1-linux-x64.tar.gz`
+- macOS: install with Homebrew, above. The `osx-arm64` and `osx-x64` packages are the ones Homebrew installs.
 
 Docs: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
 
