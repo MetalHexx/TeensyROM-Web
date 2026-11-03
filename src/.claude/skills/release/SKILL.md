@@ -77,20 +77,20 @@ git push origin main
 `Package Test` (`.github/workflows/package-test.yml`) builds the packages and installs them: through a real Homebrew install on macOS (arm64 and x64), from the tarball on Linux and from the zip on Windows, each smoke-tested with `.github/scripts/package-smoke.sh`. It runs on pull requests that touch packaging, and on demand. Run it on `main`:
 
 ```bash
+git fetch origin && git rev-parse origin/main    # {sha}, the commit to release
 gh workflow run package-test.yml -R MetalHexx/TeensyROM-Suite --ref main
-gh run list -R MetalHexx/TeensyROM-Suite --workflow package-test.yml -L 1 --json databaseId,headSha,status
+gh run list -R MetalHexx/TeensyROM-Suite --workflow package-test.yml --event workflow_dispatch --commit {sha} -L 1 --json databaseId,status,createdAt
 gh run watch <run-id> -R MetalHexx/TeensyROM-Suite --exit-status
 ```
 
-Tag only when it passes, and only the commit it ran on (`headSha`, which equals `origin/main`).
+The new run takes a few seconds to appear; until then the list is empty or shows an earlier run at the same commit (its `createdAt` is before the dispatch). Tag `{sha}` only when the new run passes.
 
 ### Step 3: Create Git Tag
 
 Tag the commit Package Test passed on, then push the tag to trigger the release workflow:
 
 ```bash
-git fetch origin
-git tag v{version} {headSha}
+git tag v{version} {sha}
 git push origin v{version}
 ```
 
@@ -99,9 +99,11 @@ git push origin v{version}
 The workflow builds the 4 packages, commits the Homebrew formula to `main`, and creates the GitHub Release. It takes about 15-20 minutes. Give the user the run's URL, `https://github.com/MetalHexx/TeensyROM-Suite/actions/runs/<run-id>`.
 
 ```bash
-gh run list -R MetalHexx/TeensyROM-Suite --workflow release.yml -L 1 --json databaseId,headBranch,status
+gh run list -R MetalHexx/TeensyROM-Suite --workflow release.yml --branch v{version} --commit {sha} -L 1 --json databaseId,status,createdAt
 gh run watch <run-id> -R MetalHexx/TeensyROM-Suite --exit-status
 ```
+
+A tag push runs with the tag as its branch. Wait for the run to appear; after a retry, the newest run is the one to watch.
 
 ### Step 5: Check the Release
 
@@ -135,7 +137,7 @@ Run this after every release: Trom Agent's version moves in lockstep with the su
 3. In `.claude-plugin/marketplace.json`, set `"version"` on the `trom-agent` entry to the release version.
 4. Bring the descriptions up to date with `docs/trom-agent.md`: the `description` in `marketplace.json`, the plugins table in the root `README.md`, and *What it does*, *How it works* and *Where the source lives* in `plugins/trom-agent/README.md`. Name the products as the docs do (Trom UI, Trom API, Trom Terminal), link `https://github.com/MetalHexx/TeensyROM-Suite`, and drop any build-from-source text: the skill installs and updates the suite from releases and Homebrew.
 5. Commit, push the branch and open a PR. Merge after review.
-6. After the merge, in Claude Code: `/plugin marketplace update tr-plugin-marketplace`, then check that `/plugin` lists `trom-agent` at the release version.
+6. After the merge, in Claude Code: `/plugin marketplace update tr-plugin-marketplace`, update or reinstall `trom-agent@tr-plugin-marketplace` from `/plugin`, and restart the session. `/plugin` then lists `trom-agent` at the release version.
 
 ## Example Workflow
 
