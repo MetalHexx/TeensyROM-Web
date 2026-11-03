@@ -4,9 +4,24 @@ Install TeensyROM Suite, connect your cart, and get your library ready to search
 
 ## Install
 
-Download the package for your platform from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases). There is one download each for Windows, macOS and Linux.
+Let Trom Agent install the suite for you, or install it yourself: download it for Windows or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac.
 
-The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) in one package. [Trom Agent](trom-agent.md) is installed separately.
+The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) in one package. [Trom Agent](trom-agent.md) is a Claude Code plugin, installed separately.
+
+### With Trom Agent
+
+If you use [Claude Code](https://claude.com/claude-code), add the Trom Agent plugin, type `/trom`, and say yes when it offers to install the suite:
+
+```
+/plugin marketplace add MetalHexx/tr-plugin-marketplace
+/plugin install trom-agent@tr-plugin-marketplace
+```
+
+- **Windows and Linux:** it downloads the newest release for your computer, checks it against the SHA-256 GitHub publishes before unpacking it, unpacks it into a folder in your user profile and puts `trom` on your PATH.
+- **macOS:** it installs with Homebrew, and installs Homebrew first if you don't have it. An install from the older `teensyrom-web` tap moves over to `teensyrom-suite`.
+- Then it starts the suite and checks that Trom API and Trom UI are running.
+
+It explains the plan and shows each command before it runs it. Apart from installing Homebrew, nothing needs admin rights. It keeps the suite up to date afterwards, too: see [Update](#update).
 
 ### Windows and Linux
 
@@ -97,6 +112,7 @@ Banning a file or folder hides it from browsing, search and shuffle. The list st
 - `trom update --yes` updates without asking.
 - A stable install updates to stable releases. A pre-release install, such as a beta, also updates to newer pre-releases.
 - On a Homebrew install, `trom update` runs Homebrew for you. `brew upgrade teensyrom-suite` works too.
+- [Trom Agent](trom-agent.md) tells you when a new release is out as a session starts, and updates the suite once you agree. You can also ask it to.
 
 `trom` checks for a new release once a day and prints a line when one is out. The guided menu shows it under the logo, with an "Update to" entry for the new version. Turn the check off with `trom settings set update-check false`, or with Toggle Update Check in the guided menu's Settings.
 

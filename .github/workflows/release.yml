@@ -55,6 +55,11 @@ jobs:
             exit 1
           fi
 
+      - name: Check CHANGELOG.md has notes for this version
+        env:
+          VERSION: ${{ steps.extract.outputs.version }}
+        run: bash .github/scripts/changelog-section.sh "$VERSION" > /dev/null
+
   build:
     name: Build packages
     needs: validate
@@ -134,12 +139,18 @@ jobs:
       
       - name: List artifacts
         run: ls -la artifacts/
-      
+
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: bash .github/scripts/changelog-section.sh "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.validate.outputs.version }}
           name: TeensyROM Suite v${{ needs.validate.outputs.version }}
+          body_path: ${{ runner.temp }}/release-notes.md
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           files: |

@@ -108,19 +108,24 @@ Video is optional but recommended.
 
 Send files from your computer to your cart's storage.
 
+<img width="2492" height="1241" alt="A transfer's details: files staged, files written to the cart, failures and the latest files" src="../.github/images/file-transfer-details.png" />
+
 - **Pick where they go:** choose a cart and a folder on it.
 - **Drag, or choose:** drop files or whole folders in, or pick them.
 - **Live progress:** each transfer shows how far it has come, the speed, how long it has taken and which files failed. You can cancel a transfer while it runs.
 - **Archives:** `.zip`, `.7z` and `.rar` files are unpacked on the way in.
 - **File types:** only the types a TeensyROM takes are sent, and the rest are left out.
 - **Auto launch:** a transferred file can start on the cart as soon as its transfer finishes.
-- **One at a time:** a cart takes one transfer at a time. If it is busy, you can retry once it is free.
+- **Several carts at once:** each cart takes one transfer at a time, and different carts transfer side by side. If a cart is busy, you can retry once it is free.
+- **Every transfer in one place:** transfers started from [Trom Terminal](trom-terminal.md) or a watch folder show here too. Open one for its details, or hide them without stopping it.
 
 A transfer resets the cart, unless it is idle with nothing launched, and a reset stops whatever is running.
 
 ## Watch folders
 
 A watch folder sends whatever lands in a folder on your computer to your cart, and launches it if you ask. It suits things like a browser downloads folder for firmware, or the output folder of a build or a music tool.
+
+<img width="2497" height="1232" alt="File Transfer with two transfers running and the watch folders panel open" src="../.github/images/file-transfer.png" />
 
 For each watch folder you choose:
 
@@ -130,7 +135,7 @@ For each watch folder you choose:
 - **Auto launch:** start a file on the cart as soon as it lands.
 - **More carts:** send the same folder to several carts.
 
-You can edit a destination, turn a folder off and on, and remove it.
+Add as many watch folders as you like. You can edit a destination, turn a folder off and on, and remove it.
 
 Only files that arrive after you add the folder are sent, and only of types the TeensyROM takes. Archives are unpacked on the cart. Your files stay in the folder: they are copied, never moved or deleted. Files that land close together go as one transfer. A file that lands while its cart is busy with another transfer is skipped, and a file that lands while its folder is turned off is not sent later. A transfer from a watch folder resets the cart like any other, which stops what is running.
 
@@ -139,6 +144,8 @@ You can also manage watch folders from [Trom Terminal](trom-terminal.md) with `t
 ## Themes
 
 Change the colors of your C64's menu.
+
+<img width="1200" height="675" alt="The Themes view: shipped themes, the C64's 16 colors and a video preview of the C64's menu" src="../.github/images/themes.png" />
 
 - **Pick a theme:** choose from the shipped themes, or from your own saved ones.
 - **Tune your own:** change any of the menu's seven colors using the C64's 16 colors.

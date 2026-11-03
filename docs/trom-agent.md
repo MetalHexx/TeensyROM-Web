@@ -17,7 +17,7 @@ In Claude Code, add the marketplace and install the plugin:
 /plugin install trom-agent@tr-plugin-marketplace
 ```
 
-Then start a session by typing `/trom`. Trom Agent greets you, picks your cart and offers a quick tour. If the suite isn't installed, it offers to install it first, and asks before it runs anything.
+Then start a session by typing `/trom`. Trom Agent greets you, picks your cart, resets it to its menu (which stops whatever is running) and offers a quick tour. If the suite isn't installed, it offers to install it first, and asks before it runs anything.
 
 ## What you can ask
 
@@ -72,6 +72,16 @@ Set the colors of your C64's menu, from a shipped theme or one of your own. Appl
 - "what theme am I on?"
 
 See [themes](trom-terminal.md#themes).
+
+### Install and update the suite
+
+Trom Agent installs TeensyROM Suite from its newest release: with Homebrew on a Mac, and from a checked download on Windows and Linux, with `trom` put on your PATH. When a newer release is out, it tells you as a session starts and updates once you agree.
+
+- "install TeensyROM Suite"
+- "is there a newer release?"
+- "update the suite"
+
+See [getting started](getting-started.md#with-trom-agent).
 
 ### The setup doctor
 
