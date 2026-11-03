@@ -74,6 +74,8 @@ trom file download /music/Artillery.sid --to ./backup
 
 Only the file types a TeensyROM takes are sent. A copy can reset the cart, which stops what is running.
 
+Different carts copy side by side. `trom transfer list` shows every transfer that is running, including ones started from Trom UI or a watch folder, and Trom UI shows the ones you start here.
+
 ## Watch folders
 
 A watch folder sends whatever lands in a folder on your computer to your cart, and launches it if you ask.
@@ -91,6 +93,8 @@ Add `--launch` to start each file as it lands, and use `trom watch-folder set` t
 ## Themes
 
 Set the colors of your C64's menu from the guided menu, or with `trom theme`.
+
+<img width="1451" height="582" alt="The guided menu's Theme screen with the CGA theme" src="../.github/images/trom-terminal-theme.png" />
 
 ```bash
 trom theme list
