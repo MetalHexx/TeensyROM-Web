@@ -21,6 +21,7 @@ This skill automates the TeensyROM Suite release process by bumping the version,
 - The release PR is merged to `main` (for `1.0.0-beta.1`, PR #93).
 - The `Package Test` workflow (`.github/workflows/package-test.yml`) is green on the commit being tagged. It builds the packages and installs them: a real Homebrew install on macOS (arm64 and x64) and a tarball install on Linux, both smoke-tested with `.github/scripts/package-smoke.sh`. It runs only on `pull_request` and `workflow_dispatch`, so after the version bump lands on main, run `gh workflow run package-test.yml --ref main` and wait for it to pass before tagging.
 - The tag equals `<Version>` in `src/apps/Version.props`. The `validate` job of `release.yml` fails otherwise.
+- `CHANGELOG.md` has a section for the version (Step 1). `release.yml` publishes it as the release notes; the `validate` job fails when it is missing or empty.
 
 ## Process
 
@@ -40,9 +41,32 @@ Example versions:
 - Stable release: `1.0.0`, `1.2.3`, `2.0.0`
 - Pre-release: `1.0.0-alpha.1`, `1.0.0-beta.1`, `2.0.0-rc.1`
 
-Commit the version bump:
+Write the release notes at the top of `CHANGELOG.md` (repo root), under a heading of this shape:
+
+```markdown
+## [{version}](https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v{version}) - {YYYY-MM-DD}
+```
+
+Everything under it, up to the next `## [` heading, becomes the GitHub release body (`.github/scripts/changelog-section.sh` extracts it); use `###` and lower inside. Lead with what users will notice, grouped by product area, and leave out internal changes. End with this:
+
+````markdown
+### Update
+- Already on a suite release: `trom update` (`trom update --check` only looks).
+- Installed with Homebrew: `brew update && brew upgrade teensyrom-suite`.
+- Fresh install: download the package for your platform below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
+
+### Downloads
+- Windows x64: `TeensyROM-Suite-{version}-win-x64.zip`
+- macOS Apple silicon: `TeensyROM-Suite-{version}-osx-arm64.tar.gz`
+- macOS Intel: `TeensyROM-Suite-{version}-osx-x64.tar.gz`
+- Linux x64: `TeensyROM-Suite-{version}-linux-x64.tar.gz`
+
+Docs: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
+````
+
+Commit the version bump and the notes:
 ```bash
-git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md
+git add src/apps/Version.props src/plugins/trom-agent/claude/.claude-plugin/plugin.json src/plugins/trom-agent/claude/skills/trom/SKILL.md CHANGELOG.md
 git commit -m "chore: bump version to {version}"
 git push origin main
 ```
@@ -64,41 +88,20 @@ Inform the user that the release workflow has been triggered and provide them wi
 
 Tell them: "The release workflow is now running. It will build TeensyROM Suite for all 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64) and create a GitHub Release with the artifacts. This typically takes 15-20 minutes. I'll wait for you to confirm when the release has been created."
 
-### Step 4: Update Release Notes
+### Step 4: Check the Release
 
-Once the user confirms the release has been created or provides a link to it:
+Once the workflow finishes, `gh release view v{version}` shows:
+- Title: `TeensyROM Suite v{version}`
+- Tag: `v{version}`
+- Pre-release flag (if the version contains `-`)
+- The 4 platform packages (each holds `README.txt`, `api/` and `cli/`)
+- The notes: the version's `CHANGELOG.md` section
 
-1. Use `gh release view v{version}` (or the GitHub MCP tools if available) to fetch the release details
-2. Ask the user for release notes content (what's new, bug fixes, breaking changes, etc.)
-3. Use `gh release edit v{version} --notes "..."` (or the GitHub MCP tools) to update the release with the provided notes
+To change the notes afterwards, edit `CHANGELOG.md` on `main`, then republish the section:
 
-The release will already have:
-- ✅ Title: `TeensyROM Suite v{version}`
-- ✅ Tag: `v{version}`
-- ✅ Pre-release flag (if version contains `-`)
-- ✅ All 4 platform artifacts attached (each holds `README.txt`, `api/` and `cli/`)
-
-You just need to add the release body/notes. Start from this template:
-
-````markdown
-## What's new
-- {highlights; lead with `trom ui` while it is new to readers}
-
-## Update
-- Already on a suite release: `trom update` (`trom update --check` only looks).
-- Installed with Homebrew: `brew update && brew upgrade teensyrom-suite`.
-- Fresh install: download the package for your platform below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
-
-Alpha installs start fresh: there is no data migration from `1.0.0-alpha.*`.
-
-## Downloads
-- Windows x64: `TeensyROM-Suite-{version}-win-x64.zip`
-- macOS Apple silicon: `TeensyROM-Suite-{version}-osx-arm64.tar.gz`
-- macOS Intel: `TeensyROM-Suite-{version}-osx-x64.tar.gz`
-- Linux x64: `TeensyROM-Suite-{version}-linux-x64.tar.gz`
-
-Docs: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
-````
+```bash
+bash .github/scripts/changelog-section.sh {version} > notes.md && gh release edit v{version} --notes-file notes.md && rm notes.md
+```
 
 ### Step 5: Post-Release Checks
 
@@ -124,13 +127,12 @@ Run this after the release, whenever the plugin changed or its version moved wit
 User: /release
 Agent: What version would you like to release? (e.g., 1.0.0 or 1.0.0-alpha.1)
 User: 1.2.0
-Agent: [Updates src/apps/Version.props, commits, creates tag v1.2.0, pushes]
-Agent: ✅ Version bumped to 1.2.0 and tag v1.2.0 created. The release workflow is now running at https://github.com/MetalHexx/TeensyROM-Suite/actions. This will take ~15-20 minutes to complete. Please let me know when the release has been created.
-User: The release is ready at https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
-Agent: Great! What release notes would you like to add? Include what's new, bug fixes, breaking changes, etc.
-User: [Provides release notes]
-Agent: [Updates release with notes]
-Agent: ✅ Release notes updated! Release is now complete: https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
+Agent: [Updates src/apps/Version.props and the plugin version, drafts the 1.2.0 section of CHANGELOG.md]
+Agent: Here are the release notes for 1.2.0. Anything to change?
+User: Looks good.
+Agent: [Commits, pushes, creates tag v1.2.0, pushes it]
+Agent: Version bumped to 1.2.0 and tag v1.2.0 pushed. The release workflow is running at https://github.com/MetalHexx/TeensyROM-Suite/actions and takes about 15-20 minutes.
+Agent: [Release published with the CHANGELOG.md notes] https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.2.0
 ```
 
 ## Important Notes
