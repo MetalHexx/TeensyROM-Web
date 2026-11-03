@@ -73,6 +73,16 @@ Set the colors of your C64's menu, from a shipped theme or one of your own. Appl
 
 See [themes](trom-terminal.md#themes).
 
+### Install and update the suite
+
+Trom Agent installs TeensyROM Suite from its newest release: with Homebrew on a Mac, and from a checked download on Windows and Linux, with `trom` put on your PATH. When a newer release is out, it tells you as a session starts and updates once you agree.
+
+- "install TeensyROM Suite"
+- "is there a newer release?"
+- "update the suite"
+
+See [getting started](getting-started.md#with-trom-agent).
+
 ### The setup doctor
 
 When something is off, Trom Agent calls over Virtual Travis. He checks Trom Terminal, Trom API, Trom UI, your cart and your index, explains what he finds, and walks you through the fixes.
