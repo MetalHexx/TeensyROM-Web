@@ -67,6 +67,7 @@ function emptyLoopsSummary(overrides: Partial<DeckLoopsSummary> = {}): DeckLoops
   return {
     hasTune: false,
     canAdd: false,
+    canDuplicate: false,
     canStop: false,
     moveStepText: '1 BEAT',
     moveStepOptions: MOVE_STEP_OPTIONS,

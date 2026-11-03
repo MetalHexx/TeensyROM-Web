@@ -193,7 +193,8 @@ export interface DeckLoopBoundary {
 /** One saved position in the tune: a cue when it has no end, a loop when it has one. */
 export interface DeckLoopMarker {
   readonly id: string;
-  /** What the performer called it; null shows as 'Item N' by list position. */
+  /** What the performer called it; null shows as 'Loop N' or 'Cue N' by its place among the
+   *  markers of its kind. */
   readonly name: string | null;
   readonly start: DeckLoopBoundary;
   readonly end: DeckLoopBoundary | null;
@@ -212,7 +213,7 @@ export interface DeckLoopMarker {
 
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
 export interface DeckLoopsState {
-  /** List order is the 'Item N' order. */
+  /** List order is the 'Loop N' / 'Cue N' counting order. */
   markers: readonly DeckLoopMarker[];
   selectedId: string | null;
   /** A marker loop the engine is running. */

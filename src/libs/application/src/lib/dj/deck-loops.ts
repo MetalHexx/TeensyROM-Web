@@ -18,6 +18,7 @@ import { otherSlot, type Slot } from './slot';
 import {
   clamp,
   markerKind,
+  markerLabel,
   nudgeLimits,
   oneSecondFrames,
   resolvedFrame,
@@ -46,6 +47,13 @@ const ALL_VOICES: readonly number[] = [0, 1, 2];
 
 /** The length a cue gains when a Length press has no loop to halve or double. */
 const CUE_BEATS = 4;
+
+const COPY_SUFFIX = ' copy';
+
+/** A copy's name: `label` cut to leave room for the suffix, which is never the part cut off. */
+function copyNameOf(label: string): string {
+  return sanitizeName(label, MARKER_NAME_MAX_LENGTH - COPY_SUFFIX.length) + COPY_SUFFIX;
+}
 
 function sameTune(a: TuneIdentity, b: TuneIdentity): boolean {
   return a.sidHash === b.sidHash && a.subtune === b.subtune;
@@ -490,6 +498,43 @@ export class DeckLoops {
       ready: false,
     };
     this.commit(slot, [...this.loopsOf(slot).markers, marker], marker.id);
+  }
+
+  /**
+   * Copies the selected marker right after itself as "‹label› copy", with the same frames, voices,
+   * settings and WRAP, and selects the copy. A cue copies to a cue. A copy of the marker running,
+   * queued or holding the settings in play takes its place there, on this deck, without moving the
+   * playhead or touching the engine's loop or queue.
+   */
+  duplicate(slot: Slot): void {
+    const marker = this.selectedMarker(slot, 'duplicate');
+    if (marker === null) {
+      return;
+    }
+    const { markers } = this.loopsOf(slot);
+    if (markers.length >= MAX_MARKERS_PER_SUBTUNE) {
+      this.refuse(
+        slot,
+        'duplicate',
+        `already has the most markers a subtune keeps (${MAX_MARKERS_PER_SUBTUNE})`
+      );
+      return;
+    }
+    const index = markers.indexOf(marker);
+    const copy: DeckLoopMarker = {
+      ...marker,
+      id: crypto.randomUUID(),
+      name: copyNameOf(markerLabel(markers, index)),
+    };
+    // A copy moves no start, so only the settings path runs: it neither re-declares the jump
+    // targets nor drops the other deck's waiting start audition.
+    this.commit(
+      slot,
+      [...markers.slice(0, index + 1), copy, ...markers.slice(index + 1)],
+      copy.id,
+      'settings'
+    );
+    this.handOver(slot, marker.id, copy.id);
   }
 
   select(slot: Slot, id: string): void {
@@ -1079,6 +1124,33 @@ export class DeckLoops {
     this.endOfPass[slot] = null;
     this.setEngaged(slot, edit.bounds);
     return true;
+  }
+
+  /**
+   * Hands the running, queued and settings-in-play roles of marker `fromId` to its copy `toId`.
+   * The copy must already be in the list, or `syncRunning` would let the running loop go. It has
+   * the same bounds and the same settings object, so the engine is left alone: no seek, no queued
+   * jump, no active loop. A waiting end-of-pass edit or start audition is re-pointed before
+   * `setActivity`, which drops a start audition that is not the new running marker's.
+   */
+  private handOver(slot: Slot, fromId: string, toId: string): void {
+    const { runningId, queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
+    if (runningId === fromId) {
+      const edit = this.endOfPass[slot];
+      if (edit !== null && edit.markerId === fromId) {
+        this.endOfPass[slot] = { ...edit, markerId: toId };
+      }
+      if (this.pendingStart[slot] === fromId) {
+        this.pendingStart[slot] = toId;
+      }
+      this.setActivity(slot, toId, queuedId, selectionMovedWhileQueued);
+    } else if (queuedId === fromId) {
+      this.setActivity(slot, runningId, toId, selectionMovedWhileQueued);
+    }
+    const { settingsInPlayId, mainSettings } = this.loopsOf(slot);
+    if (settingsInPlayId === fromId) {
+      this.swapSettings(slot, this.store.panel()[slot], toId, mainSettings);
+    }
   }
 
   /** The marker the deck is running, as listed, or undefined when none is. */

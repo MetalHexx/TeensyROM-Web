@@ -143,6 +143,7 @@ const MOVE_STEP_OPTIONS: DeckLoopsSummary['moveStepOptions'] = [
 const NO_LOOPS: DeckLoopsSummary = {
   hasTune: false,
   canAdd: false,
+  canDuplicate: false,
   canStop: false,
   moveStepText: '1 BEAT',
   moveStepOptions: MOVE_STEP_OPTIONS,
@@ -154,6 +155,7 @@ const NO_LOOPS: DeckLoopsSummary = {
 const SELECTED_CUE: DeckLoopsSummary = {
   hasTune: true,
   canAdd: true,
+  canDuplicate: true,
   canStop: false,
   moveStepText: '1 BEAT',
   moveStepOptions: MOVE_STEP_OPTIONS,

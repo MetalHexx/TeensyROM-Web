@@ -545,7 +545,7 @@ describe('DjSidPanelComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(sign(fixture, 'A')).toEqual({ name: 'Settings in play deck A: Item 2', own: true });
+      expect(sign(fixture, 'A')).toEqual({ name: 'Settings in play deck A: Cue 2', own: true });
       expect(sign(fixture, 'B')).toEqual({ name: 'Settings in play deck B: Main', own: false });
 
       store.setDeckLoops({ slot: 'A', loops: { ...EMPTY_DECK_LOOPS, markers: [marker('a')] } });

@@ -1,11 +1,13 @@
 import { computed } from '@angular/core';
 import { DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
+import { markerLabel } from '../loops/loop-marker-math';
 
 export interface SettingsInPlaySummary {
   /** The marker whose own settings are in play, or null for the main track's. */
   readonly markerId: string | null;
-  /** The marker's name, else 'Item N' by list position; or 'Main'. */
+  /** The marker's name, else 'Loop N' or 'Cue N' by its place among the markers of its kind; or
+   *  'Main'. */
   readonly name: string;
 }
 
@@ -24,7 +26,7 @@ export function settingsInPlay(store: WritableStore<DjState>) {
           const index = markers.findIndex((marker) => marker.id === settingsInPlayId);
           return settingsInPlayId === null || index < 0
             ? MAIN
-            : { markerId: settingsInPlayId, name: markers[index].name ?? `Item ${index + 1}` };
+            : { markerId: settingsInPlayId, name: markerLabel(markers, index) };
         },
         { equal: (a, b) => a.markerId === b.markerId && a.name === b.name }
       );

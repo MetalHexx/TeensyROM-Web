@@ -21,6 +21,18 @@ export function markerKind(marker: DeckLoopMarker): MarkerKind {
     : 'cue';
 }
 
+/** The marker's name, else 'Loop N' / 'Cue N' — N its 1-based place among the list's markers of
+ *  the same kind (`markerKind`), named ones included. */
+export function markerLabel(markers: readonly DeckLoopMarker[], index: number): string {
+  const marker = markers[index];
+  if (marker.name !== null) {
+    return marker.name;
+  }
+  const kind = markerKind(marker);
+  const place = markers.slice(0, index + 1).filter((other) => markerKind(other) === kind).length;
+  return `${kind === 'loop' ? 'Loop' : 'Cue'} ${place}`;
+}
+
 /** Play calls in one second of music. Frames are play calls and the interval is independent of
  *  tempo, so this window is in music time. 0 while the interval is unknown. */
 export function oneSecondFrames(playCallIntervalUs: number | null): number {

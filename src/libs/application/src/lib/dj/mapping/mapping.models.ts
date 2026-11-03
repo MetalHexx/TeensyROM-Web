@@ -54,6 +54,7 @@ export type DeckControlId =
   | 'loop-toggle'
   | 'loop-play-now'
   | 'loop-add'
+  | 'loop-duplicate'
   | 'loop-stop'
   | 'loop-in'
   | 'loop-set-end'
@@ -101,6 +102,7 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-toggle',
   'loop-play-now',
   'loop-add',
+  'loop-duplicate',
   'loop-stop',
   'loop-in',
   'loop-set-end',
