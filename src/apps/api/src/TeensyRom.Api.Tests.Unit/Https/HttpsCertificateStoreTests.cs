@@ -181,7 +181,21 @@ public sealed class HttpsCertificateStoreTests : IDisposable
     }
 
     [Fact]
-    public void Ensure_RestrictsTheFileToTheOwner_OnUnix()
+    public void Ensure_CreatesTheFileOwnerOnly_OnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        CreateStore().Ensure("studio-pc", [Lan]);
+
+        File.GetUnixFileMode(PfxPath).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.GetUnixFileMode(_folder).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
+
+    [Fact]
+    public void Ensure_RestrictsTheFileToTheOwner_WhenReusingIt_OnUnix()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -231,10 +245,30 @@ public sealed class HttpsCertificateStoreTests : IDisposable
     }
 
     [Fact]
+    public void Decide_ReportsUnreadable_WhenTheCertificateIsNotForServerAuth()
+    {
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(300), now - TimeSpan.FromDays(1), false);
+
+        HttpsCertificateStore.Decide(facts, ["localhost"], [IPAddress.Loopback], now)
+            .Should().Be(HttpsCertificateChangeReason.Unreadable);
+    }
+
+    [Fact]
+    public void Decide_ReportsUnreadable_WhenTheCertificateIsNotValidYet()
+    {
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(300), now + TimeSpan.FromDays(2), true);
+
+        HttpsCertificateStore.Decide(facts, ["localhost"], [IPAddress.Loopback], now)
+            .Should().Be(HttpsCertificateChangeReason.Unreadable);
+    }
+
+    [Fact]
     public void Decide_ReportsExpiring_BeforeMissingNames()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(10));
+        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(10), now - TimeSpan.FromDays(1), true);
 
         HttpsCertificateStore.Decide(facts, ["localhost", "new-host"], [IPAddress.Loopback, Lan], now)
             .Should().Be(HttpsCertificateChangeReason.Expiring);
@@ -244,7 +278,7 @@ public sealed class HttpsCertificateStoreTests : IDisposable
     public void Decide_ReportsHostNameChanged_BeforeNewAddress()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(300));
+        var facts = new StoredCertificateFacts(["localhost"], [IPAddress.Loopback], now + TimeSpan.FromDays(300), now - TimeSpan.FromDays(1), true);
 
         HttpsCertificateStore.Decide(facts, ["localhost", "new-host"], [IPAddress.Loopback, Lan], now)
             .Should().Be(HttpsCertificateChangeReason.HostNameChanged);

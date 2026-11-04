@@ -161,6 +161,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         if (Output.Mode == OutputMode.Json)
         {
             Output.Json(report);
+            if (report.Engine.Https?.Notice is { } jsonNotice) Output.Notice(jsonNotice);
             return;
         }
 

@@ -39,7 +39,7 @@ The Linux package also runs on a Raspberry Pi. Download the `linux-arm64` archiv
 
 - The Pi needs a 64-bit Raspberry Pi OS. The Raspberry Pi 5 is tested, and the Pi 3, 4 and Zero 2 W with a 64-bit OS are expected to work.
 - The `dialout` line above applies to USB carts.
-- On Raspberry Pi OS Lite, first run `sudo apt install libicu76 libasound2t64`. The desktop image already has them.
+- On Raspberry Pi OS Lite (Debian 13, Trixie), first run `sudo apt install libicu76 libasound2t64`. The desktop image already has them. Those are Debian 13 package names. On Raspberry Pi OS based on Bookworm (Debian 12) `apt` reports "Unable to locate package"; upgrade to the Trixie-based Pi OS, or install the Debian 12 equivalents (`libicu72 libasound2`).
 
 ### macOS
 

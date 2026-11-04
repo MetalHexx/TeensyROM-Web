@@ -15,7 +15,7 @@ public sealed class PlatformRidTests
     [InlineData("linux", Architecture.Arm, null)]
     [InlineData("linux", Architecture.X86, null)]
     [InlineData("freebsd", Architecture.X64, null)]
-    public void For_NamesTheFourShippedPlatformsAndNothingElse(string os, Architecture architecture, string? expected)
+    public void For_NamesTheFiveShippedPlatformsAndNothingElse(string os, Architecture architecture, string? expected)
     {
         PlatformRid.For(OSPlatform.Create(os.ToUpperInvariant()), architecture).Should().Be(expected);
     }

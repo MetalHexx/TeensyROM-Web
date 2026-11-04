@@ -95,6 +95,7 @@ public sealed class InitCommandTests
         var https = report.GetProperty("engine").GetProperty("https");
         https.GetProperty("change").GetString().Should().Be("created");
         https.GetProperty("notice").GetString().Should().Contain("created a security certificate");
+        host.Consoles.StdErr.Should().Contain("created a security certificate");
         Problems(report).Should().BeEmpty();
     }
 

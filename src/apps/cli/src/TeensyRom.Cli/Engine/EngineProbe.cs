@@ -122,10 +122,20 @@ internal sealed class EngineProbe : IEngineProbe
         try
         {
             var response = await _api.GetHttpsStatusAsync(ct);
-            var change = Enum.Parse<CertificateChange>(response.Change.ToString());
-            CertificateChangeReason? reason = response.ChangeReason is { } value
-                ? Enum.Parse<CertificateChangeReason>(value.ToString())
-                : null;
+            if (!Enum.TryParse<CertificateChange>(response.Change.ToString(), out var change))
+            {
+                return null;
+            }
+
+            CertificateChangeReason? reason = null;
+            if (response.ChangeReason is { } value)
+            {
+                if (!Enum.TryParse<CertificateChangeReason>(value.ToString(), out var parsed))
+                {
+                    return null;
+                }
+                reason = parsed;
+            }
 
             return new EngineHttps(
                 response.Port, response.Listening, response.Problem, [.. response.Names],

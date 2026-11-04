@@ -7,9 +7,12 @@ using TeensyRom.Core.Serial;
 
 namespace TeensyRom.Api.Https;
 
-/// <summary>What HTTPS did for this engine run. Registered as a singleton; read by the status endpoint.</summary>
+/// <summary>
+/// What HTTPS did for this engine run. Registered as a singleton; read by the status endpoint.
+/// <paramref name="Warning"/> is a logged-only note (not on the endpoint) for a degraded setup that still listens.
+/// </summary>
 public sealed record HttpsState(
-    int Port, bool Listening, string? Problem, HttpsCertificateResult? Certificate);
+    int Port, bool Listening, string? Problem, HttpsCertificateResult? Certificate, string? Warning = null);
 
 public static class HttpsStartup
 {
@@ -35,10 +38,13 @@ public static class HttpsStartup
             }
             else
             {
+                string? warning = null;
+                var addresses = NetworkHelper.GetLocalAddresses(ex =>
+                    warning = $"Couldn't read the network adapters ({ex.Message}), so the HTTPS certificate has no LAN addresses and is re-issued when they can be read again.");
                 var certificate = new HttpsCertificateStore(TeensyRomHome.HttpsPath, TimeProvider.System)
-                    .Ensure(Dns.GetHostName(), NetworkHelper.GetLocalAddresses());
+                    .Ensure(Dns.GetHostName(), addresses);
 
-                state = Decide(port, ReadHttpPort(builder.Configuration), certificate, IsPortFree);
+                state = Decide(port, ReadHttpPort(builder.Configuration), certificate, IsPortFree) with { Warning = warning };
 
                 if (state.Listening)
                 {
@@ -111,6 +117,12 @@ public static class HttpsStartup
         {
             logger.InternalWarning(state.Problem);
             Console.WriteLine(state.Problem);
+        }
+
+        if (state.Warning is not null)
+        {
+            logger.InternalWarning(state.Warning);
+            Console.WriteLine(state.Warning);
         }
     }
 

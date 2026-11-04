@@ -48,6 +48,8 @@ Write the release notes at the top of `CHANGELOG.md` (repo root), under a headin
 ## [{version}](https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v{version}) - {YYYY-MM-DD}
 ```
 
+If `CHANGELOG.md` has a `## [Unreleased]` section, fold its notes into this new version heading and remove the `[Unreleased]` heading; `changelog-section.sh` only extracts `## [<version>]` sections.
+
 Everything under it, up to the next `## [` heading, becomes the GitHub release body (`.github/scripts/changelog-section.sh` extracts it); use `###` and lower inside. Lead with what users will notice, grouped by product area, and leave out internal changes. End with this:
 
 ````markdown

@@ -97,15 +97,17 @@ public static class NetworkHelper
     /// <summary>
     /// Reads the machine's adapters and returns <see cref="SelectAddresses"/> for them.
     /// </summary>
+    /// <param name="onReadFailure">Called with the exception when the adapters cannot be read, so the caller can say why the list is empty.</param>
     /// <returns>Empty when no adapter qualifies or the adapters cannot be read.</returns>
-    public static List<IPAddress> GetLocalAddresses()
+    public static List<IPAddress> GetLocalAddresses(Action<Exception>? onReadFailure = null)
     {
         try
         {
             return SelectAddresses(ReadAdapters());
         }
-        catch
+        catch (Exception ex)
         {
+            onReadFailure?.Invoke(ex);
             return [];
         }
     }

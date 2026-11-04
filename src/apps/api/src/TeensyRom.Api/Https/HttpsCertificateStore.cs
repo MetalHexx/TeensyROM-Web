@@ -29,7 +29,9 @@ public sealed record HttpsCertificateResult(
 public sealed record StoredCertificateFacts(
     IReadOnlyList<string> DnsNames,
     IReadOnlyList<IPAddress> IPAddresses,
-    DateTimeOffset NotAfter);
+    DateTimeOffset NotAfter,
+    DateTimeOffset NotBefore,
+    bool HasServerAuth);
 
 /// <summary>
 /// Keeps a usable self-signed HTTPS certificate in <paramref name="folder"/>: creates one when there is none,
@@ -83,7 +85,7 @@ public sealed class HttpsCertificateStore(string folder, TimeProvider clock)
     }
 
     /// <summary>
-    /// Decides whether a certificate that exists on disk must be re-issued, and why. Rules in order: unreadable,
+    /// Decides whether a certificate that exists on disk must be re-issued, and why. Rules in order: unreadable (no private key, no server-auth usage, or not yet valid),
     /// expiring (an expired certificate included), a required DNS name missing, a required address missing.
     /// Names the certificate lists beyond the required ones never matter.
     /// </summary>
@@ -98,7 +100,7 @@ public sealed class HttpsCertificateStore(string folder, TimeProvider clock)
         IReadOnlyList<IPAddress> requiredIPAddresses,
         DateTimeOffset now)
     {
-        if (existing is null)
+        if (existing is null || !existing.HasServerAuth || existing.NotBefore > now)
         {
             return HttpsCertificateChangeReason.Unreadable;
         }
@@ -255,7 +257,15 @@ public sealed class HttpsCertificateStore(string folder, TimeProvider clock)
     private static StoredCertificateFacts ReadFacts(X509Certificate2 certificate)
     {
         var (dnsNames, ipAddresses) = ReadNames(certificate);
-        return new StoredCertificateFacts(dnsNames, ipAddresses, new DateTimeOffset(certificate.NotAfter.ToUniversalTime()));
+        var serverAuth = certificate.Extensions.OfType<X509EnhancedKeyUsageExtension>()
+            .Any(usage => usage.EnhancedKeyUsages.Cast<Oid>().Any(oid => oid.Value == ServerAuthOid));
+
+        return new StoredCertificateFacts(
+            dnsNames,
+            ipAddresses,
+            new DateTimeOffset(certificate.NotAfter.ToUniversalTime()),
+            new DateTimeOffset(certificate.NotBefore.ToUniversalTime()),
+            serverAuth);
     }
 
     private static (List<string> DnsNames, List<IPAddress> IPAddresses) ReadNames(X509Certificate2 certificate)
