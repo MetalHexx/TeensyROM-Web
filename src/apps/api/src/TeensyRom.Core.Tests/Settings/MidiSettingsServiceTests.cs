@@ -141,6 +141,21 @@ public class MidiSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Get_WhenAStoredMappingNamesTheRetiredRepeatControl_LoadsItUnchanged()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        File.WriteAllText(_filePath, """
+            {"mappings":[{"id":"m1","source":{"controllerId":"c1","channel":1,"kind":"note","number":40},
+            "owner":"A","control":"repeat","style":{"kind":"latch","amount":null}}]}
+            """);
+
+        var settings = new MidiSettingsService(_log).Get();
+
+        settings.Mappings.Should().ContainSingle().Which.Control.Should().Be("repeat");
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
+    }
+
+    [Fact]
     public void Save_ReturnsTrue_WritesTheFileAndUpdatesTheCache()
     {
         var service = new MidiSettingsService(_log);

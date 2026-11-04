@@ -82,15 +82,15 @@ because a synthetic `pointerdown` throws in `setPointerCapture`.
 
 **Frame A, the view at 1920 x 1080.** Matches: the display with status LED, title, author, elapsed
 and total time and frame count; the position strip with its played fill, loop markers and white
-playhead; Play (Pause while playing), Stop, Repeat and the subtune pager; the Loops / Cues plate
+playhead; Play (Pause while playing), Stop and the subtune pager; the Loops / Cues plate
 beneath; the binding plate at the foot with its Identify and Enable MIDI. A playing deck shows the
 green LED and a green line under Pause; a paused one shows the amber LED and line.
 
 **Frame B, the transport at three widths.** The deck's transport measured 474px at 1920 with the
 bindings panel closed, 404px at 1780, 364px at 1700, 314px at 1600, and 288px at 1920 with the
-bindings panel open. At 404px Stop and Repeat shrink to icon-only buttons and the pager to `1/1`,
-as the mockup's 400px frame draws them. At 288px Play takes a row, Stop and Repeat share the next,
-and the pager takes the last, as the 300px frame draws it; nothing overflows (client width equals
+bindings panel open. At 404px Play and Stop shrink to icon-only buttons and the pager to `1/1`,
+as the mockup's 400px frame draws them. At 288px Play and Stop share a row and the pager takes
+the next, as the 300px frame draws it; nothing overflows (client width equals
 scroll width) and the page does not scroll.
 
 **Frame C, the channel strip.** Matches: V1-V3 buttons with Kill beneath; a muted voice dims and its
@@ -105,7 +105,7 @@ marker; the Nudge caption over the two round pads side by side, under the fader;
   0.950x; releasing both returned the display to white 1.000x. Moving the fader to 1.100 mid-nudge
   with nudge up held read 1.150x, kept the fader at 1.100, and the release landed on 1.100x.
 - **Empty decks.** Each reads "No tune - drop a SID here"; Play, Stop and the pager are disabled;
-  Repeat stays lit; the Loops / Cues plate is empty.
+  the Loops / Cues plate is empty.
 - **Drop highlight.** With a SID drag in flight both transports show a cyan outline and "Drop to
   load - Deck A/B" over the 474 x 151 display area; dragging over deck B's overlay marks only that
   one hot. (The drag was simulated with a `dragenter` carrying the DJ drag type: there is no device
@@ -151,8 +151,8 @@ On your C64s with a real TeensyROM, say whether:
    back into step with the other; release lands where the fader says.
 2. Scrubbing works: dragging the bar and the arrow keys move a playing tune without a glitch, and
    a drop loads a tune onto the deck it lands on.
-3. The narrow transport is usable: with the bindings panel open (about 290-300px) Play, Stop,
-   Repeat and the pager are all easy to hit.
+3. The narrow transport is usable: with the bindings panel open (about 290-300px) Play, Stop
+   and the pager are all easy to hit.
 4. The restyled deck plays as before: voices, Kill, speed and the pad hold behave as they did.
 5. A mapped nudge note held and released, and released by unplugging the controller, ends the
    nudge.

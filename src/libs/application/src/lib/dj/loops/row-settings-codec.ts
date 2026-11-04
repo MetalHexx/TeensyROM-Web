@@ -7,23 +7,21 @@ import { decodeMixerSettings, encodeMixerSettings } from './marker-settings-code
 
 const VERSION = 1;
 
-/** What a set row keeps of one subtune's main track: the mixer settings, the speed fader and
- *  Repeat. Holds, nudges and the nudged tempo are never part of it. */
+/** What a set row keeps of one subtune's main track: the mixer settings and the speed fader.
+ *  Holds, nudges and the nudged tempo are never part of it. */
 export interface DeckRowSettings {
   readonly mixer: DeckMixerSettings;
   /** The speed fader's value, 0.5–1.5. */
   readonly speed: number;
-  readonly repeat: boolean;
 }
 
 /** The app's own versioned shape inside a subtune's `settings`:
- *  `{ v: 1, mixer: {…}, speed, repeat }`. */
+ *  `{ v: 1, mixer: {…}, speed }`. */
 export function encodeRowSettings(settings: DeckRowSettings): PlainValue {
   return {
     v: VERSION,
     mixer: encodeMixerSettings(settings.mixer),
     speed: settings.speed,
-    repeat: settings.repeat,
   };
 }
 
@@ -38,7 +36,8 @@ function malformed(): null {
 
 /** The stored value back as settings. Null, silently, when it is absent, the normal case for a
  *  subtune nothing was kept for; null with one `logWarn` when it is of another version or
- *  malformed. The speed is bounded to the fader's travel. */
+ *  malformed. The speed is bounded to the fader's travel. A `repeat` field written by an older
+ *  version is ignored, whatever it holds. */
 export function decodeRowSettings(value: PlainValue | undefined): DeckRowSettings | null {
   if (value === undefined || value === null) {
     return null;
@@ -46,7 +45,7 @@ export function decodeRowSettings(value: PlainValue | undefined): DeckRowSetting
   if (!isRecord(value) || value['v'] !== VERSION) {
     return malformed();
   }
-  const { mixer: storedMixer, speed, repeat } = value;
+  const { mixer: storedMixer, speed } = value;
   if (storedMixer === undefined || storedMixer === null) {
     return malformed();
   }
@@ -55,8 +54,8 @@ export function decodeRowSettings(value: PlainValue | undefined): DeckRowSetting
   if (mixer === null) {
     return null;
   }
-  if (typeof speed !== 'number' || !Number.isFinite(speed) || typeof repeat !== 'boolean') {
+  if (typeof speed !== 'number' || !Number.isFinite(speed)) {
     return malformed();
   }
-  return { mixer, speed: clamp(speed, 1 - SPEED_INPUT_SPAN, 1 + SPEED_INPUT_SPAN), repeat };
+  return { mixer, speed: clamp(speed, 1 - SPEED_INPUT_SPAN, 1 + SPEED_INPUT_SPAN) };
 }

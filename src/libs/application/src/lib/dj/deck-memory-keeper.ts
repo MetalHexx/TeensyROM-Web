@@ -30,7 +30,6 @@ interface Observed {
   readonly holding: DeckHolding | null;
   readonly shapeable: boolean;
   readonly voices: readonly DeckVoiceState[];
-  readonly repeat: boolean;
   readonly panel: DeckPanelState;
   readonly settingsInPlayId: DeckLoopsState['settingsInPlayId'];
   readonly mainSettings: DeckLoopsState['mainSettings'];
@@ -66,7 +65,7 @@ function mutesOf(voices: readonly DeckVoiceState[]): DeckMixerSettings['mutes'] 
 }
 
 /**
- * Keeps what a deck has set — the SID panel, the voices' latched mutes, the speed fader and Repeat —
+ * Keeps what a deck has set — the SID panel, the voices' latched mutes and the speed fader —
  * in the row and subtune it holds, and so in the tune's latest version.
  *
  * One effect per deck, tracking only the fields it keeps, each through its own deep signal: the
@@ -118,7 +117,6 @@ export class DeckMemoryKeeper {
             holding: holding(),
             shapeable: shapeable(),
             voices: deck.voices(),
-            repeat: deck.repeat(),
             panel: panel(),
             settingsInPlayId: loops.settingsInPlayId(),
             mainSettings: loops.mainSettings(),
@@ -189,6 +187,6 @@ export class DeckMemoryKeeper {
       settingsInPlayId !== null && mainSettings !== null
         ? mainSettings
         : { panel: observed.panel, mutes: mutesOf(observed.voices) };
-    return { mixer, speed: this.deckSpeed.keptSpeed(slot), repeat: observed.repeat };
+    return { mixer, speed: this.deckSpeed.keptSpeed(slot) };
   }
 }

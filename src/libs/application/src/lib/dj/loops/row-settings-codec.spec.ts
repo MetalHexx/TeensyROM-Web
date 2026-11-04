@@ -14,7 +14,7 @@ const MIXER: DeckMixerSettings = {
   mutes: [false, true, false],
 };
 
-const SETTINGS: DeckRowSettings = { mixer: MIXER, speed: 1.25, repeat: false };
+const SETTINGS: DeckRowSettings = { mixer: MIXER, speed: 1.25 };
 
 /** The stored value as a store would hand it back: through JSON. */
 function viaJson(value: PlainValue): PlainValue {
@@ -28,7 +28,7 @@ function stored(): Record<string, PlainValue> {
 describe('row settings codec', () => {
   beforeEach(() => vi.mocked(logWarn).mockClear());
 
-  it('round-trips the mixer settings, the speed and Repeat', () => {
+  it('round-trips the mixer settings and the speed', () => {
     expect(decodeRowSettings(viaJson(encodeRowSettings(SETTINGS)))).toEqual(SETTINGS);
     expect(logWarn).not.toHaveBeenCalled();
   });
@@ -44,11 +44,24 @@ describe('row settings codec', () => {
     ['a mixer of another shape', { ...stored(), mixer: { v: 1, panel: 5, mutes: [] } }],
     ['a non-numeric speed', { ...stored(), speed: 'fast' }],
     ['a non-finite speed', { ...stored(), speed: null }],
-    ['a missing Repeat', { ...stored(), repeat: undefined }],
     ['a non-record value', 'text'],
   ])('reads %s as nothing kept, with exactly one warning', (_name, value) => {
     expect(decodeRowSettings(value as PlainValue)).toBeNull();
     expect(logWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not write the retired repeat field', () => {
+    expect(encodeRowSettings(SETTINGS)).not.toHaveProperty('repeat');
+  });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+    ['missing', undefined],
+    ['a string', 'yes'],
+  ])('restores the mixer and speed of a row saved with repeat %s', (_name, repeat) => {
+    expect(decodeRowSettings({ ...stored(), repeat } as PlainValue)).toEqual(SETTINGS);
+    expect(logWarn).not.toHaveBeenCalled();
   });
 
   it('bounds the speed to the fader travel', () => {

@@ -20,10 +20,10 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   return { ...actual, logWarn: vi.fn(actual.logWarn) };
 });
 
-const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
 const SPEED_A: ControlIdentity = { owner: 'A', control: 'speed' };
 const KEY_A: ControlIdentity = { owner: 'A', control: 'key' };
 const MUTE_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
+const MUTE_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-mute' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 const HOLD_2_A: ControlIdentity = { owner: 'A', control: 'voice-2-hold' };
 const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
@@ -134,30 +134,30 @@ describe('MidiMappingEngine', () => {
 
   describe('state controls', () => {
     it('latch flips the control on each press edge', () => {
-      map(noteSource(40), REPEAT_A, style('latch'));
-      expect(h.djStore.deck('A')().repeat).toBe(true);
+      map(noteSource(40), MUTE_2_A, style('latch'));
+      expect(muted(1)).toBe(false);
 
       h.engine.handle(note(40, 100));
-      expect(h.djStore.deck('A')().repeat).toBe(false);
+      expect(muted(1)).toBe(true);
       h.engine.handle(note(40, 0));
-      expect(h.djStore.deck('A')().repeat).toBe(false);
+      expect(muted(1)).toBe(true);
 
       h.engine.handle(note(40, 100));
-      expect(h.djStore.deck('A')().repeat).toBe(true);
+      expect(muted(1)).toBe(false);
     });
 
     it('on and off keys set the control whatever it was', () => {
-      map(noteSource(40), REPEAT_A, style('off'));
-      map(noteSource(41), REPEAT_A, style('on'));
+      map(noteSource(40), MUTE_2_A, style('off'));
+      map(noteSource(41), MUTE_2_A, style('on'));
 
       h.engine.handle(note(40, 100));
-      expect(h.djStore.deck('A')().repeat).toBe(false);
+      expect(muted(1)).toBe(false);
       h.engine.handle(note(40, 0));
       h.engine.handle(note(40, 100));
-      expect(h.djStore.deck('A')().repeat).toBe(false);
+      expect(muted(1)).toBe(false);
 
       h.engine.handle(note(41, 100));
-      expect(h.djStore.deck('A')().repeat).toBe(true);
+      expect(muted(1)).toBe(true);
     });
 
     it('a mute mapping keeps its style across a style change and a re-learn', () => {
@@ -199,18 +199,18 @@ describe('MidiMappingEngine', () => {
       const up = (n: number): SourceEvent => message(n, 0);
 
       it('latch-release flips the control on the release edge only', () => {
-        map(sourceOf(40), REPEAT_A, style('latch-release'));
+        map(sourceOf(40), MUTE_2_A, style('latch-release'));
 
         h.engine.handle(down(40));
-        expect(h.djStore.deck('A')().repeat).toBe(true);
+        expect(muted(1)).toBe(false);
         h.engine.handle(up(40));
-        expect(h.djStore.deck('A')().repeat).toBe(false);
+        expect(muted(1)).toBe(true);
         h.engine.handle(up(40));
-        expect(h.djStore.deck('A')().repeat).toBe(false);
+        expect(muted(1)).toBe(true);
 
         h.engine.handle(down(40));
         h.engine.handle(up(40));
-        expect(h.djStore.deck('A')().repeat).toBe(true);
+        expect(muted(1)).toBe(false);
       });
 
       it('on-release only ever mutes and off-release only ever unmutes, on the release edge', () => {
@@ -251,7 +251,7 @@ describe('MidiMappingEngine', () => {
       });
 
       it('fires nothing for a release with no press the engine saw', () => {
-        map(sourceOf(40), REPEAT_A, style('latch-release'));
+        map(sourceOf(40), MUTE_2_A, style('latch-release'));
         map(sourceOf(41), MUTE_1_A, style('on-release'));
         map(sourceOf(50), SPEED_A, style('step-release', 0.1));
 
@@ -259,7 +259,7 @@ describe('MidiMappingEngine', () => {
         h.engine.handle(up(41));
         h.engine.handle(up(50));
 
-        expect(h.djStore.deck('A')().repeat).toBe(true);
+        expect(muted(1)).toBe(false);
         expect(muted()).toBe(false);
         expect(speed()).toBe(1);
       });

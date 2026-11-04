@@ -73,8 +73,8 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  *
  * Every load puts a row of the current set on the deck: a listing drop joins the set (or reuses the
  * SID's row) and loads it, and `loadRow` loads a row of any open set. Every load and subtune switch
- * restores the row's latched state for the subtune it lands on — the SID panel, mutes, speed and
- * Repeat as last left, with holds, nudges and any speed excursion at home, and everything at home
+ * restores the row's latched state for the subtune it lands on — the SID panel, mutes and speed as
+ * last left, with holds, nudges and any speed excursion at home, and everything at home
  * for a subtune with nothing kept — so a new tune never inherits the last one's settings. It
  * attaches the subtune's markers before it plays.
  *
@@ -133,7 +133,6 @@ export class DeckService {
           this.applySnapshot(slot);
         }
       });
-      this.setRepeat(slot, true);
     }
     this.watchPositions();
   }
@@ -353,11 +352,6 @@ export class DeckService {
   /** Steps one subtune up. `selectSubtune` clamps to the tune's range and applies its own gates. */
   nextSubtune(slot: Slot): Promise<void> {
     return this.selectSubtune(slot, this.store.deck(slot)().subtune + 1);
-  }
-
-  setRepeat(slot: Slot, on: boolean): void {
-    this.runtime.setRepeat(slot, on);
-    this.store.setDeckRepeat({ slot, repeat: on });
   }
 
   /** The speed fader: sets the tempo multiplier within 0.5x–1.5x. Refused while the deck has
@@ -672,8 +666,8 @@ export class DeckService {
     const snapshot = this.runtime.snapshot(slot);
     if (snapshot.tune === null) {
       // Nothing loaded: 'empty' is an application concept the engine has no notion of. A fresh
-      // player's own default transport would otherwise land here — from the constructor's own
-      // `setRepeat` notify among other things — and overwrite it before anything was ever dropped.
+      // player's own default transport would otherwise land here and overwrite it before anything
+      // was ever dropped.
       return;
     }
 
@@ -908,7 +902,7 @@ export class DeckService {
   }
 
   /** Lands the row's latched state for the holding's subtune, after `resetTuneShaping` has returned
-   *  the deck to home: the panel, mutes, speed fader and Repeat. Holds, nudges and excursions stay
+   *  the deck to home: the panel, mutes and speed fader. Holds, nudges and excursions stay
    *  at home, and so does a subtune with nothing kept. */
   private restoreTuneShaping(slot: Slot, holding: DeckHolding): DeckRowSettings | null {
     const settings = decodeRowSettings(this.sets.subtuneSettingsOf(holding));
@@ -919,7 +913,6 @@ export class DeckService {
     this.mixerApplier.applyDeck(slot);
     this.applyMutes(slot, settings.mixer.mutes);
     this.deckSpeed.setFader(slot, settings.speed);
-    this.setRepeat(slot, settings.repeat);
     this.reflectEngineControls(slot);
     return settings;
   }
@@ -965,8 +958,7 @@ export class DeckService {
   }
 
   /** Drops the marker loop, anything queued behind it or waiting for readiness, and a marker's
-   *  own settings in play; a no-op while none is set, so the repeat setting and the engine are
-   *  left alone. */
+   *  own settings in play; a no-op while none is set, so the engine is left alone. */
   private releaseMarkers(slot: Slot): void {
     const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
     if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {

@@ -117,7 +117,6 @@ function idleTransportSummary(): DeckTransportSummary {
     subtuneText: 'Subtune 0 of 0',
     subtuneCompact: '–/–',
     subtuneDisabled: true,
-    repeat: true,
     held: false,
     errors: [],
   };
@@ -297,7 +296,6 @@ function createDeckServiceStub() {
     load: vi.fn(),
     togglePlayPause: vi.fn(),
     stop: vi.fn(),
-    setRepeat: vi.fn(),
     selectSubtune: vi.fn(),
     seek: vi.fn(),
     bindDevice: vi.fn(),
@@ -1312,7 +1310,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(178);
+      expect(ALL_IDENTITIES).toHaveLength(176);
       expect(mismatched).toEqual([]);
     });
 

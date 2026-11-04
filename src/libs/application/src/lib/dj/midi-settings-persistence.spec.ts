@@ -74,6 +74,19 @@ describe('MidiSettingsPersistence', () => {
     vi.useRealTimers();
   });
 
+  describe('snapshot before the mappings hydrate', () => {
+    it('sends the loaded mappings less any on a control the app no longer has', async () => {
+      const retired = { ...SERVER_SET.mappings[0], id: 'old', control: 'repeat' };
+      repository.load.mockResolvedValue({
+        ...SERVER_SET,
+        mappings: [retired, ...SERVER_SET.mappings],
+      });
+      await persistence.load();
+
+      expect(persistence.snapshot().mappings.map((m) => m.id)).toEqual(['m1']);
+    });
+  });
+
   describe('load', () => {
     it('fetches once and hands every caller the same promise', async () => {
       const first = persistence.load();

@@ -55,15 +55,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 89 controls per deck and 3 for the set, 181 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(181);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(181);
+    it('holds 88 controls per deck and 3 for the set, 179 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(179);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(179);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(89);
+        expect(ids).toHaveLength(88);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -236,16 +236,6 @@ describe('MappableControls', () => {
   });
 
   describe('state, hold and trigger controls', () => {
-    it('repeat reads and sets the deck repeat flag', () => {
-      const repeat = pick('A', 'repeat', 'state');
-      expect(repeat.read()).toBe(true);
-
-      repeat.set(false);
-
-      expect(h.djStore.deck('A')().repeat).toBe(false);
-      expect(repeat.read()).toBe(false);
-    });
-
     it.each([0, 1, 2])('voice %i mute reads and sets that voice only', (voice) => {
       h.makeShapeable('B');
       const mute = pick('B', `voice-${voice + 1}-mute` as ControlId, 'state');

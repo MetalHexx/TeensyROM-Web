@@ -51,7 +51,6 @@ function idleTransportSummary(overrides: Partial<DeckTransportSummary> = {}): De
     subtuneText: 'Subtune 0 of 0',
     subtuneCompact: '–/–',
     subtuneDisabled: true,
-    repeat: true,
     held: false,
     errors: [],
     ...overrides,
@@ -141,7 +140,6 @@ function createDeckServiceStub() {
     load: vi.fn().mockResolvedValue(undefined),
     togglePlayPause: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
-    setRepeat: vi.fn(),
     previousSubtune: vi.fn().mockResolvedValue(undefined),
     nextSubtune: vi.fn().mockResolvedValue(undefined),
     seek: vi.fn().mockResolvedValue(undefined),
@@ -904,7 +902,6 @@ describe('DjDeckColumnComponent', () => {
         play: 'Play deck B',
         pause: 'Pause deck B',
         stop: 'Stop deck B',
-        repeat: 'Repeat track deck B',
       });
       expect(model.bar).toEqual({ kind: 'loop', introPercent: 12 });
       expect([model.state, model.stateLabel]).toEqual(['playing', 'Play']);
@@ -1075,7 +1072,7 @@ describe('DjDeckColumnComponent', () => {
       ]);
     });
 
-    it("dispatches togglePlayPause, stop and setRepeat with this deck's slot", () => {
+    it("dispatches togglePlayPause and stop with this deck's slot", () => {
       const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
       transport(fixture).playPauseClick.emit();
@@ -1083,9 +1080,6 @@ describe('DjDeckColumnComponent', () => {
 
       transport(fixture).stopClick.emit();
       expect(deckService.stop).toHaveBeenCalledWith('B');
-
-      transport(fixture).repeatTrackChange.emit(false);
-      expect(deckService.setRepeat).toHaveBeenCalledWith('B', false);
     });
 
     it("dispatches previousSubtune and nextSubtune with this deck's slot", () => {

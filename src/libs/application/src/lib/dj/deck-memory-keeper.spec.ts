@@ -200,20 +200,18 @@ describe('DeckMemoryKeeper', () => {
     );
   });
 
-  it("keeps the voices' latched mutes, the speed fader and Repeat with the panel", async () => {
+  it("keeps the voices' latched mutes, and the speed fader with the panel", async () => {
     const holding = await newRow();
     settle('A', holding);
 
     speed.setFader('A', 1.25);
     reflectSpeed('A', voicesWith({ muted: 1 }));
-    store.setDeckRepeat({ slot: 'A', repeat: false });
     TestBed.flushEffects();
     await wait(WRITE_DELAY_MS);
 
     expect(keptFor(holding)).toEqual({
       mixer: { panel: HOME_DECK_PANEL, mutes: [false, true, false] },
       speed: 1.25,
-      repeat: false,
     });
   });
 
@@ -249,7 +247,6 @@ describe('DeckMemoryKeeper', () => {
 
     store.setDeckStatus({ slot: 'A', status: 'failed', error: 'no' });
     store.setDeckPanel({ slot: 'A', patch: { cutoff: 150 } });
-    store.setDeckRepeat({ slot: 'A', repeat: false });
     TestBed.flushEffects();
     await wait(WRITE_DELAY_MS * 2);
     expect(sets.subtuneSettingsOf(holding)).toBeUndefined();
@@ -380,10 +377,11 @@ describe('DeckMemoryKeeper', () => {
       await wait(WRITE_DELAY_MS * 2);
       expect(sets.subtuneSettingsOf(holding)).toBeUndefined();
 
-      store.setDeckRepeat({ slot: 'A', repeat: false });
+      speed.setFader('A', 1.25);
+      reflectSpeed('A', voicesWith({ muted: 1 }));
       TestBed.flushEffects();
       await wait(WRITE_DELAY_MS);
-      expect(keptFor(holding)).toEqual({ mixer: MAIN, speed: 1, repeat: false });
+      expect(keptFor(holding)).toEqual({ mixer: MAIN, speed: 1.25 });
     });
 
     it('keeps the remembered speed of an open excursion, and nudges and holds not at all', async () => {

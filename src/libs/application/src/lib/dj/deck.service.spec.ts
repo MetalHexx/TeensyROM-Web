@@ -821,13 +821,23 @@ describe('DeckService', () => {
     });
   });
 
-  it('setRepeat reaches the player and the store', () => {
-    const setRepeatSpy = vi.spyOn(runtime, 'setRepeat');
+  it('a built and loaded deck repeats: its position wraps at the track end and it keeps playing', async () => {
+    const fixture = register(makeFixture());
+    const ended = playableOf(fixture);
+    resolveMock.mockResolvedValueOnce({ ...ended, index: { ...ended.index, endedAtFrame: 40 } });
 
-    service.setRepeat('A', false);
+    await service.load('A', fixture.source);
+    expect(runtime.snapshot('A').repeatTrack).toBe(true);
 
-    expect(setRepeatSpy).toHaveBeenCalledWith('A', false);
-    expect(store.deck('A')().repeat).toBe(false);
+    let furthest = 0;
+    for (let i = 1; i <= 120; i++) {
+      clocks[0].tick(milliseconds(i));
+      furthest = Math.max(furthest, runtime.position('A'));
+    }
+
+    expect(furthest).toBeGreaterThan(0);
+    expect(runtime.position('A')).toBeLessThan(120);
+    expect(store.deck('A')().status).toBe('playing');
   });
 
   it('a drop while an older load is awaiting play writes nothing once its play finally resolves', async () => {
@@ -2278,11 +2288,10 @@ describe('DeckService', () => {
       expect(runtime.position('A')).toBe(stoppedAt);
     });
 
-    it('disengages the marker loop on a scrub and leaves repeat alone', async () => {
+    it('disengages the marker loop on a scrub and leaves the repeating player alone', async () => {
       await loadPlayable('A');
       await service.toggleMarker('A', 'a');
       await service.toggleMarker('A', 'b');
-      expect(store.deck('A')().repeat).toBe(true);
 
       await service.seek('A', 50);
 
@@ -2290,7 +2299,6 @@ describe('DeckService', () => {
       expect(loopsOf('A').queuedId).toBeNull();
       expect(engineLoop('A')).toBeNull();
       expect(engineQueue('A')).toBeNull();
-      expect(store.deck('A')().repeat).toBe(true);
       expect(runtime.snapshot('A').repeatTrack).toBe(true);
     });
 
@@ -2682,12 +2690,10 @@ describe('DeckService', () => {
         mutes: [true, false, false],
       },
       speed: 1.25,
-      repeat: false,
     };
     const OTHER: DeckRowSettings = {
       mixer: { panel: { ...HOME_DECK_PANEL, resonance: 5 }, mutes: [false, true, false] },
       speed: 0.8,
-      repeat: true,
     };
     const HOME_VOICES = [false, false, false];
 
@@ -2745,8 +2751,6 @@ describe('DeckService', () => {
       expect(deck.voices.map((voice) => voice.muted)).toEqual(settings.mixer.mutes);
       expect(runtime.snapshot(slot).tempo.multiplier).toBe(settings.speed);
       expect(deck.faderSpeed).toBe(settings.speed);
-      expect(deck.repeat).toBe(settings.repeat);
-      expect(runtime.snapshot(slot).repeatTrack).toBe(settings.repeat);
     }
 
     function expectHome(slot: 'A' | 'B'): void {
@@ -2976,7 +2980,6 @@ describe('DeckService', () => {
 
         await service.selectSubtune('A', 3);
         expectHome('A');
-        expect(store.deck('A')().repeat).toBe(OTHER.repeat);
       });
 
       it('loads a voice latched muted as muted, and writes nothing back for it', async () => {
@@ -3096,7 +3099,7 @@ describe('DeckService', () => {
     });
 
     describe('a failed load', () => {
-      it('leaves the row it held untouched, also after Repeat is pressed on the failed deck', async () => {
+      it('leaves the row it held untouched, also after a voice is muted on the failed deck', async () => {
         const fixture = register(makeFixture());
         await keepSettings(fixture.reference.identity, SHAPED);
         await loadAndWait('A', fixture);
@@ -3107,7 +3110,7 @@ describe('DeckService', () => {
 
         await service.load('A', makeFixture().source);
         expect(store.deck('A')().status).toBe('failed');
-        service.setRepeat('A', !store.deck('A')().repeat);
+        service.setVoiceMuted('A', 1, true);
         await settle(WRITE_DELAY_MS * 2);
 
         expect(holdingOf('A')).toEqual(held);
@@ -3121,7 +3124,7 @@ describe('DeckService', () => {
         resolveMock.mockRejectedValue(new Error('cannot scan'));
 
         await service.load('A', fixture.source);
-        service.setRepeat('A', true);
+        service.setVoiceMuted('A', 1, true);
         await settle(WRITE_DELAY_MS * 2);
 
         expect(store.deck('A')().status).toBe('failed');
@@ -3139,7 +3142,6 @@ describe('DeckService', () => {
         mixer.setFilterKnob('A', 'cutoff', 600);
         service.setVoiceMuted('A', 1, true);
         service.setSpeed('A', 1.3);
-        service.setRepeat('A', false);
         await settle(WRITE_DELAY_MS);
 
         const held = holdingOf('A');
@@ -3147,7 +3149,6 @@ describe('DeckService', () => {
         expect(keptBy(held)).toEqual({
           mixer: { panel: store.panel().A, mutes: [false, true, false] },
           speed: 1.3,
-          repeat: false,
         });
         expect(store.panel().A.cutoff).toBe(600);
         expect(sets.subtuneSettingsOf({ ...held, subtune: 1 })).toBeUndefined();

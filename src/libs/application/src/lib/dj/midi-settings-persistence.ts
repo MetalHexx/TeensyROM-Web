@@ -11,7 +11,7 @@ import type {
   IMidiSettingsRepository,
   MidiSettingsRecord,
 } from './ports';
-import type { ControlMapping } from './mapping/mapping.models';
+import { isKnownControl, type ControlMapping } from './mapping/mapping.models';
 import { DECK_SLOTS } from './slot';
 
 const SAVE_DEBOUNCE_MS = 300;
@@ -27,7 +27,8 @@ const EMPTY_SETTINGS: MidiSettingsRecord = { controllers: [], mappings: [], deck
 /**
  * The only writer of the whole MIDI settings set. The server stores the set whole, so every save
  * sends all three lists: the deck bindings from `DjStore`, and the controllers and mappings from
- * `MidiMappingStore` once it has loaded them, exactly as `load` returned them until then.
+ * `MidiMappingStore` once it has loaded them, as `load` returned them until then, less any mapping
+ * to a control the app no longer has (the server rejects an unknown control on save).
  *
  * A failed load resolves an empty set and suppresses every save for the rest of the session, so a
  * partial set can never overwrite the server's.
@@ -101,7 +102,13 @@ export class MidiSettingsPersistence {
           ];
     });
     if (!this.mappingStore.loaded()) {
-      return { controllers: this.loaded.controllers, mappings: this.loaded.mappings, deckBindings };
+      return {
+        controllers: this.loaded.controllers,
+        mappings: this.loaded.mappings.filter((mapping) =>
+          isKnownControl(mapping.owner, mapping.control)
+        ),
+        deckBindings,
+      };
     }
     return {
       controllers: this.mappingStore.controllers(),

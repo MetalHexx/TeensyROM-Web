@@ -429,7 +429,7 @@ export class DeckLoops {
 
   /** A manual scrub or a transport stop: the marker loop, the queue and a wait for readiness are
    *  dropped, so the scrub is not pulled back into a loop and a stopped deck is not re-armed when a
-   *  start becomes ready. The repeat-track setting is untouched. */
+   *  start becomes ready. */
   disengage(slot: Slot): void {
     this.stop(slot);
   }

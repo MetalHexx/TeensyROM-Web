@@ -7,7 +7,6 @@ import { setDeckLoaded } from './set-deck-loaded';
 import { setDeckStructure } from './set-deck-structure';
 import { samplePosition } from './sample-position';
 import { setDeckSubtune } from './set-deck-subtune';
-import { setDeckRepeat } from './set-deck-repeat';
 import { setBinding } from './set-binding';
 import { setMidi } from './set-midi';
 import { markSeen } from './mark-seen';
@@ -53,7 +52,6 @@ export function withDjActions() {
       ...setDeckStructure(writableStore),
       ...samplePosition(writableStore),
       ...setDeckSubtune(writableStore),
-      ...setDeckRepeat(writableStore),
       ...setBinding(writableStore),
       ...setMidi(writableStore),
       ...markSeen(writableStore),

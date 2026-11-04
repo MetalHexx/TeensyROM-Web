@@ -24,7 +24,7 @@ const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
 const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
 const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
-const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
+const MUTE_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 
 const style = (kind: MappingStyle['kind'], amount: number | null = null): MappingStyle => ({
@@ -164,6 +164,22 @@ describe('MidiMappings', () => {
         'B:key',
         'A:speed',
       ]);
+    });
+
+    it('drops a mapping saved on the retired Repeat control, and the next save omits it', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [record('old-repeat', 7, 'A', 'repeat'), record('m2', 8, 'B', 'speed')],
+      });
+
+      await h.mappings.hydrate();
+      h.mappings.bind(ccSource(20), SPEED_A, style('absolute'));
+
+      expect(h.mappingStore.mappings().map((m) => `${m.control.owner}:${m.control.control}`)).toEqual([
+        'B:speed',
+        'A:speed',
+      ]);
+      expect((await saved()).mappings.map((m) => m.control)).toEqual(['speed', 'speed']);
     });
 
     it('keeps the first mapping when two saved mappings share a source', async () => {
@@ -349,9 +365,9 @@ describe('MidiMappings', () => {
     });
 
     it.each([
-      ['latch-release', REPEAT_A, null],
-      ['on-release', REPEAT_A, null],
-      ['off-release', REPEAT_A, null],
+      ['latch-release', MUTE_1_A, null],
+      ['on-release', MUTE_1_A, null],
+      ['off-release', MUTE_1_A, null],
       ['step-release', KEY_B, 0.1],
     ] as const)('accepts %s on a control that can take it', async (kind, control, amount) => {
       await h.mappings.hydrate();
@@ -446,7 +462,7 @@ describe('MidiMappings', () => {
 
     it('keeps a release kind when the mapping is learned onto another source', async () => {
       await h.mappings.hydrate();
-      const { mapping } = h.mappings.bind(noteSource(36), REPEAT_A, style('on-release'));
+      const { mapping } = h.mappings.bind(noteSource(36), MUTE_1_A, style('on-release'));
 
       h.mappings.replaceSource(mapping.id, noteSource(37), style('latch'));
 

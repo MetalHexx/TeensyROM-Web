@@ -135,7 +135,6 @@ export interface DeckState {
   structure: DeckStructure | null;
   subtune: number;
   subtuneCount: number;
-  repeat: boolean;
   error: string | null;
   /** The engine-reported tempo multiplier, home 1. It is what the speed display shows. */
   speed: number;
@@ -314,7 +313,6 @@ const initialDeckState: DeckState = {
   structure: null,
   subtune: 0,
   subtuneCount: 0,
-  repeat: true,
   error: null,
   speed: 1,
   faderSpeed: 1,

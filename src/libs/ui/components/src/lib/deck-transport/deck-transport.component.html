@@ -68,15 +68,6 @@
         [disabled]="!model().canStop"
         (press)="stopClick.emit()"
       />
-      <lib-synth-key
-        class="repeat-key"
-        data-control="repeat"
-        label="Repeat"
-        icon="repeat"
-        [accessibleName]="model().actionAccessibleNames.repeat"
-        [latched]="model().repeatTrack"
-        (press)="repeatTrackChange.emit(!model().repeatTrack)"
-      />
       <div class="subtune" data-control="subtune">
         <lib-synth-key
           class="step-key"

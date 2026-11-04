@@ -135,6 +135,7 @@ export class DeckRuntime {
     const prepare = this.replayFactory();
     const recorder = this.recorderFactory();
     const player = createSidPlayer({ sink, clock, replayRunner: replay, prepareRunner: prepare });
+    player.setRepeatTrack(true);
 
     this.slots.set(slot, { player, sink, clock, replay, prepare, recorder });
   }
@@ -211,10 +212,6 @@ export class DeckRuntime {
 
   stop(slot: Slot): void {
     this.requireSlot(slot).player.stop();
-  }
-
-  setRepeat(slot: Slot, on: boolean): void {
-    this.requireSlot(slot).player.setRepeatTrack(on);
   }
 
   /** The φ2 of the machine this slot's cartridge sits in, or `null` when it is not known. The player

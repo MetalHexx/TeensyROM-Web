@@ -416,12 +416,6 @@ export class MappableControls {
         (index) =>
           decks.setMoveStep(slot, MOVE_STEPS[clamp(Math.round(index), 0, MOVE_STEPS.length - 1)])
       ),
-      state(
-        id('repeat'),
-        'Repeat track',
-        () => deck().repeat,
-        (on) => decks.setRepeat(slot, on)
-      ),
       ...VOICE_NUMBERS.map((n) =>
         state(
           id(`voice-${n}-mute`),

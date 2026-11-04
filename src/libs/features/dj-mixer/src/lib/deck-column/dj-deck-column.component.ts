@@ -307,7 +307,6 @@ export class DjDeckColumnComponent {
       scrubAccessibleName: `Position deck ${letter}`,
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
-      repeatTrack: summary.repeat,
       subtune: {
         text: summary.subtuneCompact,
         disabled: summary.subtuneDisabled,
@@ -318,7 +317,6 @@ export class DjDeckColumnComponent {
         play: `Play deck ${letter}`,
         pause: `Pause deck ${letter}`,
         stop: `Stop deck ${letter}`,
-        repeat: `Repeat track deck ${letter}`,
       },
       // A failed load's reason travels in `label`, not `errors`.
       errors: summary.status === 'failed' && summary.label ? [summary.label] : summary.errors,
@@ -465,10 +463,6 @@ export class DjDeckColumnComponent {
 
   onStopClick(): void {
     this.deckService.stop(this.deck().slot);
-  }
-
-  onRepeatTrackChange(on: boolean): void {
-    this.deckService.setRepeat(this.deck().slot, on);
   }
 
   onPreviousSubtune(): void {

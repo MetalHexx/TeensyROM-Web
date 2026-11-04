@@ -53,7 +53,6 @@ describe('DjStore', () => {
       expect(store.decks().A.status).toBe('empty');
       expect(store.decks().A.loaded).toBeNull();
       expect(store.decks().A.busy).toBe(false);
-      expect(store.decks().A.repeat).toBe(true);
       expect(store.decks().B).toEqual(store.decks().A);
       expect(store.positions()).toEqual({ A: 0, B: 0 });
 
@@ -158,11 +157,6 @@ describe('DjStore', () => {
     it('setDeckSubtune sets subtune', () => {
       store.setDeckSubtune({ slot: 'A', subtune: 3 });
       expect(store.decks().A.subtune).toBe(3);
-    });
-
-    it('setDeckRepeat sets repeat', () => {
-      store.setDeckRepeat({ slot: 'A', repeat: false });
-      expect(store.decks().A.repeat).toBe(false);
     });
 
     it('setDeckBusy sets busy, leaving the other slot untouched', () => {

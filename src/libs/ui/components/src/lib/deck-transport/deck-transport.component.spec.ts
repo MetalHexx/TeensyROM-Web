@@ -17,7 +17,6 @@ function testModel(): DeckTransportModel {
     scrubAccessibleName: 'Position deck A',
     playPause: { showing: 'play', disabled: false },
     canStop: true,
-    repeatTrack: false,
     subtune: {
       text: '1/3',
       disabled: false,
@@ -28,7 +27,6 @@ function testModel(): DeckTransportModel {
       play: 'Play deck A',
       pause: 'Pause deck A',
       stop: 'Stop deck A',
-      repeat: 'Repeat track deck A',
     },
     errors: [],
     set: {
@@ -56,7 +54,6 @@ describe('DeckTransportComponent', () => {
     const component = fixture.componentInstance;
     component.playPauseClick.subscribe(() => emitted.push('playPause'));
     component.stopClick.subscribe(() => emitted.push('stop'));
-    component.repeatTrackChange.subscribe((latched) => emitted.push(`repeat:${latched}`));
     component.previousSubtune.subscribe(() => emitted.push('previous'));
     component.nextSubtune.subscribe(() => emitted.push('next'));
     component.previousInSet.subscribe(() => emitted.push('previousInSet'));
@@ -115,26 +112,6 @@ describe('DeckTransportComponent', () => {
       expect(emitted).toEqual([]);
     });
 
-    it.each([
-      [false, 'repeat:true'],
-      [true, 'repeat:false'],
-    ])(
-      'emits the inverse of the latch when Repeat is pressed while %s',
-      (repeatTrack, expected) => {
-        setModel({ repeatTrack });
-        keyButton('[data-control="repeat"]').click();
-
-        expect(emitted).toEqual([expected]);
-      }
-    );
-
-    it('reflects the repeat latch as aria-pressed', () => {
-      expect(keyButton('[data-control="repeat"]').getAttribute('aria-pressed')).toBe('false');
-
-      setModel({ repeatTrack: true });
-      expect(keyButton('[data-control="repeat"]').getAttribute('aria-pressed')).toBe('true');
-    });
-
     it('emits previousSubtune and nextSubtune from the stepper keys', () => {
       keyButton('[data-control="subtune"] [data-part="previous"]').click();
       keyButton('[data-control="subtune"] [data-part="next"]').click();
@@ -185,7 +162,6 @@ describe('DeckTransportComponent', () => {
       '[data-control="seek"]',
       '[data-control="play-pause"]',
       '[data-control="stop"]',
-      '[data-control="repeat"]',
       '[data-control="subtune"] [data-part="previous"]',
       '[data-control="subtune"] [data-part="next"]',
     ])('renders %s', (anchor) => {

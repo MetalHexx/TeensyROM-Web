@@ -174,8 +174,8 @@ describe('DJ Mixer — responsive layout', () => {
     it('keeps deck B reachable once stacked at tablet width', () => {
       cy.viewport(VIEWPORT.TABLET.width, VIEWPORT.TABLET.height);
 
-      cy.get('[aria-label="Repeat track deck B"]').scrollIntoView();
-      cy.get('[aria-label="Repeat track deck B"]').should('be.visible');
+      cy.get('[aria-label="Stop deck B"]').scrollIntoView();
+      cy.get('[aria-label="Stop deck B"]').should('be.visible');
     });
 
     it('keeps the speed fader and the +50% jump button visible and unclipped at desktop width', () => {
