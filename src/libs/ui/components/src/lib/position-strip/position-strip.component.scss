@@ -251,18 +251,18 @@ input[type='range'] {
   --mark-color: var(--color-highlight);
 }
 
-.mark[data-live] {
-  --mark-color: var(--color-success);
-  --mark-fill: color-mix(in srgb, var(--mark-color) 55%, transparent);
-  min-width: 5px;
-  box-shadow: 0 0 7px color-mix(in srgb, var(--mark-color) 90%, transparent);
-}
-
 .mark[data-kind='loop'] {
   min-width: 2px;
   border: 1px solid var(--mark-ring);
   border-radius: 2px;
   background: var(--mark-fill);
+}
+
+.mark[data-live] {
+  --mark-color: var(--color-success);
+  --mark-fill: color-mix(in srgb, var(--mark-color) 55%, transparent);
+  min-width: 5px;
+  box-shadow: 0 0 7px color-mix(in srgb, var(--mark-color) 90%, transparent);
 }
 
 .mark[data-kind='cue'] {

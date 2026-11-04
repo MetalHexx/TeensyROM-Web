@@ -1033,7 +1033,7 @@ and length, and how the drag ghost looks, needs a bench.
 
 Pending: the operator's, from the bench.
 
-## Slip, the live loop row and the bench checklist (ASID-DJ-20, 2026-11-04)
+## Live loops and slip (ASID-DJ-20, 2026-11-04)
 
 Browser check of the built Live loop row, the transport without Repeat and the strip's second
 playhead against `ASID-DJ-ROOT-WIREFRAME-SLIP.html`; the DJ mixer's timing protocol with slip on,
@@ -1082,12 +1082,24 @@ which until now sent it as an ordinary running loop); the second playhead's opac
 0.75. Checked after the change on the running loop in the browser: the bracket reads green and the
 second playhead's dots are visible beside the playhead.
 
+The first version of the live rule lost its `min-width` to the plain loop rule declared after it (same
+specificity), so the 5 px minimum never applied: a live mark and an ordinary loop mark both computed
+`min-width: 2px`. The live rule now sits after the loop rule. Measured in the dev build on a
+`data-live` loop mark set to 0.012% of the strip width (a 2-frame loop on a 16183-frame tune): computed
+`min-width` 5px, drawn 4.99 px wide, green border `rgb(111, 220, 140)`; the same mark without
+`data-live` computed 2px and drew 2.0 px with the plate-loop border. In the Storybook strip story
+(below) the live mark computed `min-width: 5px` beside ordinary loops at 2px. jsdom does not resolve
+this cascade, so no unit spec can see it; this was read in a real browser.
+
 Findings, not fixed (larger than a small visual difference or not this task's to settle): the built
 row has no tray and no lamp dot on its keys; its keys follow the page's 26 px key scale where the
 wireframe draws 24 px (live row) and 32 px (transport) keys; the Live loop and Slip keys are narrower
 than the mockup's because their labels are set smaller and the Slip key has no lamp-dot-and-label
-form. The row did not wrap or clip at any width (see the responsive spec below); the operator can
-decide whether the tray is wanted.
+form. Nothing in the idle row clips or leaves its plate at any of the five widths the responsive spec
+covers (see below), but the row does wrap: it holds on one line at 1100 and 768 px, and the Size
+control drops to its own line when the row's container is under 20 rem (the row measured 241 px wide at
+400 px, 136 at 1279 px and 196 at 1400 px, each with Size on a second line). That is the row's
+container-query layout, not a fault. The operator can decide whether the tray is wanted.
 
 ### Timing protocol with slip on
 
@@ -1155,10 +1167,21 @@ Not run, and why:
 
 `dj-mixer-responsive.cy.ts` gained "the live loop row": at 1400, 1279, 1100, 768 and 400 px it
 asserts that both rows sit inside their plate, do not overflow themselves, and that Live loop, Size
-and Slip each have width and end inside the row. Run against the dev server above with
+and Slip each have width and end inside the row. It passes with the Size control wrapped or not, and
+measures the idle row only. Run against the dev server above with
 `cypress run --project apps/teensyrom-ui-e2e --spec src/e2e/dj-mixer/dj-mixer-responsive.cy.ts`:
 47 passing (the 5 new ones included). `pnpm nx e2e teensyrom-ui-e2e` itself was not used (the Cypress
 config starts its own server on port 4200, which this session already held).
+
+### Storybook checks
+
+`pnpm nx run ui-components:build-storybook` passes. The built Storybook was served over a local HTTP
+server and the `Dj/Position strip` "Marks every state" story was opened in the browser: the strip draws
+idle, selected, running, queued and both loop marks, the cues, and the new live mark at its end. A
+live mark was added to that story's `everyMarkState` (it reads green with its glow, computed
+`min-width: 5px`, beside the ordinary loops at 2px). Not run: the strip and the Live loop row stories
+were not compared side by side with the slip mockup in Storybook (the mockup comparison above was
+made on the running app), and the Live loop row stories were not opened.
 
 ### Automated commands
 
@@ -1169,7 +1192,7 @@ config starts its own server on port 4200, which this session already held).
 | `vitest run` in `libs/ui/components` | 136 files, 2342 tests passed (the CSS-parse and shader-mock lines in its output are the suite's usual noise) |
 | `vitest run` in `libs/features/dj-mixer` | 12 files, 352 tests passed |
 | `pnpm nx run-many -t lint -p application ui-components dj-mixer` | 0 errors, 10 warnings (all in `application`, none in files this task touched) |
-| `pnpm nx build teensyrom-ui` | built; initial total 2.44 MB raw (500.71 kB transfer), over the 2.00 MB initial budget by 437.62 kB (a warning, as in the earlier sections; `project.json`'s budgets are unchanged) |
+| `pnpm nx build teensyrom-ui` | built; initial total 2.44 MB raw (500.71 kB transfer), over the 2.00 MB initial budget by 437.62 kB (a warning; `project.json`'s budgets are unchanged). No baseline was taken: the app was not built at the pre-ASID-DJ-20 commit, so how much of the 437.62 kB overage this iteration added cannot be attributed from this run. The earlier sections' last tabulated overage was 184.77 kB on the branch (143.08 kB on `main`); this phase's own change to shipped code is one optional field, a style rule and an opacity value |
 | `dotnet test apps/api/src/TeensyRom.Api.Tests.Unit` | 1110 passed, 0 failed |
 | `pnpm test` in the `sidablist` root | core 924, asid 63, analysis 209, tunes 77 tests passed |
 

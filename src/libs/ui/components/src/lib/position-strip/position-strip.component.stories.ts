@@ -224,9 +224,10 @@ const everyMarkState: PositionMark[] = [
   mark('queued', { startPercent: 50, endPercent: 60, activity: 'queued' }),
   mark('queued-cue', { kind: 'cue', startPercent: 64, endPercent: null, activity: 'queued' }),
   mark('both', { startPercent: 70, endPercent: 82, activity: 'running', selected: true }),
+  mark('live', { startPercent: 86, endPercent: 88, activity: 'running', live: true }),
 ];
 
-/** Every state at once: idle, selected, running, queued, and selected with running. */
+/** Every state at once: idle, selected, running, queued, selected with running, and a live loop. */
 export const MarksEveryState: Story = {
   args: {
     ...base,
