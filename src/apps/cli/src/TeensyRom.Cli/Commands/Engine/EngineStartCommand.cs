@@ -23,6 +23,8 @@ internal sealed class EngineStartCommand(ICliOutput output, IEngineControl engin
 
         if (!status.Running) throw new CliException(CliExitCode.EngineUnavailable, status.Problem ?? "Trom API isn't running.");
 
+        if (status.Https?.Notice is { } notice) Output.Notice(notice);
+
         return 0;
     }
 }

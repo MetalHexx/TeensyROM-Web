@@ -170,6 +170,81 @@ public class EngineProbeTests
         request.Should().Be(EngineStopRequest.Gone);
     }
 
+    private const string HttpsBody = """
+        {"port":10214,"listening":true,"problem":null,
+         "names":["localhost","mypi","127.0.0.1"],
+         "issuedAt":"2026-11-02T10:00:00+00:00","expiresAt":"2028-11-01T10:00:00+00:00",
+         "change":"Reissued","changeReason":"HostNameChanged"}
+        """;
+
+    [Fact]
+    public async Task GetHttps_OfAnEngineThatReportsIt_IsTheMappedRecordWithItsNotice()
+    {
+        var https = await Against(Reply(200, HttpsBody), probe => probe.GetHttpsAsync(CancellationToken.None));
+
+        https.Should().NotBeNull();
+        https!.Port.Should().Be(10214);
+        https.Listening.Should().BeTrue();
+        https.Problem.Should().BeNull();
+        https.Names.Should().Equal("localhost", "mypi", "127.0.0.1");
+        https.ExpiresAt.Should().Be(new DateTimeOffset(2028, 11, 1, 10, 0, 0, TimeSpan.Zero));
+        https.Change.Should().Be(CertificateChange.Reissued);
+        https.ChangeReason.Should().Be(CertificateChangeReason.HostNameChanged);
+        https.Notice.Should().Contain("name changed");
+    }
+
+    [Fact]
+    public async Task GetHttps_WhenNothingChanged_HasNoNotice()
+    {
+        var body = """{"port":10214,"listening":false,"problem":"port busy","names":[],"issuedAt":null,"expiresAt":null,"change":"None","changeReason":null}""";
+
+        var https = await Against(Reply(200, body), probe => probe.GetHttpsAsync(CancellationToken.None));
+
+        https!.Listening.Should().BeFalse();
+        https.Problem.Should().Be("port busy");
+        https.Notice.Should().BeNull();
+        https.ChangeReason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHttps_OfAnEngineWithoutTheEndpoint_IsNull()
+    {
+        var https = await Against(Reply(404), probe => probe.GetHttpsAsync(CancellationToken.None));
+
+        https.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHttps_OfARefusedConnection_IsNull()
+    {
+        var probe = new EngineProbe(ClosedPort(), Connect, Budget);
+
+        var https = await probe.GetHttpsAsync(CancellationToken.None);
+
+        https.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHttps_OfAnEngineThatAnswersTooSlowly_IsNull()
+    {
+        var https = await Against(
+            context => Task.Delay(Timeout.Infinite, context.RequestAborted),
+            probe => probe.GetHttpsAsync(CancellationToken.None));
+
+        https.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHttps_WhenTheCallerCancels_Throws()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        var act = () => Against(Reply(200, HttpsBody), probe => probe.GetHttpsAsync(cancelled.Token));
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     /// <summary>A transport that runs <paramref name="failure"/>, which is expected to end by throwing.</summary>
     private sealed class ScriptedHandler(Func<CancellationToken, Task> failure) : HttpMessageHandler
     {

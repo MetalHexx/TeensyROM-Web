@@ -3,6 +3,7 @@ using TeensyRom.Cli.Api;
 using TeensyRom.Cli.Api.Generated;
 using TeensyRom.Cli.Commands.Common;
 using TeensyRom.Cli.Commands.Device;
+using TeensyRom.Cli.Commands.Engine;
 using TeensyRom.Cli.Common;
 using TeensyRom.Cli.Engine;
 using TeensyRom.Cli.Errors;
@@ -17,7 +18,7 @@ internal sealed class InitSettings : TromSettings;
 
 internal sealed record InitTrom(string Version);
 
-internal sealed record InitEngine(bool Running, string? Version, bool Matches, string Address);
+internal sealed record InitEngine(bool Running, string? Version, bool Matches, string Address, EngineHttps? Https = null);
 
 internal sealed record InitWebUi(string Address, bool Available);
 
@@ -85,7 +86,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         if (status.Running && !webUiAvailable) problems.Add(WebUiDiagnosis.Problem(locator));
         var report = new InitReport(
             new InitTrom(status.CliVersion),
-            new InitEngine(status.Running, status.Version, status.Matches, EngineAddress.BaseUrl),
+            new InitEngine(status.Running, status.Version, status.Matches, EngineAddress.BaseUrl, status.Https),
             new InitWebUi(WebUiAddress, webUiAvailable),
             InitUpdate.From(await release),
             found,
@@ -170,6 +171,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
             ("Trom API address", report.Engine.Address),
             ("Trom API version", report.Engine.Version ?? string.Empty),
             ("Version match", report.Engine.Running ? (report.Engine.Matches ? "yes" : "no") : string.Empty),
+            .. EngineStatusCommand.DescribeHttps(report.Engine.Https),
             ("Trom UI", report.WebUi.Available ? "available" : "not available"),
             ("Trom UI address", report.WebUi.Address),
             ("Update", DescribeUpdate(report.Update))
@@ -181,11 +183,13 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
             fields.AddRange(report.Commands.Select(command => ("Command", command.Name)));
             fields.AddRange(report.Problems.Select(problem => ("Problem", problem)));
             Output.Fields(fields);
+            if (report.Engine.Https?.Notice is { } plainNotice) Output.Notice(plainNotice);
             return;
         }
 
         Output.Fields(fields);
         if (report.Devices.Count > 0) Output.Out.Write(DeviceListCommand.ToTable(report.Devices));
+        if (report.Engine.Https?.Notice is { } notice) Output.Notice(notice);
         foreach (var problem in report.Problems) Output.Notice(problem);
     }
 }

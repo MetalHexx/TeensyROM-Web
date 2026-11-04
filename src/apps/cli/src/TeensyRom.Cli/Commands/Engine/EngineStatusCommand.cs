@@ -27,7 +27,20 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
         {
             Output.Notice($"The running Trom API is version {status.Version} but this CLI is {status.CliVersion} — the next command that needs Trom API restarts it.");
         }
+        if (status.Https?.Notice is { } notice) Output.Notice(notice);
         return 0;
+    }
+
+    /// <summary>The secure-address and certificate-expiry rows for an engine that reported HTTPS; empty otherwise.</summary>
+    internal static IEnumerable<(string Label, string Value)> DescribeHttps(EngineHttps? https)
+    {
+        if (https is null) yield break;
+
+        yield return ("Secure address", https.Listening
+            ? $"https://localhost:{https.Port}"
+            : $"not available — {https.Problem}");
+
+        if (https.ExpiresAt is { } expiresAt) yield return ("Certificate expires", expiresAt.ToString("yyyy-MM-dd"));
     }
 
     internal static IReadOnlyList<(string Label, string Value)> Describe(EngineStatus status)
@@ -48,6 +61,7 @@ internal sealed class EngineStatusCommand(ICliOutput output, IEngineControl engi
                 ("CLI version", status.CliVersion)
             ];
 
+        rows.AddRange(DescribeHttps(status.Https));
         if (status.LogFolder is not null) rows.Add(("Log folder", status.LogFolder));
         if (status.LogFile is not null) rows.Add(("Log file", status.LogFile));
 

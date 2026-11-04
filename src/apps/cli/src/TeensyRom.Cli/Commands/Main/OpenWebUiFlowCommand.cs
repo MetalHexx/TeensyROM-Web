@@ -21,11 +21,16 @@ namespace TeensyRom.Cli.Commands.Main
                 return 1;
             }
 
-            var addresses = new[] { $"On this computer: {report.Address}" }
-                .Concat(report.NetworkAddresses.Select(address => $"On your network: {address}"))
-                .ToArray();
+            var addresses = new List<string> { $"On this computer: {report.Address}" };
 
-            RadHelper.WriteMenu("Trom UI", report.Opened ? "Opened in your browser." : $"Couldn't open a browser — open {report.Address} yourself.", addresses);
+            for (var i = 0; i < report.NetworkAddresses.Count; i++)
+            {
+                addresses.Add($"On your network: {report.NetworkAddresses[i]}");
+                if (i < report.SecureNetworkAddresses.Count) addresses.Add($"Secure, for MIDI and video: {report.SecureNetworkAddresses[i]}");
+            }
+
+            RadHelper.WriteMenu("Trom UI", report.Opened ? "Opened in your browser." : $"Couldn't open a browser — open {report.Address} yourself.", addresses.ToArray());
+            if (report.Https?.Notice is { } notice) RadHelper.WriteLine(notice);
             return 0;
         }
     }
