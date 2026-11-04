@@ -5,6 +5,7 @@ import {
   effect,
   input,
   output,
+  signal,
   untracked,
   viewChild,
 } from '@angular/core';
@@ -235,13 +236,18 @@ export class LoopSelectedRowComponent {
   /** Whether the name editor is open; derived from the editor so it cannot drift from it. */
   protected readonly renaming = computed(() => this.editor()?.isEditing() ?? false);
 
-  /** The marker and name the open editor was seeded with. The editor judges "changed" against the
-   *  current model's name, which a selection move under the open field replaces. */
-  private renameTarget: { id: string; name: string } | null = null;
+  /** The marker and name the open editor was seeded with; null while the editor is closed. */
+  private readonly renameTarget = signal<{ id: string; name: string } | null>(null);
+
+  /** The name the editor judges "changed" against. While the field is open it stays the name the
+   *  edit opened with, so a selection move under the open field cannot change what counts as an
+   *  edit: a draft equal to the newly selected marker's name must still commit to the marker the
+   *  edit was opened on. With the editor closed it follows the model. */
+  protected readonly editorValue = computed(() => this.renameTarget()?.name ?? this.model().name);
 
   constructor() {
     effect(() => {
-      this.renameTarget = this.renaming() ? untracked(() => this.openedOn()) : null;
+      this.renameTarget.set(this.renaming() ? untracked(() => this.openedOn()) : null);
     });
   }
 
@@ -251,7 +257,7 @@ export class LoopSelectedRowComponent {
   }
 
   protected onCommit(name: string): void {
-    const target = this.renameTarget ?? this.openedOn();
+    const target = this.renameTarget() ?? this.openedOn();
     if (target !== null && name !== target.name) {
       this.rename.emit({ id: target.id, name });
     }

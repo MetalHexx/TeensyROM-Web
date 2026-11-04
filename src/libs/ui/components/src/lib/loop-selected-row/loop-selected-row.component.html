@@ -30,7 +30,7 @@
       {{ model().name }}
       } @else {
       <lib-inline-edit-title
-        [value]="model().name"
+        [value]="editorValue()"
         [maxLength]="model().nameMaxLength"
         [editLabel]="model().renameLabel"
         (commit)="onCommit($event)"

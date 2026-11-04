@@ -450,6 +450,19 @@ describe('LoopSelectedRowComponent', () => {
         expect(renames).toEqual([{ id: 'm3', name: '' }]);
       });
 
+      it('commits a draft that matches the name of the marker the selection moved to', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().value = 'Loop 4';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+        expect(renames).toEqual([{ id: 'm3', name: 'Loop 4' }]);
+      });
+
       it('emits nothing for an untouched draft when the selection moved under the open editor', () => {
         const renames: { id: string; name: string }[] = [];
         fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
