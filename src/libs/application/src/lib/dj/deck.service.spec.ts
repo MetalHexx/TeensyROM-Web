@@ -47,6 +47,7 @@ import {
   DEFAULT_LIVE_LOOP_BEATS,
   DjStore,
   HOME_DECK_PANEL,
+  type DeckBeatGrid,
   type DeckHolding,
   type DeckMixerSettings,
 } from './dj-store';
@@ -3627,6 +3628,220 @@ describe('DeckService', () => {
         expect(held.subtune).toBe(3);
         expect(currentSet().rows[0].lastSubtune).toBe(3);
         expect((await memoryStore.load(held.sidHash))?.lastSubtune).toBe(3);
+      });
+    });
+  });
+
+  describe('live loops', () => {
+    const grid: DeckBeatGrid = {
+      beatFrames: 24,
+      beatOneFrame: 0,
+      startFrame: 0,
+      endFrame: null,
+      source: 'scan',
+    };
+    const liveOf = (slot: 'A' | 'B') => store.loops()[slot].live;
+    const engineLoop = (slot: 'A' | 'B') => runtime.snapshot(slot).loop;
+    const markerOf = (id: string, start: number, end: number): LoopMarker => ({
+      id,
+      start: { frame: start, offsetFrames: 0 },
+      end: { frame: end, offsetFrames: 0 },
+      voices: [0, 1, 2],
+    });
+    let ticks = 0;
+
+    function tick(slot: 'A' | 'B', count = 1): void {
+      for (let i = 0; i < count; i++) {
+        clocks[slot === 'A' ? 0 : 1].tick(milliseconds(++ticks));
+      }
+    }
+
+    /** Plays a tune on deck A that has `grid`, with the playhead at 30. */
+    async function playingOnGrid(
+      options: {
+        markers?: readonly LoopMarker[];
+        grid?: DeckBeatGrid | null;
+        subtuneCount?: number;
+      } = {}
+    ): Promise<void> {
+      const fixture = register(makeFixture({ subtuneCount: options.subtuneCount }));
+      if (options.markers !== undefined) {
+        await keepMarkers(fixture.reference.identity, options.markers);
+      }
+      await loadAndWait('A', fixture);
+      await vi.waitFor(() => expect(store.loops().A.markers.every((marker) => marker.ready)).toBe(true));
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: options.grid === undefined ? grid : options.grid });
+      TestBed.flushEffects();
+      tick('A', 30);
+    }
+
+    it('pushes a loop of the kept size on the grid and ends it again', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toEqual({ startFrame: 24, endFrame: 48, pendingEndFrame: null });
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 48, varispeedStart: 'wrap' });
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+    });
+
+    it('ends a running live loop on endLiveLoop, and does nothing when none runs', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+
+      service.endLiveLoop('A');
+      expect(engineLoop('A')).toBeNull();
+
+      service.toggleLiveLoop('A');
+      service.endLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+    });
+
+    it('ignores every command on a deck with no grid', async () => {
+      await playingOnGrid({ grid: null });
+
+      service.toggleLiveLoop('A');
+      service.stepLiveLoopSize('A', 'halve');
+      service.endLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(store.deck('A')().liveLoopBeats).toBe(DEFAULT_LIVE_LOOP_BEATS);
+    });
+
+    it('refuses the commands of a deck with nothing loaded', () => {
+      service.toggleLiveLoop('B');
+      service.stepLiveLoopSize('B', 'double');
+
+      expect(liveOf('B')).toBeNull();
+      expect(store.deck('B')().liveLoopBeats).toBe(DEFAULT_LIVE_LOOP_BEATS);
+    });
+
+    it('steps the kept size one rung at a time, saving it, and stops at the ends', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+      fakePersistence.scheduleSave.mockClear();
+
+      service.stepLiveLoopSize('A', 'halve');
+      expect(store.deck('A')().liveLoopBeats).toBe(0.5);
+      service.stepLiveLoopSize('A', 'double');
+      service.stepLiveLoopSize('A', 'double');
+      expect(store.deck('A')().liveLoopBeats).toBe(2);
+      expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(3);
+
+      service.setLiveLoopBeats('A', 128);
+      fakePersistence.scheduleSave.mockClear();
+      service.stepLiveLoopSize('A', 'double');
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
+      expect(fakePersistence.scheduleSave).not.toHaveBeenCalled();
+    });
+
+    it('resizes a running live loop when the kept size changes', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+      service.toggleLiveLoop('A');
+
+      service.stepLiveLoopSize('A', 'double');
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 72, varispeedStart: 'wrap' });
+
+      service.setLiveLoopBeats('A', 1);
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 48, varispeedStart: 'wrap' });
+      expect(liveOf('A')).toEqual({ startFrame: 24, endFrame: 48, pendingEndFrame: null });
+    });
+
+    it('takes the nearest rung for a kept size the grid lacks, without rewriting the kept size', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 3.1);
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toMatchObject({ startFrame: 24, endFrame: 24 + 96 });
+      expect(store.deck('A')().liveLoopBeats).toBe(3.1);
+      expect(store.liveLoopSummary('A')().sizeText).toBe('4 BEATS');
+    });
+
+    describe('the exits', () => {
+      it('ends with a transport stop', async () => {
+        await playingOnGrid();
+        service.setLiveLoopBeats('A', 1);
+        service.toggleLiveLoop('A');
+
+        service.stop('A');
+
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('ends with a scrub, and the marker underneath with it', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+
+        await service.seek('A', 50);
+
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(store.loops().A.runningId).toBeNull();
+      });
+
+      it('ends with a load and with a subtune change', async () => {
+        await playingOnGrid({ subtuneCount: 2 });
+        service.setLiveLoopBeats('A', 1);
+        service.toggleLiveLoop('A');
+        expect(liveOf('A')).not.toBeNull();
+
+        await service.selectSubtune('A', 2);
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: grid });
+        TestBed.flushEffects();
+        tick('A', 30);
+        service.toggleLiveLoop('A');
+        expect(liveOf('A')).not.toBeNull();
+
+        await service.load('A', register(makeFixture()).source);
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('ends the live loop and the marker underneath together on the plate\'s Stop', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+        expect(store.loops().A.runningId).toBe('m');
+
+        service.stopMarkerLoop('A');
+
+        expect(liveOf('A')).toBeNull();
+        expect(store.loops().A.runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('keeps the live loop running when the marker underneath is toggled off', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+        const loop = engineLoop('A');
+
+        await service.toggleMarker('A', 'm');
+
+        expect(store.loops().A.runningId).toBeNull();
+        expect(liveOf('A')).not.toBeNull();
+        expect(engineLoop('A')).toEqual(loop);
       });
     });
   });

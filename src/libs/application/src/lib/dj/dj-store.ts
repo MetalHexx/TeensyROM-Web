@@ -217,6 +217,15 @@ export interface DeckLoopMarker {
   readonly wraps: boolean;
 }
 
+/** A live loop the engine is running: its bounds in play calls. */
+export interface DeckLiveLoopState {
+  readonly startFrame: number;
+  /** The end the engine enforces now. */
+  readonly endFrame: number;
+  /** A shrink waiting for its frame: the end the loop takes then, or null. */
+  readonly pendingEndFrame: number | null;
+}
+
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
 export interface DeckLoopsState {
   /** List order is the 'Loop N' / 'Cue N' counting order. */
@@ -235,6 +244,9 @@ export interface DeckLoopsState {
   /** The main track's settings, held aside while a marker's own are in play; null otherwise,
    *  when the panel and the engine's mutes are the main track's. */
   mainSettings: DeckMixerSettings | null;
+  /** The live loop the engine is running, or null. It is never one of the `markers`; a marker
+   *  running underneath keeps its own `runningId` and `runningBounds`. */
+  readonly live: DeckLiveLoopState | null;
 }
 
 /** The row a deck holds, and the subtune its loops and settings are kept under. */
@@ -308,6 +320,7 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
   runningBounds: null,
   settingsInPlayId: null,
   mainSettings: null,
+  live: null,
 };
 
 /** A deck's live loop size, in beats, until the host says otherwise. */

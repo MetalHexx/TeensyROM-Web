@@ -14,6 +14,7 @@ export * from './lib/dj/selectors/transport-summary';
 export * from './lib/dj/selectors/transport-time';
 export * from './lib/dj/selectors/binding-summary';
 export * from './lib/dj/selectors/loops-summary';
+export * from './lib/dj/selectors/live-loop-summary';
 export * from './lib/dj/selectors/settings-in-play';
 export * from './lib/dj/selectors/sets';
 export * from './lib/dj/cartridge-options';

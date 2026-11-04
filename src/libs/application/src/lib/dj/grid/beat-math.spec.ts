@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { lengthLadder as analysisLadder } from '@sidablist/analysis';
 import type { DeckBeatGrid } from '../dj-store';
 import {
   beatAt,
@@ -11,6 +12,7 @@ import {
   MOVE_STEPS,
   moveStepLabel,
   nearestBeat,
+  nearestRungIndex,
   nextBeat,
   onBeat,
 } from './beat-math';
@@ -104,34 +106,28 @@ describe('nearestBeat', () => {
 });
 
 describe('lengthLadder', () => {
-  it('runs the powers of two up to 128 beats, with the shortest even division of the beat below', () => {
-    const sizes = lengthLadder(24);
+  it('is the ladder of the engine library, re-exported', () => {
+    expect(lengthLadder).toBe(analysisLadder);
+    expect(lengthLadder(24).map((size) => size.beats)).toContain(2 / 24);
+  });
+});
 
-    expect(sizes.map((size) => size.beats)).toEqual([
-      2 / 24, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128,
-    ]);
-    expect(sizes.map((size) => size.frames)).toEqual([
-      2, 3, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072,
-    ]);
+describe('nearestRungIndex', () => {
+  const ladder = lengthLadder(24);
+
+  it('finds the rung of a size the ladder holds', () => {
+    expect(ladder[nearestRungIndex(ladder, 4)].beats).toBe(4);
+    expect(ladder[nearestRungIndex(ladder, 0.5)].beats).toBe(0.5);
   });
 
-  it('reaches 1/32 of a beat when the beat holds it in at least two whole frames', () => {
-    expect(lengthLadder(64)[0]).toEqual({ beats: 1 / 32, frames: 2 });
-    expect(lengthLadder(64)).toHaveLength(13);
-    // 1/32 of a 32-frame beat is a single frame, which cannot lap in time.
-    expect(lengthLadder(32)[0]).toEqual({ beats: 1 / 16, frames: 2 });
+  it('takes the nearest rung in beats for a size the ladder lacks, the shorter on a tie', () => {
+    expect(ladder[nearestRungIndex(ladder, 256)].beats).toBe(128);
+    expect(ladder[nearestRungIndex(ladder, 0.01)].beats).toBe(2 / 24);
+    expect(ladder[nearestRungIndex(ladder, 1.5)].beats).toBe(1);
   });
 
-  it('adds no division a power of two already reaches, nor one longer than the shortest power', () => {
-    expect(lengthLadder(32).map((size) => size.frames)).not.toContain(1);
-    expect(lengthLadder(48).map((size) => size.frames).slice(0, 3)).toEqual([2, 3, 6]);
-  });
-
-  it('keeps time on an odd beat with a division, and leaves out what is not whole frames', () => {
-    expect(lengthLadder(25).map((size) => size.beats)).toEqual([0.2, 1, 2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(1).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(24.5).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(0)).toEqual([]);
+  it('is -1 for an empty ladder', () => {
+    expect(nearestRungIndex([], 4)).toBe(-1);
   });
 });
 

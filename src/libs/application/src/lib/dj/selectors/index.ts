@@ -7,6 +7,7 @@ import { bindingSummary } from './binding-summary';
 import { canShape, deckPanel, keyMatch, keyReadout } from './mixer';
 import { deckLoops } from './deck-loops';
 import { loopsSummary } from './loops-summary';
+import { liveLoopSummary } from './live-loop-summary';
 import { settingsInPlay } from './settings-in-play';
 import { deckHolding, deckSetSummary, setCardSummary, setTreeSummary } from './sets';
 
@@ -24,6 +25,7 @@ export function withDjSelectors() {
       ...keyMatch(writableStore),
       ...deckLoops(writableStore),
       ...loopsSummary(writableStore),
+      ...liveLoopSummary(writableStore),
       ...settingsInPlay(writableStore),
       ...setCardSummary(writableStore),
       ...setTreeSummary(writableStore),

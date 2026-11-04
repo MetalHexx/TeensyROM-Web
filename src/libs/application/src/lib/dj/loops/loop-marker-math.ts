@@ -8,6 +8,13 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** `frame` as a share of the tune's length, 0–100; 0 while the length is unknown. */
+export function percentOf(frame: number, lengthFrames: number | null): number {
+  return lengthFrames === null || lengthFrames <= 0
+    ? 0
+    : clamp((frame / lengthFrames) * 100, 0, 100);
+}
+
 /** The frame the engine jumps to for a boundary: its captured frame plus its nudge, never before
  *  the start of the tune. */
 export function resolvedFrame(boundary: DeckLoopBoundary): number {

@@ -6,6 +6,7 @@ import { DeckBindings } from './deck-bindings';
 import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { DeckHand } from './deck-hand';
 import { DeckGrid } from './deck-grid';
+import { DeckLiveLoop } from './deck-live-loop';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
@@ -95,6 +96,7 @@ export class DeckService {
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
+  private readonly liveLoop = inject(DeckLiveLoop);
   private readonly grid = inject(DeckGrid);
   private readonly sets = inject(DjSets);
   private readonly keeper = inject(DeckMemoryKeeper);
@@ -130,6 +132,7 @@ export class DeckService {
       this.runtime.build(slot);
       this.runtime.subscribe(slot, () => {
         this.reflectEngineControls(slot);
+        this.liveLoop.reflect(slot);
         this.loops.reflect(slot);
         if (!this.suspended[slot] && this.transitioned(slot)) {
           this.applySnapshot(slot);
@@ -615,10 +618,38 @@ export class DeckService {
     this.loops.playNow(slot, target);
   }
 
-  /** Lets the running marker loop go and drops whatever is queued. The playhead never moves. */
+  /** Lets the running marker loop go and drops whatever is queued, and ends a live loop with it,
+   *  on the spot. The playhead never moves. */
   stopMarkerLoop(slot: Slot): void {
     if (this.canShape(slot, 'stopMarkerLoop')) {
+      this.liveLoop.drop(slot);
       this.loops.stop(slot);
+    }
+  }
+
+  /** Pushes a live loop of the deck's size on the grid, or ends the one running back into the
+   *  marker loop underneath. Nothing off the grid. */
+  toggleLiveLoop(slot: Slot): void {
+    if (this.canShape(slot, 'toggleLiveLoop')) {
+      this.liveLoop.toggle(slot);
+    }
+  }
+
+  /** Ends a running live loop, as a hold's release does. Nothing when none runs. */
+  endLiveLoop(slot: Slot): void {
+    if (this.canShape(slot, 'endLiveLoop')) {
+      this.liveLoop.end(slot);
+    }
+  }
+
+  /** Steps the deck's live loop size one rung of the grid's ladder, stopping at its ends. A
+   *  running live loop follows. */
+  stepLiveLoopSize(slot: Slot, direction: 'halve' | 'double'): void {
+    if (this.canShape(slot, 'stepLiveLoopSize')) {
+      const beats = this.liveLoop.steppedBeats(slot, direction);
+      if (beats !== null) {
+        this.setLiveLoopBeats(slot, beats);
+      }
     }
   }
 
@@ -638,10 +669,12 @@ export class DeckService {
     this.persistence.scheduleSave();
   }
 
-  /** Sets a deck's live loop size in beats, and saves it with the MIDI settings. */
+  /** Sets a deck's live loop size in beats, and saves it with the MIDI settings. A running live
+   *  loop is resized to it. */
   setLiveLoopBeats(slot: Slot, beats: number): void {
     this.store.setDeckSettings({ slot, liveLoopBeats: beats });
     this.persistence.scheduleSave();
+    this.liveLoop.resize(slot);
   }
 
   /** Seeds each deck's slip and live loop size from the saved MIDI settings; a deck with no entry,
@@ -987,10 +1020,11 @@ export class DeckService {
     this.loops.audition(slot, boundary, edited);
   }
 
-  /** Drops the marker loop, anything queued behind it or waiting for readiness, and a marker's
-   *  own settings in play; a no-op while none is set, so the engine is left alone. */
+  /** Drops the live loop and the marker loop, anything queued behind it or waiting for readiness,
+   *  and a marker's own settings in play; a no-op while none is set, so the engine is left alone. */
   private releaseMarkers(slot: Slot): void {
     const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
+    this.liveLoop.drop(slot);
     if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {
       this.loops.disengage(slot);
     }

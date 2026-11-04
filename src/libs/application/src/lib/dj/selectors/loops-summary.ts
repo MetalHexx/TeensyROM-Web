@@ -8,10 +8,10 @@ import {
 } from '../dj-store';
 import type { Slot } from '../slot';
 import {
-  clamp,
   markerKind,
   markerLabel,
   oneSecondFrames,
+  percentOf,
   resolvedFrame,
   type LoopBoundaryName,
 } from '../loops/loop-marker-math';
@@ -107,12 +107,6 @@ export interface DeckLoopsSummary {
   readonly selected: LoopSelectionSummary | null;
 }
 
-function percentOf(frame: number, lengthFrames: number | null): number {
-  return lengthFrames === null || lengthFrames <= 0
-    ? 0
-    : clamp((frame / lengthFrames) * 100, 0, 100);
-}
-
 /** A loop's length as the lists write it: in beats when its start is a beat of the span and the
  *  length is a whole number of them or a ladder fraction, else in seconds. */
 function lengthTextOf(
@@ -160,7 +154,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
       const loops = store.loops[slot];
 
       return computed<DeckLoopsSummary>(() => {
-        const { markers, selectedId, runningId, queuedId, settingsInPlayId } = loops();
+        const { markers, selectedId, runningId, queuedId, settingsInPlayId, live } = loops();
         const lengthFrames = deck.lengthFrames();
         const intervalUs = deck.playCallIntervalUs();
         const loaded = deck.loaded();
@@ -237,7 +231,8 @@ export function loopsSummary(store: WritableStore<DjState>) {
           hasTune: loaded !== null,
           canAdd: shapeable,
           canDuplicate: shapeable && selectedId !== null,
-          canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
+          canStop:
+            runningId !== null || queuedId !== null || settingsInPlayId !== null || live !== null,
           moveStepText: moveStepLabel(moveStep),
           moveStepOptions: MOVE_STEPS.map((step) => ({
             beats: step,

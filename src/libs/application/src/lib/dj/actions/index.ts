@@ -28,6 +28,7 @@ import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
 import { setLoopActivity } from './set-loop-activity';
 import { setRunningBounds } from './set-running-bounds';
+import { setLiveLoop } from './set-live-loop';
 import { setSettingsInPlay } from './set-settings-in-play';
 import { setSetsLibrary } from './set-sets-library';
 import { putOpenSet } from './put-open-set';
@@ -74,6 +75,7 @@ export function withDjActions() {
       ...setLoopSelection(writableStore),
       ...setLoopActivity(writableStore),
       ...setRunningBounds(writableStore),
+      ...setLiveLoop(writableStore),
       ...setSettingsInPlay(writableStore),
       ...setSetsLibrary(writableStore),
       ...putOpenSet(writableStore),

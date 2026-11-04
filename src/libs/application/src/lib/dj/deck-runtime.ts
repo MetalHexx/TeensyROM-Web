@@ -9,6 +9,7 @@ import {
   playCallIntervalUs,
 } from '@sidablist/core';
 import type {
+  CrossingLines,
   DeliveryBatch,
   SidPlayer,
   PlayerSnapshot,
@@ -339,6 +340,46 @@ export class DeckRuntime {
             ...(loop.varispeedStart === undefined ? {} : { varispeedStart: loop.varispeedStart }),
           }
     );
+  }
+
+  /** Declares the lines the engine saves the live machine at as the playhead crosses them,
+   *  replacing the previous set; `[]` frees them. A saved image is what a loop pushed on a line
+   *  starts from. */
+  setCrossingCaptures(slot: Slot, lines: readonly CrossingLines[]): void {
+    this.requireSlot(slot).player.setCrossingCaptures(lines);
+  }
+
+  /** Whether the engine holds an image of the machine at `frame`, from any source. */
+  holdsImageAt(slot: Slot, frame: number): boolean {
+    return this.requireSlot(slot).player.holdsImageAt(frames(frame));
+  }
+
+  /** Names the running loop's replacement for the wrap that ends the lap ending at `frame`, with
+   *  `loop` entered from its start's image. False, changing nothing, when no loop is running or no
+   *  image of `loop`'s start is held. */
+  changeLoopAt(
+    slot: Slot,
+    frame: number,
+    loop: { startFrame: number; endFrame: number; varispeedStart?: VarispeedLoopStart }
+  ): boolean {
+    return this.requireSlot(slot).player.changeLoopAt(frames(frame), {
+      startFrame: frames(loop.startFrame),
+      endFrame: frames(loop.endFrame),
+      ...(loop.varispeedStart === undefined ? {} : { varispeedStart: loop.varispeedStart }),
+    });
+  }
+
+  /** Lands the playhead on `at` on the register record, then hands back to the machine. A bare
+   *  frame lands with no gate-off pending; a count with `held` lands as it stands. False when
+   *  there is no record, `at` lies past it, or the deck is not playing. */
+  land(
+    slot: Slot,
+    at: number | { frame: number; held: boolean },
+    settings?: JumpSettings
+  ): boolean {
+    const target = typeof at === 'number' ? frames(at) : { frame: frames(at.frame), held: at.held };
+    const { player } = this.requireSlot(slot);
+    return settings === undefined ? player.land(target) : player.land(target, settings);
   }
 
   /** Queues a jump for the end of the running loop's lap; null cancels. Its `settings` land with

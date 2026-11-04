@@ -8,6 +8,7 @@ import {
   EMPTY_DECK_LOOPS,
   type DeckBeatGrid,
   type DeckLoopBoundary,
+  type DeckLiveLoopState,
   type DeckLoopMarker,
   type DeckLoopsState,
   type DeckMixerSettings,
@@ -202,6 +203,11 @@ function reselect(
  * marker loop is looping when `runningId` is set; the track's own repeat loop counts as nothing
  * looping.
  *
+ * A live loop (`DeckLiveLoop`) can run over a marker. It counts as running for `toggle`, so a marker
+ * fired meanwhile lands at its lap end; any path that moves the playhead into a marker ends it. The
+ * edits and the running marker's own queue are kept as bookkeeping while it runs, and reach the
+ * engine when it returns through `resumeRunning`.
+ *
  * A nudge to the running loop applies at once. Every other edit to its positions (the beat commands
  * In, Out, Length and Move, and any edit arriving from the other deck) is held for the end of the
  * pass: the edited loop is queued in the engine and handed off to when the pass ends, while
@@ -253,6 +259,12 @@ export class DeckLoops {
   /** The voices' latched mutes as of the end of the last `reflect`. At a queued landing the engine
    *  and the store's mirror already hold the landed mutes, so this is what the main track had. */
   private readonly seenMutes: Record<Slot, Mutes> = { A: NO_MUTES, B: NO_MUTES };
+
+  /** The token of the hold `holdRunning` set, or null: while one is set the engine has no loop
+   *  and the running marker is not read as disarmed. */
+  private readonly held: Record<Slot, number | null> = { A: null, B: null };
+
+  private holdTokens = 0;
 
   /** The settings the engine's queued jump was built from, or null when it carries none:
    *  `syncQueued` re-queues when the settings the marker would carry now are another object. */
@@ -320,11 +332,12 @@ export class DeckLoops {
    * Follows the engine. Mirrors its prepared frames onto the markers' readiness, writing only when
    * a flag changed, then brings the performance state in line with what it did:
    * - a rising `handOffs` is a queued jump landing — the one thing read as a landing, since a
-   *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change. It is the
-   *   running marker's own queued edit landing when one is held and no marker is queued in the
-   *   engine, else the queued marker;
+   *   queue also disappears on `setActiveLoop`, a stop, a load and a subtune change. It ends a
+   *   live loop, whose loop it replaced. It is the running marker's own queued edit landing when
+   *   one is held and no marker is queued in the engine, else the queued marker;
    * - no loop at all while a marker is running, with no hand-off, is the engine disarming (a
-   *   transport stop, a load), which ends the marker and anything queued. A marker only waiting for
+   *   transport stop, a load), which ends the marker and anything queued. Not while a hold is set
+   *   (`holdRunning`), when the loop is gone on purpose. A marker only waiting for
    *   readiness is not seen here — `DeckService` drops it through `disengage` on a stop;
    * - a marker waiting for readiness engages once its start is ready;
    * - a running marker's changed start applies once that start is ready, and an audition waiting
@@ -351,10 +364,15 @@ export class DeckLoops {
     }
 
     if (handedOff) {
+      this.endLive(slot);
       if (!this.landEdit(slot)) {
         this.landQueued(slot);
       }
-    } else if (snapshot.loop === null && this.loopsOf(slot).runningId !== null) {
+    } else if (
+      snapshot.loop === null &&
+      this.loopsOf(slot).runningId !== null &&
+      this.held[slot] === null
+    ) {
       this.resetActivity(slot);
       this.releaseSettings(slot);
     }
@@ -367,15 +385,15 @@ export class DeckLoops {
 
   /**
    * Presses a marker. Idle with nothing looping, it engages now, or once its start is ready; idle
-   * with a marker looping, it queues in the engine to land at the end of the lap; queued, it
-   * cancels; running, it is let go as `stop` does. A deck that is not playing is started by the
-   * caller first.
+   * with a marker or a live loop looping, it queues in the engine to land at the end of the lap;
+   * queued, it cancels; running, it is let go as `stop` does. A deck that is not playing is started
+   * by the caller first.
    */
   toggle(slot: Slot, id: string): void {
     if (this.holdingOf(slot, 'toggle') === null) {
       return;
     }
-    const { markers, runningId, queuedId } = this.loopsOf(slot);
+    const { markers, runningId, queuedId, live } = this.loopsOf(slot);
     const marker = markers.find((candidate) => candidate.id === id);
     if (marker === undefined) {
       this.refuse(slot, 'toggle', `has no marker ${id}`);
@@ -385,7 +403,7 @@ export class DeckLoops {
       this.stop(slot);
     } else if (queuedId === id) {
       this.cancelQueue(slot);
-    } else if (runningId !== null) {
+    } else if (runningId !== null || live !== null) {
       this.queueThroughEngine(slot, marker);
     } else {
       this.engageOrWait(slot, marker);
@@ -397,8 +415,8 @@ export class DeckLoops {
    * as `toggle`'s idle press does (now, or once its start is ready), replacing whatever was queued;
    * it never queues behind a running loop and never lets a marker go. The running marker restarts
    * from the start the engine holds, as a stab: the engine and a marker queued behind it are left
-   * as they are, and a start audition still waiting is dropped. A deck that is not playing is
-   * started by the caller first.
+   * as they are, and a start audition still waiting is dropped. Under a live loop either way ends
+   * it. A deck that is not playing is started by the caller first.
    */
   playNow(slot: Slot, id: string): void {
     if (this.holdingOf(slot, 'playNow') === null) {
@@ -420,10 +438,16 @@ export class DeckLoops {
   }
 
   /** Lets the running marker go, drops whatever is queued, and returns the deck to the main
-   *  track's settings. The playhead never moves. */
+   *  track's settings. The playhead never moves. Under a live loop the engine's loop is the live
+   *  loop's and stays; only the queue this collaborator owned goes. */
   stop(slot: Slot): void {
+    const queuedInEngine = this.queuedVia[slot] === 'engine';
     this.resetActivity(slot);
-    this.runtime.setActiveLoop(slot, null);
+    if (this.loopsOf(slot).live === null) {
+      this.runtime.setActiveLoop(slot, null);
+    } else if (queuedInEngine) {
+      this.runtime.queueJump(slot, null);
+    }
     this.releaseSettings(slot);
   }
 
@@ -443,16 +467,19 @@ export class DeckLoops {
    *
    * An idle or queued marker engages now, through the readiness wait when its start is not ready.
    * A running marker is already on the right bounds, so it only seeks — a start not yet ready
-   * seeks once `reflect` has applied it, the marker staying the running one meanwhile.
+   * seeks once `reflect` has applied it, the marker staying the running one meanwhile. Under a live
+   * loop that audition is skipped, and the edit applies when the live loop returns.
    */
   audition(slot: Slot, boundary: LoopBoundaryName, id: string): void {
-    const { markers, selectedId, runningId } = this.loopsOf(slot);
+    const { markers, selectedId, runningId, live } = this.loopsOf(slot);
     const marker = markers.find((candidate) => candidate.id === id);
     if (marker === undefined || selectedId !== id) {
       return;
     }
     if (runningId === id) {
-      this.auditionRunning(slot, marker, boundary);
+      if (live === null) {
+        this.auditionRunning(slot, marker, boundary);
+      }
     } else if (boundary === 'start') {
       this.engageOrWait(slot, marker);
     } else {
@@ -468,7 +495,8 @@ export class DeckLoops {
     }
   }
 
-  /** Marks the playhead, on the nearest beat when the deck has a grid, as a new cue and selects it. */
+  /** Marks the playhead, on the nearest beat when the deck has a grid, as a new cue and selects it.
+   *  While a live loop runs, the live loop becomes a loop marker instead, running in its place. */
   add(slot: Slot): void {
     if (this.holdingOf(slot, 'add') === null) {
       return;
@@ -479,6 +507,11 @@ export class DeckLoops {
         'add',
         `already has the most markers a subtune keeps (${MAX_MARKERS_PER_SUBTUNE})`
       );
+      return;
+    }
+    const { live } = this.loopsOf(slot);
+    if (live !== null) {
+      this.addLive(slot, live);
       return;
     }
     const frame = this.cueFrame(slot);
@@ -874,6 +907,98 @@ export class DeckLoops {
     );
   }
 
+  /**
+   * Puts the engine back on the marker the deck is running, as a live loop ends over it: re-arms
+   * its bounds, whatever the live loop left in the engine, and queues again the marker queued and
+   * the end-of-pass edit held, which `setActiveLoop` dropped or the live loop deferred. The marker
+   * is never restarted, and the hold `holdRunning` set ends. With nothing running and a marker
+   * queued, the engine has no loop to queue it in, so it engages at once, as a toggle with nothing
+   * running does.
+   */
+  resumeRunning(slot: Slot): void {
+    this.held[slot] = null;
+    const { markers, runningId, queuedId } = this.loopsOf(slot);
+    const engaged = this.engaged[slot];
+    if (runningId !== null && engaged !== null) {
+      this.runtime.setActiveLoop(slot, engaged);
+      this.syncQueued(slot);
+      this.syncPendingEdit(slot);
+      return;
+    }
+    const queued = markers.find((candidate) => candidate.id === queuedId);
+    if (queued !== undefined) {
+      this.engageOrWait(slot, queued);
+    }
+  }
+
+  /** Puts the marker queued in the engine back in its queue, which `setActiveLoop` drops. */
+  reassertQueue(slot: Slot): void {
+    this.syncQueued(slot);
+  }
+
+  /**
+   * Holds the running marker while the engine has no loop on purpose: `reflect` does not read the
+   * missing loop as the engine disarming, and the marker's bounds only reach the engine at
+   * `resumeRunning`. Stop, a load, a scrub and `disengage` end the hold. Returns what resumes the
+   * marker once, if that hold is still the one set.
+   */
+  holdRunning(slot: Slot): () => void {
+    const token = ++this.holdTokens;
+    this.held[slot] = token;
+    return () => {
+      if (this.held[slot] === token) {
+        this.resumeRunning(slot);
+      }
+    };
+  }
+
+  /** Add under a live loop: the live loop's start and end become a loop marker, selected and the
+   *  running marker in its place. The engine's loop and its image stay as they are, so nothing
+   *  sounds different; the marker takes the live loop's WRAP, which the engine runs it with. */
+  private addLive(slot: Slot, live: DeckLiveLoopState): void {
+    const marker: DeckLoopMarker = {
+      id: crypto.randomUUID(),
+      name: null,
+      start: { frame: live.startFrame, offsetFrames: 0 },
+      end: { frame: live.endFrame, offsetFrames: 0 },
+      voices: ALL_VOICES,
+      settings: null,
+      ownSettings: false,
+      wraps: true,
+      ready: false,
+    };
+    const bounds: LoopBounds = {
+      startFrame: live.startFrame,
+      endFrame: live.endFrame,
+      varispeedStart: 'wrap',
+    };
+    // The live loop still stands during the commit, so no edit it makes reaches the engine.
+    this.commit(slot, [...this.loopsOf(slot).markers, marker], marker.id);
+    this.endOfPass[slot] = null;
+    this.setEngaged(slot, bounds);
+    const { queuedId, selectionMovedWhileQueued } = this.loopsOf(slot);
+    this.setActivity(slot, marker.id, queuedId, selectionMovedWhileQueued);
+    this.endLive(slot);
+    if (live.pendingEndFrame !== null) {
+      // A shrink still named in the engine would otherwise land under the marker later.
+      this.runtime.setActiveLoop(slot, bounds);
+      this.syncQueued(slot);
+    }
+  }
+
+  /** Ends the live loop in the store, before the engine's loop is set. */
+  private endLive(slot: Slot): void {
+    if (this.loopsOf(slot).live !== null) {
+      this.store.setLiveLoop({ slot, live: null });
+    }
+  }
+
+  /** True while the engine's loop is not the running marker's to set: a live loop runs, or a hold
+   *  has taken the loop away. */
+  private defersToEngine(slot: Slot): boolean {
+    return this.loopsOf(slot).live !== null || this.held[slot] !== null;
+  }
+
   /** Lands a changed list on the slot, saves it, and gives it to the other deck when that deck
    *  holds the same row and subtune. `timing` is when an edit to the running marker's bounds
    *  reaches this deck's engine; the other deck always takes it at the end of its pass. A settings
@@ -963,7 +1088,8 @@ export class DeckLoops {
    * chosen by whether an end-of-pass edit is held. With none, a changed end or WRAP mode applies
    * at once, taking effect at the next wrap; a changed start is held until its frame is ready and
    * takes effect at the next re-entry. With one, the list's bounds never reach the engine until
-   * the pass ends. None seeks. A marker that is gone, or no longer a loop, is let go.
+   * the pass ends. None seeks. A marker that is gone, or no longer a loop, is let go. Under a live
+   * loop or a hold the bounds are only noted, for `resumeRunning` to arm.
    */
   private syncRunning(slot: Slot): void {
     const { markers, runningId } = this.loopsOf(slot);
@@ -993,9 +1119,11 @@ export class DeckLoops {
       next.varispeedStart === engaged.varispeedStart;
     if (!unchanged && next.endFrame > next.startFrame) {
       this.setEngaged(slot, next);
-      this.runtime.setActiveLoop(slot, next);
-      // `setActiveLoop` drops the engine's queue.
-      this.syncQueued(slot);
+      if (!this.defersToEngine(slot)) {
+        this.runtime.setActiveLoop(slot, next);
+        // `setActiveLoop` drops the engine's queue.
+        this.syncQueued(slot);
+      }
     }
   }
 
@@ -1008,8 +1136,10 @@ export class DeckLoops {
       const next = { ...engaged, varispeedStart };
       this.setEngaged(slot, next);
       this.endOfPass[slot] = { ...edit, bounds: { ...edit.bounds, varispeedStart } };
-      this.runtime.setActiveLoop(slot, next);
-      this.syncQueued(slot);
+      if (!this.defersToEngine(slot)) {
+        this.runtime.setActiveLoop(slot, next);
+        this.syncQueued(slot);
+      }
     }
     this.syncPendingEdit(slot);
   }
@@ -1018,7 +1148,8 @@ export class DeckLoops {
    * Keeps the running marker's end-of-pass edit where the engine can land it: queued there, unless a
    * marker queued in the engine owns its one slot, in which case the edit waits behind that marker
    * and is queued when the marker goes. Queues only when the engine's queue is not already the
-   * edit, and only for the marker still running; an edit of any other marker is dropped.
+   * edit, and only for the marker still running; an edit of any other marker is dropped. Under a
+   * live loop it would land at the live loop's lap end, so it waits for `resumeRunning`.
    */
   private syncPendingEdit(slot: Slot): void {
     const edit = this.endOfPass[slot];
@@ -1033,7 +1164,7 @@ export class DeckLoops {
     if (edit.via !== via) {
       this.endOfPass[slot] = { ...edit, via };
     }
-    if (via === 'behind-queued') {
+    if (via === 'behind-queued' || this.defersToEngine(slot)) {
       return;
     }
     const { startFrame, endFrame, varispeedStart } = edit.bounds;
@@ -1342,6 +1473,8 @@ export class DeckLoops {
     if (follow) {
       this.selectId(slot, marker.id);
     }
+    this.held[slot] = null;
+    this.endLive(slot);
     this.runtime.setActiveLoop(slot, bounds);
   }
 
@@ -1357,6 +1490,11 @@ export class DeckLoops {
    * once and the seek carries none.
    */
   private jumpInto(slot: Slot, marker: DeckLoopMarker, frame: number): void {
+    if (this.loopsOf(slot).live !== null) {
+      // A jump that no `arm` preceded would leave the engine on the live loop's bounds.
+      this.endLive(slot);
+      this.resumeRunning(slot);
+    }
     const target = this.settingsToCarry(slot, marker);
     if (target === null) {
       this.seek(slot, frame);
@@ -1432,9 +1570,10 @@ export class DeckLoops {
     this.pushSettings(slot, main.mutes);
   }
 
-  /** Forgets the running and queued markers and the bounds the engine was enforcing. Touches
-   *  nothing in the engine. */
+  /** Forgets the running and queued markers, the bounds the engine was enforcing and a hold.
+   *  Touches nothing in the engine. */
   private resetActivity(slot: Slot): void {
+    this.held[slot] = null;
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
     this.endOfPass[slot] = null;
