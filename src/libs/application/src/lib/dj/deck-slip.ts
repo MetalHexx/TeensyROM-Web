@@ -53,7 +53,8 @@ interface SlotSlip {
  * departure nests: the outer line is kept as the shadow's count at that moment and resumes, folded
  * through the ticks the inner one ran, when the inner one ends. Only one outer level is kept; a
  * third level takes the outer one's place, so the middle departure's line becomes the outer line.
- * A list marker loop fired inside a departure carries the count on instead.
+ * The outer one ending first, with the inner still running, ends with no landing and the inner
+ * takes over its line. A list marker loop fired inside a departure carries the count on instead.
  *
  * It holds no store state: the painter pulls `returnFrame`. It never reaches `DeckLoops`, which
  * calls it.
@@ -147,13 +148,14 @@ export class DeckSlip {
   /**
    * The end of a departure of `kind`, with a landing: the deck lands on the shadow's count between
    * ticks, then the shadow stops, or resumes the outer line when one was saved. True when the deck
-   * landed. False when it did not: the departure is of another kind or none runs, which changes
-   * nothing, or the landing could not be made, which drops the departure; the caller ends as with
-   * slip off.
+   * landed. False when it did not: the departure running is of another kind, or none runs, which
+   * changes nothing but retires the saved outer departure when that is of `kind`, or the landing
+   * could not be made, which drops the departure; the caller ends as with slip off.
    */
   land(slot: Slot, kind: SlipKind): boolean {
     const state = this.live(slot);
     if (state.run?.kind !== kind) {
+      this.retireOuter(slot, kind);
       return false;
     }
     if (!this.runtime.landOnShadow(slot)) {
@@ -185,12 +187,15 @@ export class DeckSlip {
   }
 
   /** The end of a departure of `kind` with no landing: the outer line resumes when one was saved,
-   *  else the shadow stops. */
+   *  else the shadow stops. When `kind` is the saved outer line, the newer departure takes it
+   *  over, as at a landing. */
   release(slot: Slot, kind: SlipKind): void {
-    if (this.states[slot].run?.kind !== kind) {
+    const state = this.live(slot);
+    if (state.run?.kind !== kind) {
+      this.retireOuter(slot, kind);
       return;
     }
-    if (this.states[slot].outer === null) {
+    if (state.outer === null) {
       this.abandon(slot);
     } else {
       this.resumeOuter(slot);
@@ -217,6 +222,23 @@ export class DeckSlip {
       state.outer = null;
     }
     return state;
+  }
+
+  /**
+   * The end of the departure of `kind` while a newer one, nested inside it, still runs: the older
+   * departure is over with no landing, as the deck is not where it would land. The newer one takes
+   * over its line — the shadow re-based to the older count through the ticks the newer ran, lapping
+   * what the older lapped — so the newer one's own end still lands where the tune would be. Nothing
+   * when `kind` is not the saved outer departure.
+   */
+  private retireOuter(slot: Slot, kind: SlipKind): void {
+    const state = this.states[slot];
+    const { run, outer } = state;
+    if (run === null || outer?.run.kind !== kind) {
+      return;
+    }
+    this.resumeOuter(slot);
+    state.run = { ...run, returnsInto: outer.run.returnsInto };
   }
 
   /** Resumes the saved outer line: the shadow re-based to its lap at the count it has reached,

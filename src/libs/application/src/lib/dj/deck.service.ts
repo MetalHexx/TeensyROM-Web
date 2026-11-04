@@ -1060,10 +1060,10 @@ export class DeckService {
    *  the document is hidden — the POC's `animationFrameSignal` bridge rule. On the frames
    *  `LivePaintPacer` picks, about 30 a second whatever the display's refresh rate, it paints each
    *  such deck's playhead readouts and SID panel when its polled frame actually moved, and feeds its
-   *  waveform renderer on every one of them, moved or not. It never
-   *  writes the store: a store write per frame meant a change-detection pass per frame, and the
-   *  garbage behind it, on the main thread the decks' frame clocks share; the store's playhead is
-   *  sampled only by the explicit calls each command makes.
+   *  waveform renderer and paints its slip's second playhead on every one of them, moved or not.
+   *  It never writes the store: a store write per frame meant a change-detection pass per frame,
+   *  and the garbage behind it, on the main thread the decks' frame clocks share; the store's
+   *  playhead is sampled only by the explicit calls each command makes.
    *
    *  Between those frames it sleeps and asks for none: each frame a page asks for runs its whole
    *  rendering lifecycle even when nothing changed, and every frame that changes anything pays for
@@ -1095,6 +1095,8 @@ export class DeckService {
       this.waveFeed.paint(slot);
       const position = this.runtime.position(slot);
       if (position === painted[slot]) {
+        // The slip's second playhead follows its own count, which runs on under a held record.
+        this.playheadPainter.paintReturn(slot);
         return;
       }
       this.playheadPainter.paint(slot);

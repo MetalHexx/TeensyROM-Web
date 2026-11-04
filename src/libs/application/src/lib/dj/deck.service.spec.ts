@@ -34,6 +34,7 @@ import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckHand } from './deck-hand';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import { DeckBindings } from './deck-bindings';
 import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { MixerApplier } from './mixer-applier';
@@ -1731,6 +1732,42 @@ describe('DeckService', () => {
 
       expect(paintsOfA()).toBe(1);
       expect(wavesOfA()).toBe(3);
+    });
+
+    it("moves the slip's second playhead on frames where the position did not move, and hides it when the departure ends", () => {
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+        lengthFrames: 1000,
+      });
+      const setLiveReturnPosition = vi.fn();
+      const unused = vi.fn();
+      TestBed.inject(PlayheadPainter).attach('A', {
+        transport: {
+          setLivePosition: unused,
+          setLiveReturnPosition,
+          setLiveElapsed: unused,
+          setLiveFrame: unused,
+        },
+        loops: { setLiveProgress: unused },
+        speed: { setLiveBpm: unused },
+      });
+      playheadSpy.mockClear();
+      const returnFrame = vi.spyOn(TestBed.inject(DeckSlip), 'returnFrame');
+      returnFrame.mockReturnValue(600);
+      runFrame(0);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(60);
+
+      returnFrame.mockReturnValue(640);
+      wake();
+      runFrame(2);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(64);
+
+      returnFrame.mockReturnValue(null);
+      wake();
+      runFrame(4);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(null);
+      expect(playheadPaintsOfA()).toBe(1);
     });
 
     it('does not feed the waveforms of a deck that is neither playing nor in varispeed', async () => {

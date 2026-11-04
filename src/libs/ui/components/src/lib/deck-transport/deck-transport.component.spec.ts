@@ -242,6 +242,17 @@ describe('DeckTransportComponent', () => {
       expect(range().value).toBe('62.5');
     });
 
+    it('shows the slip’s second playhead on the strip, and hides it with null', () => {
+      const returnHead = root().querySelector('.return-head') as HTMLElement;
+      expect(returnHead.hasAttribute('data-hidden')).toBe(true);
+
+      fixture.componentInstance.setLiveReturnPosition(40);
+      expect(returnHead.hasAttribute('data-hidden')).toBe(false);
+
+      fixture.componentInstance.setLiveReturnPosition(null);
+      expect(returnHead.hasAttribute('data-hidden')).toBe(true);
+    });
+
     it('follows the elapsed time and a new total in its value text', () => {
       fixture.componentInstance.setLiveElapsed('01:30.0');
       expect(range().getAttribute('aria-valuetext')).toBe('01:30.0 of 03:12');

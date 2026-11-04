@@ -66,8 +66,8 @@ const meta: Meta<DeckTransportComponent & LiveArgs> = {
           'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
           'Every state story below shows the transport at 560, 400 and 300px. An error replaces ' +
           'the display, and each reason is a `role="alert"` line. The playhead readouts are ' +
-          'not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and ' +
-          '`setLiveFrame`.',
+          'not inputs: a painter sets them through `setLivePosition`, `setLiveReturnPosition`, ' +
+          '`setLiveElapsed` and `setLiveFrame`.',
       },
     },
   },

@@ -337,6 +337,32 @@ describe('PlayheadPainter', () => {
       expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(40);
     });
 
+    it('paintReturn follows the return frame alone while the playhead stands still', () => {
+      tuneAt(250);
+      returnFrames.A = 600;
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      clearCalls(recording);
+
+      returnFrames.A = 640;
+      painter.paintReturn('A');
+      painter.paintReturn('A');
+      expect(recording.setLiveReturnPosition).toHaveBeenCalledExactlyOnceWith(64);
+
+      returnFrames.A = null;
+      painter.paintReturn('A');
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(null);
+      expect(totalCalls(recording)).toBe(2);
+    });
+
+    it('paintReturn is a no-op with nothing attached', () => {
+      returnFrames.A = 600;
+
+      painter.paintReturn('A');
+
+      expect(position).not.toHaveBeenCalled();
+    });
+
     it('paints on the still paint of a paused deck', () => {
       tuneAt(100);
       setStatus('paused');

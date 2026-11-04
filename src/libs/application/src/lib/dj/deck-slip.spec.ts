@@ -303,6 +303,14 @@ describe('DeckSlip', () => {
     h.engine.handle(pitchBend(value, timeStampMs, 1));
   }
 
+  /** Touches the record and moves it a little, the finger staying down. */
+  function stroke(): void {
+    bend(9000, 0);
+    tick();
+    bend(12000, 10);
+    tick(3);
+  }
+
   const toggleMarker = (id: string, slot: Slot = 'A') => h.deckService.toggleMarker(slot, id);
 
   beforeEach(async () => {
@@ -543,13 +551,6 @@ describe('DeckSlip', () => {
   });
 
   describe('the hand', () => {
-    const stroke = (): void => {
-      bend(9000, 0);
-      tick();
-      bend(12000, 10);
-      tick(3);
-    };
-
     it('lands on the line at the lift when slip is on, and goes idle', async () => {
       await playing();
 
@@ -705,6 +706,70 @@ describe('DeckSlip', () => {
 
       await toggleMarker('n');
 
+      expectLandedOnTheLine();
+    });
+  });
+
+  describe('an older departure that ends while a newer one nested inside it runs', () => {
+    it('lifting the hand over a live loop pushed in the hold leaves the live loop the line, and its end lands on it', async () => {
+      await playing();
+      stroke();
+      h.deckService.toggleLiveLoop('A');
+      tick(5);
+      expect(loopsOf().live).not.toBeNull();
+
+      bend(PITCH_BEND_CENTRE, 500);
+      tick(5);
+
+      expect(deck().handHeld).toBe(false);
+      expect(slip.returnFrame('A')).toBe(position('B'));
+      tick(10);
+
+      h.deckService.endLiveLoop('A');
+
+      expect(slip.returnFrame('A')).toBeNull();
+      expect(runtime.getShadowPosition('A')).toBeNull();
+      expectLandedOnTheLine();
+    });
+
+    it('ending the live loop under a held hand leaves the hand the line, and the lift lands on it', async () => {
+      await playing();
+      h.deckService.toggleLiveLoop('A');
+      tick(40);
+      stroke();
+
+      h.deckService.endLiveLoop('A');
+
+      expect(loopsOf().live).toBeNull();
+      expect(deck().handHeld).toBe(true);
+      expect(slip.returnFrame('A')).toBe(position('B'));
+      tick(10);
+      expect(slip.returnFrame('A')).toBe(position('B'));
+
+      bend(PITCH_BEND_CENTRE, 500);
+
+      expect(slip.returnFrame('A')).toBeNull();
+      expect(runtime.getShadowPosition('A')).toBeNull();
+      expectLandedOnTheLine();
+    });
+
+    it('letting the marker loop go under a live loop leaves the live loop the line, and its end lands on it', async () => {
+      await playing({ markers: [loop('m', 200, 224)] });
+      await toggleMarker('m');
+      tick(10);
+      h.deckService.toggleLiveLoop('A');
+      tick(5);
+      expect(loopsOf().live).not.toBeNull();
+
+      await toggleMarker('m');
+
+      expect(loopsOf().runningId).toBeNull();
+      expect(slip.returnFrame('A')).toBe(position('B'));
+      tick(10);
+
+      h.deckService.endLiveLoop('A');
+
+      expect(slip.returnFrame('A')).toBeNull();
       expectLandedOnTheLine();
     });
   });
