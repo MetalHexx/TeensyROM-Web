@@ -10,6 +10,7 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
     voices: [1, 2, 3].map((n) => ({
       label: `V${n}`,
       muted: n === 2,
+      held: false,
       holdLabel: 'Kill',
       muteAccessibleName: `Mute voice ${n} deck A`,
       holdAccessibleName: `Kill voice ${n} deck A`,
@@ -30,6 +31,8 @@ function testModel(overrides: Partial<DeckChannelStripModel> = {}): DeckChannelS
     nudge: {
       downAccessibleName: 'Nudge speed down deck A',
       upAccessibleName: 'Nudge speed up deck A',
+      downHeld: false,
+      upHeld: false,
     },
     jumpButtons: [
       { id: 'up', label: '+50%', accessibleName: 'Speed up 50% deck A' },
@@ -100,11 +103,11 @@ describe('DeckChannelStripComponent', () => {
 
   it('renders the settings sign at the top of the voice section, above V1', () => {
     setModel({
-      settingsSign: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' },
+      settingsSign: { text: 'Loop 2', own: true, accessibleName: 'Settings in play deck A: Loop 2' },
     });
     const voices = q('section.voices');
     const sign = voices.querySelector('lib-deck-settings-sign') as HTMLElement;
-    expect(sign.getAttribute('aria-label')).toBe('Settings in play deck A: Item 2');
+    expect(sign.getAttribute('aria-label')).toBe('Settings in play deck A: Loop 2');
     expect(sign.hasAttribute('data-own')).toBe(true);
     const first = voices.querySelector('[data-voice="1"]') as HTMLElement;
     expect(sign.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -209,21 +212,54 @@ describe('DeckChannelStripComponent', () => {
     expect(q('.speed-display .percent').textContent?.trim()).toBe('+5.00%');
   });
 
-  it('shows no tempo until a painter sets one, and writes a live BPM straight on the DOM', () => {
-    const bpm = q('.speed-display .bpm');
-    expect(bpm.textContent).toBe('---.-- BPM');
+  it('lights each pad from the model held state, with no pointer', () => {
+    const lit = (control: string) =>
+      q(`[data-control="${control}"] button`).hasAttribute('data-held');
+    expect(['voice-hold', 'speed-nudge-down', 'speed-nudge-up'].map(lit)).toEqual([
+      false,
+      false,
+      false,
+    ]);
 
-    fixture.componentInstance.setLiveBpm('125.31 BPM');
-    expect(bpm.textContent).toBe('125.31 BPM');
-
-    fixture.componentInstance.setLiveBpm('---.-- BPM');
-    expect(bpm.textContent).toBe('---.-- BPM');
+    setModel({
+      voices: testModel().voices.map((voice, i) => ({ ...voice, held: i === 1 })),
+      nudge: { ...testModel().nudge, upHeld: true },
+    });
+    const holds = Array.from(
+      fixture.nativeElement.querySelectorAll('[data-control="voice-hold"] button')
+    ).map((b) => (b as HTMLElement).hasAttribute('data-held'));
+    expect(holds).toEqual([false, true, false]);
+    expect([lit('speed-nudge-down'), lit('speed-nudge-up')]).toEqual([false, true]);
+    expect(held).toEqual([]);
+    expect(nudges).toEqual([]);
   });
 
-  it('keeps a live BPM through a model change', () => {
+  it('shows no tempo until a painter sets one, and writes only the figure of a live BPM', () => {
+    const line = q('.speed-display .bpm');
+    const figure = q('.speed-display .bpm .figure');
+    expect(figure.textContent).toBe('---.--');
+    expect(q('.speed-display .bpm .unit').textContent).toBe('BPM');
+    expect(line.hasAttribute('data-none')).toBe(true);
+
+    fixture.componentInstance.setLiveBpm('125.31 BPM');
+    expect(figure.textContent).toBe('125.31');
+    expect(q('.speed-display .bpm .unit').textContent).toBe('BPM');
+    expect(line.hasAttribute('data-none')).toBe(false);
+
+    fixture.componentInstance.setLiveBpm('126.00 BPM');
+    expect(figure.textContent).toBe('126.00');
+    expect(line.hasAttribute('data-none')).toBe(false);
+
+    fixture.componentInstance.setLiveBpm('---.-- BPM');
+    expect(figure.textContent).toBe('---.--');
+    expect(line.hasAttribute('data-none')).toBe(true);
+  });
+
+  it('keeps a live BPM and its lit state through a model change', () => {
     fixture.componentInstance.setLiveBpm('98.50 BPM');
     setModel({ speedText: '+2.00%' });
-    expect(q('.speed-display .bpm').textContent).toBe('98.50 BPM');
+    expect(q('.speed-display .bpm .figure').textContent).toBe('98.50');
+    expect(q('.speed-display .bpm').hasAttribute('data-none')).toBe(false);
   });
 
   it('emits tap when the Tap key is pressed, and tints it and the display while tapping', () => {

@@ -32,19 +32,27 @@ describe('settingsInPlay', () => {
     expect(store.settingsInPlay('A')()).toEqual({ markerId: null, name: 'Main' });
   });
 
-  it('names the marker in play by its list position', () => {
+  it('labels the marker in play by its place among the markers of its kind', () => {
     const main = { panel: HOME_DECK_PANEL, mutes: [false, false, false] } as const;
+    const loop = { ...marker('c'), end: { frame: 400, offsetFrames: 0 } };
     store.setDeckLoops({
       slot: 'A',
       loops: {
         ...EMPTY_DECK_LOOPS,
-        markers: [marker('a'), marker('b')],
+        markers: [marker('a'), loop, marker('b')],
         settingsInPlayId: 'b',
         mainSettings: main,
       },
     });
+    expect(store.settingsInPlay('A')()).toEqual({ markerId: 'b', name: 'Cue 2' });
 
-    expect(store.settingsInPlay('A')()).toEqual({ markerId: 'b', name: 'Item 2' });
+    store.setSettingsInPlay({
+      slot: 'A',
+      panel: HOME_DECK_PANEL,
+      settingsInPlayId: 'c',
+      mainSettings: main,
+    });
+    expect(store.settingsInPlay('A')()).toEqual({ markerId: 'c', name: 'Loop 1' });
   });
 
   it('names the marker in play by its own name when it has one', () => {
@@ -73,7 +81,7 @@ describe('settingsInPlay', () => {
       settingsInPlayId: 'a',
       mainSettings: main,
     });
-    expect(summary()).toEqual({ markerId: 'a', name: 'Item 1' });
+    expect(summary()).toEqual({ markerId: 'a', name: 'Cue 1' });
     expect(store.settingsInPlay('B')()).toEqual({ markerId: null, name: 'Main' });
 
     store.setSettingsInPlay({

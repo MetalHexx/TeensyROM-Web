@@ -18,7 +18,10 @@ export interface LoopsCuesPlateModel {
   readonly accessibleName: string;
   readonly addAccessibleName: string;
   readonly stopAccessibleName: string;
+  readonly duplicateAccessibleName: string;
   readonly addDisabled: boolean;
+  /** True with nothing selected or no tune to shape. */
+  readonly duplicateDisabled: boolean;
   readonly stopDisabled: boolean;
   /** Names the tile grid, e.g. 'Loops and cues, deck A'. */
   readonly gridAccessibleName: string;
@@ -29,10 +32,10 @@ export interface LoopsCuesPlateModel {
 }
 
 /**
- * One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the fixed
+ * One deck's loops/cues faceplate: an engraved caption with the Add, Duplicate and Stop keys, the fixed
  * selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
  * Purely presentational and inert — the caller owns every marker, every drag offset and every
- * write. The keys carry their own `data-control` ids (`loop-add`, `loop-stop`), distinct from the
+ * write. The keys carry their own `data-control` ids (`loop-add`, `loop-duplicate`, `loop-stop`), distinct from the
  * transport's `stop`, so the mapping overlay resolves each to the right control. The selected row's
  * In and Out keys are `loop-in` and `loop-set-end`, the Length readout `loop-length`, the Move keys
  * `loop-move-earlier` and `loop-move-later`, and the step readout `loop-move-step`; the boundaries'
@@ -45,6 +48,7 @@ export interface LoopsCuesPlateModel {
  * <lib-loops-cues-plate
  *   [model]="plateModel()"
  *   (addMarker)="onAdd()"
+ *   (duplicateMarker)="onDuplicate()"
  *   (stopLoop)="onStop()"
  *   (triggerTile)="onTrigger($event)"
  *   (playNowTile)="onPlayNow($event)"
@@ -80,6 +84,8 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly endDragOffset = input<number | null>(null);
   /** Emits when the Add key is pressed. */
   readonly addMarker = output<void>();
+  /** Emits when the Duplicate key is pressed. */
+  readonly duplicateMarker = output<void>();
   /** Emits when the Stop key is pressed. */
   readonly stopLoop = output<void>();
   /** Emits when the selected row's trigger key is pressed. */
@@ -122,8 +128,8 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly nudgeCommit = output<LoopBoundaryNudge>();
   /** Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction. */
   readonly moveEdge = output<LoopEdgeMove>();
-  /** Emits the new name when the selected row's name is renamed in place. */
-  readonly rename = output<string>();
+  /** Emits the new name and the id of the marker it was opened on when the selected row's name is renamed in place. */
+  readonly rename = output<{ id: string; name: string }>();
 
   private readonly grid = viewChild.required(LoopTileGridComponent);
 

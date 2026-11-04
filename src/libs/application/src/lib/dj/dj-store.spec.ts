@@ -274,6 +274,7 @@ describe('DjStore', () => {
         speed: 1.2,
         faderSpeed: 1.2,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: store.decks().A.voices,
       });
@@ -338,6 +339,7 @@ describe('DjStore', () => {
         speed: 1.37,
         faderSpeed: 1.32,
         nudging: true,
+        nudgeHeld: { up: true, down: false },
         varispeed: true,
         voices,
       });

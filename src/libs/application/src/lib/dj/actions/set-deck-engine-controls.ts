@@ -4,8 +4,8 @@ import { DeckVoiceState, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
 
 /** Lands the engine-reported tempo multiplier, the speed fader's own value, whether a nudge is
- *  held, whether the engine is in varispeed, and the voice states on a deck. Logs nothing — it runs on every speed-fader tick and every
- *  nudge and hold press and release. */
+ *  held and which, whether the engine is in varispeed, and the voice states on a deck. Logs nothing
+ *  — it runs on every speed-fader tick and every nudge and hold press and release. */
 export function setDeckEngineControls(store: WritableStore<DjState>) {
   return {
     setDeckEngineControls: ({
@@ -13,6 +13,7 @@ export function setDeckEngineControls(store: WritableStore<DjState>) {
       speed,
       faderSpeed,
       nudging,
+      nudgeHeld,
       varispeed,
       voices,
     }: {
@@ -20,6 +21,7 @@ export function setDeckEngineControls(store: WritableStore<DjState>) {
       speed: number;
       faderSpeed: number;
       nudging: boolean;
+      nudgeHeld: { readonly up: boolean; readonly down: boolean };
       varispeed: boolean;
       voices: readonly DeckVoiceState[];
     }): void => {
@@ -28,7 +30,15 @@ export function setDeckEngineControls(store: WritableStore<DjState>) {
       updateState(store, actionMessage, (state) => ({
         decks: {
           ...state.decks,
-          [slot]: { ...state.decks[slot], speed, faderSpeed, nudging, varispeed, voices },
+          [slot]: {
+            ...state.decks[slot],
+            speed,
+            faderSpeed,
+            nudging,
+            nudgeHeld,
+            varispeed,
+            voices,
+          },
         },
       }));
     },

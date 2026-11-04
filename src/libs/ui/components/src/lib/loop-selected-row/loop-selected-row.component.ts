@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  input,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { InlineEditTitleComponent } from '../inline-edit-title/inline-edit-title.component';
 import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
@@ -47,6 +57,8 @@ export interface LoopMoveModel {
 
 /** The selected loop or cue's caller-composed state. */
 export interface LoopSelectedRowModel {
+  /** The selected marker's id, or null with nothing selected. A rename commits to the id it opened on. */
+  readonly id: string | null;
   /** Nothing selected: blank display, every control disabled. */
   readonly empty: boolean;
   readonly name: string;
@@ -81,7 +93,7 @@ export interface LoopSelectedRowModel {
   readonly wrapAccessibleName: string;
   /** The name cannot be edited, e.g. while the marker is not yet saved. */
   readonly renameDisabled: boolean;
-  /** Names the rename button and field, e.g. 'Rename Item 5'. */
+  /** Names the rename button and field, e.g. 'Rename Loop 5'. */
   readonly renameLabel: string;
   /** The name field's maximum length, e.g. 48. */
   readonly nameMaxLength: number;
@@ -214,8 +226,42 @@ export class LoopSelectedRowComponent {
   readonly nudgeCommit = output<LoopBoundaryNudge>();
   /** Emits when a boundary's edge-move arrow is pressed, tagged with the boundary and direction. */
   readonly moveEdge = output<LoopEdgeMove>();
-  /** Emits the new name when the name is committed; an empty name returns the marker to its place name. */
-  readonly rename = output<string>();
+  /** Emits the new name with the id of the marker the edit was opened on, even if the selection has
+   *  since moved; an empty name returns the marker to its place name. Emits nothing when the name is
+   *  the one the edit opened with. */
+  readonly rename = output<{ id: string; name: string }>();
+
+  private readonly editor = viewChild(InlineEditTitleComponent);
+
+  /** Whether the name editor is open; derived from the editor so it cannot drift from it. */
+  protected readonly renaming = computed(() => this.editor()?.isEditing() ?? false);
+
+  /** The marker and name the open editor was seeded with; null while the editor is closed. */
+  private readonly renameTarget = signal<{ id: string; name: string } | null>(null);
+
+  /** The name the editor judges "changed" against. While the field is open it stays the name the
+   *  edit opened with, so a selection move under the open field cannot change what counts as an
+   *  edit: a draft equal to the newly selected marker's name must still commit to the marker the
+   *  edit was opened on. With the editor closed it follows the model. */
+  protected readonly editorValue = computed(() => this.renameTarget()?.name ?? this.model().name);
+
+  constructor() {
+    effect(() => {
+      this.renameTarget.set(this.renaming() ? untracked(() => this.openedOn()) : null);
+    });
+  }
+
+  private openedOn(): { id: string; name: string } | null {
+    const { id, name } = this.model();
+    return id === null ? null : { id, name };
+  }
+
+  protected onCommit(name: string): void {
+    const target = this.renameTarget() ?? this.openedOn();
+    if (target !== null && name !== target.name) {
+      this.rename.emit({ id: target.id, name });
+    }
+  }
 
   protected readonly stateLight = computed(() => {
     switch (this.model().activity) {

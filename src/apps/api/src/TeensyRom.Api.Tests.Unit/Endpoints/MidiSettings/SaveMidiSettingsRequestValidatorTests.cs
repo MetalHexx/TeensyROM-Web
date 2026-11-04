@@ -343,6 +343,7 @@ public class SaveMidiSettingsRequestValidatorTests
     [InlineData("B", "set-next")]
     [InlineData("A", "panic")]
     [InlineData("B", "panic")]
+    [InlineData("A", "loop-duplicate")]
     [InlineData("set", "set-select")]
     [InlineData("set", "set-load-a")]
     [InlineData("set", "set-load-b")]
@@ -387,9 +388,9 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsEightyEightNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsEightyNineNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(88);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(89);
         MidiSettingsAllowLists.SetControls.Should().HaveCount(3);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }

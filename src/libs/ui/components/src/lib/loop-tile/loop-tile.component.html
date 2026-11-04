@@ -3,12 +3,14 @@
   icon="play_arrow"
   [accessibleName]="model().triggerAccessibleName"
   [stateLight]="stateLight()"
+  pressOn="down"
   (press)="trigger.emit()"
 />
 <lib-synth-key
   class="play-now"
   icon="bolt"
   [accessibleName]="model().playNowAccessibleName"
+  pressOn="down"
   (press)="playNow.emit()"
 />
 <button

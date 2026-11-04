@@ -367,6 +367,7 @@ export class MappableControls {
         warnOnFailure('play now', decks.playMarkerNow(slot))
       ),
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
+      trigger(id('loop-duplicate'), 'Duplicate', () => decks.duplicateMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
       trigger(id('loop-in'), 'Loop in', () => decks.setMarkerIn(slot)),
       trigger(id('loop-set-end'), 'Loop out', () => decks.setMarkerOut(slot)),

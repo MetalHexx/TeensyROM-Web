@@ -83,6 +83,7 @@ describe('loopsSummary', () => {
     expect(store.loopsSummary('A')()).toEqual({
       hasTune: false,
       canAdd: false,
+      canDuplicate: false,
       canStop: false,
       moveStepText: '1 BEAT',
       moveStepOptions: [
@@ -128,6 +129,23 @@ describe('loopsSummary', () => {
 
       expect(store.loopsSummary('A')().canAdd).toBe(canAdd);
       expect(store.loopsSummary('A')().hasTune).toBe(true);
+    }
+  );
+
+  it.each([
+    { status: 'playing', switching: false, selected: true, canDuplicate: true },
+    { status: 'stopped', switching: false, selected: true, canDuplicate: true },
+    { status: 'playing', switching: false, selected: false, canDuplicate: false },
+    { status: 'loading', switching: false, selected: true, canDuplicate: false },
+    { status: 'playing', switching: true, selected: true, canDuplicate: false },
+  ] as const)(
+    'duplicates with $status, switching $switching and a marker selected $selected: $canDuplicate',
+    ({ status, switching, selected, canDuplicate }) => {
+      loadTune(status);
+      store.setDeckSwitching({ slot: 'A', switching });
+      setLoops([marker('a', 100)], selected ? {} : { selectedId: null });
+
+      expect(store.loopsSummary('A')().canDuplicate).toBe(canDuplicate);
     }
   );
 
@@ -208,23 +226,23 @@ describe('loopsSummary', () => {
   describe('items', () => {
     beforeEach(() => loadTune());
 
-    it('names items by position and tells loops from cues, with lengths in seconds', () => {
+    it('labels items by kind and tells loops from cues, with lengths in seconds', () => {
       setLoops([marker('a', 100), marker('b', 200, 590)]);
 
       const { items } = store.loopsSummary('A')();
 
       expect(items.map((item) => [item.name, item.kind, item.lengthText])).toEqual([
-        ['Item 1', 'cue', 'CUE'],
-        ['Item 2', 'loop', '7.8s'],
+        ['Cue 1', 'cue', 'CUE'],
+        ['Loop 1', 'loop', '7.8s'],
       ]);
     });
 
-    it('shows the name a marker was given in place of its position', () => {
+    it('shows the name a marker was given in place of its label, which still counts for its kind', () => {
       setLoops([marker('a', 100, null, { name: 'Drop' }), marker('b', 200)], { selectedId: 'a' });
 
       const summary = store.loopsSummary('A')();
 
-      expect(summary.items.map((item) => item.name)).toEqual(['Drop', 'Item 2']);
+      expect(summary.items.map((item) => item.name)).toEqual(['Drop', 'Cue 2']);
       expect(summary.selected?.name).toBe('Drop');
     });
 
@@ -285,7 +303,7 @@ describe('loopsSummary', () => {
       setLoops([marker('loop', 200, 590), marker('cue', 100)]);
       expect(store.loopsSummary('A')().selected).toMatchObject({
         id: 'loop',
-        name: 'Item 1',
+        name: 'Loop 1',
         kind: 'loop',
         spanText: '00:04.0–00:11.8',
       });
@@ -293,7 +311,7 @@ describe('loopsSummary', () => {
       store.setLoopSelection({ slot: 'A', selectedId: 'cue', selectionMovedWhileQueued: false });
       expect(store.loopsSummary('A')().selected).toMatchObject({
         id: 'cue',
-        name: 'Item 2',
+        name: 'Cue 1',
         kind: 'cue',
         spanText: '00:02.0',
         end: null,

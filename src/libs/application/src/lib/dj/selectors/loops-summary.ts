@@ -10,6 +10,7 @@ import type { Slot } from '../slot';
 import {
   clamp,
   markerKind,
+  markerLabel,
   oneSecondFrames,
   resolvedFrame,
   type LoopBoundaryName,
@@ -33,7 +34,7 @@ export type LoopActivity = 'idle' | 'queued' | 'running';
 
 export interface LoopItemSummary {
   readonly id: string;
-  /** The marker's name, else 'Item N' by list position. */
+  /** The marker's name, else 'Loop N' or 'Cue N' by its place among the markers of its kind. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
   /** In beats ('5 BEATS', '½ BEAT') when the start is a beat of the deck's grid and the length is
@@ -95,6 +96,9 @@ export interface LoopSelectionSummary {
 export interface DeckLoopsSummary {
   readonly hasTune: boolean;
   readonly canAdd: boolean;
+  /** A marker is selected to copy, on a deck that can shape: enabled at the marker limit too, where
+   *  the press is refused as Add's is. */
+  readonly canDuplicate: boolean;
   readonly canStop: boolean;
   /** The deck's Move step, which exists with nothing selected. */
   readonly moveStepText: string;
@@ -172,7 +176,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
           const end = marker.end === null ? null : resolvedFrame(marker.end);
           return {
             id: marker.id,
-            name: marker.name ?? `Item ${index + 1}`,
+            name: markerLabel(markers, index),
             kind,
             lengthText:
               kind === 'loop' && end !== null
@@ -223,9 +227,16 @@ export function loopsSummary(store: WritableStore<DjState>) {
           };
         }
 
+        const shapeable = isShapeable({
+          loaded,
+          switching: deck.switching(),
+          status: deck.status(),
+        });
+
         return {
           hasTune: loaded !== null,
-          canAdd: isShapeable({ loaded, switching: deck.switching(), status: deck.status() }),
+          canAdd: shapeable,
+          canDuplicate: shapeable && selectedId !== null,
           canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
           moveStepText: moveStepLabel(moveStep),
           moveStepOptions: MOVE_STEPS.map((step) => ({

@@ -91,6 +91,9 @@ export class InlineEditTitleComponent {
   /** Whether the text field is showing in place of the resting button. */
   protected readonly editing = signal(false);
 
+  /** Whether the text field is open, for a parent that reshapes its layout around the editor. */
+  readonly isEditing = this.editing.asReadonly();
+
   /** The text currently in the field. */
   protected readonly draft = signal('');
 

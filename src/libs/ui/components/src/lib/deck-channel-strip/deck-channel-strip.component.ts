@@ -24,6 +24,8 @@ export interface ChannelStripVoiceModel {
   /** Whether the voice is muted. The mute key reports it as `aria-pressed`; its light is lit
    *  while the voice is NOT muted, i.e. while it plays. */
   readonly muted: boolean;
+  /** Whether the voice's Kill/Punch is held, from the screen or a controller. Lights the pad. */
+  readonly held: boolean;
   /** The hold pad's label: 'Kill' | 'Punch'. */
   readonly holdLabel: string;
   /** e.g. 'Mute voice 1 deck A'. */
@@ -60,13 +62,21 @@ export interface DeckChannelStripModel {
     /** What the range announces in place of its number, e.g. '+1.25%'. */
     readonly valueText: string;
   };
-  readonly nudge: { readonly downAccessibleName: string; readonly upAccessibleName: string };
+  readonly nudge: {
+    readonly downAccessibleName: string;
+    readonly upAccessibleName: string;
+    /** Whether the nudge-down pad is held, from the screen or a controller. Lights the pad. */
+    readonly downHeld: boolean;
+    /** Whether the nudge-up pad is held, from the screen or a controller. Lights the pad. */
+    readonly upHeld: boolean;
+  };
   readonly jumpButtons: readonly JumpButtonModel[];
   /** Disables every control; a held pad releases. */
   readonly disabled: boolean;
 }
 
-/** What the BPM line shows until a painter sets it; matches the template's initial text. */
+/** What the BPM line shows until a painter sets it; matches the template's initial figure and
+ *  `data-none`. */
 const NO_BPM_TEXT = '---.-- BPM';
 
 /**
@@ -78,7 +88,8 @@ const NO_BPM_TEXT = '---.-- BPM';
  * `model`. It is sized for the roughly 88px voice-and-speed column and fills that column's height.
  *
  * The BPM is position-dependent, so it is not in `model`: a painter sets it through `setLiveBpm`,
- * straight on the DOM, outside change detection.
+ * straight on the DOM, outside change detection. The line is the figure plus a fixed "BPM" unit,
+ * dimmed while no beat is found.
  *
  * @example
  * ```html
@@ -107,6 +118,7 @@ const NO_BPM_TEXT = '---.-- BPM';
 })
 export class DeckChannelStripComponent implements LiveBpmIndicator {
   private readonly bpm = viewChild.required<ElementRef<HTMLElement>>('bpm');
+  private readonly bpmLine = viewChild.required<ElementRef<HTMLElement>>('bpmLine');
   private liveBpm = NO_BPM_TEXT;
 
   /** Everything the strip draws; the caller builds it from the deck's store state. */
@@ -126,15 +138,20 @@ export class DeckChannelStripComponent implements LiveBpmIndicator {
   /** The Tap key was pressed. */
   readonly tap = output<void>();
 
-  /** Sets the BPM line under the speed percent, e.g. '125.31 BPM' or '---.-- BPM'. Deliberately not
-   *  a field of `model`: the tempo follows the playhead, and a binding would put change detection
-   *  on every frame. Writes straight to the DOM, and only a changed text. Valid once the view has
-   *  rendered. */
+  /** Sets the BPM line under the speed percent from e.g. '125.31 BPM' or '---.-- BPM'. Only the
+   *  figure is written; the unit is fixed markup. `data-none` follows whether no beat is found.
+   *  Deliberately not a field of `model`: the tempo follows the playhead, and a binding would put
+   *  change detection on every frame. Writes straight to the DOM, and only a changed text. Valid
+   *  once the view has rendered. */
   setLiveBpm(text: string): void {
     if (text === this.liveBpm) {
       return;
     }
+    const noneFlips = (text === NO_BPM_TEXT) !== (this.liveBpm === NO_BPM_TEXT);
     this.liveBpm = text;
-    this.bpm().nativeElement.textContent = text;
+    this.bpm().nativeElement.textContent = text.replace(/ BPM$/, '');
+    if (noneFlips) {
+      this.bpmLine().nativeElement.toggleAttribute('data-none', text === NO_BPM_TEXT);
+    }
   }
 }

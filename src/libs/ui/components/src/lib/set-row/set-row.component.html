@@ -18,8 +18,11 @@
   type="button"
   class="select"
   [attr.aria-label]="model().accessibleName"
+  [attr.draggable]="model().pending ? null : 'true'"
   [disabled]="model().pending"
   (click)="selectRow.emit()"
+  (dragstart)="onDragStart($event)"
+  (dragend)="onDragEnd()"
 >
   <span class="number" aria-hidden="true">{{ model().numberText }}</span>
   <span class="tune" aria-hidden="true">

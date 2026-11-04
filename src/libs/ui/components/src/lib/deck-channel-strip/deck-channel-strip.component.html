@@ -18,6 +18,7 @@
           data-control="voice-hold"
           [label]="voice.holdLabel"
           [accessibleName]="voice.holdAccessibleName"
+          [held]="voice.held"
           [disabled]="model().disabled"
           (heldChange)="heldChange.emit({ index: $index, held: $event })"
         />
@@ -33,7 +34,9 @@
         [attr.data-tapping]="model().tapping ? '' : null"
       >
         <span class="percent">{{ model().speedText }}</span>
-        <span #bpm class="bpm">---.-- BPM</span>
+        <span #bpmLine class="bpm" data-none
+          ><span #bpm class="figure">---.--</span><span class="unit">BPM</span></span
+        >
       </div>
       <lib-synth-key
         data-control="tap"
@@ -66,6 +69,7 @@
             shape="round"
             label="−"
             [accessibleName]="model().nudge.downAccessibleName"
+            [held]="model().nudge.downHeld"
             [disabled]="model().disabled"
             (heldChange)="nudgeChange.emit({ direction: 'down', held: $event })"
           />
@@ -74,6 +78,7 @@
             shape="round"
             label="+"
             [accessibleName]="model().nudge.upAccessibleName"
+            [held]="model().nudge.upHeld"
             [disabled]="model().disabled"
             (heldChange)="nudgeChange.emit({ direction: 'up', held: $event })"
           />

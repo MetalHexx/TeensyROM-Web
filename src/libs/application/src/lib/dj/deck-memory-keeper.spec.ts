@@ -116,6 +116,7 @@ describe('DeckMemoryKeeper', () => {
       speed: speed.faderValue(slot),
       faderSpeed: speed.faderValue(slot),
       nudging: speed.isNudging(slot),
+      nudgeHeld: speed.nudgeHeld(slot),
       varispeed: false,
       voices,
     });

@@ -131,6 +131,7 @@ function selectedRowModel(
   const name = selection?.name ?? 'selected marker';
   const selected = selection !== null;
   return {
+    id: selection?.id ?? null,
     empty: selection === null,
     name: selection?.name ?? '',
     kindLabel: selection === null ? '' : selection.kind === 'loop' ? 'LOOP' : 'CUE',
@@ -229,13 +230,15 @@ export class DjDeckColumnComponent {
 
   readonly plateModel = computed<LoopsCuesPlateModel>(() => {
     const { letter } = this.deck();
-    const { hasTune, canAdd, canStop, items, selected, moveStepText, moveStepOptions } =
+    const { hasTune, canAdd, canDuplicate, canStop, items, selected, moveStepText, moveStepOptions } =
       this.loops();
     return {
       accessibleName: `Loops/Cues deck ${letter}`,
       addAccessibleName: `Add cue deck ${letter}`,
       stopAccessibleName: `Stop loop deck ${letter}`,
+      duplicateAccessibleName: `Duplicate deck ${letter}`,
       addDisabled: !canAdd,
+      duplicateDisabled: !canDuplicate,
       stopDisabled: !canStop,
       gridAccessibleName: `Loops deck ${letter}`,
       emptyText: hasTune ? 'Add a cue at the playhead' : 'Load a tune to add loops',
@@ -332,17 +335,18 @@ export class DjDeckColumnComponent {
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
     const { letter } = this.deck();
-    const { speed, faderSpeed, nudging, tapping, voices } = this.deckState();
+    const { speed, faderSpeed, nudging, nudgeHeld, tapping, voices } = this.deckState();
     return {
       settingsSign: settingsSignModel(this.deck(), this.settingsInPlay()),
       voiceAccessibleName: `Voice deck ${letter}`,
       speedAccessibleName: `Speed deck ${letter}`,
-      voices: voices.map(({ muted }, i) => {
+      voices: voices.map(({ muted, held }, i) => {
         const n = i + 1;
         const holdLabel = muted ? 'Punch' : 'Kill';
         return {
           label: `V${n}`,
           muted,
+          held,
           holdLabel,
           muteAccessibleName: `Mute voice ${n} deck ${letter}`,
           holdAccessibleName: `${holdLabel} voice ${n} deck ${letter}`,
@@ -364,6 +368,8 @@ export class DjDeckColumnComponent {
       nudge: {
         downAccessibleName: `Nudge down deck ${letter}`,
         upAccessibleName: `Nudge up deck ${letter}`,
+        downHeld: nudgeHeld.down,
+        upHeld: nudgeHeld.up,
       },
       jumpButtons: [
         { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${letter}` },
@@ -503,6 +509,10 @@ export class DjDeckColumnComponent {
     this.deckService.addMarker(this.deck().slot);
   }
 
+  onDuplicateMarker(): void {
+    this.deckService.duplicateMarker(this.deck().slot);
+  }
+
   onStopLoop(): void {
     this.deckService.stopMarkerLoop(this.deck().slot);
   }
@@ -571,11 +581,8 @@ export class DjDeckColumnComponent {
     this.deckService.clearMarkerEnd(this.deck().slot);
   }
 
-  onRenameSelected(name: string): void {
-    const id = this.loops().selected?.id;
-    if (id !== undefined) {
-      this.deckService.renameMarker(this.deck().slot, id, name);
-    }
+  onRenameSelected({ id, name }: { id: string; name: string }): void {
+    this.deckService.renameMarker(this.deck().slot, id, name);
   }
 
   onDeleteSelected(): void {

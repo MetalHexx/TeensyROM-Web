@@ -394,6 +394,7 @@ describe('DeckGrid', () => {
         speed: 1.5,
         faderSpeed: 1.5,
         nudging: false,
+        nudgeHeld: { up: false, down: false },
         varispeed: false,
         voices: store.decks().A.voices,
       });

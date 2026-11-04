@@ -143,6 +143,7 @@ const MOVE_STEP_OPTIONS: DeckLoopsSummary['moveStepOptions'] = [
 const NO_LOOPS: DeckLoopsSummary = {
   hasTune: false,
   canAdd: false,
+  canDuplicate: false,
   canStop: false,
   moveStepText: '1 BEAT',
   moveStepOptions: MOVE_STEP_OPTIONS,
@@ -154,13 +155,14 @@ const NO_LOOPS: DeckLoopsSummary = {
 const SELECTED_CUE: DeckLoopsSummary = {
   hasTune: true,
   canAdd: true,
+  canDuplicate: true,
   canStop: false,
   moveStepText: '1 BEAT',
   moveStepOptions: MOVE_STEP_OPTIONS,
   items: [
     {
       id: 'm1',
-      name: 'Item 1',
+      name: 'Loop 1',
       kind: 'cue',
       lengthText: '',
       activity: 'idle',
@@ -173,7 +175,7 @@ const SELECTED_CUE: DeckLoopsSummary = {
   ],
   selected: {
     id: 'm1',
-    name: 'Item 1',
+    name: 'Loop 1',
     kind: 'cue',
     activity: 'idle',
     ready: true,
@@ -246,6 +248,7 @@ function createDjStoreStub(
     deck: () =>
       signal({
         speed: 1,
+        nudgeHeld: { up: false, down: false },
         voices: [
           { muted: false, held: false },
           { muted: false, held: false },
@@ -1309,7 +1312,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(176);
+      expect(ALL_IDENTITIES).toHaveLength(178);
       expect(mismatched).toEqual([]);
     });
 

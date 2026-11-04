@@ -82,7 +82,7 @@
 .speed-display {
   flex: 0 0 auto;
   overflow: hidden;
-  padding: 3px 0;
+  padding: 5px 2px;
   @include styles.synth-display;
   text-align: center;
   white-space: nowrap;
@@ -99,15 +99,47 @@
 }
 
 .percent {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.1;
 }
 
+// The BPM line is ruled off from the percent across the display's width. The figure and the rule
+// carry their own colours so the nudge/tap tint can reach them; the unit keeps its dim colour.
 .bpm {
-  font-size: 0.5rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  opacity: 0.85;
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--synth-display-text) 16%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.figure {
+  color: var(--synth-display-text);
+}
+
+.unit {
+  margin-left: 3px;
+  color: var(--synth-display-dim);
+  font-size: 0.53125rem;
+  line-height: 1.2;
+}
+
+.bpm[data-none] .figure {
+  color: var(--synth-display-faint);
+}
+
+.speed-display[data-nudging],
+.speed-display[data-tapping] {
+  .bpm {
+    border-top-color: color-mix(in srgb, var(--color-primary-bright) 30%, transparent);
+  }
+
+  .figure {
+    color: var(--color-primary-bright);
+  }
 }
 
 // The key is lit with the highlight; while tapping the highlight is the nudge's magenta.

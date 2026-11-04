@@ -6,7 +6,7 @@ import type { LoopTileModel } from '../loop-tile/loop-tile.component';
 function tile(id: string, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
   return {
     id,
-    name: `Item ${id}`,
+    name: `Loop ${id}`,
     kind: 'loop',
     lengthText: '4.0s',
     activity: 'idle',

@@ -90,6 +90,17 @@ describe('InlineEditTitleComponent', () => {
   });
 
   describe('entering edit mode', () => {
+    it('reports isEditing while the field is open and not after it closes', () => {
+      expect(fixture.componentInstance.isEditing()).toBe(false);
+
+      const input = startEditing();
+      expect(fixture.componentInstance.isEditing()).toBe(true);
+
+      press(input, 'Escape');
+      fixture.detectChanges();
+      expect(fixture.componentInstance.isEditing()).toBe(false);
+    });
+
     it('opens a focused field holding the value, selected, with the same accessible name', () => {
       const input = startEditing();
 

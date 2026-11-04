@@ -1035,6 +1035,31 @@ describe('DeckService', () => {
           expect(store.deck('A')().nudging).toBe(false);
         });
 
+        it('mirrors which pads are held, writing on a direction change only', async () => {
+          await loadAndWait('A', register(makeFixture()));
+          service.setSpeed('A', 0.9);
+          const controlsSpy = vi.spyOn(store, 'setDeckEngineControls');
+
+          service.setNudge('A', 'up', true);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: true, down: false });
+          expect(controlsSpy).toHaveBeenCalledTimes(1);
+
+          // Both held: the tempo and `nudging` are unchanged, but the direction is not.
+          service.setNudge('A', 'down', true);
+          expect(store.deck('A')().speed).toBe(0.9);
+          expect(store.deck('A')().nudging).toBe(true);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: true, down: true });
+          expect(controlsSpy).toHaveBeenCalledTimes(2);
+
+          // A repeated press of a held pad changes nothing the store holds.
+          service.setNudge('A', 'down', true);
+          expect(controlsSpy).toHaveBeenCalledTimes(2);
+
+          service.setNudge('A', 'up', false);
+          service.setNudge('A', 'down', false);
+          expect(store.deck('A')().nudgeHeld).toEqual({ up: false, down: false });
+        });
+
         it('follows the fader while held, and releases onto the moved fader', async () => {
           await loadAndWait('A', register(makeFixture()));
           service.setNudge('A', 'up', true);
@@ -1777,6 +1802,7 @@ describe('DeckService', () => {
           speed: 1,
           faderSpeed: 1,
           nudging: false,
+          nudgeHeld: { up: false, down: false },
           varispeed,
           voices: store.decks().A.voices,
         });
@@ -1939,6 +1965,7 @@ describe('DeckService', () => {
 
     it('refuses every marker command while the deck has nothing shapeable loaded', async () => {
       service.addMarker('A');
+      service.duplicateMarker('A');
       service.selectMarker('A', 'x');
       service.moveMarkerSelection('A', 1);
       service.selectMarkerAt('A', 0);
@@ -1960,8 +1987,22 @@ describe('DeckService', () => {
       const refusals = vi
         .mocked(logWarn)
         .mock.calls.filter(([message]) => message.startsWith('DeckService'));
-      expect(refusals).toHaveLength(18);
+      expect(refusals).toHaveLength(19);
       expect(markersOf('A')).toEqual([]);
+    });
+
+    it('duplicates the selected marker through the command, selecting the copy', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await markAt('A', 100);
+      const [original] = markersOf('A');
+
+      service.duplicateMarker('A');
+
+      expect(markersOf('A')).toHaveLength(2);
+      expect(markersOf('A')[0].id).toBe(original.id);
+      expect(markersOf('A')[1]).toMatchObject({ name: 'Cue 1 copy', start: { frame: 100 } });
+      expect(store.loops().A.selectedId).toBe(markersOf('A')[1].id);
     });
 
     it('edits through the commands once a tune is loaded', async () => {
@@ -2044,13 +2085,79 @@ describe('DeckService', () => {
       expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
     });
 
-    it('presses the marker it is given', async () => {
+    it('presses the marker it is given and selects it', async () => {
       await loadPlayable('A');
 
       await service.toggleMarker('A', 'b');
 
       expect(loopsOf('A').runningId).toBe('b');
-      expect(loopsOf('A').selectedId).toBe('a');
+      expect(loopsOf('A').selectedId).toBe('b');
+    });
+
+    it('selects the marker it plays now when one is given', async () => {
+      await loadPlayable('A');
+
+      await service.playMarkerNow('A', 'b');
+
+      expect(loopsOf('A').runningId).toBe('b');
+      expect(loopsOf('A').selectedId).toBe('b');
+    });
+
+    it('leaves the selection where it is when no id is given', async () => {
+      await loadPlayable('A');
+      service.selectMarker('A', 'c');
+
+      await service.toggleMarker('A');
+      await service.playMarkerNow('A');
+
+      expect(loopsOf('A').selectedId).toBe('c');
+    });
+
+    it.each(['toggleMarker', 'playMarkerNow'] as const)(
+      'selects the marker %s is given before it starts a deck that is not playing',
+      async (command) => {
+        await loadPlayable('A');
+        await service.togglePlayPause('A');
+        expect(store.deck('A')().status).toBe('paused');
+        const play = runtime.play.bind(runtime);
+        let selectedWhenStarted: string | null = null;
+        vi.spyOn(runtime, 'play').mockImplementation((slot) => {
+          selectedWhenStarted = loopsOf(slot).selectedId;
+          return play(slot);
+        });
+
+        await service[command]('A', 'b');
+
+        expect(selectedWhenStarted).toBe('b');
+        expect(loopsOf('A').runningId).toBe('b');
+      }
+    );
+
+    describe('a tile press while another marker runs', () => {
+      beforeEach(async () => {
+        await loadPlayable('A');
+        await service.toggleMarker('A', 'a');
+      });
+
+      it('queues the marker and selects it, and the selection stays on it when it lands', async () => {
+        await service.toggleMarker('A', 'b');
+
+        expect(loopsOf('A').queuedId).toBe('b');
+        expect(loopsOf('A').selectedId).toBe('b');
+
+        tickUntil('A', () => loopsOf('A').runningId === 'b');
+
+        expect(loopsOf('A').selectedId).toBe('b');
+      });
+
+      it('leaves the selection where it was moved during the wait when the marker lands', async () => {
+        await service.toggleMarker('A', 'b');
+        service.selectMarker('A', 'c');
+
+        tickUntil('A', () => loopsOf('A').runningId === 'b');
+
+        expect(loopsOf('A').selectedId).toBe('c');
+      });
     });
 
     it('queues behind a running loop, lands it at the end of the lap, and lets the loop go on Stop', async () => {
@@ -2150,7 +2257,7 @@ describe('DeckService', () => {
 
       expect(loopsOf('A').runningId).toBeNull();
       expect(loopsOf('A').queuedId).toBeNull();
-      expect(loopsOf('A').selectedId).toBe('a');
+      expect(loopsOf('A').selectedId).toBe('b');
       expect(store.loopsSummary('A')().canStop).toBe(false);
     });
 
@@ -3281,7 +3388,7 @@ describe('DeckService', () => {
         service.renameMarker('A', 'b', 'Drop');
 
         expect(names()).toEqual([null, 'Drop']);
-        expect(store.loopsSummary('A')().items.map((item) => item.name)).toEqual(['Item 1', 'Drop']);
+        expect(store.loopsSummary('A')().items.map((item) => item.name)).toEqual(['Cue 1', 'Drop']);
         expect(rowMarkers(fixture.reference.identity).map((marker) => marker.name)).toEqual([
           undefined,
           'Drop',
@@ -3297,7 +3404,7 @@ describe('DeckService', () => {
         service.renameMarker('A', 'a', '');
 
         expect(names()).toEqual([null, null]);
-        expect(store.loopsSummary('A')().items[0].name).toBe('Item 1');
+        expect(store.loopsSummary('A')().items[0].name).toBe('Cue 1');
       });
 
       it('caps a name at 48 characters and drops a pasted tab', async () => {

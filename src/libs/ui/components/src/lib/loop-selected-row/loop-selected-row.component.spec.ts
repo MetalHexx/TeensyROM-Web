@@ -26,8 +26,9 @@ function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = 
 }
 
 const loop: LoopSelectedRowModel = {
+  id: 'm3',
   empty: false,
-  name: 'Item 3',
+  name: 'Loop 3',
   kindLabel: 'LOOP',
   spanText: '02:39.4–02:47.5',
   activity: 'idle',
@@ -43,9 +44,9 @@ const loop: LoopSelectedRowModel = {
       { beats: 8, label: '8 BEATS', selected: false },
       { beats: 16, label: '16 BEATS', selected: true },
     ],
-    halveAccessibleName: 'Halve Item 3',
-    doubleAccessibleName: 'Double Item 3',
-    pickAccessibleName: 'Loop length Item 3',
+    halveAccessibleName: 'Halve Loop 3',
+    doubleAccessibleName: 'Double Loop 3',
+    pickAccessibleName: 'Loop length Loop 3',
   },
   move: {
     stepText: '1 BEAT',
@@ -53,25 +54,30 @@ const loop: LoopSelectedRowModel = {
       { beats: 1, label: '1 BEAT', selected: true },
       { beats: 4, label: '4 BEATS', selected: false },
     ],
-    earlierAccessibleName: 'Move Item 3 earlier',
-    laterAccessibleName: 'Move Item 3 later',
+    earlierAccessibleName: 'Move Loop 3 earlier',
+    laterAccessibleName: 'Move Loop 3 later',
     pickAccessibleName: 'Move step',
   },
-  triggerAccessibleName: 'Trigger Item 3',
-  clearEndAccessibleName: 'Clear end of Item 3',
-  deleteAccessibleName: 'Delete Item 3',
+  triggerAccessibleName: 'Trigger Loop 3',
+  clearEndAccessibleName: 'Clear end of Loop 3',
+  deleteAccessibleName: 'Delete Loop 3',
   playNowDisabled: false,
-  playNowAccessibleName: 'Play now Item 3',
+  playNowAccessibleName: 'Play now Loop 3',
   sharesGlobal: true,
   globalDisabled: false,
-  globalAccessibleName: 'GBL Item 3',
+  globalAccessibleName: 'GBL Loop 3',
   wraps: false,
   wrapDisabled: false,
-  wrapAccessibleName: 'WRAP Item 3',
+  wrapAccessibleName: 'WRAP Loop 3',
   renameDisabled: false,
-  renameLabel: 'Rename Item 3',
+  renameLabel: 'Rename Loop 3',
   nameMaxLength: 48,
 };
+
+// jsdom has no `PointerEvent` constructor — a `MouseEvent` carries the `button` the key reads.
+function pointerDown(button: number): Event {
+  return new MouseEvent('pointerdown', { bubbles: true, button });
+}
 
 const cue: Partial<LoopSelectedRowModel> = {
   kindLabel: 'CUE',
@@ -135,6 +141,40 @@ describe('LoopSelectedRowComponent', () => {
     ]);
   });
 
+  describe('the play and play-now keys press on pointer down', () => {
+    const cases = [
+      ['trigger', 'loop-toggle'],
+      ['playNow', 'loop-play-now'],
+    ] as const;
+
+    for (const [output, control] of cases) {
+      it(`emits ${output} once on a primary pointer down, and not again for the click after it`, () => {
+        let emitted = 0;
+        fixture.componentInstance[output].subscribe(() => emitted++);
+
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(0));
+        expect(emitted).toBe(1);
+
+        button(`[data-control="${control}"]`).dispatchEvent(
+          new MouseEvent('click', { bubbles: true, detail: 1 })
+        );
+        expect(emitted).toBe(1);
+      });
+
+      it(`never emits ${output} on a secondary-button pointer down or while disabled`, () => {
+        let emitted = 0;
+        fixture.componentInstance[output].subscribe(() => emitted++);
+
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(2));
+        expect(emitted).toBe(0);
+
+        setModel({ triggerDisabled: true, playNowDisabled: true });
+        button(`[data-control="${control}"]`).dispatchEvent(pointerDown(0));
+        expect(emitted).toBe(0);
+      });
+    }
+  });
+
   it('relays the In and Out keys, each from its own boundary', () => {
     const emitted: string[] = [];
     fixture.componentInstance.setIn.subscribe(() => emitted.push('setIn'));
@@ -156,8 +196,8 @@ describe('LoopSelectedRowComponent', () => {
     const emitted: string[] = [];
     fixture.componentInstance.halve.subscribe(() => emitted.push('halve'));
     fixture.componentInstance.double.subscribe(() => emitted.push('double'));
-    named('Halve Item 3').click();
-    named('Double Item 3').click();
+    named('Halve Loop 3').click();
+    named('Double Loop 3').click();
     expect(emitted).toEqual(['halve', 'double']);
   });
 
@@ -284,7 +324,7 @@ describe('LoopSelectedRowComponent', () => {
 
     it('names each picker with its readout so the visible text is in the name', () => {
       expect(picker('loop-length').getAttribute('aria-label')).toBe(
-        'Loop length Item 3, 16 BEATS'
+        'Loop length Loop 3, 16 BEATS'
       );
     });
   });
@@ -300,7 +340,7 @@ describe('LoopSelectedRowComponent', () => {
   });
 
   it('carries running, queued and not-ready in the display text', () => {
-    expect(display().getAttribute('aria-label')).toBe('Item 3, loop, 02:39.4–02:47.5');
+    expect(display().getAttribute('aria-label')).toBe('Loop 3, loop, 02:39.4–02:47.5');
     setModel({ activity: 'running' });
     expect(display().getAttribute('aria-label')).toContain('running');
     setModel({ activity: 'queued' });
@@ -323,29 +363,125 @@ describe('LoopSelectedRowComponent', () => {
     }
 
     it('emits the typed name, named for the field by the model', () => {
-      const renames: string[] = [];
-      fixture.componentInstance.rename.subscribe((name) => renames.push(name));
-      expect(nameButton()?.getAttribute('aria-label')).toBe('Rename Item 3');
+      const renames: { id: string; name: string }[] = [];
+      fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+      expect(nameButton()?.getAttribute('aria-label')).toBe('Rename Loop 3');
 
       commit('Chorus drop');
 
-      expect(renames).toEqual(['Chorus drop']);
+      expect(renames).toEqual([{ id: 'm3', name: 'Chorus drop' }]);
     });
 
     it('allows an empty name, which returns the marker to its place name', () => {
-      const renames: string[] = [];
-      fixture.componentInstance.rename.subscribe((name) => renames.push(name));
+      const renames: { id: string; name: string }[] = [];
+      fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
 
       commit('   ');
 
-      expect(renames).toEqual(['']);
+      expect(renames).toEqual([{ id: 'm3', name: '' }]);
+    });
+
+    describe('while open', () => {
+      const renaming = (): boolean => display().hasAttribute('data-renaming');
+
+      function open(): void {
+        nameButton()?.click();
+        fixture.detectChanges();
+      }
+
+      it('marks the display while the editor is open and clears after a commit', () => {
+        expect(renaming()).toBe(false);
+        open();
+        expect(renaming()).toBe(true);
+
+        field().value = 'Chorus drop';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        fixture.detectChanges();
+
+        expect(renaming()).toBe(false);
+      });
+
+      it('clears after a cancel', () => {
+        open();
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        fixture.detectChanges();
+
+        expect(renaming()).toBe(false);
+      });
+
+      it('stays marked while the selection changes under the open editor', () => {
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        expect(renaming()).toBe(true);
+      });
+
+      it('clears when the row empties', () => {
+        open();
+        setModel({ id: null, empty: true, name: '', kindLabel: '', spanText: '' });
+
+        expect(renaming()).toBe(false);
+      });
+
+      it('commits to the marker the edit was opened on, even after the model moved on', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().value = 'Chorus drop';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+        expect(renames).toEqual([{ id: 'm3', name: 'Chorus drop' }]);
+      });
+
+      it('commits an emptied name to the marker the edit was opened on', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().value = '';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+        expect(renames).toEqual([{ id: 'm3', name: '' }]);
+      });
+
+      it('commits a draft that matches the name of the marker the selection moved to', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().value = 'Loop 4';
+        field().dispatchEvent(new Event('input'));
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+        expect(renames).toEqual([{ id: 'm3', name: 'Loop 4' }]);
+      });
+
+      it('emits nothing for an untouched draft when the selection moved under the open editor', () => {
+        const renames: { id: string; name: string }[] = [];
+        fixture.componentInstance.rename.subscribe((rename) => renames.push(rename));
+        open();
+        setModel({ id: 'm4', name: 'Loop 4' });
+
+        field().dispatchEvent(new Event('blur'));
+        fixture.detectChanges();
+
+        expect(renames).toEqual([]);
+        expect(renaming()).toBe(false);
+      });
     });
 
     it('shows the name as plain text when renaming is disabled', () => {
       setModel({ renameDisabled: true });
 
       expect(nameButton()).toBeNull();
-      expect(display().textContent).toContain('Item 3');
+      expect(display().textContent).toContain('Loop 3');
     });
 
     it('offers no editor with nothing selected', () => {

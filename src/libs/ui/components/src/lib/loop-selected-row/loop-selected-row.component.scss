@@ -92,6 +92,24 @@ lib-synth-key[data-control='loop-delete'] {
   white-space: nowrap;
 }
 
+// While the name is being renamed the field spans the display: the kind and span step aside, and the
+// editor's host fills the name so its absolutely positioned field and counter use the whole width.
+.display[data-renaming] {
+  .name {
+    flex: 1 1 auto;
+  }
+
+  .kind,
+  .span {
+    display: none;
+  }
+
+  lib-inline-edit-title {
+    display: block;
+    width: 100%;
+  }
+}
+
 .kind {
   flex: 0 0 auto;
   color: var(--synth-display-dim);

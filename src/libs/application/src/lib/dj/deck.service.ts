@@ -442,6 +442,14 @@ export class DeckService {
     }
   }
 
+  /** Copies the selected marker right after itself and selects the copy. A copy of the running or
+   *  queued marker takes its place in play without moving the playhead. */
+  duplicateMarker(slot: Slot): void {
+    if (this.canShape(slot, 'duplicateMarker')) {
+      this.loops.duplicate(slot);
+    }
+  }
+
   /** Names a marker; an empty name returns it to its place in the list. */
   renameMarker(slot: Slot, id: string, name: string): void {
     if (this.canShape(slot, 'renameMarker')) {
@@ -557,14 +565,18 @@ export class DeckService {
   }
 
   /**
-   * Presses a marker — the selected one when `id` is omitted, and nothing when none is. Idle, it
-   * starts looping, or queues behind the loop running; queued, it cancels; running, it lets go. A
-   * press that starts a marker on a deck that is not playing starts playback first, through the
-   * same path as Play.
+   * Presses a marker — the selected one when `id` is omitted, and nothing when none is. A tile
+   * press (`id` given) selects its marker first, before playback may start. Idle, it starts
+   * looping, or queues behind the loop running; queued, it cancels; running, it lets go. A press
+   * that starts a marker on a deck that is not playing starts playback first, through the same
+   * path as Play.
    */
   async toggleMarker(slot: Slot, id?: string): Promise<void> {
     if (!this.canShape(slot, 'toggleMarker')) {
       return;
+    }
+    if (id !== undefined) {
+      this.loops.select(slot, id);
     }
     const { selectedId, runningId, queuedId } = this.store.loops()[slot];
     const target = id ?? selectedId;
@@ -583,12 +595,16 @@ export class DeckService {
 
   /**
    * Jumps into a marker now — the selected one when `id` is omitted, and nothing when none is —
-   * without waiting for the lap, restarting it when it is the one running. A deck that is not
-   * playing is started first, through the same path as Play, as `toggleMarker` does.
+   * without waiting for the lap, restarting it when it is the one running. A tile press (`id`
+   * given) selects its marker first, before playback may start. A deck that is not playing is
+   * started first, through the same path as Play, as `toggleMarker` does.
    */
   async playMarkerNow(slot: Slot, id?: string): Promise<void> {
     if (!this.canShape(slot, 'playMarkerNow')) {
       return;
+    }
+    if (id !== undefined) {
+      this.loops.select(slot, id);
     }
     const target = id ?? this.store.loops()[slot].selectedId;
     if (target === null) {
@@ -703,11 +719,14 @@ export class DeckService {
     const { tempo, voices } = this.runtime.snapshot(slot);
     const faderSpeed = this.deckSpeed.faderValue(slot);
     const nudging = this.deckSpeed.isNudging(slot);
+    const nudgeHeld = this.deckSpeed.nudgeHeld(slot);
     const deck = this.store.deck(slot)();
     if (
       deck.speed !== tempo.multiplier ||
       deck.faderSpeed !== faderSpeed ||
       deck.nudging !== nudging ||
+      deck.nudgeHeld.up !== nudgeHeld.up ||
+      deck.nudgeHeld.down !== nudgeHeld.down ||
       deck.varispeed !== tempo.varispeed ||
       !sameVoices(deck.voices, voices)
     ) {
@@ -716,6 +735,7 @@ export class DeckService {
         speed: tempo.multiplier,
         faderSpeed,
         nudging,
+        nudgeHeld,
         varispeed: tempo.varispeed,
         voices,
       });

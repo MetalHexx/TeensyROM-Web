@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { DeckLoopMarker } from '../dj-store';
-import { clamp, markerKind, nudgeLimits, oneSecondFrames, resolvedFrame } from './loop-marker-math';
+import {
+  clamp,
+  markerKind,
+  markerLabel,
+  nudgeLimits,
+  oneSecondFrames,
+  resolvedFrame,
+} from './loop-marker-math';
 
 function marker(
   start: { frame: number; offsetFrames?: number },
@@ -31,6 +38,32 @@ describe('resolvedFrame', () => {
       expect(resolvedFrame({ frame, offsetFrames })).toBe(expected);
     }
   );
+});
+
+describe('markerLabel', () => {
+  const cue = () => marker({ frame: 100 });
+  const loop = () => marker({ frame: 100 }, { frame: 200 });
+  const named = (name: string) => ({ ...loop(), name });
+
+  it('counts each kind apart, and lets a name stand in for its label', () => {
+    const markers = [cue(), loop(), named('Drop'), loop(), cue()];
+
+    expect(markers.map((_, index) => markerLabel(markers, index))).toEqual([
+      'Cue 1',
+      'Loop 1',
+      'Drop',
+      'Loop 3',
+      'Cue 2',
+    ]);
+  });
+
+  it('relabels a cue as a loop once it gains an end', () => {
+    const before = [loop(), cue()];
+    expect(markerLabel(before, 1)).toBe('Cue 1');
+
+    const after = [loop(), loop()];
+    expect(markerLabel(after, 1)).toBe('Loop 2');
+  });
 });
 
 describe('markerKind', () => {

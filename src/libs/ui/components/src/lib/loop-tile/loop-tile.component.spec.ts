@@ -4,16 +4,16 @@ import { LoopTileComponent, type LoopTileModel } from './loop-tile.component';
 
 const tile: LoopTileModel = {
   id: 'a',
-  name: 'Item 3',
+  name: 'Loop 3',
   kind: 'loop',
   lengthText: '7.8s',
   activity: 'idle',
   selected: false,
   ready: true,
-  triggerAccessibleName: 'Trigger Item 3',
-  selectAccessibleName: 'Select Item 3, loop, 7.8 seconds',
+  triggerAccessibleName: 'Trigger Loop 3',
+  selectAccessibleName: 'Select Loop 3, loop, 7.8 seconds',
   ownSettings: false,
-  playNowAccessibleName: 'Play now Item 3',
+  playNowAccessibleName: 'Play now Loop 3',
 };
 
 describe('LoopTileComponent', () => {
@@ -64,10 +64,36 @@ describe('LoopTileComponent', () => {
     expect([triggers, playNows, selects]).toEqual([1, 1, 1]);
   });
 
+  describe('the play and play-now keys press on pointer down', () => {
+    // jsdom has no `PointerEvent` constructor — a `MouseEvent` carries the `button` the key reads.
+    const pointerDown = (button: number): Event =>
+      new MouseEvent('pointerdown', { bubbles: true, button });
+    const keys: [string, () => HTMLButtonElement, () => number][] = [
+      ['trigger', triggerButton, () => triggers],
+      ['playNow', playNowButton, () => playNows],
+    ];
+
+    for (const [output, key, emitted] of keys) {
+      it(`emits ${output} once on a primary pointer down, and not again for the click after it`, () => {
+        key().dispatchEvent(pointerDown(0));
+        expect(emitted()).toBe(1);
+
+        key().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+        expect(emitted()).toBe(1);
+        expect(selects).toBe(0);
+      });
+
+      it(`never emits ${output} on a secondary-button pointer down`, () => {
+        key().dispatchEvent(pointerDown(2));
+        expect(emitted()).toBe(0);
+      });
+    }
+  });
+
   it('names the three buttons from the model', () => {
-    expect(playNowButton().getAttribute('aria-label')).toBe('Play now Item 3');
-    expect(triggerButton().getAttribute('aria-label')).toBe('Trigger Item 3');
-    expect(selectButton().getAttribute('aria-label')).toBe('Select Item 3, loop, 7.8 seconds');
+    expect(playNowButton().getAttribute('aria-label')).toBe('Play now Loop 3');
+    expect(triggerButton().getAttribute('aria-label')).toBe('Trigger Loop 3');
+    expect(selectButton().getAttribute('aria-label')).toBe('Select Loop 3, loop, 7.8 seconds');
   });
 
   it('marks only a selected tile with aria-current', () => {

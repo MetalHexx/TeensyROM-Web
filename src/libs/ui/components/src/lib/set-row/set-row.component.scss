@@ -77,7 +77,7 @@ button {
   align-items: center;
   column-gap: var(--spacing-sm);
   min-width: 0;
-  cursor: pointer;
+  cursor: grab;
 
   &:disabled {
     cursor: default;

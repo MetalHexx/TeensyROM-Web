@@ -47,6 +47,23 @@ describe('SetRowComponent', () => {
     return event;
   }
 
+  function startDrag(from: HTMLElement = handle()): {
+    dataTransfer: Record<string, unknown>;
+    data: Map<string, string>;
+  } {
+    const data = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: 'uninitialized',
+      setData: (type: string, value: string) => data.set(type, value),
+      setDragImage: vi.fn(),
+    };
+    const dragstart = new Event('dragstart', { bubbles: true });
+    Object.defineProperty(dragstart, 'dataTransfer', { value: dataTransfer });
+    from.dispatchEvent(dragstart);
+    fixture.detectChanges();
+    return { dataTransfer, data };
+  }
+
   it('selects on press and removes from the remove key', () => {
     select().click();
     (el().querySelector('[data-part="remove"] button') as HTMLButtonElement).click();
@@ -73,20 +90,6 @@ describe('SetRowComponent', () => {
   });
 
   describe('dragging the handle', () => {
-    function startDrag(): { dataTransfer: Record<string, unknown>; data: Map<string, string> } {
-      const data = new Map<string, string>();
-      const dataTransfer = {
-        effectAllowed: 'uninitialized',
-        setData: (type: string, value: string) => data.set(type, value),
-        setDragImage: vi.fn(),
-      };
-      const dragstart = new Event('dragstart', { bubbles: true });
-      Object.defineProperty(dragstart, 'dataTransfer', { value: dataTransfer });
-      handle().dispatchEvent(dragstart);
-      fixture.detectChanges();
-      return { dataTransfer, data };
-    }
-
     it('puts its id on the drag under the set row type, allowing copy and move', () => {
       const { dataTransfer, data } = startDrag();
 
@@ -111,6 +114,46 @@ describe('SetRowComponent', () => {
       expect(started).toHaveLength(1);
       expect(started[0].type).toBe('dragstart');
       expect(dataTransfer['setDragImage']).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dragging the row body', () => {
+    it('puts its id on the drag under the set row type, allowing copy and move', () => {
+      const { dataTransfer, data } = startDrag(select());
+
+      expect(data.get(SET_ROW_DRAG_TYPE)).toBe('r3');
+      expect(dataTransfer['effectAllowed']).toBe('copyMove');
+    });
+
+    it('dims the row until the drag ends', () => {
+      startDrag(select());
+      expect(el().hasAttribute('data-dragging')).toBe(true);
+
+      select().dispatchEvent(new Event('dragend', { bubbles: true }));
+      fixture.detectChanges();
+      expect(el().hasAttribute('data-dragging')).toBe(false);
+    });
+
+    it('announces the drag start to the host', () => {
+      const started: DragEvent[] = [];
+      fixture.componentInstance.dragStarted.subscribe((event) => started.push(event));
+      startDrag(select());
+
+      expect(started).toHaveLength(1);
+      expect(started[0].type).toBe('dragstart');
+    });
+
+    it('is draggable, and the remove key is not', () => {
+      const remove = el().querySelector('.remove') as HTMLElement;
+
+      expect(select().draggable).toBe(true);
+      expect(remove.draggable).toBe(false);
+    });
+
+    it('still selects on a plain click', () => {
+      select().click();
+
+      expect(emitted).toEqual(['select']);
     });
   });
 
@@ -179,6 +222,10 @@ describe('SetRowComponent', () => {
 
       expect(select().disabled).toBe(true);
       expect(emitted).toEqual([]);
+    });
+
+    it('cannot be dragged from the body', () => {
+      expect(select().draggable).toBe(false);
     });
   });
 });

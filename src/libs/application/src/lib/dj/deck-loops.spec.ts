@@ -260,6 +260,7 @@ describe('DeckLoops', () => {
         speed: tempo.multiplier,
         faderSpeed: deck.faderSpeed,
         nudging: deck.nudging,
+        nudgeHeld: deck.nudgeHeld,
         varispeed: false,
         voices,
       });
@@ -554,6 +555,117 @@ describe('DeckLoops', () => {
       expect(stateOf('A').markers).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
       expect(refusals()).toHaveLength(1);
       expect(await positions.load(TUNE_X)).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
+    });
+  });
+
+  describe('duplicating an idle marker', () => {
+    const SETTINGS: DeckMixerSettings = { panel: panelOf(3), mutes: [true, false, false] };
+
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [
+        cue('a', 10),
+        {
+          ...loopOf('b', 300, 320),
+          wraps: true,
+          settings: encodeMixerSettings(SETTINGS),
+          usesOwnSettings: true,
+        },
+        cue('c', 50),
+      ]);
+      await loadOn('A', TUNE_X);
+      await settle();
+    });
+
+    const namesOf = (slot: Slot) => stateOf(slot).markers.map((marker) => marker.name);
+
+    it('inserts "‹label› copy" right after the original with the same frames, settings and WRAP, selects it and saves it', async () => {
+      loops.select('A', 'b');
+
+      loops.duplicate('A');
+
+      const [, original, copy] = stateOf('A').markers;
+      expect(idsOf('A')).toEqual(['a', 'b', copy.id, 'c']);
+      expect(copy.id).not.toBe(original.id);
+      expect(copy).toEqual({ ...original, id: copy.id, name: 'Loop 1 copy' });
+      expect(copy.settings).toBe(original.settings);
+      expect(copy.ownSettings).toBe(true);
+      expect(copy.wraps).toBe(true);
+      expect(original.name).toBeNull();
+      expect(stateOf('A').selectedId).toBe(copy.id);
+
+      const saved = await positions.load(TUNE_X);
+      expect(saved.map((marker) => marker.id)).toEqual(idsOf('A'));
+      expect(saved[2]).toEqual({ ...saved[1], id: copy.id, name: 'Loop 1 copy' });
+    });
+
+    it('copies a cue to a cue', () => {
+      loops.select('A', 'c');
+
+      loops.duplicate('A');
+
+      expect(namesOf('A')).toEqual([null, null, null, 'Cue 2 copy']);
+      expect(stateOf('A').markers[3].end).toBeNull();
+    });
+
+    it('names the copy after the name the original was given, cutting a long one so " copy" still fits', () => {
+      loops.rename('A', 'a', 'Drop');
+      loops.select('A', 'a');
+      loops.duplicate('A');
+      expect(namesOf('A')[1]).toBe('Drop copy');
+
+      loops.rename('A', 'c', 'x'.repeat(MARKER_NAME_MAX_LENGTH));
+      loops.select('A', 'c');
+      loops.duplicate('A');
+      const longCopy = stateOf('A').markers[4].name;
+      expect(longCopy).toBe(`${'x'.repeat(MARKER_NAME_MAX_LENGTH - ' copy'.length)} copy`);
+      expect(longCopy).toHaveLength(MARKER_NAME_MAX_LENGTH);
+    });
+
+    it('takes the readiness of its start from the engine, and declares nothing to it', () => {
+      const declare = vi.spyOn(runtime, 'setJumpTargets');
+      loops.select('A', 'b');
+
+      loops.duplicate('A');
+
+      expect(readyOf('A')).toEqual([true, true, true, true]);
+      expect(declare).not.toHaveBeenCalled();
+    });
+
+    it('shows the copy on the other deck holding the tune, which keeps its own selection', async () => {
+      await loadOn('B', TUNE_X);
+      loops.select('B', 'c');
+      loops.select('A', 'b');
+
+      loops.duplicate('A');
+
+      expect(idsOf('B')).toEqual(idsOf('A'));
+      expect(stateOf('B').selectedId).toBe('c');
+    });
+
+    it('refuses with a warning, changing nothing, when nothing is selected', async () => {
+      await positions.save(TUNE_Y, []);
+      await loadOn('A', TUNE_Y);
+
+      loops.duplicate('A');
+
+      expect(stateOf('A').markers).toEqual([]);
+      expect(refusals()).toHaveLength(1);
+      expect(await positions.load(TUNE_Y)).toEqual([]);
+    });
+
+    it('refuses with a warning, changing nothing, at the most markers a subtune keeps', async () => {
+      await positions.save(
+        TUNE_Y,
+        Array.from({ length: MAX_MARKERS_PER_SUBTUNE }, (_, i) => cue(`m${i}`, i + 1))
+      );
+      await loadOn('A', TUNE_Y);
+
+      loops.duplicate('A');
+
+      expect(stateOf('A').markers).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
+      expect(stateOf('A').selectedId).toBe('m0');
+      expect(refusals()).toHaveLength(1);
+      expect(await positions.load(TUNE_Y)).toHaveLength(MAX_MARKERS_PER_SUBTUNE);
     });
   });
 
@@ -2874,6 +2986,209 @@ describe('DeckLoops', () => {
       });
     });
 
+    describe('duplicating', () => {
+      /** 20 play calls a beat from frame 0: loop `a` is one beat long. */
+      const GRID_20: DeckBeatGrid = {
+        beatFrames: 20,
+        beatOneFrame: 0,
+        startFrame: 0,
+        endFrame: null,
+        source: 'scan',
+      };
+      const listOf = (slot: Slot) => stateOf(slot).markers;
+
+      /** Duplicates deck A's selected marker and returns the copy. */
+      function duplicate(): DeckLoopMarker {
+        const before = new Set(idsOf('A'));
+        loops.duplicate('A');
+        const copy = listOf('A').find((marker) => !before.has(marker.id));
+        if (copy === undefined) {
+          throw new Error('duplicate added no marker');
+        }
+        return copy;
+      }
+
+      /** Watches the engine calls that move the playhead or rebuild the engine's loop and queue. */
+      function watchEngine() {
+        const seek = vi.spyOn(runtime, 'seekToFrame');
+        const queue = vi.spyOn(runtime, 'queueJump');
+        const setLoop = vi.spyOn(runtime, 'setActiveLoop');
+        return {
+          seek,
+          expectUntouched: () => {
+            expect(seek).not.toHaveBeenCalled();
+            expect(queue).not.toHaveBeenCalled();
+            expect(setLoop).not.toHaveBeenCalled();
+          },
+        };
+      }
+
+      it('makes the copy of the running loop the running marker without seeking, queuing or re-arming', async () => {
+        await engage('a');
+        tick('A', 5);
+        const position = runtime.position('A');
+        const engine = watchEngine();
+
+        const copy = duplicate();
+
+        expect(idsOf('A')).toEqual(['a', copy.id, 'b', 'c', 'wide']);
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(stateOf('A').selectedId).toBe(copy.id);
+        expect(stateOf('A').runningBounds).toEqual({ start: 100, end: 120 });
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+        expect(runtime.position('A')).toBe(position);
+        expect(store.loopsSummary('A')().items.map((item) => item.activity)).toEqual([
+          'idle',
+          'running',
+          'idle',
+          'idle',
+          'idle',
+        ]);
+        engine.expectUntouched();
+      });
+
+      it('sends later edits to the copy, leaving the original as it was', async () => {
+        await engage('a');
+        const copy = duplicate();
+
+        loops.nudge('A', 'end', 10);
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
+        expect(listOf('A')[0].end).toEqual({ frame: 120, offsetFrames: 0 });
+        expect(listOf('A')[1].end).toEqual({ frame: 120, offsetFrames: 10 });
+      });
+
+      it('carries an end-of-pass edit waiting in the engine over to the copy', async () => {
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID_20 });
+        await engage('a');
+        loops.resize('A', 'double');
+        const engine = watchEngine();
+
+        const copy = duplicate();
+
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineQueue('A')).toEqual({ startFrame: 100, endFrame: 140, varispeedStart: 'stop' });
+        engine.expectUntouched();
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 140, varispeedStart: 'stop' });
+        expect(stateOf('A').runningBounds).toEqual({ start: 100, end: 140 });
+      });
+
+      it('lets a start audition still waiting for its start to be ready follow the copy', async () => {
+        await engage('wide');
+        loops.select('A', 'wide');
+        gates.A.holding = true;
+        loops.nudge('A', 'start', 10);
+        loops.audition('A', 'start', 'wide');
+        const engine = watchEngine();
+
+        const copy = duplicate();
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        engine.expectUntouched();
+
+        await settle();
+
+        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
+        expect(engine.seek).toHaveBeenCalledTimes(1);
+        expect(engine.seek).toHaveBeenCalledWith('A', 610);
+        expect(runtime.position('A')).toBe(610);
+        expect(stateOf('A').runningId).toBe(copy.id);
+      });
+
+      it('makes the copy of a marker queued in the engine the queued marker, which lands at the end of the lap', async () => {
+        await engage('a');
+        loops.toggle('A', 'b');
+        loops.select('A', 'b');
+        const engine = watchEngine();
+
+        const copy = duplicate();
+
+        expect(stateOf('A').runningId).toBe('a');
+        expect(stateOf('A').queuedId).toBe(copy.id);
+        expect(engineQueue('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
+        engine.expectUntouched();
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
+        expect(stateOf('A').selectedId).toBe(copy.id);
+      });
+
+      it('passes the wait of a marker queued for readiness to the copy', async () => {
+        gates.A.holding = true;
+        loops.select('A', 'b');
+        loops.nudge('A', 'start', 5);
+        loops.toggle('A', 'b');
+        const engine = watchEngine();
+
+        const copy = duplicate();
+
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').queuedId).toBe(copy.id);
+        engine.expectUntouched();
+
+        await settle();
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(stateOf('A').queuedId).toBeNull();
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
+        expect(runtime.position('A')).toBe(305);
+      });
+
+      describe('with the same tune on the other deck', () => {
+        beforeEach(async () => {
+          await loadOn('B', TUNE_X);
+          await settle();
+          await runtime.play('B');
+        });
+
+        it('gives the other deck the copy and leaves what it runs, queues and selects alone', async () => {
+          loops.toggle('B', 'a');
+          await flush();
+          loops.toggle('B', 'b');
+          loops.select('B', 'c');
+          loops.select('A', 'a');
+          const engine = watchEngine();
+
+          const copy = duplicate();
+
+          expect(idsOf('B')).toEqual(['a', copy.id, 'b', 'c', 'wide']);
+          expect(stateOf('B').runningId).toBe('a');
+          expect(stateOf('B').queuedId).toBe('b');
+          expect(stateOf('B').selectedId).toBe('c');
+          expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
+          expect(engineQueue('B')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
+          engine.expectUntouched();
+        });
+
+        it('leaves a start audition waiting on the other deck waiting', async () => {
+          loops.toggle('B', 'wide');
+          await flush();
+          gates.B.holding = true;
+          loops.select('B', 'wide');
+          loops.nudge('B', 'start', 10);
+          loops.audition('B', 'start', 'wide');
+          loops.select('A', 'a');
+
+          duplicate();
+          gates.B.holding = false;
+          await settle();
+
+          expect(stateOf('B').runningId).toBe('wide');
+          expect(runtime.position('B')).toBe(610);
+          expect(engineLoop('B')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
+        });
+      });
+    });
+
     it('leaves the tempo alone through a toggle, a landing and a stop', async () => {
       runtime.setTempo('A', 1.25);
       const multiplier = runtime.snapshot('A').tempo.multiplier;
@@ -3642,6 +3957,72 @@ describe('DeckLoops', () => {
         await runtime.seekToFrame('A', 560);
         loops.setOut('A');
         expect(markerOf('A', 'c')).toMatchObject({ ownSettings: false, settings: null });
+      });
+    });
+
+    describe('duplicating a marker whose settings are in play or queued', () => {
+      function watchEngine() {
+        const calls = [
+          vi.spyOn(runtime, 'seekToFrame'),
+          vi.spyOn(runtime, 'queueJump'),
+          vi.spyOn(runtime, 'setActiveLoop'),
+          vi.spyOn(runtime, 'setVoiceMuted'),
+        ];
+        return () => calls.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      }
+
+      it('puts the copy in play, running, with the same settings and leaves the sound and the engine alone', async () => {
+        await engage('A', 'a');
+        const { mainSettings } = stateOf('A');
+        const sounding = { panel: panelOn('A'), mutes: engineMutes('A') };
+        const expectEngineUntouched = watchEngine();
+
+        loops.duplicate('A');
+
+        const copy = stateOf('A').markers[1];
+        expect(copy.settings).toBe(markerOf('A', 'a').settings);
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(stateOf('A').settingsInPlayId).toBe(copy.id);
+        expect(stateOf('A').mainSettings).toBe(mainSettings);
+        expect(panelOn('A')).toBe(sounding.panel);
+        expect(engineMutes('A')).toEqual(sounding.mutes);
+        expect(store.settingsInPlay('A')()).toEqual({ markerId: copy.id, name: 'Loop 1 copy' });
+        expectEngineUntouched();
+      });
+
+      it('puts the copy of a cue in play, and saves later edits to the copy alone', async () => {
+        await engage('A', 'e');
+        loops.select('A', 'e');
+
+        loops.duplicate('A');
+        tweak('A', 33);
+
+        const copy = stateOf('A').markers[5];
+        expect(stateOf('A').runningId).toBeNull();
+        expect(stateOf('A').settingsInPlayId).toBe(copy.id);
+        expect(store.settingsInPlay('A')()).toEqual({ markerId: copy.id, name: 'Cue 2 copy' });
+        expect(copy.settings?.panel.cutoff).toBe(33);
+        expect(markerOf('A', 'e').settings?.panel.cutoff).toBe(100);
+      });
+
+      it('keeps an independent marker queued in the engine as it was, the copy carrying the same settings', async () => {
+        await engage('A', 'd');
+        loops.toggle('A', 'a');
+        loops.select('A', 'a');
+        const queue = vi.spyOn(runtime, 'queueJump');
+
+        loops.duplicate('A');
+
+        const copy = stateOf('A').markers[1];
+        expect(stateOf('A').queuedId).toBe(copy.id);
+        expect(queue).not.toHaveBeenCalled();
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(stateOf('A').runningId).toBe(copy.id);
+        expect(stateOf('A').settingsInPlayId).toBe(copy.id);
+        expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+        expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
       });
     });
 

@@ -18,7 +18,7 @@ const meta: Meta<LoopsCuesPlateComponent & ProgressArgs> = {
     docs: {
       description: {
         component:
-          "One deck's loops/cues faceplate: an engraved caption with the Add and Stop keys, the " +
+          "One deck's loops/cues faceplate: an engraved caption with the Add, Duplicate and Stop keys, the " +
           'fixed selected-loop row (In and Out keys, a Length row and a Move row), and a two-column tile ' +
           'grid that takes the remaining height and ' +
           'scrolls. Purely presentational — it holds no state of its own; the caller owns every ' +
@@ -114,6 +114,7 @@ function moveModel(onGrid: boolean): LoopSelectedRowModel['move'] {
 
 function emptySelected(onGrid = true): LoopSelectedRowModel {
   return {
+    id: null,
     empty: true,
     name: '',
     kindLabel: '',
@@ -157,6 +158,7 @@ function selectedFor(tile: LoopTileModel, onGrid = true): LoopSelectedRowModel {
   const isCue = tile.kind === 'cue';
   return {
     ...emptySelected(onGrid),
+    id: tile.id,
     empty: false,
     name: tile.name,
     kindLabel: isCue ? 'CUE' : 'LOOP',
@@ -184,18 +186,19 @@ function selectedFor(tile: LoopTileModel, onGrid = true): LoopSelectedRowModel {
 
 function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
   const kind = overrides.kind ?? 'loop';
+  const name = `${kind === 'cue' ? 'Cue' : 'Loop'} ${number}`;
   return {
     id: `item-${number}`,
-    name: `Item ${number}`,
+    name,
     kind,
     lengthText: kind === 'cue' ? 'CUE' : `${number * 4} BEATS`,
     activity: 'idle',
     selected: false,
     ready: true,
-    triggerAccessibleName: `Trigger Item ${number}`,
-    selectAccessibleName: `Select Item ${number}, ${kind}`,
+    triggerAccessibleName: `Trigger ${name}`,
+    selectAccessibleName: `Select ${name}, ${kind}`,
     ownSettings: false,
-    playNowAccessibleName: `Play now Item ${number}`,
+    playNowAccessibleName: `Play now ${name}`,
     ...overrides,
   };
 }
@@ -209,7 +212,9 @@ function plateModel(
     accessibleName: 'Loops/Cues deck A',
     addAccessibleName: 'Add marker deck A',
     stopAccessibleName: 'Stop loop deck A',
+    duplicateAccessibleName: 'Duplicate deck A',
     addDisabled: false,
+    duplicateDisabled: selected === undefined,
     stopDisabled: false,
     gridAccessibleName: 'Loops and cues, deck A',
     emptyText: null,
@@ -251,7 +256,7 @@ export const FewMarkers: Story = {
   },
 };
 
-/** A mix: Items 2 and 4 keep their own settings (lit dot), the selected Item 2's GBL is unlit. */
+/** A mix: Loops 2 and 4 keep their own settings (lit dot), the selected Loop 2's GBL is unlit. */
 export const MixedSettings: Story = {
   args: {
     runningProgressPercent: 40,
@@ -341,7 +346,7 @@ function jumpTiles(states: Record<number, Partial<LoopTileModel>>): LoopTileMode
   );
 }
 
-/** A queued jump, step 1: Item 2 runs, Item 4 is queued, and the knob has moved on to Item 5. */
+/** A queued jump, step 1: Loop 2 runs, Loop 4 is queued, and the knob has moved on to Loop 5. */
 export const QueuedJumpKnobMovedOn: Story = {
   args: {
     runningProgressPercent: 53,
@@ -351,7 +356,7 @@ export const QueuedJumpKnobMovedOn: Story = {
   },
 };
 
-/** A queued jump, step 2: the lap ended, Item 4 runs, and the selection stays on Item 5. */
+/** A queued jump, step 2: the lap ended, Loop 4 runs, and the selection stays on Loop 5. */
 export const QueuedJumpLapEnded: Story = {
   args: {
     runningProgressPercent: 12,
@@ -359,7 +364,7 @@ export const QueuedJumpLapEnded: Story = {
   },
 };
 
-/** A queued jump, step 3: the knob was left alone, so the selection follows to Item 4. */
+/** A queued jump, step 3: the knob was left alone, so the selection follows to Loop 4. */
 export const QueuedJumpSelectionFollows: Story = {
   args: {
     runningProgressPercent: 12,

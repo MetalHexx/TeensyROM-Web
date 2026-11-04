@@ -57,18 +57,19 @@ type Story = StoryObj<LoopTileGridComponent & ProgressArgs>;
 
 function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
   const kind = overrides.kind ?? 'loop';
+  const name = `${kind === 'cue' ? 'Cue' : 'Loop'} ${number}`;
   return {
     id: `item-${number}`,
-    name: `Item ${number}`,
+    name,
     kind,
     lengthText: kind === 'cue' ? 'CUE' : `${(number * 1.3 + 2).toFixed(1)}s`,
     activity: 'idle',
     selected: false,
     ready: true,
-    triggerAccessibleName: `Trigger Item ${number}`,
-    selectAccessibleName: `Select Item ${number}, ${kind}`,
+    triggerAccessibleName: `Trigger ${name}`,
+    selectAccessibleName: `Select ${name}, ${kind}`,
     ownSettings: false,
-    playNowAccessibleName: `Play now Item ${number}`,
+    playNowAccessibleName: `Play now ${name}`,
     ...overrides,
   };
 }

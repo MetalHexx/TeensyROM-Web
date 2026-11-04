@@ -30,8 +30,9 @@ function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = 
 
 function selectedRow(overrides: Partial<LoopSelectedRowModel> = {}): LoopSelectedRowModel {
   return {
+    id: 'item-1',
     empty: false,
-    name: 'Item 1',
+    name: 'Loop 1',
     kindLabel: 'LOOP',
     spanText: '02:39.4–02:47.5',
     activity: 'idle',
@@ -89,16 +90,16 @@ function emptyRow(): LoopSelectedRowModel {
 function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileModel {
   return {
     id: `item-${number}`,
-    name: `Item ${number}`,
+    name: `Loop ${number}`,
     kind: 'loop',
     lengthText: '7.8s',
     activity: 'idle',
     selected: false,
     ready: true,
-    triggerAccessibleName: `Trigger Item ${number}`,
-    selectAccessibleName: `Select Item ${number}, loop`,
+    triggerAccessibleName: `Trigger Loop ${number}`,
+    selectAccessibleName: `Select Loop ${number}, loop`,
     ownSettings: false,
-    playNowAccessibleName: `Play now Item ${number}`,
+    playNowAccessibleName: `Play now Loop ${number}`,
     ...overrides,
   };
 }
@@ -108,7 +109,9 @@ function model(overrides: Partial<LoopsCuesPlateModel> = {}): LoopsCuesPlateMode
     accessibleName: 'Loops/Cues deck A',
     addAccessibleName: 'Add marker deck A',
     stopAccessibleName: 'Stop loop deck A',
+    duplicateAccessibleName: 'Duplicate deck A',
     addDisabled: false,
+    duplicateDisabled: false,
     stopDisabled: false,
     gridAccessibleName: 'Loops and cues, deck A',
     emptyText: null,
@@ -133,6 +136,7 @@ describe('LoopsCuesPlateComponent', () => {
     const plain = (name: string) => () => emitted.push(name);
     const valued = (name: string) => (value: unknown) => emitted.push([name, value]);
     component.addMarker.subscribe(plain('add'));
+    component.duplicateMarker.subscribe(plain('duplicate'));
     component.stopLoop.subscribe(plain('stop'));
     component.toggleSelected.subscribe(plain('toggle'));
     component.playNowSelected.subscribe(plain('playNowSelected'));
@@ -186,6 +190,14 @@ describe('LoopsCuesPlateComponent', () => {
       byName('Stop loop deck A').click();
 
       expect(emitted).toEqual(['add', 'stop']);
+    });
+
+    it('emits duplicateMarker from the Duplicate key, found by its control id', () => {
+      expect(control('loop-duplicate')?.contains(byName('Duplicate deck A'))).toBe(true);
+
+      byName('Duplicate deck A').click();
+
+      expect(emitted).toEqual(['duplicate']);
     });
 
     it('re-emits each selected-row key as its own output', () => {
@@ -246,7 +258,7 @@ describe('LoopsCuesPlateComponent', () => {
       field.dispatchEvent(new Event('input', { bubbles: true }));
       field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-      expect(emitted).toEqual([['rename', 'Chorus']]);
+      expect(emitted).toEqual([['rename', { id: 'item-1', name: 'Chorus' }]]);
     });
 
     it('re-emits an edge move tagged with the boundary and direction', () => {
@@ -268,9 +280,9 @@ describe('LoopsCuesPlateComponent', () => {
     });
 
     it('emits the tile id for a tile trigger, play now and select', () => {
-      byName('Trigger Item 2').click();
-      byName('Play now Item 2').click();
-      byName('Select Item 2, loop').click();
+      byName('Trigger Loop 2').click();
+      byName('Play now Loop 2').click();
+      byName('Select Loop 2, loop').click();
 
       expect(emitted).toEqual([
         ['triggerTile', 'item-2'],
@@ -286,6 +298,12 @@ describe('LoopsCuesPlateComponent', () => {
 
       expect(byName('Add marker deck A').disabled).toBe(true);
       expect(byName('Stop loop deck A').disabled).toBe(true);
+    });
+
+    it('disables Duplicate from the model', () => {
+      setModel(model({ duplicateDisabled: true }));
+
+      expect(byName('Duplicate deck A').disabled).toBe(true);
     });
 
     it('shows the empty text, no tiles and a blank selected row when there is no tune', () => {
@@ -316,7 +334,7 @@ describe('LoopsCuesPlateComponent', () => {
       const names = Array.from<HTMLElement>(
         fixture.nativeElement.querySelectorAll('lib-loop-tile .name')
       ).map((el) => el.textContent?.trim());
-      expect(names).toEqual(['Item 1', 'Item 2', 'Item 3']);
+      expect(names).toEqual(['Loop 1', 'Loop 2', 'Loop 3']);
     });
   });
 

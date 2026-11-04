@@ -40,5 +40,5 @@ export const Main: Story = {
 
 /** A marker's own settings are in play: lit cyan, named after the marker. */
 export const Marker: Story = {
-  args: { model: { text: 'Item 2', own: true, accessibleName: 'Settings in play deck A: Item 2' } },
+  args: { model: { text: 'Loop 2', own: true, accessibleName: 'Settings in play deck A: Loop 2' } },
 };

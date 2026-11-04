@@ -144,6 +144,8 @@ export interface DeckState {
   faderSpeed: number;
   /** True while either nudge is held. The speed display tints magenta while this is set. */
   nudging: boolean;
+  /** Which nudge pads are held, so the pads can light for a hold made on a controller. */
+  nudgeHeld: { readonly up: boolean; readonly down: boolean };
   /** Microseconds per play call for the loaded tune, or null while nothing is loaded. Converts
    *  the deck's playhead (`DjState.positions`, in play calls) to time. */
   playCallIntervalUs: number | null;
@@ -193,7 +195,8 @@ export interface DeckLoopBoundary {
 /** One saved position in the tune: a cue when it has no end, a loop when it has one. */
 export interface DeckLoopMarker {
   readonly id: string;
-  /** What the performer called it; null shows as 'Item N' by list position. */
+  /** What the performer called it; null shows as 'Loop N' or 'Cue N' by its place among the
+   *  markers of its kind. */
   readonly name: string | null;
   readonly start: DeckLoopBoundary;
   readonly end: DeckLoopBoundary | null;
@@ -212,7 +215,7 @@ export interface DeckLoopMarker {
 
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
 export interface DeckLoopsState {
-  /** List order is the 'Item N' order. */
+  /** List order is the 'Loop N' / 'Cue N' counting order. */
   markers: readonly DeckLoopMarker[];
   selectedId: string | null;
   /** A marker loop the engine is running. */
@@ -316,6 +319,7 @@ const initialDeckState: DeckState = {
   speed: 1,
   faderSpeed: 1,
   nudging: false,
+  nudgeHeld: { up: false, down: false },
   playCallIntervalUs: null,
   voices: [
     { muted: false, held: false },
