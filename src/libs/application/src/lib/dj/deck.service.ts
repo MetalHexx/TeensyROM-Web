@@ -20,6 +20,7 @@ import { SidWaveFeed } from './sid-wave-feed';
 import { RowUnavailableError, TuneLoader, type LoadPhase } from './tune-loader';
 import {
   DjStore,
+  MAX_LIVE_LOOP_BEATS,
   type DeckDetectedKey,
   type DeckHolding,
   type DeckStatus,
@@ -669,23 +670,25 @@ export class DeckService {
     this.persistence.scheduleSave();
   }
 
-  /** Sets a deck's live loop size in beats, and saves it with the MIDI settings. A running live
-   *  loop is resized to it. */
+  /** Sets a deck's live loop size in beats (at most `MAX_LIVE_LOOP_BEATS`), and saves it with the
+   *  MIDI settings. A running live loop is resized to it. */
   setLiveLoopBeats(slot: Slot, beats: number): void {
-    this.store.setDeckSettings({ slot, liveLoopBeats: beats });
+    this.store.setDeckSettings({ slot, liveLoopBeats: Math.min(beats, MAX_LIVE_LOOP_BEATS) });
     this.persistence.scheduleSave();
     this.liveLoop.resize(slot);
   }
 
   /** Seeds each deck's slip and live loop size from the saved MIDI settings; a deck with no entry,
-   *  or an unusable size, keeps its defaults. Writes the store only, so it never queues a save. */
+   *  or a size outside `(0, MAX_LIVE_LOOP_BEATS]`, keeps its defaults. Writes the store only, so it never queues a save. */
   private async hydrateDeckSettings(): Promise<void> {
     const settings = await this.persistence.load();
     for (const record of settings.deckSettings) {
       this.store.setDeckSettings({
         slot: record.slot,
         slip: record.slip,
-        ...(Number.isFinite(record.liveLoopBeats) && record.liveLoopBeats > 0
+        ...(Number.isFinite(record.liveLoopBeats) &&
+        record.liveLoopBeats > 0 &&
+        record.liveLoopBeats <= MAX_LIVE_LOOP_BEATS
           ? { liveLoopBeats: record.liveLoopBeats }
           : {}),
       });

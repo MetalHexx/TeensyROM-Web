@@ -326,6 +326,9 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
 /** A deck's live loop size, in beats, until the host says otherwise. */
 export const DEFAULT_LIVE_LOOP_BEATS = 4;
 
+/** The largest live loop size, in beats, the server accepts in the saved MIDI settings. */
+export const MAX_LIVE_LOOP_BEATS = 128;
+
 const initialDeckState: DeckState = {
   loaded: null,
   status: 'empty',

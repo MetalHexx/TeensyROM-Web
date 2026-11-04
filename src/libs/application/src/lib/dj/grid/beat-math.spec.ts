@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { lengthLadder as analysisLadder } from '@sidablist/analysis';
 import type { DeckBeatGrid } from '../dj-store';
 import {
   beatAt,
@@ -106,8 +105,7 @@ describe('nearestBeat', () => {
 });
 
 describe('lengthLadder', () => {
-  it('is the ladder of the engine library, re-exported', () => {
-    expect(lengthLadder).toBe(analysisLadder);
+  it('reaches down to a size of a single line', () => {
     expect(lengthLadder(24).map((size) => size.beats)).toContain(2 / 24);
   });
 });

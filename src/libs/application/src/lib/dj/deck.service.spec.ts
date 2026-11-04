@@ -3915,12 +3915,26 @@ describe('DeckService', () => {
       expect(store.deck('B')()).toMatchObject({ slip: true, liveLoopBeats: 2 });
     });
 
-    it('keeps the default size when the saved size is unusable', async () => {
-      savedWith([{ slot: 'A', slip: true, liveLoopBeats: 0 }]);
+    it.each([0, 129])('keeps the default size when the saved size is %s', async (liveLoopBeats) => {
+      savedWith([{ slot: 'A', slip: true, liveLoopBeats }]);
 
       await service.hydrate();
 
       expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+    });
+
+    it('keeps a saved size at the server bound', async () => {
+      savedWith([{ slot: 'A', slip: false, liveLoopBeats: 128 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
+    });
+
+    it('clamps a size above the server bound when set', () => {
+      service.setLiveLoopBeats('A', 129);
+
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
     });
 
     it('setSlip and setLiveLoopBeats write one deck and ask for a save each', () => {
