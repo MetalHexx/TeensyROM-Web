@@ -91,8 +91,8 @@ export interface DeckTransportModel {
  * any width.
  *
  * The playhead readouts — the bar's position, the elapsed time, the frame and the strip's value
- * text — are not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and
- * `setLiveFrame`, straight on the DOM, outside change detection.
+ * text — are not inputs: a painter sets them through `setLivePosition`, `setLiveReturnPosition`,
+ * `setLiveElapsed` and `setLiveFrame`, straight on the DOM, outside change detection.
  *
  * @example
  * ```html
@@ -171,6 +171,12 @@ export class DeckTransportComponent implements LivePlayheadIndicator {
    *  rendered. */
   setLivePosition(percent: number): void {
     this.strip().setLivePosition(percent);
+  }
+
+  /** Sets the slip's second playhead on the strip, 0–100, or hides it with null. Written straight
+   *  to the DOM like `setLivePosition`. */
+  setLiveReturnPosition(percent: number | null): void {
+    this.strip().setLiveReturnPosition(percent);
   }
 
   /** Sets the elapsed time on the display, e.g. '01:23.4', and the strip's value text with it —

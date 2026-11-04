@@ -13,8 +13,15 @@ export interface LivePositionIndicator {
   setLivePosition(percent: number): void;
 }
 
-/** A playhead readout a painter sets directly: the position, the elapsed time and the frame. */
-export interface LivePlayheadIndicator extends LivePositionIndicator {
+/** A second playhead a painter sets directly. */
+export interface LiveReturnPositionIndicator {
+  /** The frame the deck returns to, as a percent of the strip, or null to hide it. */
+  setLiveReturnPosition(percent: number | null): void;
+}
+
+/** A playhead readout a painter sets directly: the position, the slip's second playhead, the
+ *  elapsed time and the frame. */
+export interface LivePlayheadIndicator extends LivePositionIndicator, LiveReturnPositionIndicator {
   setLiveElapsed(text: string): void;
   setLiveFrame(label: string): void;
 }

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { TuneReference } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import {
   DjStore,
   EMPTY_DECK_LOOPS,
@@ -29,6 +30,7 @@ const TUNE: TuneReference = {
 interface RecordingTargets {
   readonly targets: DeckPlayheadTargets;
   readonly setLivePosition: ReturnType<typeof vi.fn>;
+  readonly setLiveReturnPosition: ReturnType<typeof vi.fn>;
   readonly setLiveElapsed: ReturnType<typeof vi.fn>;
   readonly setLiveFrame: ReturnType<typeof vi.fn>;
   readonly setLiveProgress: ReturnType<typeof vi.fn>;
@@ -37,17 +39,19 @@ interface RecordingTargets {
 
 function recordingTargets(): RecordingTargets {
   const setLivePosition = vi.fn();
+  const setLiveReturnPosition = vi.fn();
   const setLiveElapsed = vi.fn();
   const setLiveFrame = vi.fn();
   const setLiveProgress = vi.fn();
   const setLiveBpm = vi.fn();
   return {
     targets: {
-      transport: { setLivePosition, setLiveElapsed, setLiveFrame },
+      transport: { setLivePosition, setLiveReturnPosition, setLiveElapsed, setLiveFrame },
       loops: { setLiveProgress },
       speed: { setLiveBpm },
     },
     setLivePosition,
+    setLiveReturnPosition,
     setLiveElapsed,
     setLiveFrame,
     setLiveProgress,
@@ -58,6 +62,7 @@ function recordingTargets(): RecordingTargets {
 function allCalls(recording: RecordingTargets): ReturnType<typeof vi.fn>[] {
   return [
     recording.setLivePosition,
+    recording.setLiveReturnPosition,
     recording.setLiveElapsed,
     recording.setLiveFrame,
     recording.setLiveProgress,
@@ -92,6 +97,7 @@ describe('PlayheadPainter', () => {
   let store: InstanceType<typeof DjStore>;
   let positions: Record<Slot, number>;
   let position: ReturnType<typeof vi.fn>;
+  let returnFrames: Record<Slot, number | null>;
   let frameCallbacks: FrameRequestCallback[];
 
   function runFrames(): void {
@@ -135,6 +141,7 @@ describe('PlayheadPainter', () => {
 
   beforeEach(() => {
     positions = { A: 0, B: 0 };
+    returnFrames = { A: null, B: null };
     position = vi.fn((slot: Slot) => positions[slot]);
     frameCallbacks = [];
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number =>
@@ -142,7 +149,10 @@ describe('PlayheadPainter', () => {
     );
 
     TestBed.configureTestingModule({
-      providers: [{ provide: DeckRuntime, useValue: { position } }],
+      providers: [
+        { provide: DeckRuntime, useValue: { position } },
+        { provide: DeckSlip, useValue: { returnFrame: (slot: Slot) => returnFrames[slot] } },
+      ],
     });
     painter = TestBed.inject(PlayheadPainter);
     store = TestBed.inject(DjStore);
@@ -260,6 +270,88 @@ describe('PlayheadPainter', () => {
 
     expect(a.setLiveFrame).toHaveBeenCalledExactlyOnceWith('frame 10');
     expect(totalCalls(b)).toBe(0);
+  });
+
+  describe('the second playhead', () => {
+    it('hides on attach and while there is no slip departure', () => {
+      tuneAt(250);
+      const recording = recordingTargets();
+
+      painter.attach('A', recording.targets);
+
+      expect(recording.setLiveReturnPosition).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    it('shows the return frame as a percent of the tune, and moves with it', () => {
+      tuneAt(250);
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+
+      returnFrames.A = 600;
+      paintNextFrame();
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(60);
+
+      returnFrames.A = 640;
+      paintNextFrame();
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(64);
+    });
+
+    it('writes only when the value changed', () => {
+      tuneAt(250);
+      const recording = recordingTargets();
+      returnFrames.A = 600;
+      painter.attach('A', recording.targets);
+      recording.setLiveReturnPosition.mockClear();
+
+      positions.A = 260;
+      paintNextFrame();
+      paintNextFrame();
+
+      expect(recording.setLiveReturnPosition).not.toHaveBeenCalled();
+    });
+
+    it('hides when the departure ends', () => {
+      tuneAt(250);
+      returnFrames.A = 600;
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+
+      returnFrames.A = null;
+      paintNextFrame();
+
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(null);
+    });
+
+    it('hides when the return frame meets the playhead, and shows again once they part', () => {
+      tuneAt(250);
+      returnFrames.A = 400;
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+
+      positions.A = 400;
+      paintNextFrame();
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(null);
+
+      positions.A = 401;
+      paintNextFrame();
+      expect(recording.setLiveReturnPosition).toHaveBeenLastCalledWith(40);
+    });
+
+    it('paints on the still paint of a paused deck', () => {
+      tuneAt(100);
+      setStatus('paused');
+      const recording = recordingTargets();
+      painter.attach('A', recording.targets);
+      runFrames();
+      recording.setLiveReturnPosition.mockClear();
+
+      returnFrames.A = 500;
+      store.samplePosition({ slot: 'A', positionFrames: 100 });
+      TestBed.flushEffects();
+      runFrames();
+
+      expect(recording.setLiveReturnPosition).toHaveBeenCalledExactlyOnceWith(50);
+    });
   });
 
   describe('the running marker loop', () => {

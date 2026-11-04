@@ -164,6 +164,7 @@ input[type='range'] {
   top: -2px;
   right: 100%;
   bottom: -2px;
+  z-index: 1;
   width: 100%;
   translate: var(--playhead-position, 0%);
 
@@ -177,6 +178,34 @@ input[type='range'] {
     background: var(--synth-pointer);
     box-shadow: 0 0 6px rgba(var(--glassy-color), 0.8);
   }
+}
+
+// The slip's second playhead: the playhead's family, fainter and dotted, with no glow, under it.
+.return-head {
+  position: absolute;
+  top: -2px;
+  right: 100%;
+  bottom: -2px;
+  width: 100%;
+  translate: var(--return-position, 0%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -1px;
+    bottom: 0;
+    border-left: 2px dotted var(--synth-pointer);
+    opacity: 0.55;
+  }
+
+  &[data-hidden] {
+    display: none;
+  }
+}
+
+.strip[data-state='analyzing'] .return-head {
+  display: none;
 }
 
 .playhead[data-held]::before {

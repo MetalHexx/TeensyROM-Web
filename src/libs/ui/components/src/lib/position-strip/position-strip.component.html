@@ -34,5 +34,6 @@
     } @if (barState().kind !== 'analyzing') {
     <span class="playhead" [attr.data-held]="held() ? '' : null"></span>
     }
+    <span #returnHead class="return-head" data-hidden aria-hidden="true"></span>
   </div>
 </div>

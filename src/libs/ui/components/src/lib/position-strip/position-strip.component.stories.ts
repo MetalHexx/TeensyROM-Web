@@ -32,6 +32,7 @@ class LiveDemoComponent {
   readonly marks = input<readonly PositionMark[] | null>(null);
   readonly held = input(false);
   readonly positionPercent = input(0);
+  readonly returnPercent = input<number | null>(null);
   readonly valueText = input<string | null>(null);
   readonly scrubInput = output<number>();
   readonly scrubCommit = output<number>();
@@ -42,6 +43,7 @@ class LiveDemoComponent {
     afterRenderEffect(() => {
       const strip = this.strip();
       strip.setLivePosition(this.positionPercent());
+      strip.setLiveReturnPosition(this.returnPercent());
       const valueText = this.valueText();
       if (valueText !== null) {
         strip.setLiveValueText(valueText);
@@ -53,6 +55,7 @@ class LiveDemoComponent {
 /** What a painter sets live, as story args. */
 interface LiveArgs {
   positionPercent: number;
+  returnPercent: number | null;
   valueText: string | null;
 }
 
@@ -84,6 +87,10 @@ const meta: Meta<PositionStripComponent & LiveArgs> = {
       description:
         '0–100: the live playhead, or the caller’s drag pin — set through `setLivePosition`.',
     },
+    returnPercent: {
+      description:
+        'The slip’s second playhead, 0–100, or null to hide it — set through `setLiveReturnPosition`.',
+    },
     accessibleName: { description: "The range's accessible name, e.g. 'Position deck A'." },
     held: { description: 'A finger is on this deck’s record: the playhead turns warning amber.' },
     valueText: {
@@ -106,6 +113,7 @@ type Story = StoryObj<PositionStripComponent & LiveArgs>;
 const base = {
   accessibleName: 'Position deck A',
   valueText: '01:23.4 of 03:12',
+  returnPercent: null as number | null,
   marks: null as readonly PositionMark[] | null,
   held: false,
 };
@@ -117,6 +125,7 @@ const wrapped: Story['render'] = (args) => ({
       <lib-position-strip-live-demo
         [barState]="barState"
         [positionPercent]="positionPercent"
+        [returnPercent]="returnPercent"
         [accessibleName]="accessibleName"
         [valueText]="valueText"
         [marks]="marks"
@@ -147,6 +156,18 @@ export const Unknown: Story = {
 /** Nothing looked for yet: dim and disabled — clicking or pressing keys does nothing. */
 export const Analyzing: Story = {
   args: { ...base, barState: { kind: 'analyzing' }, positionPercent: 0, valueText: null },
+  render: wrapped,
+};
+
+/** A slip departure: the playhead at 40% and the fainter dotted second playhead at 64%, where the
+ *  tune would be. */
+export const SlipReturn: Story = {
+  args: {
+    ...base,
+    barState: { kind: 'loop', introPercent: 25 },
+    positionPercent: 40,
+    returnPercent: 64,
+  },
   render: wrapped,
 };
 
