@@ -1,9 +1,43 @@
-import type { LadderSize } from '@sidablist/analysis';
+import { lapPhaseAt, type LadderSize } from '@sidablist/analysis';
+import { reduceLapPhase } from '@sidablist/core';
 import type { DeckBeatGrid } from '../dj-store';
 
 // The ladder of loop lengths lives with the engine's grid arithmetic: one ladder, and the existing
 // importers keep their path.
 export { lengthLadder, type LadderSize } from '@sidablist/analysis';
+
+/**
+ * A loop's lap phase as the app hands it to the engine (core's `ActiveLoop.lapPhase`): reduced to
+ * its fractional part, and undefined for 0 — the phase a loop given none laps at — so a loop on a
+ * whole-frame line reaches the engine exactly as it always has. Undefined for null too.
+ */
+export function lapPhaseOrNone(phase: number | null | undefined): number | undefined {
+  if (phase === null || phase === undefined) {
+    return undefined;
+  }
+  const reduced = reduceLapPhase(phase);
+  return reduced === 0 ? undefined : reduced;
+}
+
+/**
+ * The lap phase of a loop `lengthFrames` long that starts at `startFrame`, from the deck's grid:
+ * where the line it starts on lies before rounding — a line of its own length below a beat, a beat
+ * line at a beat or more, the line a live loop's push picks — so a length that is not a whole number
+ * of frames laps in the alternating lengths whose ends land on that grid's lines. As
+ * `lapPhaseOrNone` gives it; undefined with no grid, and for a start on no line, which laps from a
+ * whole frame.
+ */
+export function loopLapPhase(
+  grid: DeckBeatGrid | null,
+  startFrame: number,
+  lengthFrames: number
+): number | undefined {
+  if (grid === null) {
+    return undefined;
+  }
+  const period = lengthFrames >= grid.beatFrames ? grid.beatFrames : lengthFrames;
+  return lapPhaseOrNone(lapPhaseAt(grid, period, startFrame));
+}
 
 /** True when `frame` falls inside the grid's span: from its start, up to but not including its end. */
 export function inGridSpan(grid: DeckBeatGrid, frame: number): boolean {
@@ -72,7 +106,7 @@ const FRACTION_LABELS: ReadonlyMap<number, string> = new Map([
   [8, '⅛ BEAT'],
 ]);
 
-/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/12 BEAT`. */
+/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/16 BEAT`. */
 export function beatsLabel(beats: number): string {
   if (Number.isInteger(beats)) {
     return `${beats} ${beats === 1 ? 'BEAT' : 'BEATS'}`;

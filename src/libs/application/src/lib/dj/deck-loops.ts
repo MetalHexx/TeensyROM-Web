@@ -1,6 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
-import type { JumpSettings, VarispeedLoopStart } from '@sidablist/core';
+import {
+  isUsableLoopLength,
+  MIN_FRACTIONAL_LOOP_FRAMES,
+  type JumpSettings,
+  type VarispeedLoopStart,
+} from '@sidablist/core';
 import type { LoopMarker, LoopPositionsStore, TuneIdentity } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
 import { DeckSlip } from './deck-slip';
@@ -30,6 +35,7 @@ import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-setting
 import {
   inGridSpan,
   lengthLadder,
+  loopLapPhase,
   MOVE_STEPS,
   nearestBeat,
   nextBeat,
@@ -72,12 +78,20 @@ export interface DeckLoopsHolding {
   readonly positions: LoopPositionsStore;
 }
 
-/** A loop's bounds in the engine's terms: the resolved start and end frames, and what backing a
- *  scrubbed record past the start does. */
+/** A loop's bounds in the engine's terms: the resolved start and end frames — the end need not be a
+ *  whole frame — what backing a scrubbed record past the start does, and the lap phase a length
+ *  that is not a whole number of frames alternates its laps from (absent: 0). */
 interface LoopBounds {
   readonly startFrame: number;
   readonly endFrame: number;
   readonly varispeedStart: VarispeedLoopStart;
+  readonly lapPhase?: number;
+}
+
+/** `{ lapPhase }` to spread into a loop, or nothing when it is undefined: a loop at phase 0 reaches
+ *  the engine exactly as it always has. */
+function lapPhaseField(lapPhase: number | undefined): { lapPhase?: number } {
+  return lapPhase === undefined ? {} : { lapPhase };
 }
 
 /** Where a queued marker waits: in the engine, for the end of the running loop's lap, or here, for
@@ -130,29 +144,46 @@ function ownSettingsOf(marker: DeckLoopMarker): DeckMixerSettings | null {
   return marker.ownSettings ? marker.settings : null;
 }
 
-/** What the engine runs for a marker: its bounds and WRAP mode as a loop, or null for a cue. */
-function loopBoundsOf(marker: DeckLoopMarker): LoopBounds | null {
-  return marker.end !== null && markerKind(marker) === 'loop'
-    ? {
-        startFrame: resolvedFrame(marker.start),
-        endFrame: resolvedFrame(marker.end),
-        varispeedStart: marker.wraps ? 'wrap' : 'stop',
-      }
-    : null;
+/** What the engine runs for a marker: its bounds and WRAP mode as a loop, with the lap phase of its
+ *  start on the deck's grid (`loopLapPhase`), or null for a cue — which a marker is, by
+ *  `markerKind`, also when its end is at or before its start or its length is one the engine
+ *  refuses to lap. */
+function loopBoundsOf(marker: DeckLoopMarker, grid: DeckBeatGrid | null): LoopBounds | null {
+  if (marker.end === null || markerKind(marker) !== 'loop') {
+    return null;
+  }
+  const startFrame = resolvedFrame(marker.start);
+  const endFrame = resolvedFrame(marker.end);
+  return {
+    startFrame,
+    endFrame,
+    varispeedStart: marker.wraps ? 'wrap' : 'stop',
+    ...lapPhaseField(loopLapPhase(grid, startFrame, endFrame - startFrame)),
+  };
 }
 
-/** The jump the engine queues for a marker: a loop, with its WRAP mode, when it has an end, else a
- *  cue. */
-function jumpOf(marker: DeckLoopMarker): {
+/**
+ * The jump the engine queues for a marker: a loop, with its WRAP mode and lap phase, when it is one,
+ * else a cue. The engine reports a loop it lands with this lap phase, its grid phase, so the
+ * comparisons here with the marker's bounds hold and nothing sets it again; it laps the loop on
+ * from the lap the loop it takes over from would have begun, so hand-offs never drift, and only
+ * `getLapPhase` shows that phase.
+ */
+function jumpOf(
+  marker: DeckLoopMarker,
+  grid: DeckBeatGrid | null
+): {
   startFrame: number;
   endFrame: number | null;
   varispeedStart?: VarispeedLoopStart;
+  lapPhase?: number;
 } {
-  const bounds = loopBoundsOf(marker);
+  const bounds = loopBoundsOf(marker, grid);
   return {
     startFrame: resolvedFrame(marker.start),
     endFrame: bounds?.endFrame ?? null,
     ...(bounds === null ? {} : { varispeedStart: bounds.varispeedStart }),
+    ...lapPhaseField(bounds?.lapPhase),
   };
 }
 
@@ -439,6 +470,8 @@ export class DeckLoops {
     if (runningId === id && engaged !== null) {
       this.pendingStart[slot] = null;
       this.slip.begin(slot, 'list-loop');
+      // Accepted transient: the lap restarted keeps the length of the lap it cut short, so one lap
+      // of an alternating length may be a frame off; the laps after it add up exactly.
       this.jumpInto(slot, marker, engaged.startFrame);
     } else {
       this.engageOrWait(slot, marker);
@@ -491,7 +524,7 @@ export class DeckLoops {
     } else if (boundary === 'start') {
       this.engageOrWait(slot, marker);
     } else {
-      const bounds = loopBoundsOf(marker);
+      const bounds = this.boundsOf(slot, marker);
       if (bounds !== null) {
         this.arm(slot, marker, false);
         this.jumpInto(
@@ -653,8 +686,9 @@ export class DeckLoops {
   /**
    * Halves or doubles the selected loop, keeping its start. From a length off the ladder, halving
    * takes the largest size below it and doubling the smallest above, so the length lands on the
-   * ladder in that direction. Doubling stops at 128 beats and at the tune's end; a cue gains a
-   * 4-beat end either way. A no-op, logged, off the grid.
+   * ladder in that direction. Doubling stops at 128 beats and at the tune's end, halving at the
+   * shortest size (2 frames or more, whole or not); a cue gains a 4-beat end either way. A size
+   * that is not a whole number of frames gives an end between two. A no-op, logged, off the grid.
    */
   resize(slot: Slot, direction: 'halve' | 'double'): void {
     const marker = this.selectedMarker(slot, 'resize');
@@ -684,8 +718,9 @@ export class DeckLoops {
     this.place(slot, 'resize', marker, marker.start, this.boundaryAt(start + size.frames));
   }
 
-  /** Gives the selected marker an end exactly `beats` after its start, a ladder size. A no-op,
-   *  logged, off the grid or for a length the grid's beat cannot hold in whole frames. */
+  /** Gives the selected marker an end exactly `beats` after its start, a ladder size — between two
+   *  frames for a size that is not a whole number of them (⅛ of a 28-frame beat ends 3.5 on). A
+   *  no-op, logged, off the grid or for a size the ladder lacks: one under 2 frames. */
   setLength(slot: Slot, beats: number): void {
     const marker = this.selectedMarker(slot, 'setLength');
     if (marker === null) {
@@ -928,6 +963,8 @@ export class DeckLoops {
     const { markers, runningId, queuedId } = this.loopsOf(slot);
     const engaged = this.engaged[slot];
     if (runningId !== null && engaged !== null) {
+      // Accepted transient: over another loop this restarts the marker at its lap 0 mid-lap, so one
+      // lap of an alternating length may be a frame off (a landing after it sets the lap exactly).
       this.runtime.setActiveLoop(slot, engaged);
       this.syncQueued(slot);
       this.syncPendingEdit(slot);
@@ -961,8 +998,9 @@ export class DeckLoops {
   }
 
   /** Add under a live loop: the live loop's start and end become a loop marker, selected and the
-   *  running marker in its place. The engine's loop and its image stay as they are, so nothing
-   *  sounds different; the marker takes the live loop's WRAP, which the engine runs it with. */
+   *  running marker in its place — an end between two frames included. The engine's loop and its
+   *  image stay as they are, so nothing sounds different; the marker takes the live loop's WRAP and
+   *  lap phase, which the engine runs it with, so its laps carry on as they were. */
   private addLive(slot: Slot, live: DeckLiveLoopState): void {
     const marker: DeckLoopMarker = {
       id: crypto.randomUUID(),
@@ -979,6 +1017,7 @@ export class DeckLoops {
       startFrame: live.startFrame,
       endFrame: live.endFrame,
       varispeedStart: 'wrap',
+      ...lapPhaseField(live.lapPhase),
     };
     // The live loop still stands during the commit, so no edit it makes reaches the engine.
     this.commit(slot, [...this.loopsOf(slot).markers, marker], marker.id);
@@ -1114,7 +1153,7 @@ export class DeckLoops {
       return;
     }
     const marker = markers.find((candidate) => candidate.id === runningId);
-    const desired = marker === undefined ? null : loopBoundsOf(marker);
+    const desired = marker === undefined ? null : this.boundsOf(slot, marker);
     if (marker === undefined || desired === null) {
       this.stop(slot);
       return;
@@ -1124,18 +1163,30 @@ export class DeckLoops {
       this.syncEndOfPass(slot, edit, desired.varispeedStart);
       return;
     }
-    const next = {
-      startFrame: marker.ready ? desired.startFrame : engaged.startFrame,
+    const startFrame = marker.ready ? desired.startFrame : engaged.startFrame;
+    const sameSpan = startFrame === engaged.startFrame && desired.endFrame === engaged.endFrame;
+    // The same span keeps the lap phase the engine runs it at — a live loop kept as a marker keeps
+    // the live loop's — so a WRAP change alone carries the lap in progress on.
+    const next: LoopBounds = {
+      startFrame,
       endFrame: desired.endFrame,
       varispeedStart: desired.varispeedStart,
+      ...lapPhaseField(
+        sameSpan
+          ? engaged.lapPhase
+          : loopLapPhase(this.gridOf(slot), startFrame, desired.endFrame - startFrame)
+      ),
     };
-    const unchanged =
-      next.startFrame === engaged.startFrame &&
-      next.endFrame === engaged.endFrame &&
-      next.varispeedStart === engaged.varispeedStart;
-    if (!unchanged && next.endFrame > next.startFrame) {
+    const unchanged = sameSpan && next.varispeedStart === engaged.varispeedStart;
+    if (
+      !unchanged &&
+      next.endFrame > next.startFrame &&
+      isUsableLoopLength(next.startFrame, next.endFrame)
+    ) {
       this.setEngaged(slot, next);
       if (!this.defersToEngine(slot)) {
+        // Accepted transient: a changed span restarts the loop at its lap 0 mid-lap, so one lap of
+        // an alternating length may be a frame off; the laps after it add up exactly.
         this.runtime.setActiveLoop(slot, next);
         // `setActiveLoop` drops the engine's queue.
         this.syncQueued(slot);
@@ -1183,14 +1234,20 @@ export class DeckLoops {
     if (via === 'behind-queued' || this.defersToEngine(slot)) {
       return;
     }
-    const { startFrame, endFrame, varispeedStart } = edit.bounds;
+    const { startFrame, endFrame, varispeedStart, lapPhase } = edit.bounds;
     const queued = this.runtime.snapshot(slot).tune?.queuedJump ?? null;
     if (
       queued?.startFrame !== startFrame ||
       queued.endFrame !== endFrame ||
-      queued.varispeedStart !== varispeedStart
+      queued.varispeedStart !== varispeedStart ||
+      queued.lapPhase !== lapPhase
     ) {
-      this.runtime.queueJump(slot, { startFrame, endFrame, varispeedStart });
+      this.runtime.queueJump(slot, {
+        startFrame,
+        endFrame,
+        varispeedStart,
+        ...lapPhaseField(lapPhase),
+      });
     }
   }
 
@@ -1232,8 +1289,8 @@ export class DeckLoops {
     before: DeckLoopMarker | undefined
   ): { readonly id: string; readonly bounds: LoopBounds } | null {
     const running = this.runningMarker(slot);
-    const previous = before === undefined ? null : loopBoundsOf(before);
-    const bounds = running === undefined ? null : loopBoundsOf(running);
+    const previous = before === undefined ? null : this.boundsOf(slot, before);
+    const bounds = running === undefined ? null : this.boundsOf(slot, running);
     return running === undefined ||
       previous === null ||
       bounds === null ||
@@ -1321,12 +1378,13 @@ export class DeckLoops {
     if (this.queuedVia[slot] !== 'engine') {
       return;
     }
-    const target = jumpOf(marker);
+    const target = jumpOf(marker, this.gridOf(slot));
     const queued = this.runtime.snapshot(slot).tune?.queuedJump ?? null;
     if (
       queued?.startFrame !== target.startFrame ||
       queued.endFrame !== target.endFrame ||
       queued.varispeedStart !== target.varispeedStart ||
+      queued.lapPhase !== target.lapPhase ||
       this.queuedSource[slot] !== this.settingsToCarry(slot, marker)
     ) {
       this.queueInEngine(slot, marker);
@@ -1346,7 +1404,7 @@ export class DeckLoops {
       this.stop(slot);
       return;
     }
-    const bounds = loopBoundsOf(marker);
+    const bounds = this.boundsOf(slot, marker);
     const carried = this.queuedSource[slot];
     // The queue's bookkeeping goes first: the swap re-syncs the queue, and a marker still queued
     // would be queued again.
@@ -1399,6 +1457,8 @@ export class DeckLoops {
     if (boundary === 'end') {
       this.pendingStart[slot] = null;
       if (marker.end !== null && engaged !== null) {
+        // Accepted transient: the seek keeps the lap in progress, so the lap it lands in may be a
+        // frame off for an alternating length; the laps after it add up exactly.
         this.jumpInto(
           slot,
           marker,
@@ -1428,7 +1488,7 @@ export class DeckLoops {
 
   /** Engages the marker now when its start is ready, else waits for it to be. */
   private engageOrWait(slot: Slot, marker: DeckLoopMarker): void {
-    if (loopBoundsOf(marker) !== null) {
+    if (this.boundsOf(slot, marker) !== null) {
       this.slip.begin(slot, 'list-loop', !marker.ready);
     }
     if (marker.ready) {
@@ -1450,7 +1510,7 @@ export class DeckLoops {
   /** Queues the marker in the engine to land at the end of the running loop's lap. It replaces the
    *  running marker's edit there, which waits behind it. */
   private queueThroughEngine(slot: Slot, marker: DeckLoopMarker): void {
-    if (loopBoundsOf(marker) !== null) {
+    if (this.boundsOf(slot, marker) !== null) {
       this.slip.begin(slot, 'list-loop', true);
     }
     const edit = this.endOfPass[slot];
@@ -1468,7 +1528,7 @@ export class DeckLoops {
     const source = this.settingsToCarry(slot, marker);
     this.queuedSource[slot] = source;
     this.runtime.queueJump(slot, {
-      ...jumpOf(marker),
+      ...jumpOf(marker, this.gridOf(slot)),
       ...(source === null ? {} : { settings: engineSettingsOf(source.panel, source.mutes) }),
     });
   }
@@ -1492,7 +1552,7 @@ export class DeckLoops {
    * The caller moves the playhead. The selection follows when `follow` is set.
    */
   private arm(slot: Slot, marker: DeckLoopMarker, follow: boolean): void {
-    const bounds = loopBoundsOf(marker);
+    const bounds = this.boundsOf(slot, marker);
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
     this.endOfPass[slot] = null;
@@ -1617,14 +1677,26 @@ export class DeckLoops {
     this.setActivity(slot, null, null, false);
   }
 
-  /** Records the bounds the engine is enforcing for the running marker, and publishes them. */
+  /** Records the bounds the engine is enforcing for the running marker, and publishes them with the
+   *  lap phase the engine runs them at. */
   private setEngaged(slot: Slot, bounds: LoopBounds | null): void {
     this.engaged[slot] = bounds;
     const current = this.loopsOf(slot).runningBounds;
-    if (current?.start !== bounds?.startFrame || current?.end !== bounds?.endFrame) {
+    if (
+      current?.start !== bounds?.startFrame ||
+      current?.end !== bounds?.endFrame ||
+      current?.lapPhase !== bounds?.lapPhase
+    ) {
       this.store.setRunningBounds({
         slot,
-        runningBounds: bounds === null ? null : { start: bounds.startFrame, end: bounds.endFrame },
+        runningBounds:
+          bounds === null
+            ? null
+            : {
+                start: bounds.startFrame,
+                end: bounds.endFrame,
+                ...lapPhaseField(bounds.lapPhase),
+              },
       });
     }
   }
@@ -1699,8 +1771,10 @@ export class DeckLoops {
 
   /**
    * Puts `start` and `end` on the selected marker as an end-of-pass edit. Refused, changing
-   * nothing, when an edge would fall before the start of the tune or past its length, or the end
-   * at or before the start. An edit that leaves both boundaries as they were does nothing.
+   * nothing, when an edge would fall before the start of the tune or past its length, the end at
+   * or before the start, or a length that is not a whole number of frames under
+   * `MIN_FRACTIONAL_LOOP_FRAMES`, which the engine cannot lap. An edit that leaves both boundaries
+   * as they were does nothing.
    */
   private place(
     slot: Slot,
@@ -1719,6 +1793,12 @@ export class DeckLoops {
       this.refuse(slot, command, "would put an edge past the tune's length");
     } else if (end !== null && edges[1] <= edges[0]) {
       this.refuse(slot, command, 'would put the end at or before the start');
+    } else if (end !== null && !isUsableLoopLength(edges[0], edges[1])) {
+      this.refuse(
+        slot,
+        command,
+        `would make a loop of a part frame shorter than ${MIN_FRACTIONAL_LOOP_FRAMES} frames`
+      );
     } else if (!sameBoundary(start, marker.start) || !sameBoundary(end, marker.end)) {
       // Nothing is auditioned, so a seek still waiting on an earlier nudge would surprise.
       this.pendingStart[slot] = null;
@@ -1870,6 +1950,15 @@ export class DeckLoops {
 
   private loopsOf(slot: Slot): DeckLoopsState {
     return this.store.loops()[slot];
+  }
+
+  private gridOf(slot: Slot): DeckBeatGrid | null {
+    return this.store.decks()[slot].beatGrid;
+  }
+
+  /** `loopBoundsOf` on the deck's grid. */
+  private boundsOf(slot: Slot, marker: DeckLoopMarker): LoopBounds | null {
+    return loopBoundsOf(marker, this.gridOf(slot));
   }
 
   private oneSecond(slot: Slot): number {

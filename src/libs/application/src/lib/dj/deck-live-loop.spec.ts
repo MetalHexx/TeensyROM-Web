@@ -37,7 +37,8 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 
 const INTERVAL_US = 20_000;
 
-/** A grid of 24 frames a beat from frame 0, so the ladder runs 2, 3, 6, 12, 24, 48, 96 … frames. */
+/** A grid of 24 frames a beat from frame 0, so the ladder runs 3, 6, 12, 24, 48, 96 … frames: ⅛ is
+ *  the shortest, 1/16 being 1.5 frames. Every size is a whole number of frames. */
 const GRID: DeckBeatGrid = {
   beatFrames: 24,
   beatOneFrame: 0,
@@ -45,6 +46,11 @@ const GRID: DeckBeatGrid = {
   endFrame: null,
   source: 'scan',
 };
+
+/** 28 frames a beat from frame 0: ⅛ is 3.5 frames, ¼ 7, ½ 14, and there is no 1/16 (1.75). The ⅛
+ *  lines round to 0, 4, 7, 11, 14, 18, 21, 25, 28, 32, 35, 39, 42, 46, 49 … so a ⅛ loop on an odd
+ *  line (39) laps 3, 4, 3, 4 frames and one on an even line (28) 4, 3, 4, 3. */
+const GRID_28: DeckBeatGrid = { ...GRID, beatFrames: 28 };
 
 /** Answers every request with the real `replayToFrame`, and counts them: a push that starts from a
  *  saved image asks for none. */
@@ -282,6 +288,25 @@ describe('DeckLiveLoop', () => {
     throw new Error('the playhead never wrapped');
   }
 
+  /** How many frames each of the next `count` laps of a loop of alternating lap lengths takes, read
+   *  off the engine's lap phase, which moves on at each wrap — the first from now. */
+  function lapsByPhase(slot: Slot, count: number): number[] {
+    const laps: number[] = [];
+    let phase = runtime.getLapPhase(slot);
+    let ticks = 0;
+    for (let i = 0; i < 800 && laps.length < count; i++) {
+      tick(slot);
+      ticks++;
+      const next = runtime.getLapPhase(slot);
+      if (next !== phase) {
+        laps.push(ticks);
+        ticks = 0;
+        phase = next;
+      }
+    }
+    return laps;
+  }
+
   /** The positions of the next `count` frames. */
   function positionsOver(slot: Slot, count: number): number[] {
     const seen: number[] = [];
@@ -433,7 +458,8 @@ describe('DeckLiveLoop', () => {
       expect(liveOf('A')).toBeNull();
       expect(engineLoop('A')).toBeNull();
 
-      await play('B', { grid: { ...GRID, beatFrames: 0.3 } });
+      // 128 beats of 0.01 frames is 1.28 frames, under the 2 every size needs.
+      await play('B', { grid: { ...GRID, beatFrames: 0.01 } });
       tick('B', 30);
       live.toggle('B');
       expect(liveOf('B')).toBeNull();
@@ -1002,6 +1028,293 @@ describe('DeckLiveLoop', () => {
       loops.detach('A');
 
       expect(liveOf('A')).toBeNull();
+    });
+  });
+
+  describe('a size that is not a whole number of frames', () => {
+    it("pushes ⅛ of a 28-frame beat with its end between two frames and its start line's lap phase", async () => {
+      await play('A', { beats: 1 / 8, grid: GRID_28 });
+      playTo('A', 38);
+
+      live.toggle('A');
+
+      expect(liveOf('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        pendingEndFrame: null,
+        lapPhase: 0.5,
+      });
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+    });
+
+    it('laps a pushed ⅛ in alternating lengths that end on its lines and add up to the beat', async () => {
+      await play('A', { beats: 1 / 8, grid: GRID_28 });
+      playTo('A', 38);
+      live.toggle('A');
+
+      const laps = Array.from({ length: 8 }, () => lapTicks('A'));
+
+      // From 38 the loop wraps where the ⅛ lines after 39 fall: 42, 46, 49, 53, 56 …
+      expect(laps).toEqual([3, 4, 3, 4, 3, 4, 3, 4]);
+      expect(laps.reduce((sum, lap) => sum + lap, 0)).toBe(28);
+    });
+
+    it('pushes ⅛ on a whole-frame line with no lap phase, lapping 4 then 3', async () => {
+      await play('A', { beats: 1 / 8, grid: GRID_28 });
+      playTo('A', 27);
+
+      live.toggle('A');
+
+      expect(liveOf('A')).toEqual({ startFrame: 28, endFrame: 31.5, pendingEndFrame: null });
+      expect(engineLoop('A')).toEqual({ startFrame: 28, endFrame: 31.5, varispeedStart: 'wrap' });
+      expect([lapTicks('A'), lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([4, 3, 4, 3]);
+    });
+
+    it('takes a size saved at a division the ladder no longer has as the nearest rung left', async () => {
+      await play('A', { beats: 1 / 14, grid: GRID_28 });
+      playTo('A', 38);
+
+      live.toggle('A');
+
+      expect(liveOf('A')).toMatchObject({ startFrame: 39, endFrame: 42.5 });
+      expect(live.steppedBeats('A', 'halve')).toBeNull();
+      expect(live.steppedBeats('A', 'double')).toBe(1 / 4);
+      expect(store.decks()['A'].liveLoopBeats).toBe(1 / 14);
+
+      // The old 2-frame rung of a 24-frame beat (1/12) is now its ⅛, 3 frames.
+      await play('B', { beats: 1 / 12 });
+      playTo('B', 31);
+      live.toggle('B');
+      expect(liveOf('B')).toMatchObject({ startFrame: 30, endFrame: 33 });
+    });
+
+    it('grows at once from the lap in progress, which the engine reports', async () => {
+      await play('A', { beats: 1 / 8, grid: GRID_28 });
+      playTo('A', 38);
+      live.toggle('A');
+      lapTicks('A');
+      lapTicks('A');
+      // The third lap: phase 0.5, where ¼'s own line phase at 39 would be 0.
+      const lapPhase = vi.spyOn(runtime, 'getLapPhase');
+
+      turnTo('A', 1 / 4);
+
+      expect(lapPhase).toHaveReturnedWith(0.5);
+      expect(liveOf('A')).toEqual({
+        startFrame: 39,
+        endFrame: 46,
+        pendingEndFrame: null,
+        lapPhase: 0.5,
+      });
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 46,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+
+      turnTo('A', 1 / 8);
+
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+      // On from the line at 46: 49, 53.
+      expect([lapTicks('A'), lapTicks('A')]).toEqual([3, 4]);
+    });
+
+    it('shrinks at once from the lap in progress, carrying the alternation on exactly', async () => {
+      // 22 frames a beat: ¼ is 5.5 frames, its lines round to 33, 39, 44, 50; ⅛ is 2.75, its lines
+      // round to 39, 41, 44, 47, 50, 52.
+      await play('A', { beats: 1 / 4, grid: { ...GRID, beatFrames: 22 } });
+      playTo('A', 32);
+      live.toggle('A');
+      expect(liveOf('A')).toEqual({ startFrame: 33, endFrame: 38.5, pendingEndFrame: null });
+      expect(lapTicks('A')).toBe(6);
+      expect(runtime.getLapPhase('A')).toBe(0.5);
+
+      turnTo('A', 1 / 8);
+
+      expect(loopChange('A')).toBeNull();
+      expect(engineLoop('A')).toEqual({
+        startFrame: 33,
+        endFrame: 35.75,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+      // From the line at 39: 41, 44, 47, 50, 52. A 2-frame lap never shows the playhead past the
+      // start, so the laps are read off the lap phase, which moves on at every wrap.
+      expect(lapsByPhase('A', 5)).toEqual([2, 3, 3, 3, 2]);
+    });
+
+    it('names a late shrink at a whole frame, the new size lapping from the phase there', async () => {
+      await play('A', { beats: 1 / 2, grid: GRID_28 });
+      playTo('A', 30);
+      live.toggle('A');
+      expect(liveOf('A')).toEqual({ startFrame: 28, endFrame: 42, pendingEndFrame: null });
+      playTo('A', 35);
+
+      turnTo('A', 1 / 8);
+
+      // ⅛ laps from 28 end at 32, 35, 39: the first after the next frame is three laps on, at
+      // phase 0.5.
+      expect(loopChange('A')).toMatchObject({
+        atFrame: 39,
+        loop: { startFrame: 28, endFrame: 31.5, varispeedStart: 'wrap', lapPhase: 0.5 },
+      });
+      expect(liveOf('A')).toEqual({ startFrame: 28, endFrame: 42, pendingEndFrame: 31.5 });
+
+      let ticks = 0;
+      while (loopChange('A') !== null && ticks < 100) {
+        tick('A');
+        ticks++;
+      }
+
+      expect(ticks).toBe(39 - 1 - 35);
+      expect(Number(runtime.position('A'))).toBe(28);
+      expect(liveOf('A')).toEqual({
+        startFrame: 28,
+        endFrame: 31.5,
+        pendingEndFrame: null,
+        lapPhase: 0.5,
+      });
+      expect(engineLoop('A')).toEqual({
+        startFrame: 28,
+        endFrame: 31.5,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+      // On from the line at 39: 42, 46, 49, 53.
+      expect([lapTicks('A'), lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([3, 4, 3, 4]);
+    });
+
+    it('keeps a live ⅛ as a marker with its end and lap phase, its laps running on', async () => {
+      await play('A', { beats: 1 / 8, grid: GRID_28 });
+      await flush();
+      playTo('A', 38);
+      live.toggle('A');
+      lapTicks('A');
+      tick('A');
+
+      loops.add('A');
+
+      const marker = stateOf('A').markers[0];
+      expect(marker.end).toEqual({ frame: 42.5, offsetFrames: 0 });
+      expect(stateOf('A').runningBounds).toEqual({ start: 39, end: 42.5, lapPhase: 0.5 });
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+      // One frame into the second lap, of 4.
+      expect([lapTicks('A'), lapTicks('A')]).toEqual([3, 3]);
+    });
+  });
+
+  describe('returning into a marker whose length is not a whole number of frames', () => {
+    /** ⅛ from beat 1, at phase 0: laps of 4, 3, 4, 3 frames, ending at 32, 35, 39, 42. */
+    const M = loopOf('m', 28, 31.5);
+
+    /** Deck A running `m`, with a half-beat live loop pushed over it from its start. */
+    async function underEighth(options: { slip?: boolean; slot?: Slot } = {}): Promise<void> {
+      const slot = options.slot ?? 'A';
+      await play(slot, { beats: 1 / 2, grid: GRID_28, markers: [M], record: recordOf(2000) });
+      store.setDeckSettings({ slot, slip: options.slip ?? false });
+      await flush();
+      loops.toggle(slot, 'm');
+      await flush();
+      expect(Number(runtime.position(slot))).toBe(28);
+    }
+
+    /** Pushes the live loop on A one frame into the marker. */
+    function pushOverMarker(): void {
+      tick('A');
+      live.toggle('A');
+      expect(liveOf('A')).toMatchObject({ startFrame: 28, endFrame: 42 });
+    }
+
+    it('lands mid-lap in the lap the playhead folds into, at its lap phase', async () => {
+      await underEighth();
+      pushOverMarker();
+      // 33 is a frame into the 3-frame lap from 32: 29 of the loop.
+      playTo('A', 33);
+      const land = vi.spyOn(runtime, 'land');
+
+      live.end('A');
+
+      expect(land).toHaveBeenCalledExactlyOnceWith('A', { frame: 29, held: false, lapPhase: 0.5 });
+      expect(engineLoop('A')).toEqual({ startFrame: 28, endFrame: 31.5, varispeedStart: 'stop' });
+      expect(runtime.getLapPhase('A')).toBe(0.5);
+      expect(Number(runtime.position('A'))).toBe(29);
+      // That lap ends at 35, then 39, 42, 46.
+      expect([lapTicks('A'), lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([1, 4, 3, 4]);
+    });
+
+    it('lands on the start with the gate-off pending at the wrap point of a 3-frame lap', async () => {
+      await underEighth();
+      pushOverMarker();
+      playTo('A', 34);
+      const land = vi.spyOn(runtime, 'land');
+
+      live.end('A');
+
+      expect(land).toHaveBeenCalledExactlyOnceWith('A', { frame: 28, held: true, lapPhase: 0 });
+      expect(Number(runtime.position('A'))).toBe(28);
+      // The next lap, from 35, is 4 frames: 39, 42, 46.
+      expect([lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([4, 3, 4]);
+    });
+
+    it('lands on the start with the gate-off pending at the wrap point of a 4-frame lap', async () => {
+      await underEighth();
+      pushOverMarker();
+      playTo('A', 31);
+      const land = vi.spyOn(runtime, 'land');
+
+      live.end('A');
+
+      expect(land).toHaveBeenCalledExactlyOnceWith('A', { frame: 28, held: true, lapPhase: 0.5 });
+      expect(Number(runtime.position('A'))).toBe(28);
+      // The next lap, from 32, is 3 frames: 35, 39, 42.
+      expect([lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([3, 4, 3]);
+    });
+
+    it('with slip, lands back on the laps a deck that never left the marker plays', async () => {
+      await underEighth({ slip: true });
+      await underEighth({ slip: true, slot: 'B' });
+      const both = (count: number): void => {
+        for (let i = 0; i < count; i++) {
+          tick('A');
+          tick('B');
+        }
+      };
+      both(1);
+      live.toggle('A');
+      expect(liveOf('A')).toMatchObject({ startFrame: 28, endFrame: 42 });
+      // B's laps of 4 and 3 from here wrap after 3, 7, 10, 14 and 17 ticks: 18 is a frame into a
+      // 3-frame lap, where a marker set after the landing would start a 4-frame one.
+      both(18);
+      expect(runtime.getLapPhase('B')).toBe(0.5);
+
+      live.end('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toEqual(engineLoop('B'));
+      expect(runtime.getLapPhase('A')).toBe(0.5);
+      const seen: Record<Slot, number[]> = { A: [], B: [] };
+      for (let i = 0; i < 30; i++) {
+        both(1);
+        seen.A.push(Number(runtime.position('A')));
+        seen.B.push(Number(runtime.position('B')));
+      }
+      expect(seen.A).toEqual(seen.B);
     });
   });
 });

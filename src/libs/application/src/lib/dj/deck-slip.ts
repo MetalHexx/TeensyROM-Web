@@ -7,10 +7,18 @@ import { DECK_SLOTS, type Slot } from './slot';
 /** What starts a departure from the line. */
 export type SlipKind = 'live-loop' | 'list-loop' | 'hand';
 
-/** A loop's bounds in play calls. */
+/** A loop's bounds in play calls, and the lap phase the engine's loop was set with: a count that
+ *  laps a length that is not a whole number of frames, handed in with no lap of its own, is in the
+ *  lap at this phase. */
 export interface SlipLoop {
   readonly startFrame: number;
   readonly endFrame: number;
+  readonly lapPhase?: number;
+}
+
+/** `loop` carrying its lap phase only when it has one. */
+function slipLoopOf(startFrame: number, endFrame: number, lapPhase: number | undefined): SlipLoop {
+  return { startFrame, endFrame, ...(lapPhase === undefined ? {} : { lapPhase }) };
 }
 
 /** One slip departure: a live loop, a list marker loop or the hand, taking the deck off the line
@@ -76,7 +84,9 @@ export class DeckSlip {
 
   /**
    * Begins a departure, when slip is on. Idle, the shadow starts from the player's position and
-   * phase, lapping the loop then running. Inside a running departure a live loop or the hand nests,
+   * phase, lapping the loop then running in the lap the player is in (the engine matches the loop
+   * by its bounds, and counts from the loop's own lap phase only when it is not the one running).
+   * Inside a running departure a live loop or the hand nests,
    * and a list marker loop does nothing: the count carries on and `markerLanded` makes the marker
    * the departure. `queued` marks a marker that waits to land.
    */
@@ -242,7 +252,9 @@ export class DeckSlip {
   }
 
   /** Resumes the saved outer line: the shadow re-based to its lap at the count it has reached,
-   *  the ticks the inner departure ran later. Nothing without one. */
+   *  the ticks the inner departure ran later. Nothing without one. The count carries the lap it is
+   *  in on a loop of alternating lap lengths, which `countAfter` and the re-based shadow read before
+   *  the loop's own phase, so the alternation carries on exactly. */
   private resumeOuter(slot: Slot): void {
     const state = this.states[slot];
     const { outer } = state;
@@ -255,22 +267,27 @@ export class DeckSlip {
       this.runtime.getShadowTicks(slot) ?? 0,
       lap === null
         ? this.trackLoop(slot)
-        : { startFrame: frames(lap.startFrame), endFrame: frames(lap.endFrame) }
+        : {
+            startFrame: frames(lap.startFrame),
+            endFrame: frames(lap.endFrame),
+            ...(lap.lapPhase === undefined ? {} : { lapPhase: lap.lapPhase }),
+          }
     );
     state.run = outer.run;
     state.outer = null;
     this.runtime.startShadow(slot, lap, count);
   }
 
-  /** The loop the deck runs now: the live loop, else the running marker; null on the line. */
+  /** The loop the deck runs now, with the lap phase the engine's loop was set with: the live loop,
+   *  else the running marker; null on the line. */
   private loopRunning(slot: Slot): SlipLoop | null {
     const { live, runningBounds } = this.store.loops()[slot];
     if (live !== null) {
-      return { startFrame: live.startFrame, endFrame: live.endFrame };
+      return slipLoopOf(live.startFrame, live.endFrame, live.lapPhase);
     }
     return runningBounds === null
       ? null
-      : { startFrame: runningBounds.start, endFrame: runningBounds.end };
+      : slipLoopOf(runningBounds.start, runningBounds.end, runningBounds.lapPhase);
   }
 
   /** The loop the track wraps at, which a count with no lap of its own follows; null when the

@@ -20,7 +20,7 @@ namespace TeensyRom.Api.Endpoints.DjLibrary.SaveTuneMemory
                     "- Last subtune is 1-256; memory subtunes are unique and within 1-256\n" +
                     "- Updated is an ISO-8601 timestamp\n" +
                     "- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores\n" +
-                    "- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2\n" +
+                    "- Marker name is null or 1-48 characters after trimming; frame is a finite number 0 or more and may be fractional; offset is within 1000000 either way; 1-3 distinct voices in 0-2\n" +
                     "- Settings values are null or at most 8192 characters of JSON\n\n" +
                     "Anything outside these rules is rejected with a 400 and nothing is written."
                 );

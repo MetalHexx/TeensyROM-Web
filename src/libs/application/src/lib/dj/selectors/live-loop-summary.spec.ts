@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DjStore, EMPTY_DECK_LOOPS, type DeckBeatGrid } from '../dj-store';
 
-/** 24 play calls a beat from frame 0: the ladder runs 1/12 beat up to 128 beats. */
+/** 24 play calls a beat from frame 0: the ladder runs ⅛ beat (3 frames; 1/16 would be 1.5) up to
+ *  128 beats. */
 const GRID: DeckBeatGrid = {
   beatFrames: 24,
   beatOneFrame: 0,
@@ -41,7 +42,8 @@ describe('liveLoopSummary', () => {
   });
 
   it('is unavailable on a grid whose ladder is empty', () => {
-    withGrid({ ...GRID, beatFrames: 0.3 });
+    // 128 beats of 0.01 frames is 1.28 frames, under the 2 every size needs.
+    withGrid({ ...GRID, beatFrames: 0.01 });
 
     expect(summary().available).toBe(false);
     expect(summary().sizeOptions).toEqual([]);
@@ -55,7 +57,7 @@ describe('liveLoopSummary', () => {
 
     expect(result.available).toBe(true);
     expect(result.sizeText).toBe('½ BEAT');
-    expect(result.sizeOptions[0]).toEqual({ beats: 2 / 24, label: '1/12 BEAT', selected: false });
+    expect(result.sizeOptions[0]).toEqual({ beats: 1 / 8, label: '⅛ BEAT', selected: false });
     expect(result.sizeOptions.filter((option) => option.selected)).toEqual([
       { beats: 0.5, label: '½ BEAT', selected: true },
     ]);
@@ -70,13 +72,22 @@ describe('liveLoopSummary', () => {
     expect(summary().sizeOptions.find((option) => option.selected)?.beats).toBe(4);
   });
 
+  it('shows a size saved at an odd division the ladder no longer has as the nearest rung left', () => {
+    withGrid({ ...GRID, beatFrames: 28 });
+    store.setDeckSettings({ slot: 'A', liveLoopBeats: 1 / 14 });
+
+    expect(summary().sizeText).toBe('⅛ BEAT');
+    expect(summary().sizeOptions[0]).toEqual({ beats: 1 / 8, label: '⅛ BEAT', selected: true });
+    expect(summary()).toMatchObject({ canHalve: false, canDouble: true });
+  });
+
   it('can halve and double except at the ends of the ladder', () => {
     withGrid();
 
     store.setDeckSettings({ slot: 'A', liveLoopBeats: 4 });
     expect(summary()).toMatchObject({ canHalve: true, canDouble: true });
 
-    store.setDeckSettings({ slot: 'A', liveLoopBeats: 1 / 12 });
+    store.setDeckSettings({ slot: 'A', liveLoopBeats: 1 / 8 });
     expect(summary()).toMatchObject({ canHalve: false, canDouble: true });
 
     store.setDeckSettings({ slot: 'A', liveLoopBeats: 128 });
@@ -103,6 +114,20 @@ describe('liveLoopSummary', () => {
 
     expect(summary().running).toBe(true);
     expect(summary().mark).toEqual({ startPercent: 10, endPercent: 20 });
+  });
+
+  it('marks a live loop whose end falls between two frames at that end', () => {
+    withGrid({ ...GRID, beatFrames: 28 }, 1_000);
+    store.setDeckLoops({
+      slot: 'A',
+      loops: {
+        ...EMPTY_DECK_LOOPS,
+        live: { startFrame: 39, endFrame: 42.5, pendingEndFrame: null, lapPhase: 0.5 },
+      },
+    });
+
+    expect(summary().mark?.startPercent).toBeCloseTo(3.9);
+    expect(summary().mark?.endPercent).toBeCloseTo(4.25);
   });
 
   it('never lists the live loop among the markers\' tiles', () => {

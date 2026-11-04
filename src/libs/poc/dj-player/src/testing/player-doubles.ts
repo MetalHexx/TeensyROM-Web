@@ -152,6 +152,7 @@ export function createFakeDeckPlayer(): FakeDeckPlayer {
     nextSubtune: vi.fn(),
     previousSubtune: vi.fn(),
     setActiveLoop: vi.fn(),
+    getLapPhase: vi.fn((): number | null => null),
     setTrackStructure: vi.fn(),
     setRepeatTrack: vi.fn(),
     setTempo: vi.fn(),

@@ -204,9 +204,9 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
     public record DjLoopBoundaryDto
     {
         /// <summary>
-        /// The frame, 0 or more.
+        /// The frame, a finite number 0 or more. May be fractional: a loop that ends at 3.5 frames plays laps of 4, 3, 4, 3.
         /// </summary>
-        [Required] public int Frame { get; set; }
+        [Required] public double Frame { get; set; }
 
         /// <summary>
         /// A fine offset in frames, within plus or minus 1000000.
@@ -413,7 +413,8 @@ namespace TeensyRom.Api.Endpoints.DjLibrary
     {
         public DjLoopBoundaryValidator()
         {
-            RuleFor(x => x.Frame)
+            RuleFor(x => x.Frame).Cascade(CascadeMode.Stop)
+                .Must(frame => double.IsFinite(frame)).WithMessage("Frame must be a finite number.")
                 .GreaterThanOrEqualTo(0).WithMessage("Frame must be 0 or more.");
 
             RuleFor(x => x.OffsetFrames)

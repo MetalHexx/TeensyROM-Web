@@ -132,6 +132,53 @@ public class DjLibraryServiceTests : IDisposable
         AssertSameJson(NewService().GetTuneMemory(SidHash), Memory());
     }
 
+    private static DjSubtuneMemory FractionalSubtune() => Subtune() with
+    {
+        Markers = [Subtune().Markers[0] with { Start = new DjLoopBoundary { Frame = 0, OffsetFrames = 0 }, End = new DjLoopBoundary { Frame = 3.5, OffsetFrames = -2 } }]
+    };
+
+    [Fact]
+    public void FractionalBoundaryFrame_RoundTripsThroughSetAndTuneMemory()
+    {
+        var service = NewService();
+        var set = Set() with { Rows = [Set().Rows[0] with { Subtunes = [FractionalSubtune()] }] };
+        var memory = Memory() with { Subtunes = [FractionalSubtune()] };
+
+        service.SaveSet(set).Should().Be(DjSaveResult.Saved);
+        service.SaveTuneMemory(memory).Should().BeTrue();
+
+        var readSet = NewService().GetSet(SetId)!;
+        var readMemory = NewService().GetTuneMemory(SidHash)!;
+
+        readSet.Rows[0].Subtunes[0].Markers[0].End!.Frame.Should().Be(3.5);
+        readMemory.Subtunes[0].Markers[0].End!.Frame.Should().Be(3.5);
+        AssertSameJson(readSet, set);
+        AssertSameJson(readMemory, memory);
+        File.ReadAllText(TuneFile(SidHash)).Should().Contain("\"frame\": 3.5");
+    }
+
+    [Fact]
+    public void FileWithIntegerFrames_StillReads_AndWholeFramesAreWrittenAsIntegers()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(TuneFile(SidHash))!);
+        File.WriteAllText(TuneFile(SidHash), $$"""
+            { "sidHash": "{{SidHash}}", "lastSubtune": 1, "updated": "2026-10-26T21:02:44.871Z",
+              "subtunes": [{ "subtune": 1, "markers": [{ "id": "c1", "start": { "frame": 7950, "offsetFrames": 0 },
+                "end": { "frame": 8360, "offsetFrames": 6 }, "voices": [0] }] }] }
+            """);
+        var service = NewService();
+
+        var marker = service.GetTuneMemory(SidHash)!.Subtunes[0].Markers[0];
+
+        marker.Start.Frame.Should().Be(7950d);
+        marker.End!.Frame.Should().Be(8360d);
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
+
+        service.SaveTuneMemory(Memory()).Should().BeTrue();
+        var written = File.ReadAllText(TuneFile(SidHash));
+        written.Should().Contain("\"frame\": 7950,").And.Contain("\"frame\": 8360,");
+    }
+
     [Fact]
     public void TuneGrids_RoundTrip_AndStayApartFromTuneMemory()
     {

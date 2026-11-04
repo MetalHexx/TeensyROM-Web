@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { FakeClock } from '@sidablist/core';
+import { FakeClock, frames } from '@sidablist/core';
 import type { FrameClock, RegisterRecord, ReplayRunner, SidPlayer } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import type { Playable } from '@sidablist/tunes';
@@ -591,6 +591,54 @@ describe('DeckRuntime', () => {
       await runtime.seekToFrame('A', 320, settings);
 
       expect(seek).toHaveBeenCalledExactlyOnceWith(320, settings);
+    });
+
+    it('passes a loop\'s lap phase through setActiveLoop, changeLoopAt, startShadow and queueJump', () => {
+      const player = playerFor(0);
+      const loop = vi.spyOn(player, 'setActiveLoop').mockImplementation(() => undefined);
+      const change = vi.spyOn(player, 'changeLoopAt').mockImplementation(() => true);
+      const shadow = vi.spyOn(player, 'startShadow').mockImplementation(() => true);
+      const queue = vi.spyOn(player, 'queueJump').mockImplementation(() => undefined);
+      const eighth = { startFrame: 39, endFrame: 42.5, lapPhase: 0.5 };
+
+      runtime.setActiveLoop('A', { ...eighth, varispeedStart: 'wrap' });
+      runtime.changeLoopAt('A', 42, { ...eighth, varispeedStart: 'wrap' });
+      runtime.startShadow('A', eighth);
+      runtime.startShadow('A', eighth, { frame: frames(40), held: false, lapPhase: 0 });
+      runtime.queueJump('A', { ...eighth, varispeedStart: 'stop' });
+
+      expect(loop).toHaveBeenCalledExactlyOnceWith({ ...eighth, varispeedStart: 'wrap' });
+      expect(change).toHaveBeenCalledExactlyOnceWith(42, { ...eighth, varispeedStart: 'wrap' });
+      expect(shadow.mock.calls).toEqual([
+        [eighth],
+        [eighth, { frame: 40, held: false, lapPhase: 0 }],
+      ]);
+      expect(queue).toHaveBeenCalledExactlyOnceWith({ ...eighth, varispeedStart: 'stop' });
+    });
+
+    it('leaves the lap phase out of a loop that has none', () => {
+      const player = playerFor(0);
+      const loop = vi.spyOn(player, 'setActiveLoop').mockImplementation(() => undefined);
+      const shadow = vi.spyOn(player, 'startShadow').mockImplementation(() => true);
+
+      runtime.setActiveLoop('A', { startFrame: 24, endFrame: 48 });
+      runtime.startShadow('A', { startFrame: 24, endFrame: 48 });
+
+      expect(Object.keys(loop.mock.calls[0][0] ?? {})).toEqual(['startFrame', 'endFrame']);
+      expect(Object.keys(shadow.mock.calls[0][0] ?? {})).toEqual(['startFrame', 'endFrame']);
+    });
+
+    it("lands a count with its lap phase, and reads the running loop's lap phase", () => {
+      const player = playerFor(0);
+      const land = vi.spyOn(player, 'land').mockImplementation(() => true);
+      vi.spyOn(player, 'getLapPhase').mockReturnValue(0.5);
+
+      runtime.land('A', { frame: 39, held: true, lapPhase: 0 });
+      runtime.land('A', 52);
+
+      expect(land.mock.calls).toEqual([[{ frame: 39, held: true, lapPhase: 0 }], [52]]);
+      expect(runtime.getLapPhase('A')).toBe(0.5);
+      expect(runtime.getLapPhase('B')).toBeNull();
     });
 
     it('queueJump hands the jump settings to the engine with the target', () => {

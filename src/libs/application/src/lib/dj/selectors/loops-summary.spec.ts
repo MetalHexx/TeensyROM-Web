@@ -410,8 +410,8 @@ describe('loopsSummary', () => {
       const selected = store.loopsSummary('A')().selected;
 
       expect(selected?.lengthText).toBe('4 BEATS');
+      // 1/16 of a 24-frame beat is 1.5 frames, under the 2 a size needs: ⅛ is the shortest.
       expect(selected?.lengthOptions.map((option) => option.label)).toEqual([
-        '1/12 BEAT',
         '⅛ BEAT',
         '¼ BEAT',
         '½ BEAT',
@@ -427,6 +427,17 @@ describe('loopsSummary', () => {
       expect(selected?.lengthOptions.filter((option) => option.selected)).toEqual([
         { beats: 4, label: '4 BEATS', selected: true },
       ]);
+    });
+
+    it('writes and selects a ladder size whose end falls between two frames', () => {
+      // 28 frames a beat: ⅛ is 3.5 frames, ¼ is 7.
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, beatFrames: 28 } });
+      setLoops([marker('eighth', 252, 255.5), marker('quarter', 252, 259)]);
+
+      expect(lengthTexts()).toEqual(['⅛ BEAT', '¼ BEAT']);
+      const options = store.loopsSummary('A')().selected?.lengthOptions;
+      expect(options?.[0]).toEqual({ beats: 1 / 8, label: '⅛ BEAT', selected: true });
+      expect(options?.filter((option) => option.selected)).toHaveLength(1);
     });
 
     it('offers no lengths with no grid, and keeps seconds', () => {

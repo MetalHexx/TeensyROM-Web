@@ -192,7 +192,10 @@ export interface MidiState {
 /** One end of a marker: the frame the performer captured it at and the signed nudge applied to it.
  *  The frame the engine jumps to is `max(0, frame + offsetFrames)`. */
 export interface DeckLoopBoundary {
+  /** Not always a whole frame for an end: a ladder length that is not a whole number of frames
+   *  ends between two, and the loop laps in alternating whole-frame lengths. */
   readonly frame: number;
+  /** Always whole: a nudge moves by play calls. */
   readonly offsetFrames: number;
 }
 
@@ -220,10 +223,14 @@ export interface DeckLoopMarker {
 /** A live loop the engine is running: its bounds in play calls. */
 export interface DeckLiveLoopState {
   readonly startFrame: number;
-  /** The end the engine enforces now. */
+  /** The end the engine enforces now. Not always a whole frame: a length that is not laps in
+   *  alternating whole-frame lengths, and this is their average end. */
   readonly endFrame: number;
   /** A shrink waiting for its frame: the end the loop takes then, or null. */
   readonly pendingEndFrame: number | null;
+  /** The lap phase the engine's loop was set with (core's `ActiveLoop.lapPhase`), reduced; absent
+   *  for 0. */
+  readonly lapPhase?: number;
 }
 
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
@@ -237,8 +244,13 @@ export interface DeckLoopsState {
   queuedId: string | null;
   selectionMovedWhileQueued: boolean;
   /** The bounds the engine is enforcing for the running marker, in play calls. They trail the
-   *  marker's list entry while an edit waits for the end of the pass, so the lap follows these. */
-  runningBounds: { readonly start: number; readonly end: number } | null;
+   *  marker's list entry while an edit waits for the end of the pass, so the lap follows these.
+   *  `lapPhase` is the one the engine's loop was set with, reduced; absent for 0. */
+  runningBounds: {
+    readonly start: number;
+    readonly end: number;
+    readonly lapPhase?: number;
+  } | null;
   /** The marker whose own settings are in play, or null while the main track's are. */
   settingsInPlayId: string | null;
   /** The main track's settings, held aside while a marker's own are in play; null otherwise,

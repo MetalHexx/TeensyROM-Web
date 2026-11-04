@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using TeensyRom.Api.Endpoints.DjLibrary;
 using TeensyRom.Api.Endpoints.DjLibrary.DeleteDjSet;
 using TeensyRom.Api.Endpoints.DjLibrary.GetDjLibraryState;
@@ -109,6 +110,68 @@ namespace TeensyRom.Api.Tests.Integration
             File.Exists(SetFile(SetId)).Should().BeFalse();
             (await GetSetAsync(SetId)).Content.Set.Should().BeNull();
             (await f.Client.GetAsync<ListDjSetsEndpoint, ListDjSetsResponse>()).Content.Sets.Should().NotContain(s => s.Id == SetId);
+        }
+
+        [Fact]
+        public async Task SetAndTuneMemory_WithAFractionalFrame_RoundTrip()
+        {
+            var setJson = SetJson
+                .Replace("\"start\": { \"frame\": 7950, \"offsetFrames\": 0 }", "\"start\": { \"frame\": 0, \"offsetFrames\": 0 }")
+                .Replace("\"end\": { \"frame\": 8360, \"offsetFrames\": 6 }", "\"end\": { \"frame\": 3.5, \"offsetFrames\": 6 }");
+            setJson.Should().Contain("\"frame\": 3.5");
+            var set = JsonSerializer.Deserialize<DjSetDto>(setJson, Web)!;
+
+            (await SaveSetAsync<SaveDjSetResponse>(SetId, set)).Should().BeSuccessful<SaveDjSetResponse>().WithStatusCode(HttpStatusCode.OK);
+
+            var got = await GetSetAsync(SetId);
+            got.Content.Set!.Rows[0].Subtunes[0].Markers[0].End!.Frame.Should().Be(3.5);
+            AssertSameJson(got.Content.Set!, setJson);
+
+            var memoryJson = $$"""
+                { "sidHash": "{{SidHash}}", "lastSubtune": 1,
+                  "subtunes": {{JsonSerializer.Serialize(set.Rows[0].Subtunes, Web)}},
+                  "updated": "2026-10-26T21:02:44.871Z" }
+                """;
+            var memory = JsonSerializer.Deserialize<DjTuneMemoryDto>(memoryJson, Web)!;
+
+            (await f.Client.PutAsync<SaveTuneMemoryEndpoint, SaveTuneMemoryRequest, SaveTuneMemoryResponse>(new() { SidHash = SidHash, Body = memory }))
+                .Should().BeSuccessful<SaveTuneMemoryResponse>().WithStatusCode(HttpStatusCode.OK);
+
+            var gotMemory = await f.Client.GetAsync<GetTuneMemoryEndpoint, GetTuneMemoryRequest, GetTuneMemoryResponse>(new() { SidHash = SidHash });
+            gotMemory.Content.Memory!.Subtunes[0].Markers[0].End!.Frame.Should().Be(3.5);
+            AssertSameJson(gotMemory.Content.Memory!, memoryJson);
+        }
+
+        [Fact]
+        public async Task SaveSet_WithANegativeFrame_IsRejectedAndWritesNothing()
+        {
+            var set = FixtureSet();
+            set.Rows[0].Subtunes[0].Markers[0].Start.Frame = -0.5;
+
+            var r = await SaveSetAsync<ValidationProblemDetails>(SetId, set);
+
+            r.Should().BeValidationProblem().WithKey("Body.Rows[0].Subtunes[0].Markers[0].Start.Frame");
+            File.Exists(SetFile(SetId)).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveSet_WithANaNFrame_IsRejectedAndWritesNothing()
+        {
+            var set = FixtureSet();
+            set.Rows[0].Subtunes[0].Markers[0].End!.Frame = double.NaN;
+            var sendsNaN = new RadHttpClientOptions
+            {
+                JsonSerializerOptions = new JsonSerializerOptions(TestOptions.WithEnumSupport.JsonSerializerOptions!)
+                {
+                    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+                }
+            };
+
+            var r = await f.Client.PutAsync<SaveDjSetEndpoint, SaveDjSetRequest, ProblemDetails>(new() { SetId = SetId, Body = set }, sendsNaN);
+
+            r.Should().BeProblem().WithStatusCode(HttpStatusCode.BadRequest);
+            File.Exists(SetFile(SetId)).Should().BeFalse();
+            (await GetSetAsync(SetId)).Content.Set.Should().BeNull();
         }
 
         [Fact]

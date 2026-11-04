@@ -1,16 +1,38 @@
 import { Injectable, effect, inject, untracked } from '@angular/core';
-import { foldIntoLoop, gridLine, loopStartAtOrBefore, shrinkLanding } from '@sidablist/analysis';
-import type { CrossingLines } from '@sidablist/core';
+import {
+  foldIntoLoop,
+  gridLine,
+  lapPhaseOfFold,
+  loopStartAtOrBefore,
+  shrinkLanding,
+} from '@sidablist/analysis';
+import { lapLength, lapPhaseAfter, reduceLapPhase, type CrossingLines } from '@sidablist/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
 import { DeckSlip } from './deck-slip';
 import { DjStore, type DeckBeatGrid, type DeckLiveLoopState } from './dj-store';
-import { lengthLadder, nearestRungIndex, type LadderSize } from './grid/beat-math';
+import {
+  lapPhaseOrNone,
+  lengthLadder,
+  loopLapPhase,
+  nearestRungIndex,
+  type LadderSize,
+} from './grid/beat-math';
 import { DECK_SLOTS, type Slot } from './slot';
 
 /** How many of the most recent crossings of each declared line the engine keeps an image of. */
 const CROSSINGS_KEPT = 2;
+
+/** A live loop's state, carrying its lap phase only when it has one. */
+function liveLoopOf(
+  startFrame: number,
+  endFrame: number,
+  pendingEndFrame: number | null,
+  lapPhase: number | undefined
+): DeckLiveLoopState {
+  return { startFrame, endFrame, pendingEndFrame, ...(lapPhase === undefined ? {} : { lapPhase }) };
+}
 
 /** The deck's grid and the rung of its ladder the kept live loop size names. */
 interface LiveSize {
@@ -108,6 +130,10 @@ export class DeckLiveLoop {
    * once and drops a shrink still waiting. A smaller one applies at once while the playhead is
    * early enough in the first lap of the new size, else at the end of the lap it falls in, named in
    * the engine by frame; a newer turn replaces a shrink waiting. Nothing when idle or off the grid.
+   *
+   * Every size laps from the lap the running loop is in (`getLapPhase`), so a length that is not a
+   * whole number of frames carries the alternation on exactly: at once from the lap in progress, and
+   * from a shrink's landing — always a whole frame, a lap end of both sizes — at the phase there.
    */
   resize(slot: Slot): void {
     const live = this.liveOf(slot);
@@ -118,34 +144,45 @@ export class DeckLiveLoop {
     const { startFrame, endFrame, pendingEndFrame } = live;
     const frames = size.ladder[size.index].frames;
     const newEnd = startFrame + frames;
+    // The lap in progress of the loop in force — the one a shrink waiting would change.
+    const phase = this.runtime.getLapPhase(slot) ?? reduceLapPhase(live.lapPhase ?? 0);
     if (newEnd >= endFrame) {
       if (newEnd !== endFrame || pendingEndFrame !== null) {
-        this.apply(slot, { startFrame, endFrame: newEnd, pendingEndFrame: null });
+        this.apply(slot, liveLoopOf(startFrame, newEnd, null, lapPhaseOrNone(phase)));
       }
       return;
     }
 
     const position = Number(this.runtime.position(slot));
-    if (position <= newEnd - 2) {
-      this.apply(slot, { startFrame, endFrame: newEnd, pendingEndFrame: null });
+    if (position <= startFrame + lapLength(phase, frames) - 2) {
+      this.apply(slot, liveLoopOf(startFrame, newEnd, null, lapPhaseOrNone(phase)));
       return;
     }
-    const at = shrinkLanding(startFrame, frames, position + 1, endFrame);
-    this.store.setLiveLoop({ slot, live: { startFrame, endFrame, pendingEndFrame: newEnd } });
+    const lapEnd = startFrame + lapLength(phase, endFrame - startFrame);
+    const at = shrinkLanding(startFrame, frames, position + 1, lapEnd, phase);
+    const lapPhase = lapPhaseOrNone(lapPhaseOfFold(at, startFrame, newEnd, phase));
+    this.store.setLiveLoop({
+      slot,
+      live: liveLoopOf(startFrame, endFrame, newEnd, live.lapPhase),
+    });
     const named = this.runtime.changeLoopAt(slot, at, {
       startFrame,
       endFrame: newEnd,
       varispeedStart: 'wrap',
+      ...(lapPhase === undefined ? {} : { lapPhase }),
     });
     if (!named) {
       logWarn(`DeckLiveLoop: deck ${slot} could not name a loop change at ${at} — left as it is.`);
-      this.store.setLiveLoop({ slot, live: { startFrame, endFrame, pendingEndFrame: null } });
+      this.store.setLiveLoop({
+        slot,
+        live: liveLoopOf(startFrame, endFrame, null, live.lapPhase),
+      });
     }
   }
 
   /**
    * Follows the engine: a live loop the engine no longer runs is over, and a shrink named in the
-   * engine that has landed becomes the loop in force.
+   * engine that has landed becomes the loop in force, with the lap phase it landed at.
    */
   reflect(slot: Slot): void {
     const live = this.liveOf(slot);
@@ -160,13 +197,15 @@ export class DeckLiveLoop {
     if (live.pendingEndFrame === null || (snapshot.tune?.loopChange ?? null) !== null) {
       return;
     }
+    const landed = snapshot.loop.endFrame === live.pendingEndFrame;
     this.store.setLiveLoop({
       slot,
-      live: {
-        startFrame: live.startFrame,
-        endFrame: snapshot.loop.endFrame === live.pendingEndFrame ? live.pendingEndFrame : live.endFrame,
-        pendingEndFrame: null,
-      },
+      live: liveLoopOf(
+        live.startFrame,
+        landed ? live.pendingEndFrame : live.endFrame,
+        null,
+        landed ? lapPhaseOrNone(snapshot.loop.lapPhase) : live.lapPhase
+      ),
     });
   }
 
@@ -204,7 +243,8 @@ export class DeckLiveLoop {
    * playhead — one ahead, since a wrap falls due a frame before the end and an end at the playhead
    * could never be met — or the first line ahead when none is behind. A start behind the playhead
    * whose image is not held, on a deck with no register record to lap on, starts on the next line
-   * instead and is armed as the playhead crosses it.
+   * instead and is armed as the playhead crosses it. The end is a size on, which need not be a whole
+   * frame: the loop then laps from its start line's lap phase, its lap ends on that line's grid.
    */
   private push(slot: Slot): void {
     const size = this.sizing(slot);
@@ -231,7 +271,7 @@ export class DeckLiveLoop {
       start = lineAfter(grid, period, ahead);
     }
     this.slip.begin(slot, 'live-loop');
-    this.apply(slot, { startFrame: start, endFrame: start + frames, pendingEndFrame: null });
+    this.apply(slot, liveLoopOf(start, start + frames, null, loopLapPhase(grid, start, frames)));
   }
 
   /** Makes `live` the engine's loop: the store first, then the engine, then the marker queued
@@ -242,6 +282,7 @@ export class DeckLiveLoop {
       startFrame: live.startFrame,
       endFrame: live.endFrame,
       varispeedStart: 'wrap',
+      ...(live.lapPhase === undefined ? {} : { lapPhase: live.lapPhase }),
     });
     this.loops.reassertQueue(slot);
   }
@@ -251,57 +292,73 @@ export class DeckLiveLoop {
    * else into the tune on its own with a marker queued over the live loop engaged at once. The
    * live loop is cleared first, so `DeckLoops` lets its own engine calls through.
    *
-   * A slip departure lands on the shadow's count, which laps the marker underneath, and the marker
-   * is resumed after it. When the landing cannot be made the end is the slip-off end below.
+   * A slip departure lands on the shadow's count, which laps the marker underneath. When the landing
+   * cannot be made the end is the slip-off end below.
+   *
+   * The marker's loop goes back into the engine first, before any landing: a landing gives the loop
+   * running at it the lap its count or fold is in, and a different loop set after it would start
+   * again from its own lap 0 — a lap of alternating length off from then on.
    */
   private returnFrom(slot: Slot): void {
     this.store.setLiveLoop({ slot, live: null });
     const { runningId, runningBounds } = this.store.loops()[slot];
-    if (this.slip.land(slot, 'live-loop')) {
-      if (runningId === null || runningBounds === null) {
-        this.runtime.setActiveLoop(slot, null);
-      }
-      this.loops.resumeRunning(slot);
-      return;
-    }
     if (runningId === null || runningBounds === null) {
+      // No loop to land in: the line, then a marker queued over the live loop engages.
+      this.slip.land(slot, 'live-loop');
       this.runtime.setActiveLoop(slot, null);
       this.loops.resumeRunning(slot);
       return;
     }
-    const { start, end } = runningBounds;
-    const position = Math.floor(Number(this.runtime.position(slot)));
-    if (position < end - 1) {
-      this.loops.resumeRunning(slot);
+    this.loops.resumeRunning(slot);
+    if (this.slip.land(slot, 'live-loop')) {
       return;
     }
-    this.foldInto(slot, position, start, end);
+    const { start, end } = runningBounds;
+    // The lap the re-armed marker is in: its own lap 0, or the live loop's lap carried on when the
+    // two have the same bounds.
+    const phase = this.runtime.getLapPhase(slot) ?? reduceLapPhase(runningBounds.lapPhase ?? 0);
+    const position = Math.floor(Number(this.runtime.position(slot)));
+    if (position < start + lapLength(phase, end - start) - 1) {
+      // Accepted transient: the marker restarts at its lap 0 wherever the playhead is in a lap, so
+      // one lap of an alternating length may be a frame off; the laps after it add up exactly.
+      return;
+    }
+    this.foldInto(slot, position, start, end, phase);
   }
 
   /**
    * Returns a deck whose playhead is at or past the marker's wrap point into the marker at the
    * place its lap has reached: the record lands there, carrying the lap's phase — a playhead one
-   * tick from the loop's start would otherwise leave the marker a tick behind once a lap.
+   * tick from the loop's start would otherwise leave the marker a tick behind once a lap. The fold
+   * counts the marker's laps in their alternating lengths from `phase`, and the landing carries the
+   * lap it lands in, so the alternation carries on from there. The caller has re-armed the marker.
    *
    * With no register record to land on, the one exception: the deck plays with no loop and a worker
    * jump takes it to the fold computed now, so the landing is late by the worker's latency. It is
    * never sent to the loop's start.
    */
-  private foldInto(slot: Slot, position: number, start: number, end: number): void {
+  private foldInto(slot: Slot, position: number, start: number, end: number, phase: number): void {
     const length = end - start;
-    const folded = foldIntoLoop(position, start, end);
-    const atGateOff = (position - start) % length === length - 1;
+    const lapPhase = lapPhaseOfFold(position, start, end, phase);
+    const folded = foldIntoLoop(position, start, end, phase);
+    const atGateOff = folded - start === lapLength(lapPhase, length) - 1;
+    // A whole length lands as it always has: its laps never alternate.
+    const lapOf = (landedPhase: number) =>
+      Number.isInteger(length) ? {} : { lapPhase: reduceLapPhase(landedPhase) };
     const landed = this.runtime.land(
       slot,
-      atGateOff ? { frame: start, held: true } : { frame: folded, held: false }
+      atGateOff
+        ? { frame: start, held: true, ...lapOf(lapPhaseAfter(lapPhase, length, 1)) }
+        : { frame: folded, held: false, ...lapOf(lapPhase) }
     );
     if (landed) {
-      this.loops.resumeRunning(slot);
       return;
     }
 
     const resume = this.loops.holdRunning(slot);
     this.runtime.setActiveLoop(slot, null);
+    // Accepted transient: the resume re-arms the marker at its lap 0 after the worker jump, so one
+    // lap of an alternating length may be a frame off; the laps after it add up exactly.
     this.runtime.seekToFrame(slot, folded).then(resume, (error: unknown) => {
       logError(`DeckLiveLoop: deck ${slot}'s jump back into its loop failed`, error);
       resume();

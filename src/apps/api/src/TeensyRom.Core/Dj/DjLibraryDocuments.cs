@@ -63,9 +63,12 @@ namespace TeensyRom.Core.Dj
         public bool? Wraps { get; init; }
     }
 
+    /// <summary>
+    /// A position in a tune. The frame may be fractional; files written when it was a whole number read back unchanged.
+    /// </summary>
     public record DjLoopBoundary
     {
-        public int Frame { get; init; }
+        public double Frame { get; init; }
         public int OffsetFrames { get; init; }
     }
 

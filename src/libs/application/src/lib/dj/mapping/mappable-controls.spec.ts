@@ -316,7 +316,7 @@ describe('MappableControls', () => {
   });
 
   describe('live loop and slip', () => {
-    /** 24 play calls a beat: twelve sizes, ⅛ beat up to 128 beats; 4 beats is index 6. */
+    /** 24 play calls a beat: eleven sizes, ⅛ beat (3 frames) up to 128 beats; 4 beats is index 5. */
     const GRID = {
       beatFrames: 24,
       beatOneFrame: 0,
@@ -388,32 +388,40 @@ describe('MappableControls', () => {
 
         seedGrid();
 
-        expect(size().max).toBe(11);
+        expect(size().max).toBe(10);
         expect(size().wholeSteps).toBe(true);
         expect(size().styles).toContain('absolute');
       });
 
       it('reads the current size as its rung index', () => {
         seedGrid();
-        expect(size().read()).toBe(6);
+        expect(size().read()).toBe(5);
 
         h.deckService.setLiveLoopBeats('A', 8);
 
-        expect(size().read()).toBe(7);
+        expect(size().read()).toBe(6);
+      });
+
+      it('reads a size saved at an odd division the ladder no longer has as the nearest rung', () => {
+        seedGrid();
+
+        h.deckService.setLiveLoopBeats('A', 1 / 12);
+
+        expect(size().read()).toBe(0);
       });
 
       it('sets the size of the rung it is given, and leaves an unchanged rung alone', () => {
         const set = vi.spyOn(h.deckService, 'setLiveLoopBeats');
         seedGrid();
 
-        size().set(6);
+        size().set(5);
         expect(set).not.toHaveBeenCalled();
 
-        size().set(8);
+        size().set(7);
         expect(set).toHaveBeenCalledTimes(1);
         const [, beats] = set.mock.calls[0];
         expect(h.djStore.deck('A')().liveLoopBeats).toBe(beats);
-        expect(size().read()).toBe(8);
+        expect(size().read()).toBe(7);
       });
 
       it('does nothing with no ladder', () => {
@@ -477,7 +485,8 @@ describe('MappableControls', () => {
     });
 
     describe('loop-length', () => {
-      /** 24 play calls a beat: the ladder runs 1/12 (2 frames), then ⅛ to 128 beats, twelve sizes. */
+      /** 24 play calls a beat: the ladder runs ⅛ (3 frames) to 128 beats, eleven sizes; 4 beats
+       *  (96 frames) is index 5. */
       const GRID = {
         beatFrames: 24,
         beatOneFrame: 0,
@@ -516,36 +525,58 @@ describe('MappableControls', () => {
 
         seedMarker(96);
 
-        expect(length().max).toBe(11);
+        expect(length().max).toBe(10);
         expect(length().wholeSteps).toBe(true);
       });
 
       it("reads the size's index, a half index off the ladder, the ends beyond it and the 4-beat index on a cue", () => {
         seedMarker(96);
-        expect(length().read()).toBe(6);
+        expect(length().read()).toBe(5);
 
         seedMarker(100);
-        expect(length().read()).toBe(6.5);
+        expect(length().read()).toBe(5.5);
 
         seedMarker(4000);
-        expect(length().read()).toBe(11);
+        expect(length().read()).toBe(10);
 
         seedMarker(1);
         expect(length().read()).toBe(0);
 
         seedMarker(null);
-        expect(length().read()).toBe(6);
+        expect(length().read()).toBe(5);
+      });
+
+      it("reads a size whose end falls between two frames as that size's index", () => {
+        seedMarker(96);
+        h.djStore.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, beatFrames: 28 } });
+        h.djStore.setDeckLoops({
+          slot: 'A',
+          loops: {
+            ...h.djStore.loops().A,
+            markers: [
+              {
+                ...h.djStore.loops().A.markers[0],
+                start: { frame: 252, offsetFrames: 0 },
+                end: { frame: 255.5, offsetFrames: 0 },
+              },
+            ],
+          },
+        });
+
+        // 28 frames a beat: ⅛ (3.5 frames) is the shortest size.
+        expect(length().read()).toBe(0);
+        expect(length().max).toBe(10);
       });
 
       it('halves or doubles once for a step either way, whatever the length', () => {
         const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
         seedMarker(100);
 
-        length().set(7.5);
-        length().set(5.5);
+        length().set(6.5);
+        length().set(4.5);
         seedMarker(96);
-        length().set(7);
-        length().set(5);
+        length().set(6);
+        length().set(4);
 
         expect(resize.mock.calls).toEqual([
           ['A', 'double'],
@@ -558,7 +589,7 @@ describe('MappableControls', () => {
       it('does nothing for a turn past either end', () => {
         const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
         seedMarker(4000);
-        length().set(11);
+        length().set(10);
         seedMarker(1);
         length().set(0);
 
@@ -580,10 +611,10 @@ describe('MappableControls', () => {
           const resize = landingResize();
           seedMarker(96);
 
-          length().set(9);
+          length().set(8);
           expect(endFrame()).toBe(240 + 768);
 
-          length().set(7);
+          length().set(6);
           expect(endFrame()).toBe(240 + 192);
           expect(resize.mock.calls.map(([, direction]) => direction)).toEqual([
             'double',
@@ -596,13 +627,13 @@ describe('MappableControls', () => {
 
         it('takes a half place, off the ladder or clamped at an end, as one click', () => {
           const resize = landingResize();
-          seedMarker(100); // 6.5
-          length().set(8.5);
+          seedMarker(100); // 5.5
+          length().set(7.5);
           expect(resize).toHaveBeenCalledTimes(2);
 
           resize.mockClear();
-          seedMarker(1000); // 9.5: a turn of five clamps to 11, a place and a half
-          length().set(11);
+          seedMarker(1000); // 8.5: a turn of five clamps to 10, a place and a half
+          length().set(10);
           expect(resize).toHaveBeenCalledTimes(2);
         });
 
@@ -610,7 +641,7 @@ describe('MappableControls', () => {
           const resize = vi.spyOn(h.deckService, 'resizeMarker').mockImplementation(() => undefined);
           seedMarker(96);
 
-          length().set(9);
+          length().set(8);
 
           expect(resize).toHaveBeenCalledTimes(1);
         });
