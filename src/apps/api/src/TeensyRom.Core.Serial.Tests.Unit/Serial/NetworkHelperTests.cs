@@ -191,6 +191,60 @@ public class NetworkHelperTests
 
     #endregion
 
+    #region SelectAddresses Tests
+
+    [Fact]
+    public void SelectAddresses_ReturnsRealAdapterAddresses_DistinctAndInAdapterOrder()
+    {
+        var adapters = new[]
+        {
+            Adapter("192.168.1.113", name: "Ethernet 3"),
+            Adapter("10.84.215.225", name: "Wi-Fi", type: NetworkInterfaceType.Wireless80211),
+            Adapter("192.168.1.113", name: "Ethernet 4")
+        };
+
+        var result = NetworkHelper.SelectAddresses(adapters);
+
+        result.Should().Equal(IPAddress.Parse("192.168.1.113"), IPAddress.Parse("10.84.215.225"));
+    }
+
+    [Fact]
+    public void SelectAddresses_SkipsAdaptersTheDeviceSweepSkips()
+    {
+        var adapters = new[]
+        {
+            Adapter("192.168.1.10", status: OperationalStatus.Down),
+            Adapter("127.0.0.1", type: NetworkInterfaceType.Loopback),
+            Adapter("10.8.0.2", type: NetworkInterfaceType.Tunnel),
+            Adapter("172.17.32.1", name: "vEthernet (WSLCore)", description: "Hyper-V Virtual Ethernet Adapter #2", hasGateway: false),
+            Adapter("172.18.0.1", name: "docker0", description: "docker0", hasGateway: false)
+        };
+
+        NetworkHelper.SelectAddresses(adapters).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectAddresses_SkipsLoopbackAndLinkLocalAddresses()
+    {
+        var adapters = new[]
+        {
+            Adapter("169.254.194.56", hasGateway: false),
+            Adapter("127.0.0.1")
+        };
+
+        NetworkHelper.SelectAddresses(adapters).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectAddresses_KeepsAVirtualAdapterWithAGateway()
+    {
+        var adapters = new[] { Adapter("192.168.1.113", name: "vEthernet (External)", description: "Hyper-V Virtual Ethernet Adapter", hasGateway: true) };
+
+        NetworkHelper.SelectAddresses(adapters).Should().Equal(IPAddress.Parse("192.168.1.113"));
+    }
+
+    #endregion
+
     #region GenerateIpRange Tests
 
     [Fact]
