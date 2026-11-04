@@ -69,6 +69,11 @@ export type DeckControlId =
   | 'loop-move-earlier'
   | 'loop-move-later'
   | 'loop-move-step'
+  | 'live-loop'
+  | 'live-loop-size'
+  | 'live-loop-halve'
+  | 'live-loop-double'
+  | 'slip'
   | `voice-${VoiceNumber}-mute`
   | `voice-${VoiceNumber}-hold`
   | 'key'
@@ -116,6 +121,11 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-move-earlier',
   'loop-move-later',
   'loop-move-step',
+  'live-loop',
+  'live-loop-size',
+  'live-loop-halve',
+  'live-loop-double',
+  'slip',
   ...VOICE_NUMBERS.map((n) => `voice-${n}-mute` as const),
   ...VOICE_NUMBERS.map((n) => `voice-${n}-hold` as const),
   'key',

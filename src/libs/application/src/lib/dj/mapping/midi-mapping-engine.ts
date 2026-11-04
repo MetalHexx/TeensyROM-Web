@@ -17,6 +17,7 @@ import {
 import { MidiMappingStore } from './midi-mapping-store';
 
 type HoldControl = Extract<MappableControl, { nature: 'hold' }>;
+type StateControl = Extract<MappableControl, { nature: 'state' }>;
 type ValueControl = Extract<MappableControl, { nature: 'value' }>;
 
 /** A hold whose key is down: released by its key coming up, or by one of the engine's release
@@ -24,7 +25,7 @@ type ValueControl = Extract<MappableControl, { nature: 'value' }>;
 interface ActiveHold {
   readonly mappingId: string;
   readonly controllerId: string;
-  readonly control: HoldControl;
+  readonly control: HoldControl | StateControl;
 }
 
 /** A strip mapped as a hand with a finger on it: lifted by its source going away or by one of the
@@ -142,7 +143,7 @@ export class MidiMappingEngine {
         }
         return;
       case 'hold':
-        if (control.nature === 'hold') {
+        if (control.nature === 'hold' || control.nature === 'state') {
           this.applyHold(mapping, control, event, pressEdge, releaseEdge);
         }
         return;
@@ -157,8 +158,13 @@ export class MidiMappingEngine {
         }
         return;
       case 'absolute':
-        if (event.kind === 'cc' && control.nature === 'value' && !control.wholeSteps) {
+        if (
+          event.kind === 'cc' &&
+          control.nature === 'value' &&
+          (!control.wholeSteps || control.styles?.includes('absolute'))
+        ) {
           const fraction = event.value / 127;
+          // A whole-step control's step of 1 rounds this to a rung, spread across the travel.
           control.set(quantize(control, control.min + fraction * (control.max - control.min)));
         }
         return;
@@ -240,7 +246,7 @@ export class MidiMappingEngine {
 
   private applyHold(
     mapping: ControlMapping,
-    control: HoldControl,
+    control: HoldControl | StateControl,
     event: SourceEvent,
     pressEdge: boolean,
     releaseEdge: boolean
@@ -248,9 +254,21 @@ export class MidiMappingEngine {
     const key = sourceKey(event);
     if (pressEdge) {
       this.holds.set(key, { mappingId: mapping.id, controllerId: event.controllerId, control });
-      control.set(true, mapping.style.amount);
+      if (control.nature === 'state') {
+        control.set(true);
+      } else {
+        control.set(true, mapping.style.amount);
+      }
     } else if (releaseEdge) {
       this.holds.delete(key);
+      this.release(control);
+    }
+  }
+
+  private release(control: HoldControl | StateControl): void {
+    if (control.nature === 'state') {
+      control.set(false);
+    } else {
       control.set(false, null);
     }
   }
@@ -349,7 +367,7 @@ export class MidiMappingEngine {
   /** Releases a hold, logging rather than throwing so one failing release cannot strand the rest. */
   private letGo(hold: ActiveHold): void {
     try {
-      hold.control.set(false, null);
+      this.release(hold.control);
     } catch (error) {
       logWarn(
         `MidiMappingEngine: releasing ${controlKey(hold.control.identity)} failed — ${

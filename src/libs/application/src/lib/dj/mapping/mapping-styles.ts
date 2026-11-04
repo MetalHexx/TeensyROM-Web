@@ -122,7 +122,8 @@ export function stylesFor(nature: ControlNature, sourceKind: MidiSourceKind): Ma
 }
 
 /** The styles this control offers for a source of this kind: its nature's, narrowed to the
- *  control's own `styles` when it declares them. A pitch bend strip is a hand where the control
+ *  control's own `styles` when it declares them. A state control's own list replaces its nature's
+ *  instead (it may add `hold`). A pitch bend strip is a hand where the control
  *  has one, and takes nothing elsewhere. */
 export function stylesForControl(
   control: MappableControl,
@@ -130,6 +131,9 @@ export function stylesForControl(
 ): MappingStyleKind[] {
   if (sourceKind === 'pitch-bend') {
     return control.nature === 'value' && control.hand !== undefined ? ['hand'] : [];
+  }
+  if (control.nature === 'state' && control.styles !== undefined) {
+    return [...control.styles];
   }
   const styles = stylesFor(control.nature, sourceKind);
   const allowed = control.nature === 'value' ? control.styles : undefined;

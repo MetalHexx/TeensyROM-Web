@@ -185,6 +185,38 @@ describe('the control-aware styles', () => {
     expect(actionsForControl(selector, 'note')).toEqual(['step']);
   });
 
+  describe('a state control with its own style list', () => {
+    const liveLoop = {
+      ...toggle,
+      styles: ['latch', 'latch-release', 'on', 'on-release', 'off', 'off-release', 'hold'],
+    } as MappableControl;
+
+    it('offers that list, hold included, from a note and from a CC', () => {
+      expect(stylesForControl(liveLoop, 'note')).toContain('hold');
+      expect(stylesForControl(liveLoop, 'cc')).toEqual(stylesForControl(liveLoop, 'note'));
+      expect(actionsForControl(liveLoop, 'note')).toEqual(['toggle', 'on', 'off', 'hold']);
+      expect(isStyleAvailableFor(liveLoop, 'note', 'hold')).toBe(true);
+      expect(isStyleAvailableFor(toggle, 'note', 'hold')).toBe(false);
+    });
+
+    it('still defaults to a toggle, and takes no amount under hold', () => {
+      expect(defaultStyle(liveLoop, 'note')).toEqual({ kind: 'latch', amount: null });
+      expect(defaultAmountFor(liveLoop, 'hold')).toBeNull();
+      expect(clampAmount(liveLoop, 'hold', 0.5)).toBeNull();
+    });
+  });
+
+  it('offer a whole-step selection absolute only when it lists it', () => {
+    const spread = {
+      ...selector,
+      styles: ['absolute', 'relative-offset', 'relative-signed', 'step', 'step-release'],
+    } as MappableControl;
+
+    expect(isStyleAvailableFor(spread, 'cc', 'absolute')).toBe(true);
+    expect(isStyleAvailableFor(spread, 'note', 'absolute')).toBe(false);
+    expect(defaultStyle(spread, 'cc')).toEqual({ kind: 'relative-offset', amount: 1 });
+  });
+
   it('refuse absolute on a whole-step selection and keep it on an ordinary value', () => {
     expect(isStyleAvailableFor(selector, 'cc', 'absolute')).toBe(false);
     expect(isStyleAvailableFor(selector, 'cc', 'relative-signed')).toBe(true);

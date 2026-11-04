@@ -396,9 +396,9 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsEightyEightNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsNinetyThreeNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(88);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(93);
         MidiSettingsAllowLists.SetControls.Should().HaveCount(3);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }
@@ -484,6 +484,17 @@ public class SaveMidiSettingsRequestValidatorTests
         request.Mappings[0].Style = new MidiMappingStyleDto { Kind = kind, Amount = amount };
 
         AssertRejectedAt(request, "Mappings[0].Style.Amount");
+    }
+
+    [Fact]
+    public void Validate_HoldStyleOnTheLiveLoop_Passes()
+    {
+        var request = ValidRequest();
+        request.Mappings[0].Owner = "A";
+        request.Mappings[0].Control = "live-loop";
+        request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "hold" };
+
+        _validator.Validate(request).IsValid.Should().BeTrue();
     }
 
     [Theory]

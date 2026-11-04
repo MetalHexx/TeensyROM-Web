@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { logWarn } from '@teensyrom-nx/utils';
 import type { HandTarget } from '../deck-hand';
+import { lengthLadder } from '../grid/beat-math';
 import type { ControlIdentity, MappingStyle, MidiSource, SourceEvent } from './mapping.models';
 import {
   LAUNCH_CONTROL,
@@ -642,6 +643,134 @@ describe('MidiMappingEngine', () => {
       h.engine.handle(note(50, 100));
 
       expect(selected()).toBeNull();
+    });
+  });
+
+  describe('the live loop', () => {
+    const LIVE_LOOP_A: ControlIdentity = { owner: 'A', control: 'live-loop' };
+    const SIZE_A: ControlIdentity = { owner: 'A', control: 'live-loop-size' };
+    const running = (): boolean => h.djStore.loops().A.live !== null;
+    const sizeBeats = (): number => h.djStore.deck('A')().liveLoopBeats;
+
+    beforeEach(() => {
+      h.djStore.setDeckBeatGrid({
+        slot: 'A',
+        beatGrid: { beatFrames: 24, beatOneFrame: 0, startFrame: 0, endFrame: null, source: 'scan' },
+      });
+      vi.spyOn(h.deckService, 'toggleLiveLoop').mockImplementation((slot) =>
+        h.djStore.setLiveLoop({
+          slot,
+          live: running() ? null : { startFrame: 0, endFrame: 96, pendingEndFrame: null },
+        })
+      );
+      vi.spyOn(h.deckService, 'endLiveLoop').mockImplementation((slot) =>
+        h.djStore.setLiveLoop({ slot, live: null })
+      );
+    });
+
+    describe('under hold', () => {
+      beforeEach(() => {
+        map(noteSource(40), LIVE_LOOP_A, style('hold'));
+        map(noteSource(41, 1, 'other-controller'), { owner: 'B', control: 'live-loop' }, style('hold'));
+      });
+
+      it('runs while the key is down and ends on its release edge', () => {
+        h.engine.handle(note(40, 100));
+        expect(running()).toBe(true);
+        expect(h.engine.isHolding(noteSource(40))).toBe(true);
+
+        h.engine.handle(note(40, 0));
+        expect(running()).toBe(false);
+        expect(h.engine.isHolding(noteSource(40))).toBe(false);
+      });
+
+      it.each([
+        ['the controller is lost', () => h.engine.releaseHolds(LAUNCH_CONTROL)],
+        ['every hold is released', () => h.engine.releaseHolds()],
+        ['the page is hidden', () => window.dispatchEvent(new Event('pagehide'))],
+        [
+          'its mapping is removed',
+          () =>
+            h.mappings.remove(
+              h.mappingStore.mappingBySource(`${LAUNCH_CONTROL}|1|note|40`)()?.id as string
+            ),
+        ],
+      ])('ends when %s', (_when, release) => {
+        h.engine.handle(note(40, 100));
+        expect(running()).toBe(true);
+
+        release();
+
+        expect(running()).toBe(false);
+      });
+
+      it("releases only the lost controller's hold", () => {
+        h.makeShapeable('B');
+        h.engine.handle(note(40, 100));
+        h.engine.handle(note(41, 100, 1, 'other-controller'));
+
+        h.engine.releaseHolds('other-controller');
+
+        expect(running()).toBe(true);
+        expect(h.djStore.loops().B.live).toBeNull();
+      });
+    });
+
+    it('toggles under the default latch', () => {
+      map(noteSource(40), LIVE_LOOP_A, style('latch'));
+
+      h.engine.handle(note(40, 100));
+      h.engine.handle(note(40, 0));
+      expect(running()).toBe(true);
+
+      h.engine.handle(note(40, 100));
+      expect(running()).toBe(false);
+    });
+
+    describe('the size', () => {
+      const ladder = lengthLadder(24).map((rung) => rung.beats);
+      const home = ladder.indexOf(4);
+
+      it('steps one rung per relative tick, whatever the sensitivity', () => {
+        map(ccSource(30), SIZE_A, style('relative-offset', 0.01));
+
+        h.engine.handle(cc(30, 65));
+        expect(sizeBeats()).toBe(ladder[home + 1]);
+
+        h.engine.handle(cc(30, 63));
+        h.engine.handle(cc(30, 63));
+        expect(sizeBeats()).toBe(ladder[home - 1]);
+      });
+
+      it('spreads the rungs across an absolute knob, end to end', () => {
+        map(ccSource(31), SIZE_A, style('absolute'));
+
+        h.engine.handle(cc(31, 0));
+        expect(sizeBeats()).toBe(ladder[0]);
+
+        h.engine.handle(cc(31, 127));
+        expect(sizeBeats()).toBe(ladder[ladder.length - 1]);
+
+        h.engine.handle(cc(31, 64));
+        expect(sizeBeats()).toBe(ladder[Math.round((64 / 127) * (ladder.length - 1))]);
+      });
+
+      it('does not let the loop-length selection take absolute', () => {
+        h.seedMarkers('A', 3, 0);
+        h.mappingStore.upsertMapping({
+          mapping: {
+            id: 'stale',
+            source: ccSource(32),
+            control: { owner: 'A', control: 'loop-length' },
+            style: style('absolute'),
+          },
+        });
+        const resize = vi.spyOn(h.deckService, 'resizeMarker');
+
+        h.engine.handle(cc(32, 127));
+
+        expect(resize).not.toHaveBeenCalled();
+      });
     });
   });
 

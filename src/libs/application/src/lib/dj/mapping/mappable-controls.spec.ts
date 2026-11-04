@@ -55,15 +55,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 88 controls per deck and 3 for the set, 179 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(179);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(179);
+    it('holds 93 controls per deck and 3 for the set, 189 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(189);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(189);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(88);
+        expect(ids).toHaveLength(93);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -312,6 +312,128 @@ describe('MappableControls', () => {
 
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith('B', ...extra);
+    });
+  });
+
+  describe('live loop and slip', () => {
+    /** 24 play calls a beat: twelve sizes, ⅛ beat up to 128 beats; 4 beats is index 6. */
+    const GRID = {
+      beatFrames: 24,
+      beatOneFrame: 0,
+      startFrame: 0,
+      endFrame: null,
+      source: 'scan',
+    } as const;
+
+    const seedGrid = (): void => h.djStore.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
+    const setRunning = (running: boolean): void =>
+      h.djStore.setLiveLoop({
+        slot: 'A',
+        live: running ? { startFrame: 0, endFrame: 96, pendingEndFrame: null } : null,
+      });
+
+    describe('live-loop', () => {
+      it('offers hold beside the state styles, latch first', () => {
+        const styles = pick('A', 'live-loop', 'state').styles;
+
+        expect(styles?.[0]).toBe('latch');
+        expect(styles).toContain('hold');
+      });
+
+      it('reads whether a live loop runs', () => {
+        const live = pick('A', 'live-loop', 'state');
+        expect(live.read()).toBe(false);
+
+        setRunning(true);
+
+        expect(live.read()).toBe(true);
+      });
+
+      it('pushes when idle and ends when running, and does nothing otherwise', () => {
+        const toggle = vi.spyOn(h.deckService, 'toggleLiveLoop').mockImplementation(() => undefined);
+        const end = vi.spyOn(h.deckService, 'endLiveLoop').mockImplementation(() => undefined);
+        const live = pick('A', 'live-loop', 'state');
+
+        live.set(false);
+        live.set(true);
+        expect(toggle.mock.calls).toEqual([['A']]);
+        expect(end).not.toHaveBeenCalled();
+
+        setRunning(true);
+        live.set(true);
+        live.set(false);
+        expect(toggle).toHaveBeenCalledTimes(1);
+        expect(end.mock.calls).toEqual([['A']]);
+      });
+    });
+
+    describe('slip', () => {
+      it('reads the deck slip and sets it through the deck service', () => {
+        const slip = pick('A', 'slip', 'state');
+        const set = vi.spyOn(h.deckService, 'setSlip');
+
+        slip.set(true);
+
+        expect(set).toHaveBeenCalledWith('A', true);
+        expect(slip.read()).toBe(true);
+        expect(pick('B', 'slip', 'state').read()).toBe(false);
+      });
+    });
+
+    describe('live-loop-size', () => {
+      const size = () => pick('A', 'live-loop-size', 'value');
+
+      it('spans the ladder, with relative and absolute styles', () => {
+        expect(size().max).toBe(0);
+
+        seedGrid();
+
+        expect(size().max).toBe(11);
+        expect(size().wholeSteps).toBe(true);
+        expect(size().styles).toContain('absolute');
+      });
+
+      it('reads the current size as its rung index', () => {
+        seedGrid();
+        expect(size().read()).toBe(6);
+
+        h.deckService.setLiveLoopBeats('A', 8);
+
+        expect(size().read()).toBe(7);
+      });
+
+      it('sets the size of the rung it is given, and leaves an unchanged rung alone', () => {
+        const set = vi.spyOn(h.deckService, 'setLiveLoopBeats');
+        seedGrid();
+
+        size().set(6);
+        expect(set).not.toHaveBeenCalled();
+
+        size().set(8);
+        expect(set).toHaveBeenCalledTimes(1);
+        const [, beats] = set.mock.calls[0];
+        expect(h.djStore.deck('A')().liveLoopBeats).toBe(beats);
+        expect(size().read()).toBe(8);
+      });
+
+      it('does nothing with no ladder', () => {
+        const set = vi.spyOn(h.deckService, 'setLiveLoopBeats');
+
+        size().set(0);
+
+        expect(set).not.toHaveBeenCalled();
+      });
+    });
+
+    it.each([
+      ['live-loop-halve', 'halve'],
+      ['live-loop-double', 'double'],
+    ] as const)('%s steps the size %s for its own deck', (id, direction) => {
+      const step = vi.spyOn(h.deckService, 'stepLiveLoopSize').mockImplementation(() => undefined);
+
+      pick('B', id, 'trigger').fire();
+
+      expect(step).toHaveBeenCalledWith('B', direction);
     });
   });
 
