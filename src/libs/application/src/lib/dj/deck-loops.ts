@@ -3,6 +3,7 @@ import { logError, logWarn } from '@teensyrom-nx/utils';
 import type { JumpSettings, VarispeedLoopStart } from '@sidablist/core';
 import type { LoopMarker, LoopPositionsStore, TuneIdentity } from '@sidablist/tunes';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import {
   DjStore,
   EMPTY_DECK_LOOPS,
@@ -218,6 +219,11 @@ function reselect(
  * track's held aside) and carries it to the engine with the jump; a jump into a sharing marker
  * brings the main track's back, and so does letting go. Mixer edits reach the copy in play.
  *
+ * With slip on, firing a marker loop is a slip departure (`DeckSlip`): it begins when the marker
+ * engages or is queued, ahead of the engine call that moves the playhead, and letting the marker go
+ * lands the deck on the count the departure kept. A marker that lands over a live loop or another
+ * marker carries the count on, and a cue that lands ends the departure.
+ *
  * The engine notifies synchronously inside calls such as `capturePosition`, `setJumpTargets`,
  * `setActiveLoop` and `queueJump`, and `reflect` runs in that notification. Every path here
  * therefore writes the store and its own bookkeeping before it calls the engine, so `reflect`
@@ -228,6 +234,7 @@ export class DeckLoops {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
   private readonly mixerApplier = inject(MixerApplier);
+  private readonly slip = inject(DeckSlip);
 
   /** The holding each slot's markers belong to; null while nothing is attached. */
   private readonly attached: Record<Slot, DeckLoopsHolding | null> = { A: null, B: null };
@@ -400,7 +407,7 @@ export class DeckLoops {
       return;
     }
     if (runningId === id) {
-      this.stop(slot);
+      this.letGo(slot);
     } else if (queuedId === id) {
       this.cancelQueue(slot);
     } else if (runningId !== null || live !== null) {
@@ -431,6 +438,7 @@ export class DeckLoops {
     const engaged = this.engaged[slot];
     if (runningId === id && engaged !== null) {
       this.pendingStart[slot] = null;
+      this.slip.begin(slot, 'list-loop');
       this.jumpInto(slot, marker, engaged.startFrame);
     } else {
       this.engageOrWait(slot, marker);
@@ -984,6 +992,14 @@ export class DeckLoops {
       this.runtime.setActiveLoop(slot, bounds);
       this.syncQueued(slot);
     }
+    this.slip.markerLanded(slot);
+  }
+
+  /** The play key letting go of the running marker: with slip on, the deck lands on the count
+   *  first, then the marker goes as `stop` lets it. */
+  private letGo(slot: Slot): void {
+    this.slip.land(slot, 'list-loop');
+    this.stop(slot);
   }
 
   /** Ends the live loop in the store, before the engine's loop is set. */
@@ -1339,6 +1355,11 @@ export class DeckLoops {
     this.endOfPass[slot] = null;
     this.setEngaged(slot, bounds);
     this.setActivity(slot, bounds === null ? null : marker.id, null, false);
+    if (bounds === null) {
+      this.slip.cueLanded(slot);
+    } else {
+      this.slip.markerLanded(slot);
+    }
     if (carried !== null) {
       const { mainSettings } = this.loopsOf(slot);
       if (marker.ownSettings) {
@@ -1407,6 +1428,9 @@ export class DeckLoops {
 
   /** Engages the marker now when its start is ready, else waits for it to be. */
   private engageOrWait(slot: Slot, marker: DeckLoopMarker): void {
+    if (loopBoundsOf(marker) !== null) {
+      this.slip.begin(slot, 'list-loop', !marker.ready);
+    }
     if (marker.ready) {
       this.arm(slot, marker, false);
       this.jumpInto(slot, marker, resolvedFrame(marker.start));
@@ -1426,6 +1450,9 @@ export class DeckLoops {
   /** Queues the marker in the engine to land at the end of the running loop's lap. It replaces the
    *  running marker's edit there, which waits behind it. */
   private queueThroughEngine(slot: Slot, marker: DeckLoopMarker): void {
+    if (loopBoundsOf(marker) !== null) {
+      this.slip.begin(slot, 'list-loop', true);
+    }
     const edit = this.endOfPass[slot];
     if (edit !== null) {
       this.endOfPass[slot] = { ...edit, via: 'behind-queued' };
@@ -1452,6 +1479,7 @@ export class DeckLoops {
     this.queuedVia[slot] = null;
     this.queuedSource[slot] = null;
     this.setActivity(slot, this.loopsOf(slot).runningId, null, false);
+    this.slip.cancel(slot);
     if (via === 'engine') {
       this.runtime.queueJump(slot, null);
       // The running marker's edit saved behind the cancelled marker goes into the engine instead.
@@ -1476,6 +1504,13 @@ export class DeckLoops {
     this.held[slot] = null;
     this.endLive(slot);
     this.runtime.setActiveLoop(slot, bounds);
+    // After the engine's loop is set: the shadow's notification must not find a marker running in
+    // the store and no loop in the engine, which `reflect` reads as the engine disarming.
+    if (bounds === null) {
+      this.slip.cueLanded(slot);
+    } else {
+      this.slip.markerLanded(slot);
+    }
   }
 
   /**
@@ -1494,6 +1529,7 @@ export class DeckLoops {
       // A jump that no `arm` preceded would leave the engine on the live loop's bounds.
       this.endLive(slot);
       this.resumeRunning(slot);
+      this.slip.markerLanded(slot);
     }
     const target = this.settingsToCarry(slot, marker);
     if (target === null) {

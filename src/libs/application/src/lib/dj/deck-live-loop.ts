@@ -4,6 +4,7 @@ import type { CrossingLines } from '@sidablist/core';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckLoops } from './deck-loops';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import { DjStore, type DeckBeatGrid, type DeckLiveLoopState } from './dj-store';
 import { lengthLadder, nearestRungIndex, type LadderSize } from './grid/beat-math';
 import { DECK_SLOTS, type Slot } from './slot';
@@ -43,12 +44,16 @@ function lineAfter(grid: DeckBeatGrid, period: number, frame: number): number {
  * The live loop is state of the deck's loops (`live`), never one of its markers. It is written
  * before every engine call, since the engine notifies synchronously. `DeckLoops` keeps the marker
  * underneath, and the marker queued over the live loop, true while it runs.
+ *
+ * With slip on, a push is a slip departure and its end lands the deck on the count `DeckSlip`
+ * kept, instead of on the playhead.
  */
 @Injectable({ providedIn: 'root' })
 export class DeckLiveLoop {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
   private readonly loops = inject(DeckLoops);
+  private readonly slip = inject(DeckSlip);
 
   constructor() {
     for (const slot of DECK_SLOTS) {
@@ -78,10 +83,11 @@ export class DeckLiveLoop {
   }
 
   /** Ends a running live loop with no return: the engine's loop goes too, and the marker underneath
-   *  with it. Nothing when idle. */
+   *  with it. A slip departure of the live loop ends with no landing. Nothing when idle. */
   drop(slot: Slot): void {
     if (this.liveOf(slot) !== null) {
       this.store.setLiveLoop({ slot, live: null });
+      this.slip.release(slot, 'live-loop');
       this.runtime.setActiveLoop(slot, null);
     }
   }
@@ -224,6 +230,7 @@ export class DeckLiveLoop {
     ) {
       start = lineAfter(grid, period, ahead);
     }
+    this.slip.begin(slot, 'live-loop');
     this.apply(slot, { startFrame: start, endFrame: start + frames, pendingEndFrame: null });
   }
 
@@ -243,10 +250,20 @@ export class DeckLiveLoop {
    * The one way a live loop ends into the deck's play: back into the marker running underneath,
    * else into the tune on its own with a marker queued over the live loop engaged at once. The
    * live loop is cleared first, so `DeckLoops` lets its own engine calls through.
+   *
+   * A slip departure lands on the shadow's count, which laps the marker underneath, and the marker
+   * is resumed after it. When the landing cannot be made the end is the slip-off end below.
    */
   private returnFrom(slot: Slot): void {
     this.store.setLiveLoop({ slot, live: null });
     const { runningId, runningBounds } = this.store.loops()[slot];
+    if (this.slip.land(slot, 'live-loop')) {
+      if (runningId === null || runningBounds === null) {
+        this.runtime.setActiveLoop(slot, null);
+      }
+      this.loops.resumeRunning(slot);
+      return;
+    }
     if (runningId === null || runningBounds === null) {
       this.runtime.setActiveLoop(slot, null);
       this.loops.resumeRunning(slot);

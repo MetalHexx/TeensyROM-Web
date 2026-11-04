@@ -9,6 +9,7 @@ import { DeckGrid } from './deck-grid';
 import { DeckLiveLoop } from './deck-live-loop';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
+import { DeckSlip } from './deck-slip';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
 import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
@@ -98,6 +99,7 @@ export class DeckService {
   private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
   private readonly liveLoop = inject(DeckLiveLoop);
+  private readonly slip = inject(DeckSlip);
   private readonly grid = inject(DeckGrid);
   private readonly sets = inject(DjSets);
   private readonly keeper = inject(DeckMemoryKeeper);
@@ -256,6 +258,7 @@ export class DeckService {
     const sidHash = current.loaded.identity.sidHash;
 
     this.deckHand.drop(slot);
+    this.slip.abandon(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -620,9 +623,11 @@ export class DeckService {
   }
 
   /** Lets the running marker loop go and drops whatever is queued, and ends a live loop with it,
-   *  on the spot. The playhead never moves. */
+   *  on the spot. The playhead never moves, except under slip: a departure lands the deck on the
+   *  outermost line first. */
   stopMarkerLoop(slot: Slot): void {
     if (this.canShape(slot, 'stopMarkerLoop')) {
+      this.slip.landOutermost(slot);
       this.liveLoop.drop(slot);
       this.loops.stop(slot);
     }
@@ -664,9 +669,13 @@ export class DeckService {
     await this.bindings.hydrate();
   }
 
-  /** Turns a deck's slip on or off, and saves it with the MIDI settings. */
+  /** Turns a deck's slip on or off, and saves it with the MIDI settings. Switching it off ends a
+   *  departure running with no landing; switching it on starts nothing for one already running. */
   setSlip(slot: Slot, on: boolean): void {
     this.store.setDeckSettings({ slot, slip: on });
+    if (!on) {
+      this.slip.abandon(slot);
+    }
     this.persistence.scheduleSave();
   }
 
@@ -814,6 +823,7 @@ export class DeckService {
    */
   private async loadOnto(slot: Slot, target: LoadTarget): Promise<void> {
     this.deckHand.drop(slot);
+    this.slip.abandon(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -1024,9 +1034,11 @@ export class DeckService {
   }
 
   /** Drops the live loop and the marker loop, anything queued behind it or waiting for readiness,
-   *  and a marker's own settings in play; a no-op while none is set, so the engine is left alone. */
+   *  and a marker's own settings in play; a no-op while none is set, so the engine is left alone.
+   *  A slip departure ends with no landing. */
   private releaseMarkers(slot: Slot): void {
     const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
+    this.slip.abandon(slot);
     this.liveLoop.drop(slot);
     if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {
       this.loops.disengage(slot);

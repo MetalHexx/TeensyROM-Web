@@ -17,6 +17,7 @@ import type {
   FrameClock,
   ReplayRunner,
   JumpSettings,
+  ShadowCount,
   SidField,
   SidModel,
   VarispeedLoopStart,
@@ -380,6 +381,50 @@ export class DeckRuntime {
     const target = typeof at === 'number' ? frames(at) : { frame: frames(at.frame), held: at.held };
     const { player } = this.requireSlot(slot);
     return settings === undefined ? player.land(target) : player.land(target, settings);
+  }
+
+  /** Starts, or re-bases, this slot's shadow position: a count that moves a frame a tick wherever
+   *  the playhead goes. It laps `loop` (null: wraps where the track does), counting from `from` or,
+   *  with none, from the player's own position and phase. False with no tune loaded. */
+  startShadow(
+    slot: Slot,
+    loop: { startFrame: number; endFrame: number } | null,
+    from?: ShadowCount
+  ): boolean {
+    const { player } = this.requireSlot(slot);
+    const lap =
+      loop === null
+        ? null
+        : { startFrame: frames(loop.startFrame), endFrame: frames(loop.endFrame) };
+    return from === undefined ? player.startShadow(lap) : player.startShadow(lap, from);
+  }
+
+  stopShadow(slot: Slot): void {
+    this.requireSlot(slot).player.stopShadow();
+  }
+
+  /** The frame the shadow counts now, or null while it is stopped. Pulled for painting; allocates
+   *  nothing. */
+  getShadowPosition(slot: Slot): Frames | null {
+    return this.requireSlot(slot).player.getShadowPosition();
+  }
+
+  /** The shadow's exact count, frame and phase, or null while it is stopped. */
+  getShadowCount(slot: Slot): ShadowCount | null {
+    return this.requireSlot(slot).player.getShadowCount();
+  }
+
+  /** Ticks counted since the shadow last started or re-based, or null while it is stopped. */
+  getShadowTicks(slot: Slot): number | null {
+    return this.requireSlot(slot).player.getShadowTicks();
+  }
+
+  /** Lands the playhead on the shadow's count, as `land` does, sending nothing when the deck is
+   *  already there. False when there is no record, the count lies past it, the deck is not playing
+   *  or the shadow is stopped. The shadow keeps running. */
+  landOnShadow(slot: Slot, settings?: JumpSettings): boolean {
+    const { player } = this.requireSlot(slot);
+    return settings === undefined ? player.landOnShadow() : player.landOnShadow(settings);
   }
 
   /** Queues a jump for the end of the running loop's lap; null cancels. Its `settings` land with
