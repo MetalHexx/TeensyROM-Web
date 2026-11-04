@@ -57,8 +57,9 @@
   --synth-key-padding: 0 10px;
 }
 
-// The selected row keeps its height; the tile grid (which sizes itself `flex: 1 1 auto`) takes
+// The live loop row and the selected row keep their height; the tile grid (which sizes itself `flex: 1 1 auto`) takes
 // what is left and scrolls.
+lib-live-loop-row,
 lib-loop-selected-row {
   flex: 0 0 auto;
 }

@@ -9,39 +9,25 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import type { LoopLengthModel } from '../loop-size-control/loop-size-control.component';
 import { InlineEditTitleComponent } from '../inline-edit-title/inline-edit-title.component';
 import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 import { LoopBoundaryComponent, type LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 import type { LoopTileActivity } from '../loop-tile/loop-tile.component';
+import { LoopSizeControlComponent } from '../loop-size-control/loop-size-control.component';
 import { SynthKeyComponent } from '../synth-key/synth-key.component';
+
+export type { LoopLengthModel, LoopLengthOptionModel } from '../loop-size-control/loop-size-control.component';
 
 /** Which end of the selected loop a boundary output is about. */
 export type LoopBoundaryName = 'start' | 'end';
-
-/** One size the Length picker offers. */
-export interface LoopLengthOptionModel {
-  readonly beats: number;
-  readonly label: string;
-  readonly selected: boolean;
-}
 
 /** One distance the Move step picker offers: beats, or `'frame'` for one play call. */
 export interface LoopMoveStepOptionModel {
   readonly beats: 'frame' | 1 | 2 | 4 | 8 | 16;
   readonly label: string;
   readonly selected: boolean;
-}
-
-/** The Length row: halve and double keys around a readout that opens a picker of sizes. */
-export interface LoopLengthModel {
-  /** '16 BEATS' | '7.8s' | 'NO END'. */
-  readonly text: string;
-  /** Empty when there is no grid: the readout is then plain text with no list. */
-  readonly options: readonly LoopLengthOptionModel[];
-  readonly halveAccessibleName: string;
-  readonly doubleAccessibleName: string;
-  readonly pickAccessibleName: string;
 }
 
 /** The Move row: move-earlier and move-later keys around a readout that opens a picker of steps. */
@@ -176,6 +162,7 @@ const LAMP_OFF = 'radio_button_unchecked';
     DropdownMenuItemComponent,
     InlineEditTitleComponent,
     LoopBoundaryComponent,
+    LoopSizeControlComponent,
     SynthKeyComponent,
   ],
   templateUrl: './loop-selected-row.component.html',

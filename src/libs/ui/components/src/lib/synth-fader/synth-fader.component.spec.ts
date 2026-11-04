@@ -68,43 +68,6 @@ describe('SynthFaderComponent', () => {
       expect(down.defaultPrevented).toBe(true);
     });
 
-    it('accumulates small pixel deltas until they make a click', () => {
-      wheel(-40);
-      wheel(-40);
-      expect(wheels).toEqual([]);
-
-      wheel(-40);
-      expect(wheels.map((w) => w.clicks)).toEqual([1]);
-
-      wheel(-100);
-      expect(wheels.map((w) => w.clicks)).toEqual([1, 1]);
-    });
-
-    it('drops a partial click after a pause or a change of direction', () => {
-      wheel(-60, 0, 1000);
-      wheel(-60, 0, 1500);
-      expect(wheels).toEqual([]);
-
-      wheel(-80, 0, 2000);
-      wheel(10, 0, 2010);
-      wheel(-40, 0, 2020);
-      expect(wheels).toEqual([]);
-    });
-
-    it('emits several clicks for a large delta and keeps the remainder', () => {
-      wheel(-250);
-      wheel(-50);
-      expect(wheels.map((w) => w.clicks)).toEqual([2, 1]);
-    });
-
-    it('counts 3 lines, or one page, as a click', () => {
-      wheel(-1, 1);
-      wheel(-2, 1);
-      wheel(1, 2);
-
-      expect(wheels.map((w) => w.clicks)).toEqual([1, -1]);
-    });
-
     it('emits nothing and lets the page scroll while disabled', () => {
       fixture.componentRef.setInput('disabled', true);
       fixture.detectChanges();

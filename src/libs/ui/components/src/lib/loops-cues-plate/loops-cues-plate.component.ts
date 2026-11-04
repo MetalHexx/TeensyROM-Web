@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output, viewChild } from '@angular/core';
+import { LiveLoopRowComponent, type LiveLoopRowModel } from '../live-loop-row/live-loop-row.component';
 import {
   LoopSelectedRowComponent,
   type LoopBoundaryNudge,
@@ -27,16 +28,19 @@ export interface LoopsCuesPlateModel {
   readonly gridAccessibleName: string;
   /** Shown in the grid's place when there are no tiles: no tune, or a tune with no markers. */
   readonly emptyText: string | null;
+  /** The live loop row above the selected row. */
+  readonly live: LiveLoopRowModel;
   readonly selected: LoopSelectedRowModel;
   readonly tiles: readonly LoopTileModel[];
 }
 
 /**
- * One deck's loops/cues faceplate: an engraved caption with the Add, Duplicate and Stop keys, the fixed
- * selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
+ * One deck's loops/cues faceplate: an engraved caption with the Add, Duplicate and Stop keys, the live loop
+ * row (Live loop, SIZE, SLIP), the fixed selected-loop row, and beneath it the scrolling tile grid, which takes the remaining height.
  * Purely presentational and inert — the caller owns every marker, every drag offset and every
  * write. The keys carry their own `data-control` ids (`loop-add`, `loop-duplicate`, `loop-stop`), distinct from the
- * transport's `stop`, so the mapping overlay resolves each to the right control. The selected row's
+ * transport's `stop`, so the mapping overlay resolves each to the right control. The live loop row's
+ * keys are `live-loop`, `live-loop-halve`, `live-loop-double`, `live-loop-size` and `slip`. The selected row's
  * In and Out keys are `loop-in` and `loop-set-end`, the Length readout `loop-length`, the Move keys
  * `loop-move-earlier` and `loop-move-later`, and the step readout `loop-move-step`; the boundaries'
  * edge-move arrows sit under `loop-start` and `loop-end` as `move-earlier` and `move-later` parts. The running
@@ -50,6 +54,13 @@ export interface LoopsCuesPlateModel {
  *   (addMarker)="onAdd()"
  *   (duplicateMarker)="onDuplicate()"
  *   (stopLoop)="onStop()"
+ *   (toggleLiveLoop)="onToggleLiveLoop()"
+ *   (endLiveLoop)="onEndLiveLoop()"
+ *   (halveLiveLoop)="onHalveLiveLoop()"
+ *   (doubleLiveLoop)="onDoubleLiveLoop()"
+ *   (pickLiveLoopSize)="onPickLiveLoopSize($event)"
+ *   (liveLoopSizeWheel)="onLiveLoopSizeWheel($event)"
+ *   (toggleSlip)="onToggleSlip()"
  *   (triggerTile)="onTrigger($event)"
  *   (playNowTile)="onPlayNow($event)"
  *   (playNowSelected)="onPlayNowSelected()"
@@ -73,7 +84,13 @@ export interface LoopsCuesPlateModel {
   templateUrl: './loops-cues-plate.component.html',
   styleUrl: './loops-cues-plate.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SynthPanelComponent, SynthKeyComponent, LoopSelectedRowComponent, LoopTileGridComponent],
+  imports: [
+    SynthPanelComponent,
+    SynthKeyComponent,
+    LiveLoopRowComponent,
+    LoopSelectedRowComponent,
+    LoopTileGridComponent,
+  ],
 })
 export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   /** The plate's display model and state. */
@@ -88,6 +105,20 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly duplicateMarker = output<void>();
   /** Emits when the Stop key is pressed. */
   readonly stopLoop = output<void>();
+  /** Emits when the Live loop key goes down. */
+  readonly toggleLiveLoop = output<void>();
+  /** Emits when a Live loop press that started the loop is released after a hold. */
+  readonly endLiveLoop = output<void>();
+  /** Emits when the live loop's ½ key is pressed. */
+  readonly halveLiveLoop = output<void>();
+  /** Emits when the live loop's 2× key is pressed. */
+  readonly doubleLiveLoop = output<void>();
+  /** Emits the size picked in the live loop's picker, in beats. */
+  readonly pickLiveLoopSize = output<number>();
+  /** Emits whole wheel clicks over the live loop's size readout, upward positive. */
+  readonly liveLoopSizeWheel = output<{ clicks: number; timeStampMs: number }>();
+  /** Emits when the SLIP key is pressed. */
+  readonly toggleSlip = output<void>();
   /** Emits when the selected row's trigger key is pressed. */
   readonly toggleSelected = output<void>();
   /** Emits when the selected row's play-now key is pressed. */

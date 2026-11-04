@@ -23,12 +23,14 @@ import type {
   DeckChannelStripModel,
   DeckTransportModel,
   DeckTransportState,
+  LiveLoopRowModel,
   LoopBoundaryModel,
   LoopBoundaryNudge,
   LoopEdgeMove,
   LoopSelectedRowModel,
   LoopTileModel,
   LoopsCuesPlateModel,
+  PositionMark,
 } from '@teensyrom-nx/ui/components/dj';
 import {
   DeckService,
@@ -39,6 +41,7 @@ import {
   SPEED_FADER_RANGE,
   formatSpeedPercent,
   type DeckTransportSummary,
+  type LiveLoopSummary,
   type LoopActivity,
   type LoopBoundaryName,
   type LoopBoundarySummary,
@@ -174,6 +177,26 @@ function selectedRowModel(
   };
 }
 
+/** The live loop row from its summary. With no grid the row is inert and the readout stays blank. */
+function liveLoopRowModel(live: LiveLoopSummary, letter: string): LiveLoopRowModel {
+  return {
+    running: live.running,
+    disabled: !live.available,
+    liveLoopAccessibleName: `Live loop deck ${letter}`,
+    size: {
+      text: live.available ? live.sizeText : '—',
+      options: live.sizeOptions,
+      halveAccessibleName: `Halve live loop deck ${letter}`,
+      doubleAccessibleName: `Double live loop deck ${letter}`,
+      pickAccessibleName: `Live loop size deck ${letter}`,
+    },
+    canHalve: live.canHalve,
+    canDouble: live.canDouble,
+    slip: live.slip,
+    slipAccessibleName: `Slip deck ${letter}`,
+  };
+}
+
 type SpeedJump = 'up' | 'home' | 'down';
 
 /** The channel strip's `jump` id is an opaque string; this is the one place it is narrowed. */
@@ -223,6 +246,9 @@ export class DjDeckColumnComponent {
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
   readonly loops = computed(() => this.djStore.loopsSummary(this.deck().slot)());
 
+  /** Never reads the playhead either. */
+  private readonly liveLoop = computed(() => this.djStore.liveLoopSummary(this.deck().slot)());
+
   // Non-null only while a nudge strip is being dragged: the pointer's offset pins the boundary
   // readout until the nudge is committed or the selection moves on.
   readonly startDragOffset = signal<number | null>(null);
@@ -242,6 +268,7 @@ export class DjDeckColumnComponent {
       stopDisabled: !canStop,
       gridAccessibleName: `Loops deck ${letter}`,
       emptyText: hasTune ? 'Add a cue at the playhead' : 'Load a tune to add loops',
+      live: liveLoopRowModel(this.liveLoop(), letter),
       selected: selectedRowModel(selected, moveStepText, moveStepOptions, letter),
       tiles: items.map(
         (item): LoopTileModel => ({
@@ -303,7 +330,7 @@ export class DjDeckColumnComponent {
       emptyText: 'No tune — drop a SID here',
       totalText: summary.totalText,
       bar: summary.bar,
-      marks: this.loops().items,
+      marks: this.stripMarks(),
       scrubAccessibleName: `Position deck ${letter}`,
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
@@ -329,6 +356,25 @@ export class DjDeckColumnComponent {
         nextAccessibleName: `Next in the set deck ${letter}`,
       },
     };
+  });
+
+  /** The plate's markers, then a running live loop's bracket; the live loop is never a tile. */
+  private readonly stripMarks = computed<readonly PositionMark[]>(() => {
+    const { items } = this.loops();
+    const { mark } = this.liveLoop();
+    return mark === null
+      ? items
+      : [
+          ...items,
+          {
+            id: 'live',
+            kind: 'loop',
+            startPercent: mark.startPercent,
+            endPercent: mark.endPercent,
+            activity: 'running',
+            selected: false,
+          },
+        ];
   });
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
@@ -513,6 +559,38 @@ export class DjDeckColumnComponent {
 
   onToggleSelected(): void {
     void this.deckService.toggleMarker(this.deck().slot);
+  }
+
+  onToggleLiveLoop(): void {
+    this.deckService.toggleLiveLoop(this.deck().slot);
+  }
+
+  onEndLiveLoop(): void {
+    this.deckService.endLiveLoop(this.deck().slot);
+  }
+
+  onHalveLiveLoop(): void {
+    this.deckService.stepLiveLoopSize(this.deck().slot, 'halve');
+  }
+
+  onDoubleLiveLoop(): void {
+    this.deckService.stepLiveLoopSize(this.deck().slot, 'double');
+  }
+
+  onPickLiveLoopSize(beats: number): void {
+    this.deckService.setLiveLoopBeats(this.deck().slot, beats);
+  }
+
+  /** One rung per wheel click: up doubles, down halves. */
+  onLiveLoopSizeWheel({ clicks }: { clicks: number; timeStampMs: number }): void {
+    const direction = clicks > 0 ? 'double' : 'halve';
+    for (let i = 0; i < Math.abs(clicks); i++) {
+      this.deckService.stepLiveLoopSize(this.deck().slot, direction);
+    }
+  }
+
+  onToggleSlip(): void {
+    this.deckService.setSlip(this.deck().slot, !this.liveLoop().slip);
   }
 
   onTriggerTile(id: string): void {

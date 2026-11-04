@@ -280,6 +280,17 @@ describe('LoopSelectedRowComponent', () => {
     const menuItems = (): HTMLButtonElement[] =>
       Array.from(document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item'));
 
+    it('draws the Length row through the shared size control, with the wheel off and the control id on the readout', () => {
+      const control = el().querySelector('lib-loop-size-control') as HTMLElement;
+      expect(control).not.toBeNull();
+      expect(control.querySelector('.tag')?.textContent).toBe('Length');
+      expect(control.querySelector('[data-control="loop-length"]')).not.toBeNull();
+
+      const wheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+      picker('loop-length').dispatchEvent(wheel);
+      expect(wheel.defaultPrevented).toBe(false);
+    });
+
     it('relays Move earlier and later', () => {
       const emitted: string[] = [];
       fixture.componentInstance.moveEarlier.subscribe(() => emitted.push('earlier'));

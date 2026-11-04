@@ -19,6 +19,8 @@ export * from './lib/loop-tile/loop-tile.component';
 export * from './lib/loop-tile-grid/loop-tile-grid.component';
 export * from './lib/loop-boundary/loop-boundary.component';
 export * from './lib/loop-selected-row/loop-selected-row.component';
+export * from './lib/loop-size-control/loop-size-control.component';
+export * from './lib/live-loop-row/live-loop-row.component';
 export * from './lib/set-card/set-card.component';
 export * from './lib/set-header/set-header.component';
 export * from './lib/set-control-plate/set-control-plate.component';

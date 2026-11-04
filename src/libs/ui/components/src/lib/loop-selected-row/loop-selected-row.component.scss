@@ -152,7 +152,7 @@ lib-synth-key[data-control='loop-delete'] {
   text-transform: uppercase;
 }
 
-// ½, 2×, and the Move arrows: square keys that sit level with the boundary rows' arrows.
+// The Move arrows: square keys that sit level with the boundary rows' arrows.
 lib-synth-key.step {
   --synth-key-height: 22px;
   --synth-key-min-width: 32px;
@@ -161,20 +161,13 @@ lib-synth-key.step {
   --synth-key-letter-spacing: 0;
 }
 
-// The Length and Move readouts: a small display that is a picker's trigger when it has options and
+// The Move readout: a small display that is a picker's trigger when it has options and
 // plain text when it has none. The dropdown's wrappers are inline blocks; stretch them to the slot.
 lib-dropdown-menu {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
-
-  ::ng-deep {
-    lib-dropdown-dialog,
-    lib-dropdown-dialog > div,
-    .dropdown-container {
-      display: block;
-    }
-  }
+  --dropdown-menu-trigger-display: block;
 }
 
 .readout {
@@ -211,10 +204,6 @@ button.readout {
 .caret {
   color: var(--synth-display-dim);
   font-size: 0.5rem;
-}
-
-:host([data-empty]) .control:first-of-type .readout {
-  color: var(--synth-display-dim);
 }
 
 // Too narrow for two boundaries abreast: stack them, and give the display a line of its own so the

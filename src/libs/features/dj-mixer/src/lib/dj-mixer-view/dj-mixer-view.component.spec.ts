@@ -237,6 +237,17 @@ function createDjStoreStub(
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
     loopsSummary: () => signal(loops),
+    liveLoopSummary: () =>
+      signal({
+        available: false,
+        running: false,
+        sizeText: '1 BEAT',
+        sizeOptions: [],
+        canHalve: false,
+        canDouble: false,
+        slip: false,
+        mark: null,
+      }),
     settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
     asidLaunching,
     bindings: signal({

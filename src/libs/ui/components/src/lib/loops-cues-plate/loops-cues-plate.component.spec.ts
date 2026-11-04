@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { LiveLoopRowModel } from '../live-loop-row/live-loop-row.component';
 import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 import type { LoopSelectedRowModel } from '../loop-selected-row/loop-selected-row.component';
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
@@ -104,6 +105,29 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
   };
 }
 
+function liveRow(overrides: Partial<LiveLoopRowModel> = {}): LiveLoopRowModel {
+  return {
+    running: false,
+    disabled: false,
+    liveLoopAccessibleName: 'Live loop deck A',
+    size: {
+      text: '4 BEATS',
+      options: [
+        { beats: 2, label: '2 BEATS', selected: false },
+        { beats: 4, label: '4 BEATS', selected: true },
+      ],
+      halveAccessibleName: 'Halve live loop deck A',
+      doubleAccessibleName: 'Double live loop deck A',
+      pickAccessibleName: 'Live loop size deck A',
+    },
+    canHalve: true,
+    canDouble: true,
+    slip: false,
+    slipAccessibleName: 'Slip deck A',
+    ...overrides,
+  };
+}
+
 function model(overrides: Partial<LoopsCuesPlateModel> = {}): LoopsCuesPlateModel {
   return {
     accessibleName: 'Loops/Cues deck A',
@@ -115,6 +139,7 @@ function model(overrides: Partial<LoopsCuesPlateModel> = {}): LoopsCuesPlateMode
     stopDisabled: false,
     gridAccessibleName: 'Loops and cues, deck A',
     emptyText: null,
+    live: liveRow(),
     selected: selectedRow(),
     tiles: [tile(1, { selected: true }), tile(2)],
     ...overrides,
@@ -138,6 +163,13 @@ describe('LoopsCuesPlateComponent', () => {
     component.addMarker.subscribe(plain('add'));
     component.duplicateMarker.subscribe(plain('duplicate'));
     component.stopLoop.subscribe(plain('stop'));
+    component.toggleLiveLoop.subscribe(plain('toggleLiveLoop'));
+    component.endLiveLoop.subscribe(plain('endLiveLoop'));
+    component.halveLiveLoop.subscribe(plain('halveLiveLoop'));
+    component.doubleLiveLoop.subscribe(plain('doubleLiveLoop'));
+    component.pickLiveLoopSize.subscribe(valued('pickLiveLoopSize'));
+    component.liveLoopSizeWheel.subscribe(valued('liveLoopSizeWheel'));
+    component.toggleSlip.subscribe(plain('toggleSlip'));
     component.toggleSelected.subscribe(plain('toggle'));
     component.playNowSelected.subscribe(plain('playNowSelected'));
     component.toggleGlobal.subscribe(plain('toggleGlobal'));
@@ -198,6 +230,39 @@ describe('LoopsCuesPlateComponent', () => {
       byName('Duplicate deck A').click();
 
       expect(emitted).toEqual(['duplicate']);
+    });
+
+    it('re-emits the live loop row as its own outputs, above the selected row', () => {
+      const row = fixture.nativeElement.querySelector('lib-live-loop-row') as HTMLElement;
+      const selected = fixture.nativeElement.querySelector('lib-loop-selected-row') as HTMLElement;
+      expect(row.compareDocumentPosition(selected) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      byName('Live loop deck A').dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      byName('Halve live loop deck A').click();
+      byName('Double live loop deck A').click();
+      byName('Slip deck A').click();
+      control('live-loop-size')?.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })
+      );
+
+      expect(emitted).toEqual([
+        'toggleLiveLoop',
+        'halveLiveLoop',
+        'doubleLiveLoop',
+        'toggleSlip',
+        ['liveLoopSizeWheel', expect.objectContaining({ clicks: 1 })],
+      ]);
+    });
+
+    it('re-emits a picked live loop size in beats', () => {
+      control('live-loop-size')?.click();
+      fixture.detectChanges();
+      const item = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')
+      ).find((candidate) => candidate.textContent?.includes('2 BEATS'));
+      item?.click();
+
+      expect(emitted).toEqual([['pickLiveLoopSize', 2]]);
     });
 
     it('re-emits each selected-row key as its own output', () => {

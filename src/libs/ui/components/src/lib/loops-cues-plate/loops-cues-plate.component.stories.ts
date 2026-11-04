@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
+import type { LiveLoopRowModel } from '../live-loop-row/live-loop-row.component';
 import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
 import type { LoopSelectedRowModel } from '../loop-selected-row/loop-selected-row.component';
 import type { LoopTileModel } from '../loop-tile/loop-tile.component';
@@ -203,6 +204,30 @@ function tile(number: number, overrides: Partial<LoopTileModel> = {}): LoopTileM
   };
 }
 
+function liveRow(overrides: Partial<LiveLoopRowModel> = {}): LiveLoopRowModel {
+  return {
+    running: false,
+    disabled: false,
+    liveLoopAccessibleName: 'Live loop deck A',
+    size: {
+      text: '4 BEATS',
+      options: LENGTH_BEATS.map((beats) => ({
+        beats,
+        label: beatsLabel(beats),
+        selected: beats === 4,
+      })),
+      halveAccessibleName: 'Halve live loop deck A',
+      doubleAccessibleName: 'Double live loop deck A',
+      pickAccessibleName: 'Live loop size deck A',
+    },
+    canHalve: true,
+    canDouble: true,
+    slip: false,
+    slipAccessibleName: 'Slip deck A',
+    ...overrides,
+  };
+}
+
 function plateModel(
   tiles: readonly LoopTileModel[],
   overrides: Partial<LoopsCuesPlateModel> = {}
@@ -218,6 +243,7 @@ function plateModel(
     stopDisabled: false,
     gridAccessibleName: 'Loops and cues, deck A',
     emptyText: null,
+    live: liveRow(),
     selected: selected ? selectedFor(selected) : emptySelected(),
     tiles,
     ...overrides,
@@ -312,8 +338,24 @@ export const NoGrid: Story = {
       const loop = tile(1, { selected: true, lengthText: '7.8s' });
       return plateModel([loop, tile(2, { lengthText: '13.4s' })], {
         selected: selectedFor(loop, false),
+        live: liveRow({
+          disabled: true,
+          canHalve: false,
+          canDouble: false,
+          size: { ...liveRow().size, text: '—', options: [] },
+        }),
       });
     })(),
+  },
+};
+
+/** A live loop running with SLIP latched: the row's light is on and the tiles are unchanged. */
+export const LiveLoopRunning: Story = {
+  args: {
+    runningProgressPercent: 0,
+    model: plateModel([tile(1, { selected: true }), tile(2)], {
+      live: liveRow({ running: true, slip: true }),
+    }),
   },
 };
 

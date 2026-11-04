@@ -101,46 +101,15 @@
   />
 </div>
 <div class="controls">
-  <div class="control">
-    <span class="tag" aria-hidden="true">Length</span>
-    <lib-synth-key
-      class="step"
-      label="½"
-      [accessibleName]="model().length.halveAccessibleName"
-      [disabled]="model().empty"
-      (press)="halve.emit()"
-    />
-    @if (model().length.options.length > 0) {
-    <lib-dropdown-menu #lengthMenu>
-      <button
-        type="button"
-        class="readout"
-        data-control="loop-length"
-        aria-haspopup="menu"
-        [attr.aria-label]="model().length.pickAccessibleName + ', ' + model().length.text"
-        (click)="lengthMenu.toggle()"
-      >
-        {{ model().length.text }}<span class="caret" aria-hidden="true">▾</span>
-      </button>
-      <div dropdown-content>
-        @for (option of model().length.options; track option.beats) {
-        <lib-dropdown-menu-item [selected]="option.selected" (itemClick)="pickLength.emit(option.beats)">
-          {{ option.label }}
-        </lib-dropdown-menu-item>
-        }
-      </div>
-    </lib-dropdown-menu>
-    } @else {
-    <span class="readout" data-control="loop-length">{{ model().length.text }}</span>
-    }
-    <lib-synth-key
-      class="step"
-      label="2×"
-      [accessibleName]="model().length.doubleAccessibleName"
-      [disabled]="model().empty"
-      (press)="double.emit()"
-    />
-  </div>
+  <lib-loop-size-control
+    tag="Length"
+    readoutControl="loop-length"
+    [model]="model().length"
+    [disabled]="model().empty"
+    (halve)="halve.emit()"
+    (double)="double.emit()"
+    (pickLength)="pickLength.emit($event)"
+  />
   <div class="control">
     <span class="tag" aria-hidden="true">Move</span>
     <lib-synth-key

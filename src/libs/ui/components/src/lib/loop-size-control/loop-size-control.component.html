@@ -1,0 +1,44 @@
+<span class="tag" aria-hidden="true">{{ tag() }}</span>
+<lib-synth-key
+  class="step"
+  label="½"
+  [attr.data-control]="halveControl()"
+  [accessibleName]="model().halveAccessibleName"
+  [disabled]="halveOff()"
+  (press)="halve.emit()"
+/>
+@if (model().options.length > 0) {
+<lib-dropdown-menu #sizeMenu>
+  <button
+    type="button"
+    class="readout"
+    aria-haspopup="menu"
+    [disabled]="disabled()"
+    [attr.data-control]="readoutControl()"
+    [attr.aria-label]="model().pickAccessibleName + ', ' + model().text"
+    (click)="sizeMenu.toggle()"
+    (wheel)="onWheel($event)"
+  >
+    {{ model().text }}<span class="caret" aria-hidden="true">▾</span>
+  </button>
+  <div dropdown-content>
+    @for (option of model().options; track option.beats) {
+    <lib-dropdown-menu-item [selected]="option.selected" (itemClick)="pickLength.emit(option.beats)">
+      {{ option.label }}
+    </lib-dropdown-menu-item>
+    }
+  </div>
+</lib-dropdown-menu>
+} @else {
+<span class="readout" [attr.data-control]="readoutControl()" (wheel)="onWheel($event)">{{
+  model().text
+}}</span>
+}
+<lib-synth-key
+  class="step"
+  label="2×"
+  [attr.data-control]="doubleControl()"
+  [accessibleName]="model().doubleAccessibleName"
+  [disabled]="doubleOff()"
+  (press)="double.emit()"
+/>
