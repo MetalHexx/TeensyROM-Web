@@ -9,7 +9,8 @@ const meta: Meta<LiveLoopRowComponent> = {
     docs: {
       description: {
         component:
-          "The live loop row at the top of a deck's loops/cues plate: the Live loop key, the SIZE " +
+          "The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights " +
+          'green while the loop runs: the Live loop key, the SIZE ' +
           'control (½, a size picker, 2×, with the mouse wheel on the readout) and the latching SLIP ' +
           'key. The Live loop key acts on press: a quick click leaves the loop running, and a press ' +
           'held for 300 ms or more ends the loop it started when released. Presentational only.',
@@ -64,7 +65,7 @@ const idle: LiveLoopRowModel = {
 /** No live loop: the key's light is dark and SLIP is off. */
 export const Idle: Story = { args: { model: idle } };
 
-/** The live loop is running: the Live loop key's light is on. */
+/** The live loop is running: the tray's border and rim glow green and the Live loop key's light is on. */
 export const Running: Story = { args: { model: { ...idle, running: true } } };
 
 /** SLIP latched: its lamp is a ringed dot. */

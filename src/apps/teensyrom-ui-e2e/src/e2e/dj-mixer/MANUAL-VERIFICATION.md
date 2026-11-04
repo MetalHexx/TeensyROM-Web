@@ -1064,7 +1064,7 @@ The browser ran at a device pixel ratio of 1.5625, so the mockup's 1 px borders 
 | | mockup (frame A) | built | outcome |
 | --- | --- | --- | --- |
 | Row order | Live loop key, Size control, Slip key | Live loop key, Size control, Slip key | same |
-| Row box | a bordered tray (6 / 8 px padding, 1 px border, dark fill; green border and inner glow while running), 444.7 x 37.3 | no tray, 440.4 x 26 | finding |
+| Row box | a bordered tray (6 / 8 px padding, 1 px border, dark fill; green border and inner glow while running), 444.7 x 37.3 | the same tray in the theme's tokens (the selected row's border colour and radius, 6 / 8 px padding, 25% black fill, a success-colour border at 60% and an inner glow at 12% while running), 440.4 x 39.6 | tray added; the 2.3 px of height is the 26 px key scale |
 | Spacing between the three | 8 px | 6 px | finding (part of the key scale) |
 | Live loop key | 110.3 x 24, 9.5 px label, running lamp dot, label "Live loop" | 79.7 x 26, 8.5 px label, running state as the green bar across the key's top (the same as Pause) | finding |
 | Size control | 223.7 x 22: dim "Size" tag, half, readout, double | 299.8 x 22: bright "SIZE" tag, half, readout, double | the tag colour is the shared control's (the Length and Move rows use it too); not changed |
@@ -1092,14 +1092,18 @@ specificity), so the 5 px minimum never applied: a live mark and an ordinary loo
 this cascade, so no unit spec can see it; this was read in a real browser.
 
 Findings, not fixed (larger than a small visual difference or not this task's to settle): the built
-row has no tray and no lamp dot on its keys; its keys follow the page's 26 px key scale where the
+row has no lamp dot on its keys (the tray was added afterwards, see the Row box line); its keys follow the page's 26 px key scale where the
 wireframe draws 24 px (live row) and 32 px (transport) keys; the Live loop and Slip keys are narrower
 than the mockup's because their labels are set smaller and the Slip key has no lamp-dot-and-label
 form. Nothing in the idle row clips or leaves its plate at any of the five widths the responsive spec
 covers (see below), but the row does wrap: it holds on one line at 1100 and 768 px, and the Size
 control drops to its own line when the row's container is under 20 rem (the row measured 241 px wide at
 400 px, 136 at 1279 px and 196 at 1400 px, each with Size on a second line). That is the row's
-container-query layout, not a fault. The operator can decide whether the tray is wanted.
+container-query layout, not a fault. The tray was added in the final-review correction: the row's
+padding and border take 18 px of the container's content width, so the 20 rem threshold now reads the
+content box (the row's controls need about 273 px abreast at the 8 px gap, so it still leaves headroom);
+the five-width responsive spec passes with the tray (47 of 47), and in the 1920 x 1080 frame the running
+tray read a success-green border and inner glow beside the idle tray's grey border.
 
 ### Timing protocol with slip on
 
@@ -1212,7 +1216,7 @@ made on the running app), and the Live loop row stories were not opened.
 - [ ] Toggle and hold on a pad.
 - [ ] A push encoder.
 - [ ] The other deck's timing throughout.
-- [ ] The row beside the mockup on the real display: the tray, the key sizes and the Slip key's form
+- [ ] The row beside the mockup on the real display: the key sizes and the Slip key's form
   (findings above), and the green live bracket.
 - [ ] Playback timing per the timing protocol above and the `asid-dj-diagnostics` skill, with both
   cartridges connected and DevTools closed, repeating the build-up and the live-loop-after-landing

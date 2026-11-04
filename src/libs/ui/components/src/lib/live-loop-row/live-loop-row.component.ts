@@ -31,7 +31,8 @@ export interface LiveLoopRowModel {
 }
 
 /**
- * The live loop row at the top of a deck's loops/cues plate: the Live loop key, the SIZE control
+ * The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights green
+ * (`data-running` on the host) while the loop runs: the Live loop key, the SIZE control
  * (½, a size picker, 2×) and the latching SLIP key. Purely presentational: the caller owns the loop,
  * the size and the slip, and supplies every label.
  *
@@ -61,6 +62,9 @@ export interface LiveLoopRowModel {
   templateUrl: './live-loop-row.component.html',
   styleUrl: './live-loop-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-running]': 'model().running ? "" : null',
+  },
 })
 export class LiveLoopRowComponent {
   /** The row's state. */

@@ -2,12 +2,23 @@
   display: block;
   container-type: inline-size;
   min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--synth-control-border);
+  border-radius: var(--border-radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+}
+
+// A running live loop lights the tray's border and rim.
+:host([data-running]) {
+  border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--color-success) 12%, transparent);
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 

@@ -146,6 +146,18 @@ describe('LiveLoopRowComponent', () => {
       expect(liveKey().getAttribute('data-state-light')).toBe('playing');
     });
 
+    it('marks the tray as running while the loop runs', () => {
+      expect(el.hasAttribute('data-running')).toBe(false);
+
+      set({ ...row, running: true });
+
+      expect(el.hasAttribute('data-running')).toBe(true);
+
+      set(row);
+
+      expect(el.hasAttribute('data-running')).toBe(false);
+    });
+
     it('does nothing while the row is disabled', () => {
       set({ ...row, disabled: true });
 
