@@ -158,3 +158,4 @@ jobs:
             artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
             artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
             artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-linux-x64.tar.gz
+            artifacts/TeensyROM-Suite-${{ needs.validate.outputs.version }}-linux-arm64.tar.gz

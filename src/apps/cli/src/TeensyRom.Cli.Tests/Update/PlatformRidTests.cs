@@ -11,7 +11,8 @@ public sealed class PlatformRidTests
     [InlineData("osx", Architecture.Arm64, "osx-arm64")]
     [InlineData("linux", Architecture.X64, "linux-x64")]
     [InlineData("windows", Architecture.Arm64, null)]
-    [InlineData("linux", Architecture.Arm64, null)]
+    [InlineData("linux", Architecture.Arm64, "linux-arm64")]
+    [InlineData("linux", Architecture.Arm, null)]
     [InlineData("linux", Architecture.X86, null)]
     [InlineData("freebsd", Architecture.X64, null)]
     public void For_NamesTheFourShippedPlatformsAndNothingElse(string os, Architecture architecture, string? expected)
@@ -24,6 +25,7 @@ public sealed class PlatformRidTests
     [InlineData("osx-arm64", ".tar.gz", "trom", "TeensyRom.Api")]
     [InlineData("osx-x64", ".tar.gz", "trom", "TeensyRom.Api")]
     [InlineData("linux-x64", ".tar.gz", "trom", "TeensyRom.Api")]
+    [InlineData("linux-arm64", ".tar.gz", "trom", "TeensyRom.Api")]
     public void Names_FollowTheRid(string rid, string suffix, string trom, string api)
     {
         PlatformRid.ArchiveSuffix(rid).Should().Be(suffix);

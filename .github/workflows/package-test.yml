@@ -52,7 +52,7 @@ jobs:
     uses: ./.github/workflows/build-packages.yml
     with:
       version: ${{ needs.version.outputs.version }}
-      rids: '["win-x64","osx-arm64","osx-x64","linux-x64"]'
+      rids: '["win-x64","osx-arm64","osx-x64","linux-x64","linux-arm64"]'
       retention-days: 1
 
   macos:
@@ -137,14 +137,20 @@ jobs:
           if-no-files-found: ignore
 
   linux:
-    name: Tarball install (linux-x64)
+    name: Tarball install (${{ matrix.rid }})
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, rid: linux-x64 }
+          - { runner: ubuntu-24.04-arm, rid: linux-arm64 }
 
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      RID: linux-x64
+      RID: ${{ matrix.rid }}
       NEXT_VERSION: '999.0.0'
       TROM_RELEASES_URL: http://127.0.0.1:8765/releases.json
 
@@ -155,7 +161,7 @@ jobs:
       - name: Download package
         uses: actions/download-artifact@v4
         with:
-          name: TeensyROM-Suite-${{ needs.version.outputs.version }}-linux-x64
+          name: TeensyROM-Suite-${{ needs.version.outputs.version }}-${{ matrix.rid }}
           path: ${{ runner.temp }}/pkg
 
       - name: Unpack package
@@ -209,7 +215,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: package-test-logs-linux-x64
+          name: package-test-logs-${{ matrix.rid }}
           path: ${{ runner.temp }}/logs
           if-no-files-found: ignore
 
