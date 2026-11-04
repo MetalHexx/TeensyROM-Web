@@ -886,6 +886,7 @@ describe('DjDeckColumnComponent', () => {
             endPercent: 20,
             activity: 'running',
             selected: false,
+            live: true,
           },
         ]);
         expect(plate(fixture).model().tiles.map((tile) => tile.id)).toEqual(['m1']);

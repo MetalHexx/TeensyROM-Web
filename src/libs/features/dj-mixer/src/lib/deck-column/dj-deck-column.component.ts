@@ -373,6 +373,7 @@ export class DjDeckColumnComponent {
             endPercent: mark.endPercent,
             activity: 'running',
             selected: false,
+            live: true,
           },
         ];
   });

@@ -449,6 +449,17 @@ describe('PositionStripComponent', () => {
       expect(selectedCue.hasAttribute('data-selected')).toBe(true);
     });
 
+    it('flags a live loop’s bracket apart from the plate’s own loops', () => {
+      set('marks', [
+        { ...loop, id: 'plain' },
+        { ...loop, id: 'live', live: true },
+      ]);
+
+      const [plain, live] = marks();
+      expect(plain.hasAttribute('data-live')).toBe(false);
+      expect(live.hasAttribute('data-live')).toBe(true);
+    });
+
     it('holds a mark outside 0–100 on the track and never draws a negative width', () => {
       set('marks', [
         { ...loop, startPercent: -10, endPercent: 140 },

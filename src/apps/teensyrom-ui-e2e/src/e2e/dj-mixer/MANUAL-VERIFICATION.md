@@ -1032,3 +1032,169 @@ and length, and how the drag ghost looks, needs a bench.
 ### Verdict
 
 Pending: the operator's, from the bench.
+
+## Slip, the live loop row and the bench checklist (ASID-DJ-20, 2026-11-04)
+
+Browser check of the built Live loop row, the transport without Repeat and the strip's second
+playhead against `ASID-DJ-ROOT-WIREFRAME-SLIP.html`; the DJ mixer's timing protocol with slip on,
+very short live loops and build-ups, driven against the running dev build; the automated commands;
+and what the operator needs at the bench. The listening verdict is the operator's and is not given
+here.
+
+**How this was driven.** `pnpm nx run teensyrom-ui:serve` (the dev build, so `djBench` exists) on
+`localhost:4200`, and the API from this branch (`dotnet run` in `apps/api/src/TeensyRom.Api`) on the
+default port 10213 with `TEENSYROM_DATA_DIR` pointed at a scratch folder. Claude in Chrome drove the
+tab. The tab's viewport cannot be set to a target size, so the app was loaded into a same-origin
+`<iframe>` of **1920 x 1080** CSS px, with `lib-scaling-container { transform: none }` injected before
+measuring (as in the sections above). The mockup was opened over a local HTTP server (the browser
+tool does not open `file://`) at its own 1920 x 1080 frame A. No cartridge and no MIDI port were
+bound. The tunes were the two bundled with the player POC: `InSID3_Out.sid` on deck A (2x multispeed,
+9975 us a play call, 48 frames a beat, scanned grid) and `Still_Time.sid` on deck B (19950 us a play
+call, 22 frames a beat). They were loaded through `DeckService.load` with the content request
+answered from a small local server (the listing is not what this checks), after one real click on
+the page. Slip, the live loop and its size were driven through `DeckService` (`setSlip`,
+`toggleLiveLoop`, `stepLiveLoopSize`, `endLiveLoop`), not through a pad, a hold or a controller.
+
+### The mockup against the built view (1920 x 1080, deck A)
+
+Built figures are `getBoundingClientRect()` on the live DOM (idle row, deck loaded); mockup figures
+are the same on frame A (the running row, deck A). Both plates are 474 px wide and start at x = 112.
+The browser ran at a device pixel ratio of 1.5625, so the mockup's 1 px borders read 0.64 px.
+
+| | mockup (frame A) | built | outcome |
+| --- | --- | --- | --- |
+| Row order | Live loop key, Size control, Slip key | Live loop key, Size control, Slip key | same |
+| Row box | a bordered tray (6 / 8 px padding, 1 px border, dark fill; green border and inner glow while running), 444.7 x 37.3 | no tray, 440.4 x 26 | finding |
+| Spacing between the three | 8 px | 6 px | finding (part of the key scale) |
+| Live loop key | 110.3 x 24, 9.5 px label, running lamp dot, label "Live loop" | 79.7 x 26, 8.5 px label, running state as the green bar across the key's top (the same as Pause) | finding |
+| Size control | 223.7 x 22: dim "Size" tag, half, readout, double | 299.8 x 22: bright "SIZE" tag, half, readout, double | the tag colour is the shared control's (the Length and Move rows use it too); not changed |
+| Slip key | 77.5 x 24, lamp dot, icon and "Slip" | 49 x 26, lamp ring and "SLIP"; latched cyan with slip on | finding |
+| Transport keys | Pause 92 x 32, Stop 74.9 x 32, step keys 32 x 32 | Pause 80 x 26, Stop 80 x 26, step keys 31.6 x 26 | finding (the same key scale as above) |
+| Transport without Repeat | Pause, Stop, previous, SUB readout, next; no Repeat | Pause, Stop, previous, readout, next; no Repeat | same. The "SUB" caption shows from a 496 px transport container; the container is 440 px here, so only the count reads |
+| Transport plate | 474 x 206.9 | 474 x 181 | follows from the key scale |
+| Strip | 444.7 x 14, playhead 2 px wide | 440.4 x 14, playhead 2 px wide | same |
+| Second playhead | 2 px wide, striped 2 px on / 2 px off, 75% alpha, no glow, to the right of the playhead | 2 px wide, dotted, was 55% alpha, no glow | alpha changed to 75% |
+| Running live loop's mark above the strip | green bracket (fill 55%, glow, at least 5 px wide) | was the plate-loop colour (magenta fill) | changed to the mockup's green |
+
+Fixed in the components: the live loop's bracket now draws in the live (success) colour with its glow
+and a 5 px minimum width, flagged by an optional `live` on `PositionMark` (set by the deck column,
+which until now sent it as an ordinary running loop); the second playhead's opacity went from 0.55 to
+0.75. Checked after the change on the running loop in the browser: the bracket reads green and the
+second playhead's dots are visible beside the playhead.
+
+Findings, not fixed (larger than a small visual difference or not this task's to settle): the built
+row has no tray and no lamp dot on its keys; its keys follow the page's 26 px key scale where the
+wireframe draws 24 px (live row) and 32 px (transport) keys; the Live loop and Slip keys are narrower
+than the mockup's because their labels are set smaller and the Slip key has no lamp-dot-and-label
+form. The row did not wrap or clip at any width (see the responsive spec below); the operator can
+decide whether the tray is wanted.
+
+### Timing protocol with slip on
+
+The protocol in the `asid-dj-diagnostics` skill, run as far as this session allows. Each window:
+both clocks restarted (Pause then Play), `djBench.reset()`, about 10 s with the actions below, then
+`djBench.report()`. "One deck" is deck A playing alone (deck B paused); "two decks" is both playing
+with the same actions on both at once. Slip on in every row after the first; the live loop size
+ladder is 1/24 beat (2 frames on both tunes: 2 of 48 on A, 2 of 22 on B), 1/16, 1/8, 1/4, 1/2, 1 ...
+beats, so the shortest rung is 1/24 beat. A build-up is 1 beat then 1/2 then 1/4, one step every
+1.5 s.
+
+Not comparable to the Performance log's numbers (lag p99 10.5 ms, collapsed 3.8%, on grid 90.8%,
+0 long tasks, on the operator's page with DevTools closed): the page was a tab in a window under
+automation, and Claude in Chrome's debugger was attached. Read them against the baseline rows, which
+were taken the same way. `lag` is `lagMs` p99 / max; `player.worstLagMs` read 44.88 ms on A and
+37.98 ms on B in every row (it does not reset with `djBench.reset()` and was set before the first
+window), so it is not repeated. `longTasks` read `{ count: 0, longestMs: 0 }` in every window.
+
+| window | deck | frames | lag p99 / max (ms) | collapsed | on grid | worst gap (ms) |
+| --- | --- | --- | --- | --- | --- | --- |
+| baseline, both playing, slip off | A | 1003 | 11.41 / 18.38 | 3.5% | 92.8% | 21.5 |
+| | B | 501 | 11.38 / 18.48 | 0% | 93.4% | 20.7 |
+| baseline, both playing, repeated at the end | A | 1003 | 10.18 / 11.48 | 2.2% | 95.8% | 15.1 |
+| | B | 501 | 10.08 / 10.23 | 0% | 95.0% | 15.4 |
+| one deck, baseline, slip off | A | 1004 | 10.28 / 14.96 | 3.3% | 93.6% | 20.2 |
+| one deck, slip on, no departure | A | 1004 | 10.11 / 10.78 | 1.6% | 96.9% | 12.5 |
+| one deck, live loop 1 beat | A | 1003 | 10.11 / 10.63 | 1.9% | 96.4% | 12.5 |
+| one deck, live loop at the shortest rung | A | 1004 | 10.08 / 11.03 | 2.1% | 96.1% | 11.7 |
+| one deck, build-up 1, 1/2, 1/4 | A | 1004 | 13.13 / 19.41 | 3.9% | 92.0% | 20.6 |
+| one deck, slip landing | A | 1003 | 10.11 / 12.56 | 1.8% | 96.0% | 14.1 |
+| one deck, live loop within 2 s of a landing | A | 1004 | 13.91 / 19.86 | 3.7% | 92.6% | 20.8 |
+| two decks, live loop 1 beat on both | A | 1003 | 10.08 / 13.26 | 2.5% | 95.0% | 20.1 |
+| | B | 501 | 10.23 / 10.58 | 0% | 95.4% | 20.3 |
+| two decks, shortest rung on both | A | 1004 | 10.06 / 12.53 | 1.6% | 96.8% | 15.3 |
+| | B | 502 | 10.08 / 11.33 | 0% | 96.8% | 15.4 |
+| two decks, build-up on both | A | 1004 | 15.01 / 19.76 | 2.8% | 93.9% | 20.9 |
+| | B | 502 | 11.18 / 19.53 | 0% | 93.2% | 21.1 |
+| two decks, slip landing on both | A | 1003 | 10.08 / 11.53 | 2.1% | 95.6% | 14.8 |
+| | B | 501 | 10.13 / 10.78 | 0% | 96.2% | 14.7 |
+| two decks, live loop within 2 s of a landing, both | A | 1003 | 10.06 / 11.48 | 1.9% | 96.2% | 14.2 |
+| | B | 502 | 10.18 / 13.08 | 0% | 97.0% | 14.2 |
+
+Read as numbers: the windows with the live loop at 1 beat, at the shortest rung, with a landing, and
+the two-deck loop within 2 s of a landing sit inside the spread of the baselines (p99 10.1-11.4 ms,
+max 10.2-18.5 ms, worst gap 12.5-21.5 ms). The build-up windows (both decks) and the one-deck live
+loop within 2 s of a landing read higher (p99 13.1-15.0 ms, max 19.4-19.9 ms on A), and the
+baselines themselves moved by about as much between runs (max 11.5 to 18.4 ms); one window each is
+not enough to say whether the build-up costs anything or the tab was throttled for those 10 s. They
+are the windows to repeat at the bench.
+
+Not run, and why:
+- **Pops.** Counting them needs the ear, or `send-capture.js` with `send-analysis.js` against a bound
+  cartridge with an operator tapping at each pop; there was no cartridge, no MIDI port and no sound.
+- **DevTools Performance traces** (`trace-compare.mjs`, `trace-long.mjs`): the traces are recorded
+  and saved by the operator in DevTools (the skill's Step 3); the browser tool here cannot record or
+  save one.
+- **Both cartridges connected**, as the protocol asks: the decks' output ticked on its own, so the
+  figures are what the page hands to `send()`, not wire timing.
+- The display's refresh rate and the page's extensions were not recorded; the tab was driven by an
+  extension, and the page was fresh (a few minutes old) when the first window ran.
+- The Slip key, the Live loop key's hold and the push encoder were not driven; the service calls
+  were made directly, so the hold timing and a press are unproven here.
+
+### Responsive spec
+
+`dj-mixer-responsive.cy.ts` gained "the live loop row": at 1400, 1279, 1100, 768 and 400 px it
+asserts that both rows sit inside their plate, do not overflow themselves, and that Live loop, Size
+and Slip each have width and end inside the row. Run against the dev server above with
+`cypress run --project apps/teensyrom-ui-e2e --spec src/e2e/dj-mixer/dj-mixer-responsive.cy.ts`:
+47 passing (the 5 new ones included). `pnpm nx e2e teensyrom-ui-e2e` itself was not used (the Cypress
+config starts its own server on port 4200, which this session already held).
+
+### Automated commands
+
+| command | result |
+| --- | --- |
+| `pnpm nx run-many -t test -p application ui-components dj-mixer` | printed nothing in about 25 minutes while other nx and pnpm processes were running on the machine; not used. The three projects were run with `vitest run` from each project's folder instead |
+| `vitest run` in `libs/application` | 98 files, 2723 tests passed |
+| `vitest run` in `libs/ui/components` | 136 files, 2342 tests passed (the CSS-parse and shader-mock lines in its output are the suite's usual noise) |
+| `vitest run` in `libs/features/dj-mixer` | 12 files, 352 tests passed |
+| `pnpm nx run-many -t lint -p application ui-components dj-mixer` | 0 errors, 10 warnings (all in `application`, none in files this task touched) |
+| `pnpm nx build teensyrom-ui` | built; initial total 2.44 MB raw (500.71 kB transfer), over the 2.00 MB initial budget by 437.62 kB (a warning, as in the earlier sections; `project.json`'s budgets are unchanged) |
+| `dotnet test apps/api/src/TeensyRom.Api.Tests.Unit` | 1110 passed, 0 failed |
+| `pnpm test` in the `sidablist` root | core 924, asid 63, analysis 209, tunes 77 tests passed |
+
+### Bench checklist (operator, real hardware)
+
+- [ ] A live loop of 2-3 frames (1/24 beat on a 2x tune, 1/16 beat at 125 BPM): stutter or a held
+  note.
+- [ ] A build-up (1, then 1/2, then 1/4) landing on the grid with no seam.
+- [ ] Slip landing after a live loop, after a list loop, and after the hand.
+- [ ] A live loop over a 128-beat list loop, returning into it.
+- [ ] A list loop fired from a build-up.
+- [ ] A live loop pushed with a voice muted, then unmuted (the saved image may keep that voice silent
+  until its next note).
+- [ ] Right after a load, before the register record lands: a live loop over a list loop, ended past
+  that loop's end (the worker-jump exception may land late).
+- [ ] The 4-beat default size: confirm or change.
+- [ ] Toggle and hold on a pad.
+- [ ] A push encoder.
+- [ ] The other deck's timing throughout.
+- [ ] The row beside the mockup on the real display: the tray, the key sizes and the Slip key's form
+  (findings above), and the green live bracket.
+- [ ] Playback timing per the timing protocol above and the `asid-dj-diagnostics` skill, with both
+  cartridges connected and DevTools closed, repeating the build-up and the live-loop-after-landing
+  windows.
+
+### Verdict
+
+Pending the operator.

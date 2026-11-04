@@ -24,6 +24,8 @@ export interface PositionMark {
   readonly endPercent: number | null;
   readonly activity: 'idle' | 'queued' | 'running';
   readonly selected: boolean;
+  /** A live loop's bracket: drawn in the live colour, apart from the plate's own loops. */
+  readonly live?: boolean;
 }
 
 /** A mark with its position held to 0–100, ready to draw. */

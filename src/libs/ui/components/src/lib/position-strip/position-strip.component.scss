@@ -196,7 +196,7 @@ input[type='range'] {
     right: -1px;
     bottom: 0;
     border-left: 2px dotted var(--synth-pointer);
-    opacity: 0.55;
+    opacity: 0.75;
   }
 
   &[data-hidden] {
@@ -249,6 +249,13 @@ input[type='range'] {
 
 .mark[data-selected][data-activity='running'] {
   --mark-color: var(--color-highlight);
+}
+
+.mark[data-live] {
+  --mark-color: var(--color-success);
+  --mark-fill: color-mix(in srgb, var(--mark-color) 55%, transparent);
+  min-width: 5px;
+  box-shadow: 0 0 7px color-mix(in srgb, var(--mark-color) 90%, transparent);
 }
 
 .mark[data-kind='loop'] {

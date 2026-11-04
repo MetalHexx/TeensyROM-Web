@@ -171,6 +171,48 @@ describe('DJ Mixer — responsive layout', () => {
       });
     });
 
+    describe('the live loop row', () => {
+      NO_OVERFLOW_WIDTHS.forEach((width) => {
+        it(`fits inside its plate with every control whole at ${width}px wide`, () => {
+          cy.viewport(width, 900);
+
+          // Retried via `.should()`: the plates animate in, so a single read can catch them mid-scale.
+          cy.get('lib-live-loop-row').should('have.length', 2);
+          cy.get('lib-live-loop-row').should(($rows) => {
+            $rows.each((_, row) => {
+              const plate = row.closest('lib-synth-panel');
+              expect(plate, 'the row sits on a plate').to.not.equal(null);
+              const rowRect = row.getBoundingClientRect();
+              const plateRect = (plate as Element).getBoundingClientRect();
+
+              expect(row.scrollWidth, 'the row does not overflow itself').to.be.at.most(
+                row.clientWidth
+              );
+              expect(rowRect.left, 'the row starts inside the plate').to.be.at.least(
+                plateRect.left
+              );
+              expect(rowRect.right, 'the row ends inside the plate').to.be.at.most(
+                plateRect.right + 0.5
+              );
+
+              const controls = row.querySelectorAll(':scope > .row > *');
+              expect(controls.length, 'Live loop, Size and Slip').to.equal(3);
+              controls.forEach((control) => {
+                const rect = control.getBoundingClientRect();
+                expect(rect.width, 'the control has width').to.be.greaterThan(0);
+                expect(rect.left, 'the control starts inside the row').to.be.at.least(
+                  rowRect.left - 0.5
+                );
+                expect(rect.right, 'the control ends inside the row').to.be.at.most(
+                  rowRect.right + 0.5
+                );
+              });
+            });
+          });
+        });
+      });
+    });
+
     it('keeps deck B reachable once stacked at tablet width', () => {
       cy.viewport(VIEWPORT.TABLET.width, VIEWPORT.TABLET.height);
 
