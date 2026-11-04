@@ -15,7 +15,7 @@ This guide documents the complete distribution process for TeensyROM Suite, a se
 - Automated GitHub Releases via CI/CD
 - Updates from inside `trom` (`trom update`), no re-download
 - macOS distribution via Homebrew (one formula installs all the commands)
-- Cross-platform support (Windows, macOS Intel/ARM, Linux)
+- Cross-platform support (Windows, macOS Intel/ARM, Linux x64 and ARM64)
 
 ---
 
@@ -105,7 +105,7 @@ cli/
 
 **Release feed**: `https://api.github.com/repos/MetalHexx/TeensyROM-Suite/releases?per_page=30`, sent with `User-Agent: trom/<version>`. Drafts and non-SemVer tags are dropped. The hidden env var `TROM_RELEASES_URL` replaces the URL, and plain `http` is accepted only through it (the fake feed in package-test and `release-local`). A rate limit (403 with none left, or 429) is reported as such.
 
-**Which release**: stable releases always qualify; pre-releases only when the installed version is itself a pre-release. The newest is the highest SemVer with an asset named `TeensyROM-Suite-{version}-{rid}.zip|.tar.gz` for this platform (`win-x64`, `osx-x64`, `osx-arm64`, `linux-x64`).
+**Which release**: stable releases always qualify; pre-releases only when the installed version is itself a pre-release. The newest is the highest SemVer with an asset named `TeensyROM-Suite-{version}-{rid}.zip|.tar.gz` for this platform (`win-x64`, `osx-x64`, `osx-arm64`, `linux-x64`, `linux-arm64`).
 
 **Contract with the release**: the asset names and the GitHub `digest` (`sha256:<hex>`) on each asset. A download is streamed through SHA-256 and compared with `digest`; a missing digest is refused before any download, and a mismatch deletes the file and refuses.
 
@@ -126,7 +126,7 @@ cli/
 
 **Homebrew**: `ApplyAsync` stops the engine, runs `brew update` and `brew upgrade teensyrom-suite` (output streamed to stderr), reads `<prefix>/bin/trom --version`, and starts the engine again through `<prefix>/bin/trom` even when brew failed (brew leaves whatever it linked). It fails with "Homebrew doesn't offer … yet" when the installed version is not newer than before.
 
-**Platform**: `PlatformRid.Current` maps the OS and `RuntimeInformation.ProcessArchitecture` to `win-x64`, `osx-x64`, `osx-arm64` or `linux-x64`; any other combination has no package, and `trom update` says so.
+**Platform**: `PlatformRid.Current` maps the OS and `RuntimeInformation.ProcessArchitecture` to `win-x64`, `osx-x64`, `osx-arm64`, `linux-x64` or `linux-arm64`; any other combination has no package, and `trom update` says so.
 
 **The release check**: `trom` fetches the feed at most every 24 h (a failure retries after 1 h) and records `<home>/cli/release-check.json`. Interactive commands (not `--json`, help, `--version`, `init` or `update`; a terminal is required) print one notice on stderr (code `updateAvailable`, at most once per 24 h; the lookup has 5 s and the command's end waits at most 1 s), and the guided menu shows the line under the logo and an "Update to {version}" entry before Leave, which closes the menu after a successful update. `trom init --json` reports `update: {installed, latest, available, installKind, checkedAt}` (no network for a source install). `trom settings set update-check false` turns the check off; source and unknown installs never check.
 
@@ -198,15 +198,15 @@ GitHub Actions automates the entire release process:
 
 **`.github/workflows/build-packages.yml`** (`workflow_call`; inputs `version`, `rids`, `retention-days`). Job `frontend` builds Trom UI and uploads `wwwroot`; job `package` (RID matrix) downloads it and runs `.github/scripts/package.sh publish` then `assemble`, uploading `TeensyROM-Suite-<version>-<rid>`. It defines its own .NET and Node versions, because a called workflow doesn't inherit the caller's `env`.
 
-**`.github/workflows/package-test.yml`** (pull requests touching `.github/workflows/{build-packages,package-test,release}.yml`, `.github/scripts/**`, `Formula/**`, `src/apps/cli/**`, `src/apps/api/src/TeensyRom.Api/**`, `src/apps/Version.props` or `src/apps/packaging/**`, plus manual dispatch). It builds osx-arm64, osx-x64 and linux-x64 and installs them without publishing, secrets or pushes:
+**`.github/workflows/package-test.yml`** (pull requests touching `.github/workflows/{build-packages,package-test,release}.yml`, `.github/scripts/**`, `Formula/**`, `src/apps/cli/**`, `src/apps/api/src/TeensyRom.Api/**`, `src/apps/Version.props` or `src/apps/packaging/**`, plus manual dispatch). It builds osx-arm64, osx-x64, linux-x64 and linux-arm64 and installs them without publishing, secrets or pushes:
 - `macos` (arm64 on `macos-15`, x64 on `macos-15-intel`): a fake release feed, a local Homebrew tap with the real formula rewritten by `update-formula.sh` to `file://` URLs, `brew install`, `package-smoke.sh` on `$(brew --prefix)/bin/trom`, then `brew test`.
-- `linux`: untar the package, `package-smoke.sh` on `cli/trom`, then `trom path add`, `status` and `remove` with a diff of `~/.bashrc`.
+- `linux` (a matrix: x64 on `ubuntu-latest`, ARM64 on `ubuntu-24.04-arm`): untar the package, `package-smoke.sh` on `cli/trom`, then `trom path add`, `status` and `remove` with a diff of `~/.bashrc`.
 
 **Scripts** (`.github/scripts/`):
 - `package.sh publish|assemble`: builds the package layout (see `release-local`).
 - `update-formula.sh <formula> <version> <sha_arm> <sha_x64> [url_arm url_x64]`: the formula seds, portable between GNU and BSD sed; used by the release and by package-test.
 - `fake_release_feed.py <dir> <next-version> <assets…>`: writes a GitHub-shaped `releases.json` (real `sha256:` digests, `http://127.0.0.1` URLs, an older release and a draft); `--digest wrong|none` writes bad digests.
-- `package-smoke.sh <trom> <version> [release|homebrew]`: `--version`, `api start`, `/api/version`, `/` as `text/html`, `ui --no-open`, `init`, `update --check` against the fake feed, `api status`, `api stop`.
+- `package-smoke.sh <trom> <version> [release|homebrew]`: `--version`, `api start` (HTTPS listening), `/api/version` over http and over `https://localhost:<port>`, `/` as `text/html`, `ui --no-open`, `init`, `update --check` against the fake feed, `api status`, `api stop`.
 
 ### Version Requirements
 
@@ -302,11 +302,12 @@ git push origin v1.2.0-alpha.1
 **GitHub Release**:
 1. Go to **Releases** page
 2. Find release tagged `v1.2.0`
-3. Verify 4 artifacts attached (each holds `README.txt`, `api/` and `cli/`), each with a GitHub `digest` (`gh release view v1.2.0 --json assets`); `trom update` needs both the names and the digests:
+3. Verify 5 artifacts attached (each holds `README.txt`, `api/` and `cli/`), each with a GitHub `digest` (`gh release view v1.2.0 --json assets`); `trom update` needs both the names and the digests:
    - `TeensyROM-Suite-1.2.0-win-x64.zip`
    - `TeensyROM-Suite-1.2.0-osx-x64.tar.gz`
    - `TeensyROM-Suite-1.2.0-osx-arm64.tar.gz`
    - `TeensyROM-Suite-1.2.0-linux-x64.tar.gz`
+   - `TeensyROM-Suite-1.2.0-linux-arm64.tar.gz`
 4. Check pre-release checkbox (should be unchecked for stable)
 
 **Homebrew Formula** (every release, pre-releases included):
@@ -576,6 +577,7 @@ https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-
 https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-x64.tar.gz
 https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-osx-arm64.tar.gz
 https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-linux-x64.tar.gz
+https://github.com/MetalHexx/TeensyROM-Suite/releases/download/v1.2.0/TeensyROM-Suite-1.2.0-linux-arm64.tar.gz
 ```
 
 **Homebrew** (macOS only):

@@ -2,7 +2,7 @@
 
 The suite (`trom`, the engine and the web UI) installs from the newest GitHub release, or from Homebrew on a Mac. Explain the plan first and get a yes before running anything. Show each command before running it.
 
-Nothing here needs admin rights, a compiler or developer tools. The library, settings and themes in `~/.teensyrom` are never touched.
+Nothing here needs admin rights, a compiler or developer tools, except the Raspberry Pi OS Lite library line in step 1. The library, settings and themes in `~/.teensyrom` are never touched.
 
 ## Rules
 
@@ -17,7 +17,8 @@ Nothing here needs admin rights, a compiler or developer tools. The library, set
 1. **Platform.** Detect the OS and chip.
    - macOS: the Homebrew path (step 2).
    - Windows x64: `win-x64`.
-   - Linux x64: `linux-x64`.
+   - Linux x64 (`uname -m` prints `x86_64`): `linux-x64`.
+   - Linux ARM64 (`uname -m` prints `aarch64` or `arm64`, such as a Raspberry Pi with a 64-bit OS): `linux-arm64`. Raspberry Pi OS Lite has no desktop, so before step 7 ask the user to run `sudo apt install libicu76 libasound2t64` in a terminal. It needs admin rights, so don't run it yourself. The desktop image already has these libraries.
    - Anything else: say it isn't supported and point to https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md.
 2. **Mac.** Run `brew --version`.
    - **Homebrew missing:** offer to install it with the official installer from https://brew.sh: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`. It needs the user's password, so it runs in a terminal the user controls; tell them how to open one and run it. Afterwards `brew` isn't on this session's PATH. Apple Silicon puts it at `/opt/homebrew/bin/brew`, Intel at `/usr/local/bin/brew`. Run `eval "$(<that path> shellenv)"`, or use the full path, for the rest of the session.
@@ -27,9 +28,9 @@ Nothing here needs admin rights, a compiler or developer tools. The library, set
      - **Never tap again.** A second tap of the same repo makes `brew install` and `brew upgrade teensyrom-suite` fail with "Formulae found in multiple taps".
    - **Otherwise:** `brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite`, then `brew install teensyrom-suite`.
    - The formula tracks the newest release on its own, so no lookup is needed. Continue at step 7.
-3. **Windows and Linux: find the newest release.**
+3. **Windows and Linux (x64 or ARM64): find the newest release.**
    - Fetch `https://api.github.com/repos/MetalHexx/TeensyROM-Suite/releases?per_page=1`. It returns the newest release first, pre-releases included. Don't use `/releases/latest`, which skips pre-releases.
-   - Take that release's `tag_name` and its asset whose `name` ends with `-win-x64.zip` or `-linux-x64.tar.gz`.
+   - Take that release's `tag_name` and its asset whose `name` ends with the platform's suffix from step 1: `-win-x64.zip`, `-linux-x64.tar.gz` or `-linux-arm64.tar.gz`.
    - Note the asset's `browser_download_url` and `digest` (`sha256:<hex>`).
    - No matching asset: say so and point to the install page from step 1.
    - GitHub refuses the lookup (rate limit, HTTP 403 or 429): say so and suggest trying again later.

@@ -14,6 +14,16 @@ To run it in a terminal window instead, run `trom-suite` on Homebrew, or run `./
 
 It listens on port `10213`.
 
+## HTTPS
+
+Trom API also serves the same app over HTTPS, on port `10214`. The port is set by `Https:Port` in `api/appsettings.json`. Both ports serve the same app, and nothing redirects http to https, so each address works on its own. `trom ui` lists the secure address for each network address; [getting started](getting-started.md#secure-address) explains how to use it.
+
+- **Certificate:** Trom API makes a self-signed certificate on your computer the first time it starts with HTTPS, and keeps it in the data home at `~/.teensyrom/api/Https/engine-https.pfx` (`%USERPROFILE%\.teensyrom\api\Https\engine-https.pfx` on Windows). `TEENSYROM_DATA_DIR` moves the data home.
+- **Coverage:** the certificate covers `localhost`, this computer's name and its network addresses. It lasts two years. Trom API re-issues it when the computer's name or address changes, or when it is within 30 days of expiry, and each re-issue is reported.
+- **Port in use:** if port `10214` is taken or the certificate can't be made, Trom API keeps serving http alone, and `trom api status` says why.
+- **Status:** `GET /api/engine/https` reports the port, whether HTTPS is listening, the certificate's names, dates and change, and the reason for any problem.
+- **Trusted local network:** HTTPS here protects against passive snooping on your home network. It is not for exposing Trom API to the internet.
+
 ## Build your own tools
 
 Your tools can do what Trom UI and Trom Terminal do: launch files, browse and search your library, copy files, manage favorites and bans, and set themes. Call it over HTTP from any language, or generate a client from its OpenAPI spec at [http://localhost:10213/openapi/v1.json](http://localhost:10213/openapi/v1.json).

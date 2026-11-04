@@ -211,6 +211,9 @@ bash .github/scripts/package.sh assemble osx-arm64 1.0.0-local ./src/publish/osx
 
 bash .github/scripts/package.sh publish linux-x64  1.0.0-local ./src/publish/linux-x64
 bash .github/scripts/package.sh assemble linux-x64 1.0.0-local ./src/publish/linux-x64 ./src/publish/out
+
+bash .github/scripts/package.sh publish linux-arm64  1.0.0-local ./src/publish/linux-arm64
+bash .github/scripts/package.sh assemble linux-arm64 1.0.0-local ./src/publish/linux-arm64 ./src/publish/out
 ```
 
 `assemble` sets the executable bits and writes `.tar.gz` for macOS and Linux.
@@ -295,7 +298,7 @@ After successful local testing:
 5. Confirm SignalR real-time updates work
 
 **When ready for official release:**
-Use the `release` skill to version bump, tag, and create GitHub Release with all 4 platforms.
+Use the `release` skill to version bump, tag, and create GitHub Release with all 5 platforms.
 
 ## References
 

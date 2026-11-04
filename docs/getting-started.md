@@ -4,7 +4,7 @@ Install TeensyROM Suite, connect your cart, and get your library ready to search
 
 ## Install
 
-Let Trom Agent install the suite for you, or install it yourself: download it for Windows or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac.
+Let Trom Agent install the suite for you, or install it yourself: download it for Windows, Linux or a Raspberry Pi from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac.
 
 The download holds Trom API, [Trom UI](trom-ui.md) and [Trom Terminal](trom-terminal.md) in one package. [Trom Agent](trom-agent.md) is a Claude Code plugin, installed separately.
 
@@ -17,7 +17,7 @@ If you use [Claude Code](https://claude.com/claude-code), add the Trom Agent plu
 /plugin install trom-agent@tr-plugin-marketplace
 ```
 
-- **Windows and Linux:** it downloads the newest release for your computer, checks it against the SHA-256 GitHub publishes before unpacking it, unpacks it into a folder in your user profile and puts `trom` on your PATH.
+- **Windows, Linux and Raspberry Pi:** it downloads the newest release for your computer, checks it against the SHA-256 GitHub publishes before unpacking it, unpacks it into a folder in your user profile and puts `trom` on your PATH.
 - **macOS:** it installs with Homebrew, and installs Homebrew first if you don't have it. An install from the older `teensyrom-web` tap moves over to `teensyrom-suite`.
 - Then it starts the suite and checks that Trom API and Trom UI are running.
 
@@ -32,6 +32,14 @@ It explains the plan and shows each command before it runs it. Apart from instal
 Windows may show a security warning the first time: choose "More info", then "Run anyway". Windows Firewall asks the first time Trom API starts: allow Private networks so phones and tablets can connect.
 
 On Linux, USB carts need your user in the `dialout` group. Run `sudo usermod -aG dialout $USER`, then log out and back in.
+
+#### Raspberry Pi
+
+The Linux package also runs on a Raspberry Pi. Download the `linux-arm64` archive (`TeensyROM-Suite-<version>-linux-arm64.tar.gz`) and follow the steps above.
+
+- The Pi needs a 64-bit Raspberry Pi OS. The Raspberry Pi 5 is tested, and the Pi 3, 4 and Zero 2 W with a 64-bit OS are expected to work.
+- The `dialout` line above applies to USB carts.
+- On Raspberry Pi OS Lite, first run `sudo apt install libicu76 libasound2t64`. The desktop image already has them.
 
 ### macOS
 
@@ -48,7 +56,13 @@ macOS may block the app on first run. Open System Settings, go to Privacy & Secu
 
 ### Open Trom UI
 
-`trom ui` starts Trom API if it isn't running and opens Trom UI in your browser at [http://localhost:10213](http://localhost:10213). It also prints the addresses phones and tablets on the same network can use, such as `http://192.168.1.20:10213`. Add `--no-open` to print the addresses without opening the browser.
+`trom ui` starts Trom API if it isn't running and opens Trom UI in your browser at [http://localhost:10213](http://localhost:10213). It also prints the addresses phones and tablets on the same network can use, such as `http://192.168.1.20:10213`, and the [secure address](#secure-address) beside each one. Add `--no-open` to print the addresses without opening the browser.
+
+### Secure address
+
+Trom API also serves Trom UI over HTTPS, on port `10214`. From another device, open the secure address that `trom ui` lists, such as `https://192.168.1.20:10214`. MIDI controllers and capture-card video need this address from another device; on the computer itself, `http://localhost:10213` works.
+
+The certificate is made by Trom API on your computer and isn't signed by a public authority, so the browser warns once, the first time it opens the secure address. The warning comes back after the computer gets a new network address or name, or when the certificate nears its expiry. When that happens, `trom` says the certificate was re-issued.
 
 ### Firmware
 

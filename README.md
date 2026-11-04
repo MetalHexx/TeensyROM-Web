@@ -10,7 +10,7 @@
 
 TeensyROM Suite is a set of apps for the [TeensyROM](https://github.com/SensoriumEmbedded/TeensyROM) cartridge. They put everything on your cart, every game, demo, SID tune and image, a click, a command or a sentence away, and it all plays on your real C64.
 
-Browse your library from the couch, stream it like a music service, script it, ask an AI for a set, or take the stage with two C64s as your decks. Pick the app that suits the moment. They all run on Trom API, so they work with the same carts at the same time, on Windows, macOS and Linux.
+Browse your library from the couch, stream it like a music service, script it, ask an AI for a set, or take the stage with two C64s as your decks. Pick the app that suits the moment. They all run on Trom API, so they work with the same carts at the same time, on Windows, macOS, Linux and Raspberry Pi.
 
 ## Trom UI
 
@@ -75,7 +75,7 @@ Build your own tools on it, from a quick script to a full app, in any language. 
 
 ## Get started
 
-1. **Install** the suite: download it for Windows or Linux from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac. Or type `/trom` in Claude Code and let [Trom Agent](docs/trom-agent.md) install it and keep it up to date for you.
+1. **Install** the suite: download it for Windows, Linux or a Raspberry Pi (64-bit OS) from the [releases page](https://github.com/MetalHexx/TeensyROM-Suite/releases), or install it with Homebrew on a Mac. Or type `/trom` in Claude Code and let [Trom Agent](docs/trom-agent.md) install it and keep it up to date for you.
 2. **Connect** your TeensyROM over USB or your network.
 3. **Play.** Run `trom ui` to open Trom UI in your browser, run `trom` for the guided menu, or type `/trom` in Claude Code.
 
