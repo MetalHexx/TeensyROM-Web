@@ -3699,6 +3699,26 @@
           }
         }
       },
+      "DeckSettingsDto": {
+        "required": [
+          "slot",
+          "slip",
+          "liveLoopBeats"
+        ],
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string"
+          },
+          "slip": {
+            "type": "boolean"
+          },
+          "liveLoopBeats": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "DeleteDjSetResponse": {
         "required": [
           "message"
@@ -4526,7 +4546,8 @@
         "required": [
           "controllers",
           "mappings",
-          "deckBindings"
+          "deckBindings",
+          "deckSettings"
         ],
         "type": "object",
         "properties": {
@@ -4546,6 +4567,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DeckDeviceBindingDto"
+            }
+          },
+          "deckSettings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckSettingsDto"
             }
           }
         }
@@ -5185,6 +5212,13 @@
             "items": {
               "$ref": "#/components/schemas/DeckDeviceBindingDto"
             }
+          },
+          "deckSettings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckSettingsDto"
+            },
+            "nullable": true
           }
         }
       },

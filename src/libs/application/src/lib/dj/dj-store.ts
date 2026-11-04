@@ -155,6 +155,11 @@ export interface DeckState {
   /** How far the Move controls shift a loop or an edge: a whole number of beats, or `'frame'` for
    *  one play call by the edges' nudges. Kept across loads. */
   moveStepBeats: MoveStep;
+  /** Whether slip is on. A setting of the deck, not of a tune or a set: it is kept on the host
+   *  with the MIDI settings and no load touches it. */
+  slip: boolean;
+  /** The live loop size in beats. A setting of the deck, kept like `slip`. */
+  liveLoopBeats: number;
   /** True from the first tap of a sequence until the taps stop. */
   tapping: boolean;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
@@ -305,6 +310,9 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
   mainSettings: null,
 };
 
+/** A deck's live loop size, in beats, until the host says otherwise. */
+export const DEFAULT_LIVE_LOOP_BEATS = 4;
+
 const initialDeckState: DeckState = {
   loaded: null,
   status: 'empty',
@@ -327,6 +335,8 @@ const initialDeckState: DeckState = {
   detectedKey: null,
   beatGrid: null,
   moveStepBeats: 1,
+  slip: false,
+  liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS,
   tapping: false,
   switching: false,
   handHeld: false,

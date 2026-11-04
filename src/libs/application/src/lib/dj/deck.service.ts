@@ -3,6 +3,7 @@ import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { DeckHand } from './deck-hand';
 import { DeckGrid } from './deck-grid';
 import { DeckLoops } from './deck-loops';
@@ -90,6 +91,7 @@ export class DeckService {
   private readonly loader = inject(TuneLoader);
   private readonly store = inject(DjStore);
   private readonly bindings = inject(DeckBindings);
+  private readonly persistence = inject(MidiSettingsPersistence);
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
@@ -626,7 +628,35 @@ export class DeckService {
    *  `DjBootstrapService` makes in the same startup beat, so a spec can construct this service
    *  without the settings ever loading. */
   async hydrate(): Promise<void> {
+    await this.hydrateDeckSettings();
     await this.bindings.hydrate();
+  }
+
+  /** Turns a deck's slip on or off, and saves it with the MIDI settings. */
+  setSlip(slot: Slot, on: boolean): void {
+    this.store.setDeckSettings({ slot, slip: on });
+    this.persistence.scheduleSave();
+  }
+
+  /** Sets a deck's live loop size in beats, and saves it with the MIDI settings. */
+  setLiveLoopBeats(slot: Slot, beats: number): void {
+    this.store.setDeckSettings({ slot, liveLoopBeats: beats });
+    this.persistence.scheduleSave();
+  }
+
+  /** Seeds each deck's slip and live loop size from the saved MIDI settings; a deck with no entry,
+   *  or an unusable size, keeps its defaults. Writes the store only, so it never queues a save. */
+  private async hydrateDeckSettings(): Promise<void> {
+    const settings = await this.persistence.load();
+    for (const record of settings.deckSettings) {
+      this.store.setDeckSettings({
+        slot: record.slot,
+        slip: record.slip,
+        ...(Number.isFinite(record.liveLoopBeats) && record.liveLoopBeats > 0
+          ? { liveLoopBeats: record.liveLoopBeats }
+          : {}),
+      });
+    }
   }
 
   /** Binds the slot to a TeensyROM device by id; `null` clears it. */

@@ -47,6 +47,7 @@ const SAVED: MidiSettingsRecord = {
   ],
   mappings: [record('m1', 7, 'A', 'speed'), record('m2', 8, 'B', 'speed')],
   deckBindings: [],
+  deckSettings: [],
 };
 
 describe('MidiMappings', () => {
@@ -239,6 +240,10 @@ describe('MidiMappings', () => {
           },
         ],
         deckBindings: [],
+        deckSettings: [
+          { slot: 'A', slip: false, liveLoopBeats: 4 },
+          { slot: 'B', slip: false, liveLoopBeats: 4 },
+        ],
       });
     });
 

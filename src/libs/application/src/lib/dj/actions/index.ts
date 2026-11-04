@@ -22,6 +22,7 @@ import { setDeckTiming } from './set-deck-timing';
 import { setDeckBeatGrid } from './set-deck-beat-grid';
 import { setDeckTapping } from './set-deck-tapping';
 import { setDeckMoveStep } from './set-deck-move-step';
+import { setDeckSettings } from './set-deck-settings';
 import { setDeckLoops } from './set-deck-loops';
 import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
@@ -67,6 +68,7 @@ export function withDjActions() {
       ...setDeckBeatGrid(writableStore),
       ...setDeckTapping(writableStore),
       ...setDeckMoveStep(writableStore),
+      ...setDeckSettings(writableStore),
       ...setDeckLoops(writableStore),
       ...setLoopMarkers(writableStore),
       ...setLoopSelection(writableStore),

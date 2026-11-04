@@ -23,7 +23,8 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
             {
                 Controllers = request.Controllers.Select(MapController).ToList(),
                 Mappings = request.Mappings.Select(MapMapping).ToList(),
-                DeckBindings = request.DeckBindings.Select(MapDeckBinding).ToList()
+                DeckBindings = request.DeckBindings.Select(MapDeckBinding).ToList(),
+                DeckSettings = (request.DeckSettings ?? []).Select(MapDeckSettings).ToList()
             };
         }
 
@@ -68,6 +69,16 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                 Slot = dto.Slot,
                 DeviceId = dto.DeviceId,
                 LastSeenName = dto.LastSeenName
+            };
+        }
+
+        private static DeckSettings MapDeckSettings(DeckSettingsDto dto)
+        {
+            return new DeckSettings
+            {
+                Slot = dto.Slot,
+                Slip = dto.Slip,
+                LiveLoopBeats = dto.LiveLoopBeats
             };
         }
     }

@@ -78,7 +78,8 @@ namespace TeensyRom.Core.Settings
         {
             Controllers = [.. settings.Controllers ?? []],
             Mappings = [.. settings.Mappings ?? []],
-            DeckBindings = [.. settings.DeckBindings ?? []]
+            DeckBindings = [.. settings.DeckBindings ?? []],
+            DeckSettings = [.. settings.DeckSettings ?? []]
         };
 
         private void TryDelete(string path)

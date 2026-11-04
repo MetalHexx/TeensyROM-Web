@@ -737,6 +737,7 @@ describe('DeckHand', () => {
               },
             ],
             deckBindings: [],
+            deckSettings: [],
           },
           new FakeReplayRunner()
         );

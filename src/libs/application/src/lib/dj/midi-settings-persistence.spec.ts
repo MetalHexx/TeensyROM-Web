@@ -19,7 +19,13 @@ const SERVER_SET: MidiSettingsRecord = {
     },
   ],
   deckBindings: [{ slot: 'B', deviceId: '19277260', lastSeenName: 'TR-2' }],
+  deckSettings: [{ slot: 'A', slip: true, liveLoopBeats: 2 }],
 };
+
+const HOME_DECK_SETTINGS = [
+  { slot: 'A', slip: false, liveLoopBeats: 4 },
+  { slot: 'B', slip: false, liveLoopBeats: 4 },
+];
 
 /** Resolves the next pending call when asked, so a test decides exactly when a request settles. */
 function deferred<T = void>() {
@@ -102,7 +108,7 @@ describe('MidiSettingsPersistence', () => {
 
       const settings = await persistence.load();
 
-      expect(settings).toEqual({ controllers: [], mappings: [], deckBindings: [] });
+      expect(settings).toEqual({ controllers: [], mappings: [], deckBindings: [], deckSettings: [] });
       expect(alertService.warning).toHaveBeenCalledTimes(1);
     });
 
@@ -125,6 +131,17 @@ describe('MidiSettingsPersistence', () => {
 
       expect(persistence.snapshot().deckBindings).toEqual([
         { slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' },
+      ]);
+    });
+
+    it('takes slip and live loop size for both decks from the store', async () => {
+      await persistence.load();
+      store.setDeckSettings({ slot: 'A', slip: true });
+      store.setDeckSettings({ slot: 'B', liveLoopBeats: 0.5 });
+
+      expect(persistence.snapshot().deckSettings).toEqual([
+        { slot: 'A', slip: true, liveLoopBeats: 4 },
+        { slot: 'B', slip: false, liveLoopBeats: 0.5 },
       ]);
     });
 
@@ -189,6 +206,7 @@ describe('MidiSettingsPersistence', () => {
         controllers: SERVER_SET.controllers,
         mappings: SERVER_SET.mappings,
         deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+        deckSettings: HOME_DECK_SETTINGS,
       });
     });
 
@@ -260,6 +278,7 @@ describe('MidiSettingsPersistence', () => {
           controllers: SERVER_SET.controllers,
           mappings: SERVER_SET.mappings,
           deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+          deckSettings: HOME_DECK_SETTINGS,
         },
         { keepalive: true }
       );

@@ -21,6 +21,12 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
         /// Which TeensyROM cartridge each deck slot is bound to. At most one binding per slot, and the slots must name different devices.
         /// </summary>
         [Required] public List<DeckDeviceBindingDto> DeckBindings { get; set; } = [];
+
+        /// <summary>
+        /// Each deck's own settings: slip and the live loop size in beats. Optional; at most one entry per slot.
+        /// Absent or null saves an empty list.
+        /// </summary>
+        public List<DeckSettingsDto>? DeckSettings { get; set; } = [];
     }
 
     /// <summary>
@@ -54,6 +60,10 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                 .Must(bindings => bindings.Count <= MidiSettingsAllowLists.MaxDeckBindings)
                 .WithMessage($"At most {MidiSettingsAllowLists.MaxDeckBindings} deck bindings are allowed.");
 
+            RuleFor(x => x.DeckSettings)
+                .Must(settings => settings is null || settings.Count <= MidiSettingsAllowLists.MaxDeckSettings)
+                .WithMessage($"At most {MidiSettingsAllowLists.MaxDeckSettings} deck settings are allowed.");
+
             RuleForEach(x => x.Controllers)
                 .NotNull().WithMessage("Controller entries must not be null.")
                 .SetValidator(new KnownMidiControllerValidator());
@@ -65,6 +75,10 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
             RuleForEach(x => x.DeckBindings)
                 .NotNull().WithMessage("Deck binding entries must not be null.")
                 .SetValidator(new DeckDeviceBindingValidator());
+
+            RuleForEach(x => x.DeckSettings)
+                .NotNull().WithMessage("Deck settings entries must not be null.")
+                .SetValidator(new DeckSettingsValidator());
 
             RuleFor(x => x).Custom(ValidateAcrossEntries);
         }
@@ -78,6 +92,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
             var controllers = request.Controllers ?? [];
             var mappings = request.Mappings ?? [];
             var deckBindings = request.DeckBindings ?? [];
+            var deckSettings = request.DeckSettings ?? [];
 
             FlagDuplicates(controllers, c => c.Id, "Controllers", ".Id", "Controller ID is already used by another controller.", context);
             FlagDuplicates(mappings, m => m.Id, "Mappings", ".Id", "Mapping ID is already used by another mapping.", context);
@@ -89,6 +104,7 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.SaveMidiSettings
                 context);
             FlagDuplicates(deckBindings, b => b.Slot, "DeckBindings", ".Slot", "Deck slot is already bound.", context);
             FlagDuplicates(deckBindings, b => b.DeviceId, "DeckBindings", ".DeviceId", "Device is already bound to the other deck slot.", context);
+            FlagDuplicates(deckSettings, d => d.Slot, "DeckSettings", ".Slot", "Deck slot already has settings.", context);
 
             var controllerIds = controllers
                 .Where(c => c?.Id is not null)

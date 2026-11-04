@@ -35,6 +35,7 @@ import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckHand } from './deck-hand';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
 import { LIVE_PAINT_CLOCK } from './live-paint-clock';
@@ -42,7 +43,14 @@ import { PlayheadPainter } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
 import { SidWaveFeed } from './sid-wave-feed';
 import { TuneLoader } from './tune-loader';
-import { DjStore, HOME_DECK_PANEL, type DeckHolding, type DeckMixerSettings } from './dj-store';
+import {
+  DEFAULT_LIVE_LOOP_BEATS,
+  DjStore,
+  HOME_DECK_PANEL,
+  type DeckHolding,
+  type DeckMixerSettings,
+} from './dj-store';
+import type { MidiSettingsRecord } from './ports';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { decodeRowSettings, encodeRowSettings, type DeckRowSettings } from './loops/row-settings-codec';
 import { DjSets } from './sets/dj-sets';
@@ -193,6 +201,10 @@ describe('DeckService', () => {
     enableMidi: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
   };
+  let fakePersistence: {
+    load: ReturnType<typeof vi.fn>;
+    scheduleSave: ReturnType<typeof vi.fn>;
+  };
   let fileContentMock: ReturnType<typeof vi.fn>;
   let insertMock: ReturnType<typeof vi.fn>;
   let resolveMock: ReturnType<typeof vi.fn>;
@@ -290,6 +302,16 @@ describe('DeckService', () => {
       identify: vi.fn(),
     };
 
+    fakePersistence = {
+      load: vi.fn().mockResolvedValue({
+        controllers: [],
+        mappings: [],
+        deckBindings: [],
+        deckSettings: [],
+      } satisfies MidiSettingsRecord),
+      scheduleSave: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         DeckService,
@@ -297,6 +319,7 @@ describe('DeckService', () => {
         TuneLoader,
         DjStore,
         { provide: DeckBindings, useValue: fakeBindings },
+        { provide: MidiSettingsPersistence, useValue: fakePersistence },
         {
           provide: FRAME_CLOCK_FACTORY,
           useValue: (): FakeClock => {
@@ -2806,6 +2829,20 @@ describe('DeckService', () => {
     });
 
     describe('loadRow', () => {
+      it('leaves slip and the live loop size of each deck as they were', async () => {
+        service.setSlip('A', true);
+        service.setLiveLoopBeats('A', 0.5);
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        const held = holdingOf('A');
+
+        await service.loadRow('A', held.setId, held.rowId);
+        await settle();
+
+        expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: 0.5 });
+        expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(2);
+      });
+
       it('loads any open set\'s row at the subtune it was last on, replacing what plays', async () => {
         const first = register(makeFixture({ subtuneCount: 3 }));
         const second = register(makeFixture());
@@ -3625,6 +3662,59 @@ describe('DeckService', () => {
       await service.selectSubtune('A', 2);
 
       expect(drop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deck settings', () => {
+    function savedWith(deckSettings: MidiSettingsRecord['deckSettings']): void {
+      fakePersistence.load.mockResolvedValue({
+        controllers: [],
+        mappings: [],
+        deckBindings: [],
+        deckSettings,
+      } satisfies MidiSettingsRecord);
+    }
+
+    it('hydrates each deck from its saved entry, before the bindings, without queueing a save', async () => {
+      savedWith([
+        { slot: 'A', slip: true, liveLoopBeats: 0.5 },
+        { slot: 'B', slip: false, liveLoopBeats: 16 },
+      ]);
+      fakeBindings.hydrate.mockImplementation(async () => {
+        expect(store.deck('A')().liveLoopBeats).toBe(0.5);
+      });
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: 0.5 });
+      expect(store.deck('B')()).toMatchObject({ slip: false, liveLoopBeats: 16 });
+      expect(fakePersistence.scheduleSave).not.toHaveBeenCalled();
+    });
+
+    it('keeps the defaults for a deck with no saved entry', async () => {
+      savedWith([{ slot: 'B', slip: true, liveLoopBeats: 2 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: false, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+      expect(store.deck('B')()).toMatchObject({ slip: true, liveLoopBeats: 2 });
+    });
+
+    it('keeps the default size when the saved size is unusable', async () => {
+      savedWith([{ slot: 'A', slip: true, liveLoopBeats: 0 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+    });
+
+    it('setSlip and setLiveLoopBeats write one deck and ask for a save each', () => {
+      service.setSlip('A', true);
+      service.setLiveLoopBeats('B', 8);
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+      expect(store.deck('B')()).toMatchObject({ slip: false, liveLoopBeats: 8 });
+      expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(2);
     });
   });
 
