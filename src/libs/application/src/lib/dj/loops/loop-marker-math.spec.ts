@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { DeckLoopMarker } from '../dj-store';
-import {
-  clamp,
-  markerKind,
-  markerLabel,
-  nudgeLimits,
-  oneSecondFrames,
-  resolvedFrame,
-} from './loop-marker-math';
+import { clamp, markerKind, markerLabel, oneSecondFrames, resolvedFrame } from './loop-marker-math';
 
 function marker(
   start: { frame: number; offsetFrames?: number },
@@ -106,64 +99,6 @@ describe('oneSecondFrames', () => {
     { intervalUs: Number.NaN, expected: 0 },
   ])('is $expected play calls at $intervalUs microseconds each', ({ intervalUs, expected }) => {
     expect(oneSecondFrames(intervalUs)).toBe(expected);
-  });
-});
-
-describe('nudgeLimits', () => {
-  const second = 50;
-
-  it('allows a second either way for a cue start', () => {
-    expect(nudgeLimits(marker({ frame: 100 }), 'start', second)).toEqual({ min: -50, max: 50 });
-  });
-
-  it('stops a loop start one frame short of its end', () => {
-    expect(nudgeLimits(marker({ frame: 100 }, { frame: 120 }), 'start', second)).toEqual({
-      min: -50,
-      max: 19,
-    });
-  });
-
-  it('counts the end nudge when limiting the start', () => {
-    expect(
-      nudgeLimits(marker({ frame: 100 }, { frame: 120, offsetFrames: 10 }), 'start', second)
-    ).toEqual({
-      min: -50,
-      max: 29,
-    });
-  });
-
-  it('keeps the full second for a start whose end is far away', () => {
-    expect(nudgeLimits(marker({ frame: 100 }, { frame: 900 }), 'start', second)).toEqual({
-      min: -50,
-      max: 50,
-    });
-  });
-
-  it('stops a loop end one frame past its start', () => {
-    expect(nudgeLimits(marker({ frame: 100 }, { frame: 120 }), 'end', second)).toEqual({
-      min: -19,
-      max: 50,
-    });
-  });
-
-  it('counts the start nudge when limiting the end', () => {
-    expect(
-      nudgeLimits(marker({ frame: 100, offsetFrames: 8 }, { frame: 120 }), 'end', second)
-    ).toEqual({
-      min: -11,
-      max: 50,
-    });
-  });
-
-  it('gives a missing end no room to move', () => {
-    expect(nudgeLimits(marker({ frame: 100 }), 'end', second)).toEqual({ min: 0, max: 0 });
-  });
-
-  it('allows no nudge while the second is unknown', () => {
-    expect(nudgeLimits(marker({ frame: 100 }, { frame: 900 }), 'start', 0)).toEqual({
-      min: 0,
-      max: 0,
-    });
   });
 });
 

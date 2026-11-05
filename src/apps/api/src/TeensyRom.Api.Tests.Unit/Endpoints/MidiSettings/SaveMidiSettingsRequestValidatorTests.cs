@@ -49,11 +49,19 @@ public class SaveMidiSettingsRequestValidatorTests
         LastSeenName = lastSeenName
     };
 
+    private static DeckSettingsDto Settings(string slot = "A", bool slip = false, double liveLoopBeats = 4) => new()
+    {
+        Slot = slot,
+        Slip = slip,
+        LiveLoopBeats = liveLoopBeats
+    };
+
     private static SaveMidiSettingsRequest ValidRequest() => new()
     {
         Controllers = [Controller()],
         Mappings = [Mapping()],
-        DeckBindings = [Binding("A", "19277260"), Binding("B", "19277261")]
+        DeckBindings = [Binding("A", "19277260"), Binding("B", "19277261")],
+        DeckSettings = [Settings("A"), Settings("B", slip: true, liveLoopBeats: 0.5)]
     };
 
     private void AssertRejectedAt(SaveMidiSettingsRequest request, string propertyName)
@@ -388,9 +396,9 @@ public class SaveMidiSettingsRequestValidatorTests
     }
 
     [Fact]
-    public void DeckControls_LoadedFromTheContractFile_HoldsEightyNineNames()
+    public void DeckControls_LoadedFromTheContractFile_HoldsEightyEightNames()
     {
-        MidiSettingsAllowLists.DeckControls.Should().HaveCount(89);
+        MidiSettingsAllowLists.DeckControls.Should().HaveCount(88);
         MidiSettingsAllowLists.SetControls.Should().HaveCount(3);
         MidiSettingsAllowLists.MixerControls.Should().BeEmpty();
     }
@@ -476,6 +484,17 @@ public class SaveMidiSettingsRequestValidatorTests
         request.Mappings[0].Style = new MidiMappingStyleDto { Kind = kind, Amount = amount };
 
         AssertRejectedAt(request, "Mappings[0].Style.Amount");
+    }
+
+    [Fact]
+    public void Validate_HoldStyleOnTheLiveLoop_Passes()
+    {
+        var request = ValidRequest();
+        request.Mappings[0].Owner = "A";
+        request.Mappings[0].Control = "live-loop";
+        request.Mappings[0].Style = new MidiMappingStyleDto { Kind = "hold" };
+
+        _validator.Validate(request).IsValid.Should().BeTrue();
     }
 
     [Theory]
@@ -652,6 +671,86 @@ public class SaveMidiSettingsRequestValidatorTests
 
         request.DeckBindings = [Binding(lastSeenName: new string('n', 129))];
         AssertRejectedAt(request, "DeckBindings[0].LastSeenName");
+    }
+
+    #endregion
+
+    #region Deck settings
+
+    [Fact]
+    public void Validate_DeckSettingsNullOrAbsent_Passes()
+    {
+        var request = ValidRequest();
+        request.DeckSettings = null;
+        _validator.Validate(request).IsValid.Should().BeTrue();
+
+        _validator.Validate(new SaveMidiSettingsRequest()).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_TooManyDeckSettings_IsRejected()
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [Settings("A"), Settings("B"), Settings("A")];
+
+        AssertRejectedAt(request, nameof(SaveMidiSettingsRequest.DeckSettings));
+    }
+
+    [Fact]
+    public void Validate_NullDeckSettingsEntry_IsRejected()
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [null!];
+
+        AssertRejectedAt(request, "DeckSettings[0]");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("C")]
+    [InlineData("a")]
+    public void Validate_DeckSettingsUnknownSlot_IsRejected(string slot)
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [Settings(slot)];
+
+        AssertRejectedAt(request, "DeckSettings[0].Slot");
+    }
+
+    [Fact]
+    public void Validate_DeckSettingsDuplicateSlots_AreRejected()
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [Settings("B"), Settings("B")];
+
+        AssertRejectedAt(request, "DeckSettings[1].Slot");
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    [InlineData(128.5)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Validate_LiveLoopBeatsOutOfRangeOrNotFinite_IsRejected(double beats)
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [Settings(liveLoopBeats: beats)];
+
+        AssertRejectedAt(request, "DeckSettings[0].LiveLoopBeats");
+    }
+
+    [Theory]
+    [InlineData(0.0208)]
+    [InlineData(0.5)]
+    [InlineData(4.0)]
+    [InlineData(128.0)]
+    public void Validate_LiveLoopBeatsInRange_Passes(double beats)
+    {
+        var request = ValidRequest();
+        request.DeckSettings = [Settings(liveLoopBeats: beats)];
+
+        _validator.Validate(request).IsValid.Should().BeTrue();
     }
 
     #endregion

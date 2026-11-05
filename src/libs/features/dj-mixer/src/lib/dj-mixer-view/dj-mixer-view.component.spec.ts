@@ -117,7 +117,6 @@ function idleTransportSummary(): DeckTransportSummary {
     subtuneText: 'Subtune 0 of 0',
     subtuneCompact: '–/–',
     subtuneDisabled: true,
-    repeat: true,
     held: false,
     errors: [],
   };
@@ -151,7 +150,7 @@ const NO_LOOPS: DeckLoopsSummary = {
   selected: null,
 };
 
-/** A deck with one cue, selected: its Out key makes it a loop. */
+/** A deck with one cue, selected. */
 const SELECTED_CUE: DeckLoopsSummary = {
   hasTune: true,
   canAdd: true,
@@ -184,12 +183,6 @@ const SELECTED_CUE: DeckLoopsSummary = {
     spanText: '00:01.0',
     lengthText: 'NO END',
     lengthOptions: [],
-    start: {
-      offsetFrames: 0,
-      rangeFrames: 0,
-      tickPercents: [],
-    },
-    end: null,
   },
 };
 
@@ -238,6 +231,17 @@ function createDjStoreStub(
     transportSummary: () => signal(idleTransportSummary()),
     bindingSummary: () => signal(idleBindingSummary()),
     loopsSummary: () => signal(loops),
+    liveLoopSummary: () =>
+      signal({
+        available: false,
+        running: false,
+        sizeText: '1 BEAT',
+        sizeOptions: [],
+        canHalve: false,
+        canDouble: false,
+        slip: false,
+        mark: null,
+      }),
     settingsInPlay: () => signal({ markerId: null, name: 'Main' }),
     asidLaunching,
     bindings: signal({
@@ -297,7 +301,6 @@ function createDeckServiceStub() {
     load: vi.fn(),
     togglePlayPause: vi.fn(),
     stop: vi.fn(),
-    setRepeat: vi.fn(),
     selectSubtune: vi.fn(),
     seek: vi.fn(),
     bindDevice: vi.fn(),
@@ -1312,7 +1315,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(178);
+      expect(ALL_IDENTITIES).toHaveLength(176);
       expect(mismatched).toEqual([]);
     });
 
@@ -1330,15 +1333,17 @@ describe('DjMixerViewComponent', () => {
       }
     });
 
-    it("finds each deck's Out key as exactly one element once a cue is selected", () => {
+    it("finds each deck's length step keys as exactly one element each, with a cue selected", () => {
       const { fixture } = render([], {}, { loops: SELECTED_CUE });
       const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
 
-      const matches = DECK_SLOTS.map(
-        (owner) => grid.querySelectorAll(anchorFor({ owner, control: 'loop-set-end' })).length
+      const matches = DECK_SLOTS.flatMap((owner) =>
+        (['loop-length-down', 'loop-length-up'] as const).map(
+          (control) => grid.querySelectorAll(anchorFor({ owner, control })).length
+        )
       );
 
-      expect(matches).toEqual([1, 1]);
+      expect(matches).toEqual([1, 1, 1, 1]);
     });
   });
 

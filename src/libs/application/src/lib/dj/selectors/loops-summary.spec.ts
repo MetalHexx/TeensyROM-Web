@@ -314,7 +314,6 @@ describe('loopsSummary', () => {
         name: 'Cue 1',
         kind: 'cue',
         spanText: '00:02.0',
-        end: null,
       });
     });
 
@@ -322,32 +321,6 @@ describe('loopsSummary', () => {
       setLoops([marker('a', 100)], { selectedId: 'gone' });
 
       expect(store.loopsSummary('A')().selected).toBeNull();
-    });
-
-    it("lays the beats within reach on each boundary's one-second track", () => {
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
-      setLoops([marker('a', 100, 300)]);
-
-      const { start, end } = store.loopsSummary('A')().selected ?? {};
-
-      expect(start).toEqual({ offsetFrames: 0, rangeFrames: 50, tickPercents: [22, 46, 70, 94] });
-      expect(end?.tickPercents.map(Math.round)).toEqual([14, 38, 62, 86]);
-    });
-
-    it('draws no ticks with no grid, no beat of its span in reach or while the interval is unknown', () => {
-      setLoops([marker('a', 100, 300)]);
-      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
-
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, endFrame: 40 } });
-      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
-
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
-      store.setDeckTiming({ slot: 'A', playCallIntervalUs: null });
-      expect(store.loopsSummary('A')().selected?.start).toEqual({
-        offsetFrames: 0,
-        rangeFrames: 0,
-        tickPercents: [],
-      });
     });
   });
 
@@ -376,7 +349,7 @@ describe('loopsSummary', () => {
     it('writes a ladder fraction of a beat', () => {
       setLoops([marker('half', 240, 252), marker('eighth', 240, 243), marker('quarter', 240, 246)]);
 
-      expect(lengthTexts()).toEqual(['½ BEAT', '⅛ BEAT', '¼ BEAT']);
+      expect(lengthTexts()).toEqual(['1/2 BEAT', '1/8 BEAT', '1/4 BEAT']);
     });
 
     it('falls back to seconds off the beats, between ladder sizes, off the grid and outside its span', () => {
@@ -410,11 +383,11 @@ describe('loopsSummary', () => {
       const selected = store.loopsSummary('A')().selected;
 
       expect(selected?.lengthText).toBe('4 BEATS');
+      // 1/16 of a 24-frame beat is 1.5 frames, under the 2 a size needs: 1/8 is the shortest.
       expect(selected?.lengthOptions.map((option) => option.label)).toEqual([
-        '1/12 BEAT',
-        '⅛ BEAT',
-        '¼ BEAT',
-        '½ BEAT',
+        '1/8 BEAT',
+        '1/4 BEAT',
+        '1/2 BEAT',
         '1 BEAT',
         '2 BEATS',
         '4 BEATS',
@@ -427,6 +400,17 @@ describe('loopsSummary', () => {
       expect(selected?.lengthOptions.filter((option) => option.selected)).toEqual([
         { beats: 4, label: '4 BEATS', selected: true },
       ]);
+    });
+
+    it('writes and selects a ladder size whose end falls between two frames', () => {
+      // 28 frames a beat: 1/8 is 3.5 frames, 1/4 is 7.
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, beatFrames: 28 } });
+      setLoops([marker('eighth', 252, 255.5), marker('quarter', 252, 259)]);
+
+      expect(lengthTexts()).toEqual(['1/8 BEAT', '1/4 BEAT']);
+      const options = store.loopsSummary('A')().selected?.lengthOptions;
+      expect(options?.[0]).toEqual({ beats: 1 / 8, label: '1/8 BEAT', selected: true });
+      expect(options?.filter((option) => option.selected)).toHaveLength(1);
     });
 
     it('offers no lengths with no grid, and keeps seconds', () => {

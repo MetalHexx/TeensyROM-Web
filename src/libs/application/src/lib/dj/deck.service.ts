@@ -3,10 +3,13 @@ import type { TuneReference } from '@sidablist/tunes';
 import { logError, logWarn } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
+import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { DeckHand } from './deck-hand';
 import { DeckGrid } from './deck-grid';
+import { DeckLiveLoop } from './deck-live-loop';
 import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
+import { DeckSlip } from './deck-slip';
 import { DeckSpeed, type NudgeDirection } from './deck-speed';
 import { NUDGE_DEFAULT_AMOUNT } from './mixer/speed-excursion';
 import { MixerApplier } from './mixer-applier';
@@ -18,6 +21,7 @@ import { SidWaveFeed } from './sid-wave-feed';
 import { RowUnavailableError, TuneLoader, type LoadPhase } from './tune-loader';
 import {
   DjStore,
+  MAX_LIVE_LOOP_BEATS,
   type DeckDetectedKey,
   type DeckHolding,
   type DeckStatus,
@@ -29,7 +33,6 @@ import { decodeRowHost } from './sets/row-host';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
 import type { MoveStep } from './grid/beat-math';
-import type { LoopBoundaryName } from './selectors/loops-summary';
 
 /** `error instanceof Error ? error.message : String(error)` — a local helper, not core's
  *  `describeError`. This file imports nothing from `@sidablist/*`; every type it touches flows in
@@ -73,8 +76,8 @@ function sameVoices(a: readonly DeckVoiceState[], b: readonly DeckVoiceState[]):
  *
  * Every load puts a row of the current set on the deck: a listing drop joins the set (or reuses the
  * SID's row) and loads it, and `loadRow` loads a row of any open set. Every load and subtune switch
- * restores the row's latched state for the subtune it lands on — the SID panel, mutes, speed and
- * Repeat as last left, with holds, nudges and any speed excursion at home, and everything at home
+ * restores the row's latched state for the subtune it lands on — the SID panel, mutes and speed as
+ * last left, with holds, nudges and any speed excursion at home, and everything at home
  * for a subtune with nothing kept — so a new tune never inherits the last one's settings. It
  * attaches the subtune's markers before it plays.
  *
@@ -90,9 +93,12 @@ export class DeckService {
   private readonly loader = inject(TuneLoader);
   private readonly store = inject(DjStore);
   private readonly bindings = inject(DeckBindings);
+  private readonly persistence = inject(MidiSettingsPersistence);
   private readonly deckSpeed = inject(DeckSpeed);
   private readonly deckHand = inject(DeckHand);
   private readonly loops = inject(DeckLoops);
+  private readonly liveLoop = inject(DeckLiveLoop);
+  private readonly slip = inject(DeckSlip);
   private readonly grid = inject(DeckGrid);
   private readonly sets = inject(DjSets);
   private readonly keeper = inject(DeckMemoryKeeper);
@@ -128,12 +134,12 @@ export class DeckService {
       this.runtime.build(slot);
       this.runtime.subscribe(slot, () => {
         this.reflectEngineControls(slot);
+        this.liveLoop.reflect(slot);
         this.loops.reflect(slot);
         if (!this.suspended[slot] && this.transitioned(slot)) {
           this.applySnapshot(slot);
         }
       });
-      this.setRepeat(slot, true);
     }
     this.watchPositions();
   }
@@ -251,6 +257,7 @@ export class DeckService {
     const sidHash = current.loaded.identity.sidHash;
 
     this.deckHand.drop(slot);
+    this.slip.abandon(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -353,11 +360,6 @@ export class DeckService {
   /** Steps one subtune up. `selectSubtune` clamps to the tune's range and applies its own gates. */
   nextSubtune(slot: Slot): Promise<void> {
     return this.selectSubtune(slot, this.store.deck(slot)().subtune + 1);
-  }
-
-  setRepeat(slot: Slot, on: boolean): void {
-    this.runtime.setRepeat(slot, on);
-    this.store.setDeckRepeat({ slot, repeat: on });
   }
 
   /** The speed fader: sets the tempo multiplier within 0.5x–1.5x. Refused while the deck has
@@ -477,21 +479,6 @@ export class DeckService {
     }
   }
 
-  /** Sets the selected marker's start at the playhead, on the nearest beat. Auditions nothing. */
-  setMarkerIn(slot: Slot): void {
-    if (this.canShape(slot, 'setMarkerIn')) {
-      this.loops.setIn(slot);
-    }
-  }
-
-  /** Sets the selected marker's end at the playhead, on the nearest beat: a cue becomes a loop, a
-   *  loop's end moves. Auditions nothing. */
-  setMarkerOut(slot: Slot): void {
-    if (this.canShape(slot, 'setMarkerOut')) {
-      this.loops.setOut(slot);
-    }
-  }
-
   /** Halves or doubles the selected loop, keeping its start; a cue gains a 4-beat end. */
   resizeMarker(slot: Slot, direction: 'halve' | 'double'): void {
     if (this.canShape(slot, 'resizeMarker')) {
@@ -513,14 +500,14 @@ export class DeckService {
     }
   }
 
-  /** Moves one edge of the selected marker by the deck's Move step. */
-  moveMarkerEdge(slot: Slot, boundary: LoopBoundaryName, direction: -1 | 1): void {
-    if (this.canShape(slot, 'moveMarkerEdge')) {
-      this.loops.moveEdge(slot, boundary, direction);
+  /** Gives the selected loop one more or one fewer whole beat, keeping its start. */
+  stepMarkerLength(slot: Slot, direction: -1 | 1): void {
+    if (this.canShape(slot, 'stepMarkerLength')) {
+      this.loops.stepLength(slot, direction);
     }
   }
 
-  /** Sets how far the deck's Move controls shift a loop or an edge: beats, or one frame. */
+  /** Sets how far the deck's Move controls shift a loop: beats, or one frame. */
   setMoveStep(slot: Slot, step: MoveStep): void {
     if (this.canShape(slot, 'setMoveStep')) {
       this.loops.setMoveStep(slot, step);
@@ -552,15 +539,6 @@ export class DeckService {
   toggleMarkerWrap(slot: Slot): void {
     if (this.canShape(slot, 'toggleMarkerWrap')) {
       this.loops.toggleWrap(slot);
-    }
-  }
-
-  /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
-   *  auditions it on this deck, whatever is running or queued. The edit lands before the first
-   *  await; a deck that is not playing is started first, as `toggleMarker` does. */
-  async nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): Promise<void> {
-    if (this.canShape(slot, 'nudgeMarker')) {
-      await this.auditionEdit(slot, boundary, this.loops.nudge(slot, boundary, offsetFrames));
     }
   }
 
@@ -619,10 +597,40 @@ export class DeckService {
     this.loops.playNow(slot, target);
   }
 
-  /** Lets the running marker loop go and drops whatever is queued. The playhead never moves. */
+  /** Lets the running marker loop go and drops whatever is queued, and ends a live loop with it,
+   *  on the spot. The playhead never moves, except under slip: a departure lands the deck on the
+   *  outermost line first. */
   stopMarkerLoop(slot: Slot): void {
     if (this.canShape(slot, 'stopMarkerLoop')) {
+      this.slip.landOutermost(slot);
+      this.liveLoop.drop(slot);
       this.loops.stop(slot);
+    }
+  }
+
+  /** Pushes a live loop of the deck's size on the grid, or ends the one running back into the
+   *  marker loop underneath. Nothing off the grid. */
+  toggleLiveLoop(slot: Slot): void {
+    if (this.canShape(slot, 'toggleLiveLoop')) {
+      this.liveLoop.toggle(slot);
+    }
+  }
+
+  /** Ends a running live loop, as a hold's release does. Nothing when none runs. */
+  endLiveLoop(slot: Slot): void {
+    if (this.canShape(slot, 'endLiveLoop')) {
+      this.liveLoop.end(slot);
+    }
+  }
+
+  /** Steps the deck's live loop size one rung of the grid's ladder, stopping at its ends. A
+   *  running live loop follows. */
+  stepLiveLoopSize(slot: Slot, direction: 'halve' | 'double'): void {
+    if (this.canShape(slot, 'stepLiveLoopSize')) {
+      const beats = this.liveLoop.steppedBeats(slot, direction);
+      if (beats !== null) {
+        this.setLiveLoopBeats(slot, beats);
+      }
     }
   }
 
@@ -632,7 +640,45 @@ export class DeckService {
    *  `DjBootstrapService` makes in the same startup beat, so a spec can construct this service
    *  without the settings ever loading. */
   async hydrate(): Promise<void> {
+    await this.hydrateDeckSettings();
     await this.bindings.hydrate();
+  }
+
+  /** Turns a deck's slip on or off, and saves it with the MIDI settings. Switching it off ends a
+   *  departure running with no landing; switching it on starts nothing for one already running. */
+  setSlip(slot: Slot, on: boolean): void {
+    this.store.setDeckSettings({ slot, slip: on });
+    if (!on) {
+      this.slip.abandon(slot);
+    }
+    this.persistence.scheduleSave();
+  }
+
+  /** Sets a deck's live loop size in beats (at most `MAX_LIVE_LOOP_BEATS`), and saves it with the
+   *  MIDI settings. A running live loop is resized to it. */
+  setLiveLoopBeats(slot: Slot, beats: number): void {
+    this.store.setDeckSettings({ slot, liveLoopBeats: Math.min(beats, MAX_LIVE_LOOP_BEATS) });
+    this.persistence.scheduleSave();
+    this.liveLoop.resize(slot);
+  }
+
+  /** Seeds each deck's slip and live loop size from the saved MIDI settings; a deck with no entry,
+   *  or a size outside `(0, MAX_LIVE_LOOP_BEATS]`, keeps its defaults (slip on, `DEFAULT_LIVE_LOOP_BEATS`).
+   *  A saved record overrides them, so a saved slip off stays off. Writes the store only, so it
+   *  never queues a save. */
+  private async hydrateDeckSettings(): Promise<void> {
+    const settings = await this.persistence.load();
+    for (const record of settings.deckSettings) {
+      this.store.setDeckSettings({
+        slot: record.slot,
+        slip: record.slip,
+        ...(Number.isFinite(record.liveLoopBeats) &&
+        record.liveLoopBeats > 0 &&
+        record.liveLoopBeats <= MAX_LIVE_LOOP_BEATS
+          ? { liveLoopBeats: record.liveLoopBeats }
+          : {}),
+      });
+    }
   }
 
   /** Binds the slot to a TeensyROM device by id; `null` clears it. */
@@ -672,8 +718,8 @@ export class DeckService {
     const snapshot = this.runtime.snapshot(slot);
     if (snapshot.tune === null) {
       // Nothing loaded: 'empty' is an application concept the engine has no notion of. A fresh
-      // player's own default transport would otherwise land here — from the constructor's own
-      // `setRepeat` notify among other things — and overwrite it before anything was ever dropped.
+      // player's own default transport would otherwise land here and overwrite it before anything
+      // was ever dropped.
       return;
     }
 
@@ -754,6 +800,7 @@ export class DeckService {
    */
   private async loadOnto(slot: Slot, target: LoadTarget): Promise<void> {
     this.deckHand.drop(slot);
+    this.slip.abandon(slot);
     // Before anything can close the set of the row the deck holds now.
     this.keeper.flush(slot);
     const mySeq = ++this.sequence[slot];
@@ -908,7 +955,7 @@ export class DeckService {
   }
 
   /** Lands the row's latched state for the holding's subtune, after `resetTuneShaping` has returned
-   *  the deck to home: the panel, mutes, speed fader and Repeat. Holds, nudges and excursions stay
+   *  the deck to home: the panel, mutes and speed fader. Holds, nudges and excursions stay
    *  at home, and so does a subtune with nothing kept. */
   private restoreTuneShaping(slot: Slot, holding: DeckHolding): DeckRowSettings | null {
     const settings = decodeRowSettings(this.sets.subtuneSettingsOf(holding));
@@ -919,7 +966,6 @@ export class DeckService {
     this.mixerApplier.applyDeck(slot);
     this.applyMutes(slot, settings.mixer.mutes);
     this.deckSpeed.setFader(slot, settings.speed);
-    this.setRepeat(slot, settings.repeat);
     this.reflectEngineControls(slot);
     return settings;
   }
@@ -943,32 +989,13 @@ export class DeckService {
     this.reflectEngineControls(slot);
   }
 
-  /** Auditions the boundary of marker `edited` — the marker an accepted edit just changed; null for
-   *  a refused one, which starts nothing. A deck that is not playing is started first, which
-   *  resumes a pause and restarts a stop from the top. The marker is fixed up front, since a
-   *  selection change can land during that wait, and `DeckLoops` skips it then. */
-  private async auditionEdit(
-    slot: Slot,
-    boundary: LoopBoundaryName,
-    edited: string | null
-  ): Promise<void> {
-    if (edited === null) {
-      return;
-    }
-    if (this.store.deck(slot)().status !== 'playing') {
-      await this.togglePlayPause(slot);
-      if (this.store.deck(slot)().status !== 'playing') {
-        return;
-      }
-    }
-    this.loops.audition(slot, boundary, edited);
-  }
-
-  /** Drops the marker loop, anything queued behind it or waiting for readiness, and a marker's
-   *  own settings in play; a no-op while none is set, so the repeat setting and the engine are
-   *  left alone. */
+  /** Drops the live loop and the marker loop, anything queued behind it or waiting for readiness,
+   *  and a marker's own settings in play; a no-op while none is set, so the engine is left alone.
+   *  A slip departure ends with no landing. */
   private releaseMarkers(slot: Slot): void {
     const { runningId, queuedId, settingsInPlayId } = this.store.loops()[slot];
+    this.slip.abandon(slot);
+    this.liveLoop.drop(slot);
     if (runningId !== null || queuedId !== null || settingsInPlayId !== null) {
       this.loops.disengage(slot);
     }
@@ -989,10 +1016,10 @@ export class DeckService {
    *  the document is hidden — the POC's `animationFrameSignal` bridge rule. On the frames
    *  `LivePaintPacer` picks, about 30 a second whatever the display's refresh rate, it paints each
    *  such deck's playhead readouts and SID panel when its polled frame actually moved, and feeds its
-   *  waveform renderer on every one of them, moved or not. It never
-   *  writes the store: a store write per frame meant a change-detection pass per frame, and the
-   *  garbage behind it, on the main thread the decks' frame clocks share; the store's playhead is
-   *  sampled only by the explicit calls each command makes.
+   *  waveform renderer and paints its slip's second playhead on every one of them, moved or not.
+   *  It never writes the store: a store write per frame meant a change-detection pass per frame,
+   *  and the garbage behind it, on the main thread the decks' frame clocks share; the store's
+   *  playhead is sampled only by the explicit calls each command makes.
    *
    *  Between those frames it sleeps and asks for none: each frame a page asks for runs its whole
    *  rendering lifecycle even when nothing changed, and every frame that changes anything pays for
@@ -1024,6 +1051,8 @@ export class DeckService {
       this.waveFeed.paint(slot);
       const position = this.runtime.position(slot);
       if (position === painted[slot]) {
+        // The slip's second playhead follows its own count, which runs on under a held record.
+        this.playheadPainter.paintReturn(slot);
         return;
       }
       this.playheadPainter.paint(slot);

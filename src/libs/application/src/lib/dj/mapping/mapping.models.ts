@@ -1,5 +1,5 @@
 import type { MappingStyleKind } from '../ports';
-import type { Slot } from '../slot';
+import { DECK_SLOTS, type Slot } from '../slot';
 
 export const VOICE_NUMBERS = [1, 2, 3] as const;
 
@@ -56,20 +56,19 @@ export type DeckControlId =
   | 'loop-add'
   | 'loop-duplicate'
   | 'loop-stop'
-  | 'loop-in'
-  | 'loop-set-end'
-  | 'loop-clear-end'
   | 'loop-global'
   | 'loop-wrap'
-  | 'loop-start-snap-previous'
-  | 'loop-start-snap-next'
-  | 'loop-end-snap-previous'
-  | 'loop-end-snap-next'
   | 'loop-length'
+  | 'loop-length-down'
+  | 'loop-length-up'
   | 'loop-move-earlier'
   | 'loop-move-later'
   | 'loop-move-step'
-  | 'repeat'
+  | 'live-loop'
+  | 'live-loop-size'
+  | 'live-loop-halve'
+  | 'live-loop-double'
+  | 'slip'
   | `voice-${VoiceNumber}-mute`
   | `voice-${VoiceNumber}-hold`
   | 'key'
@@ -104,20 +103,19 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-add',
   'loop-duplicate',
   'loop-stop',
-  'loop-in',
-  'loop-set-end',
-  'loop-clear-end',
   'loop-global',
   'loop-wrap',
-  'loop-start-snap-previous',
-  'loop-start-snap-next',
-  'loop-end-snap-previous',
-  'loop-end-snap-next',
   'loop-length',
+  'loop-length-down',
+  'loop-length-up',
   'loop-move-earlier',
   'loop-move-later',
   'loop-move-step',
-  'repeat',
+  'live-loop',
+  'live-loop-size',
+  'live-loop-halve',
+  'live-loop-double',
+  'slip',
   ...VOICE_NUMBERS.map((n) => `voice-${n}-mute` as const),
   ...VOICE_NUMBERS.map((n) => `voice-${n}-hold` as const),
   'key',
@@ -192,6 +190,19 @@ const CONTROL_IDS: ReadonlySet<string> = new Set<string>([...DECK_CONTROL_IDS, .
 
 export function isControlId(value: string): value is ControlId {
   return CONTROL_IDS.has(value);
+}
+
+/** Whether a saved mapping's owner and control name a control the app has: each deck carries the
+ *  whole deck list and the set carries its own. The same table `MappableControls` builds, without
+ *  needing the services behind it. */
+export function isKnownControl(owner: string, control: string): boolean {
+  if (!isControlId(control)) {
+    return false;
+  }
+  return owner === 'set'
+    ? (SET_CONTROL_IDS as readonly string[]).includes(control)
+    : DECK_SLOTS.some((slot) => slot === owner) &&
+        (DECK_CONTROL_IDS as readonly string[]).includes(control);
 }
 
 /** The identity of a control, unique across owners. */

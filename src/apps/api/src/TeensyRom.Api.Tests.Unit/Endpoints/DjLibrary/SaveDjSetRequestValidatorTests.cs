@@ -299,6 +299,24 @@ public class SaveDjSetRequestValidatorTests
         AssertRejectedAt(WithMarker(m => m.End!.OffsetFrames = 1_000_001), "Body.Rows[0].Subtunes[0].Markers[0].End.OffsetFrames");
     }
 
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(-0.5)]
+    public void BoundaryFrame_ThatIsNotAFiniteNumberZeroOrMore_IsRejected(double frame)
+    {
+        AssertRejectedAt(WithMarker(m => m.Start.Frame = frame), "Body.Rows[0].Subtunes[0].Markers[0].Start.Frame");
+        AssertRejectedAt(WithMarker(m => m.End!.Frame = frame), "Body.Rows[0].Subtunes[0].Markers[0].End.Frame");
+    }
+
+    [Fact]
+    public void BoundaryFrame_MayBeFractional()
+    {
+        AssertPasses(WithMarker(m => m.End = new DjLoopBoundaryDto { Frame = 3.5, OffsetFrames = 0 }));
+        AssertPasses(WithMarker(m => m.Start = new DjLoopBoundaryDto { Frame = 0.25, OffsetFrames = 0 }));
+    }
+
     [Fact]
     public void Voices_AreOneToThreeDistinctValuesInZeroToTwo()
     {

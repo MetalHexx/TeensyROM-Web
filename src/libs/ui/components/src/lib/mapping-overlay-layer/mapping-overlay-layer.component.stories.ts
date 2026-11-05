@@ -60,8 +60,8 @@ const FIXTURE = `
   >
     <button type="button" data-control="play-pause">Play</button>
     <button type="button" data-control="stop">Stop</button>
-    <label data-control="repeat" style="display: inline-flex; align-items: center; gap: 8px;">
-      <input type="checkbox" /> Repeat track
+    <label data-control="voice-1-mute" style="display: inline-flex; align-items: center; gap: 8px;">
+      <input type="checkbox" /> Voice 1 mute
     </label>
     <input type="range" data-control="speed" aria-label="Speed" style="width: 120px;" />
     <lib-mapping-overlay-layer
@@ -81,7 +81,7 @@ export const AllStates: Story = {
       targets: [
         target('play-pause', 'bound'),
         target('stop', 'selectable'),
-        target('repeat', 'selected'),
+        target('voice-1-mute', 'selected'),
       ],
       onTargetSelect: () => undefined,
       onDismiss: () => undefined,
@@ -99,7 +99,7 @@ export const Interactive: Story = {
       targets: [
         target('play-pause', 'bound'),
         target('stop', 'selectable'),
-        target('repeat', 'selectable'),
+        target('voice-1-mute', 'selectable'),
         target('speed', 'selectable'),
       ],
       onTargetSelect(this: { targets: MappingOverlayTarget[] }, id: string) {
@@ -132,7 +132,7 @@ export const Focused: Story = {
       targets: [
         target('play-pause', 'selectable'),
         target('stop', 'selected'),
-        target('repeat', 'bound'),
+        target('voice-1-mute', 'bound'),
       ],
       onTargetSelect: () => undefined,
       onDismiss: () => undefined,

@@ -135,7 +135,6 @@ export interface DeckState {
   structure: DeckStructure | null;
   subtune: number;
   subtuneCount: number;
-  repeat: boolean;
   error: string | null;
   /** The engine-reported tempo multiplier, home 1. It is what the speed display shows. */
   speed: number;
@@ -153,9 +152,14 @@ export interface DeckState {
   detectedKey: DeckDetectedKey | null;
   /** The grid the deck plays to, or null when the tune has none. */
   beatGrid: DeckBeatGrid | null;
-  /** How far the Move controls shift a loop or an edge: a whole number of beats, or `'frame'` for
+  /** How far the Move controls shift a loop: a whole number of beats, or `'frame'` for
    *  one play call by the edges' nudges. Kept across loads. */
   moveStepBeats: MoveStep;
+  /** Whether slip is on. A setting of the deck, not of a tune or a set: it is kept on the host
+   *  with the MIDI settings and no load touches it. */
+  slip: boolean;
+  /** The live loop size in beats. A setting of the deck, kept like `slip`. */
+  liveLoopBeats: number;
   /** True from the first tap of a sequence until the taps stop. */
   tapping: boolean;
   /** True only while `DeckService` runs a load or subtune switch — narrower than `busy`, which
@@ -188,7 +192,10 @@ export interface MidiState {
 /** One end of a marker: the frame the performer captured it at and the signed nudge applied to it.
  *  The frame the engine jumps to is `max(0, frame + offsetFrames)`. */
 export interface DeckLoopBoundary {
+  /** Not always a whole frame for an end: a ladder length that is not a whole number of frames
+   *  ends between two, and the loop laps in alternating whole-frame lengths. */
   readonly frame: number;
+  /** Always whole: a nudge moves by play calls. */
   readonly offsetFrames: number;
 }
 
@@ -213,6 +220,19 @@ export interface DeckLoopMarker {
   readonly wraps: boolean;
 }
 
+/** A live loop the engine is running: its bounds in play calls. */
+export interface DeckLiveLoopState {
+  readonly startFrame: number;
+  /** The end the engine enforces now. Not always a whole frame: a length that is not laps in
+   *  alternating whole-frame lengths, and this is their average end. */
+  readonly endFrame: number;
+  /** A shrink waiting for its frame: the end the loop takes then, or null. */
+  readonly pendingEndFrame: number | null;
+  /** The lap phase the engine's loop was set with (core's `ActiveLoop.lapPhase`), reduced; absent
+   *  for 0. */
+  readonly lapPhase?: number;
+}
+
 /** One deck's markers for the tune it holds, and where the performer is working in them. */
 export interface DeckLoopsState {
   /** List order is the 'Loop N' / 'Cue N' counting order. */
@@ -224,13 +244,21 @@ export interface DeckLoopsState {
   queuedId: string | null;
   selectionMovedWhileQueued: boolean;
   /** The bounds the engine is enforcing for the running marker, in play calls. They trail the
-   *  marker's list entry while an edit waits for the end of the pass, so the lap follows these. */
-  runningBounds: { readonly start: number; readonly end: number } | null;
+   *  marker's list entry while an edit waits for the end of the pass, so the lap follows these.
+   *  `lapPhase` is the one the engine's loop was set with, reduced; absent for 0. */
+  runningBounds: {
+    readonly start: number;
+    readonly end: number;
+    readonly lapPhase?: number;
+  } | null;
   /** The marker whose own settings are in play, or null while the main track's are. */
   settingsInPlayId: string | null;
   /** The main track's settings, held aside while a marker's own are in play; null otherwise,
    *  when the panel and the engine's mutes are the main track's. */
   mainSettings: DeckMixerSettings | null;
+  /** The live loop the engine is running, or null. It is never one of the `markers`; a marker
+   *  running underneath keeps its own `runningId` and `runningBounds`. */
+  readonly live: DeckLiveLoopState | null;
 }
 
 /** The row a deck holds, and the subtune its loops and settings are kept under. */
@@ -304,7 +332,17 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
   runningBounds: null,
   settingsInPlayId: null,
   mainSettings: null,
+  live: null,
 };
+
+/** A deck's live loop size, in beats, until the host says otherwise. */
+export const DEFAULT_LIVE_LOOP_BEATS = 4;
+
+/** Whether a deck's slip starts on, until a saved record says otherwise. */
+const DEFAULT_SLIP = true;
+
+/** The largest live loop size, in beats, the server accepts in the saved MIDI settings. */
+export const MAX_LIVE_LOOP_BEATS = 128;
 
 const initialDeckState: DeckState = {
   loaded: null,
@@ -314,7 +352,6 @@ const initialDeckState: DeckState = {
   structure: null,
   subtune: 0,
   subtuneCount: 0,
-  repeat: true,
   error: null,
   speed: 1,
   faderSpeed: 1,
@@ -329,6 +366,8 @@ const initialDeckState: DeckState = {
   detectedKey: null,
   beatGrid: null,
   moveStepBeats: 1,
+  slip: DEFAULT_SLIP,
+  liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS,
   tapping: false,
   switching: false,
   handHeld: false,

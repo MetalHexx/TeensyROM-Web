@@ -41,7 +41,7 @@ Browse the SD and USB storage of every connected cart, along with your saved set
 
 ## Play a deck
 
-- **Transport:** play, pause, stop and repeat the tune.
+- **Transport:** play, pause and stop. Every tune repeats when it ends.
 - **Position:** see how far in you are, and jump to any point.
 - **Tunes:** step to the previous or next tune in the loaded set, and to the previous or next sub-tune of the tune that is loaded.
 - **Speed:** change the playback speed in steps as fine as 0.01%, nudge it up or down for a moment, or return to normal.
@@ -67,11 +67,11 @@ The settings show the chip's live values as the tune plays, and every voice has 
 
 Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats.
 
+- **Live loop:** press the Live loop key to loop the beats just played, without setting a marker first. Tap it, or hold it and let go to end the loop. Halve or double its length, or pick one, at any time.
+- **Slip:** SLIP starts on, and stays as you last set it. With SLIP on, the tune carries on underneath a loop or a hand hold, and playing returns to where it would have been when you let go.
 - **Set:** add a marker at the current position. Give it an end to make it a loop, or leave it as a cue. Stop a running loop at any time.
-- **Start and end:** set a marker's start or end at the current position.
-- **Length:** halve or double a loop, or set its length in beats, up to 128.
-- **Move:** move a loop, or just its start or end, by 1, 2, 4, 8 or 16 beats.
-- **Fine tune:** nudge a marker's start or end by up to a second.
+- **Length:** halve or double a loop, make it a beat shorter or longer, or set its length in beats, up to 128. Pick No End to turn a loop back into a cue.
+- **Move:** move a loop by 1, 2, 4, 8 or 16 beats, or by 1 frame at a time with the 1 FRAME step.
 - **Name:** rename any marker.
 - **Jump:** jump to a marker, or start it right away.
 - **Own mixer settings:** a marker follows the deck's settings by default. Give it voice, filter and key settings of its own, and the list shows which markers have them.

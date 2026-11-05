@@ -21,5 +21,10 @@ namespace TeensyRom.Api.Endpoints.MidiSettings.GetMidiSettings
         /// Which TeensyROM cartridge each deck slot is bound to.
         /// </summary>
         [Required] public List<DeckDeviceBindingDto> DeckBindings { get; set; } = [];
+
+        /// <summary>
+        /// Each deck's own settings: slip and the live loop size in beats.
+        /// </summary>
+        [Required] public List<DeckSettingsDto> DeckSettings { get; set; } = [];
     }
 }

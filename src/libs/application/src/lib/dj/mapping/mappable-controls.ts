@@ -25,6 +25,28 @@ import {
   type VoiceStripControl,
 } from './mapping.models';
 
+/** The styles of a state control that also takes `hold`: latch first, so learn's default stays a
+ *  toggle. */
+const STATE_WITH_HOLD_STYLES: readonly MappingStyleKind[] = [
+  'latch',
+  'latch-release',
+  'on',
+  'on-release',
+  'off',
+  'off-release',
+  'hold',
+];
+
+const WHOLE_STEP_STYLES: readonly MappingStyleKind[] = [
+  'relative-offset',
+  'relative-signed',
+  'step',
+  'step-release',
+];
+
+/** A whole-step value that also spreads its places across a knob's travel. */
+const WHOLE_STEP_ABSOLUTE_STYLES: readonly MappingStyleKind[] = ['absolute', ...WHOLE_STEP_STYLES];
+
 /** The defaults a value control offers when a CC source is mapped onto it. `sensitivity` is the
  *  fraction of the range one relative tick moves; `stepAmount` is the fraction one step press
  *  moves. */
@@ -43,7 +65,14 @@ interface ControlBase {
  *  deck and mixer commands the screen uses. */
 export type MappableControl =
   | (ControlBase & { readonly nature: 'trigger'; fire(): void })
-  | (ControlBase & { readonly nature: 'state'; read(): boolean; set(on: boolean): void })
+  | (ControlBase & {
+      readonly nature: 'state';
+      /** The styles this control offers in place of its nature's, when it declares its own (a
+       *  state that also takes `hold`). */
+      readonly styles?: readonly MappingStyleKind[];
+      read(): boolean;
+      set(on: boolean): void;
+    })
   | (ControlBase & {
       readonly nature: 'hold';
       /** The amount a fresh mapping of this hold starts with, or null for a hold that takes none
@@ -63,7 +92,8 @@ export type MappableControl =
       /** The styles this control offers, when fewer than its nature's. */
       readonly styles?: readonly MappingStyleKind[];
       /** A selection that moves one place per tick or press: the engine ignores sensitivity, reads
-       *  a step amount only for its sign (the direction), and never applies `absolute`. */
+       *  a step amount only for its sign (the direction), and spreads its places evenly across a
+       *  knob's travel under `absolute` (offered only where `styles` lists it). */
       readonly wholeSteps?: boolean;
       /** Present on a control whose relative ticks move less the more slowly they arrive: the
        *  smallest move one tick makes, in the control's own units. */
@@ -197,9 +227,10 @@ function state(
   identity: ControlIdentity,
   name: string,
   read: () => boolean,
-  set: (on: boolean) => void
+  set: (on: boolean) => void,
+  styles?: readonly MappingStyleKind[]
 ): MappableControl {
-  return { identity, name, nature: 'state', read, set };
+  return { identity, name, nature: 'state', read, set, ...(styles === undefined ? {} : { styles }) };
 }
 
 function hold(
@@ -235,13 +266,15 @@ function value(
 }
 
 /** A selection over `count()` places, from 0 to `count() − 1` (0 when there are none). It moves
- *  one place per relative tick or step press and is never set to an absolute position. */
+ *  one place per relative tick or step press, and is set to an absolute position only when `styles`
+ *  lists `absolute`. */
 function wholeStepValue(
   identity: ControlIdentity,
   name: string,
   count: () => number,
   read: () => number,
-  set: (index: number) => void
+  set: (index: number) => void,
+  styles: readonly MappingStyleKind[] = WHOLE_STEP_STYLES
 ): MappableControl {
   return {
     identity,
@@ -254,7 +287,7 @@ function wholeStepValue(
     home: 0,
     step: 1,
     defaults: { ccStyle: 'relative-offset', sensitivity: 1, stepAmount: 1 },
-    styles: ['relative-offset', 'relative-signed', 'step', 'step-release'],
+    styles,
     wholeSteps: true,
     read,
     set,
@@ -305,6 +338,7 @@ export class MappableControls {
         )
       );
     const seek = this.coalescedSeek(slot);
+    const liveLoop = this.djStore.liveLoopSummary(slot);
 
     return [
       trigger(id('play-pause'), 'Play / Pause', () => void decks.togglePlayPause(slot)),
@@ -369,23 +403,8 @@ export class MappableControls {
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
       trigger(id('loop-duplicate'), 'Duplicate', () => decks.duplicateMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
-      trigger(id('loop-in'), 'Loop in', () => decks.setMarkerIn(slot)),
-      trigger(id('loop-set-end'), 'Loop out', () => decks.setMarkerOut(slot)),
-      trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
       trigger(id('loop-global'), 'Loop GBL', () => decks.toggleMarkerGlobal(slot)),
       trigger(id('loop-wrap'), 'Loop WRAP', () => decks.toggleMarkerWrap(slot)),
-      trigger(id('loop-start-snap-previous'), 'Move loop start earlier', () =>
-        decks.moveMarkerEdge(slot, 'start', -1)
-      ),
-      trigger(id('loop-start-snap-next'), 'Move loop start later', () =>
-        decks.moveMarkerEdge(slot, 'start', 1)
-      ),
-      trigger(id('loop-end-snap-previous'), 'Move loop end earlier', () =>
-        decks.moveMarkerEdge(slot, 'end', -1)
-      ),
-      trigger(id('loop-end-snap-next'), 'Move loop end later', () =>
-        decks.moveMarkerEdge(slot, 'end', 1)
-      ),
       wholeStepValue(
         id('loop-length'),
         'Loop length',
@@ -406,6 +425,10 @@ export class MappableControls {
           }
         }
       ),
+      trigger(id('loop-length-down'), 'Loop length down a beat', () =>
+        decks.stepMarkerLength(slot, -1)
+      ),
+      trigger(id('loop-length-up'), 'Loop length up a beat', () => decks.stepMarkerLength(slot, 1)),
       trigger(id('loop-move-earlier'), 'Move loop earlier', () => decks.moveMarker(slot, -1)),
       trigger(id('loop-move-later'), 'Move loop later', () => decks.moveMarker(slot, 1)),
       wholeStepValue(
@@ -417,10 +440,47 @@ export class MappableControls {
           decks.setMoveStep(slot, MOVE_STEPS[clamp(Math.round(index), 0, MOVE_STEPS.length - 1)])
       ),
       state(
-        id('repeat'),
-        'Repeat track',
-        () => deck().repeat,
-        (on) => decks.setRepeat(slot, on)
+        id('live-loop'),
+        'Live loop',
+        () => liveLoop().running,
+        (on) => {
+          if (on === liveLoop().running) {
+            return;
+          }
+          if (on) {
+            decks.toggleLiveLoop(slot);
+          } else {
+            decks.endLiveLoop(slot);
+          }
+        },
+        STATE_WITH_HOLD_STYLES
+      ),
+      wholeStepValue(
+        id('live-loop-size'),
+        'Live loop length',
+        () => liveLoop().sizeOptions.length,
+        () => Math.max(0, liveLoop().sizeOptions.findIndex((option) => option.selected)),
+        (index) => {
+          const { sizeOptions } = liveLoop();
+          const option = sizeOptions[clamp(Math.round(index), 0, sizeOptions.length - 1)];
+          // An absolute knob repeats its position; only a change resizes (and saves).
+          if (option !== undefined && !option.selected) {
+            decks.setLiveLoopBeats(slot, option.beats);
+          }
+        },
+        WHOLE_STEP_ABSOLUTE_STYLES
+      ),
+      trigger(id('live-loop-halve'), 'Halve live loop', () =>
+        decks.stepLiveLoopSize(slot, 'halve')
+      ),
+      trigger(id('live-loop-double'), 'Double live loop', () =>
+        decks.stepLiveLoopSize(slot, 'double')
+      ),
+      state(
+        id('slip'),
+        'Slip',
+        () => liveLoop().slip,
+        (on) => decks.setSlip(slot, on)
       ),
       ...VOICE_NUMBERS.map((n) =>
         state(

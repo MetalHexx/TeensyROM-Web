@@ -18,6 +18,7 @@ export * from './ConnectionType';
 export * from './CreateJobBody';
 export * from './CreateJobResponse';
 export * from './DeckDeviceBindingDto';
+export * from './DeckSettingsDto';
 export * from './DeleteDjSetResponse';
 export * from './DeleteThemeResponse';
 export * from './DeviceSettingsDto';

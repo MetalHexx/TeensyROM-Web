@@ -19,7 +19,7 @@ import {
 } from './dj-store';
 import { MixerApplier } from './mixer-applier';
 import type { MoveStepBeats } from './grid/beat-math';
-import { oneSecondFrames, resolvedFrame } from './loops/loop-marker-math';
+import { markerKind, markerLabel, oneSecondFrames, resolvedFrame } from './loops/loop-marker-math';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { engineSettingsOf } from './mixer/engine-settings';
 import { MARKER_NAME_MAX_LENGTH, MAX_MARKERS_PER_SUBTUNE } from './sets/set-limits';
@@ -43,9 +43,8 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   return { ...actual, logWarn: vi.fn(), logError: vi.fn() };
 });
 
-/** 50 play calls a second, so a nudge reaches 50 frames either way. */
+/** 50 play calls a second. */
 const INTERVAL_US = 20_000;
-const SECOND = 50;
 
 interface Gate {
   holding: boolean;
@@ -233,6 +232,8 @@ describe('DeckLoops', () => {
     runtime = TestBed.inject(DeckRuntime);
     store = TestBed.inject(DjStore);
     loops = TestBed.inject(DeckLoops);
+    store.setDeckSettings({ slot: 'A', slip: false });
+    store.setDeckSettings({ slot: 'B', slip: false });
     for (const slot of ['A', 'B'] as const) {
       runtime.build(slot);
       // What `DeckService` does for every engine notification: mirror the engine's controls
@@ -316,6 +317,15 @@ describe('DeckLoops', () => {
   const engineLoop = (slot: Slot) => runtime.snapshot(slot).loop;
   const engineQueue = (slot: Slot) => runtime.snapshot(slot).tune?.queuedJump ?? null;
   const handOffsOf = (slot: Slot) => runtime.snapshot(slot).tune?.handOffs;
+
+  /** Shifts the selected marker, start and end together, by `frames` frames on the frame Move step,
+   *  which needs no grid. */
+  function shiftSelected(slot: Slot, frames: number): void {
+    loops.setMoveStep(slot, 'frame');
+    for (let press = 0; press < Math.abs(frames); press++) {
+      loops.moveLoop(slot, frames > 0 ? 1 : -1);
+    }
+  }
 
   /** Fires `count` frames of the deck's clock. */
   function tick(slot: Slot, count = 1): void {
@@ -489,7 +499,7 @@ describe('DeckLoops', () => {
       await settle();
       const declare = vi.spyOn(runtime, 'setJumpTargets');
 
-      loops.nudge('A', 'start', 20);
+      shiftSelected('A', 20);
       await settle();
 
       expect(declare).toHaveBeenLastCalledWith('A', [120]);
@@ -811,55 +821,13 @@ describe('DeckLoops', () => {
     });
   });
 
-  describe('ending and clearing', () => {
+  describe('clearing', () => {
     beforeEach(async () => {
-      await positions.save(TUNE_X, [cue('a', 100)]);
+      await positions.save(TUNE_X, [loopOf('a', 100, 180)]);
       await loadOn('A', TUNE_X);
     });
 
-    it('ends the selected marker at the playhead, making it a loop, and saves it', async () => {
-      await runtime.seekToFrame('A', 180);
-
-      loops.setOut('A');
-
-      expect(stateOf('A').markers[0].end).toEqual({ frame: 180, offsetFrames: 0 });
-      expect(await positions.load(TUNE_X)).toEqual([loopOf('a', 100, 180)]);
-    });
-
-    it('refuses an end that is not after the start', async () => {
-      await runtime.seekToFrame('A', 100);
-
-      loops.setOut('A');
-
-      expect(stateOf('A').markers[0].end).toBeNull();
-      expect(refusals()).toHaveLength(1);
-    });
-
-    it('counts the start nudge when judging the end', async () => {
-      loops.nudge('A', 'start', 30);
-      await runtime.seekToFrame('A', 120);
-
-      loops.setOut('A');
-
-      expect(stateOf('A').markers[0].end).toBeNull();
-      expect(refusals()).toHaveLength(1);
-    });
-
-    it("moves a loop's end to the playhead", async () => {
-      await runtime.seekToFrame('A', 180);
-      loops.setOut('A');
-      await runtime.seekToFrame('A', 190);
-
-      loops.setOut('A');
-
-      expect(stateOf('A').markers[0].end).toEqual({ frame: 190, offsetFrames: 0 });
-      expect(await positions.load(TUNE_X)).toEqual([loopOf('a', 100, 190)]);
-    });
-
     it('turns a loop back into a cue, and does nothing to a cue', async () => {
-      await runtime.seekToFrame('A', 180);
-      loops.setOut('A');
-
       loops.clearEnd('A');
       expect(stateOf('A').markers[0].end).toBeNull();
       expect(await positions.load(TUNE_X)).toEqual([cue('a', 100)]);
@@ -873,11 +841,10 @@ describe('DeckLoops', () => {
     it('refuses with a warning when no marker is selected', async () => {
       await loadOn('A', TUNE_Y);
 
-      loops.setOut('A');
       loops.clearEnd('A');
       loops.remove('A');
 
-      expect(refusals()).toHaveLength(3);
+      expect(refusals()).toHaveLength(2);
     });
   });
 
@@ -913,76 +880,9 @@ describe('DeckLoops', () => {
     });
   });
 
-  describe('nudging', () => {
-    beforeEach(async () => {
-      await positions.save(TUNE_X, [cue('cue', 100), loopOf('loop', 300, 320)]);
-      await loadOn('A', TUNE_X);
-    });
-
-    it('holds a nudge to a second either way', async () => {
-      loops.nudge('A', 'start', 80);
-      expect(stateOf('A').markers[0].start.offsetFrames).toBe(SECOND);
-
-      loops.nudge('A', 'start', -80);
-      expect(stateOf('A').markers[0].start.offsetFrames).toBe(-SECOND);
-
-      expect(await positions.load(TUNE_X)).toEqual([
-        cue('cue', 100, -SECOND),
-        loopOf('loop', 300, 320),
-      ]);
-    });
-
-    it('keeps a loop end at least one frame after its start, from either side', () => {
-      loops.select('A', 'loop');
-
-      loops.nudge('A', 'start', 40);
-      expect(stateOf('A').markers[1].start.offsetFrames).toBe(19);
-
-      loops.nudge('A', 'start', 0);
-      loops.nudge('A', 'end', -30);
-      expect(stateOf('A').markers[1].end?.offsetFrames).toBe(-19);
-
-      loops.nudge('A', 'end', 80);
-      expect(stateOf('A').markers[1].end?.offsetFrames).toBe(SECOND);
-    });
-
-    it('counts the other boundary nudge when limiting', () => {
-      loops.select('A', 'loop');
-      loops.nudge('A', 'end', -10);
-
-      loops.nudge('A', 'start', 40);
-
-      expect(stateOf('A').markers[1].start.offsetFrames).toBe(9);
-    });
-
-    it('refuses an end nudge on a cue', () => {
-      expect(loops.nudge('A', 'end', 5)).toBeNull();
-
-      expect(refusals()).toHaveLength(1);
-      expect(stateOf('A').markers[0]).toMatchObject({ end: null });
-    });
-
-    it('ignores a value that is not a number', () => {
-      const before = stateOf('A').markers;
-
-      expect(loops.nudge('A', 'start', Number.NaN)).toBeNull();
-
-      expect(stateOf('A').markers).toBe(before);
-    });
-
-    it('returns the edited marker, also when the boundary stays where it was', () => {
-      expect(loops.nudge('A', 'start', 5)).toBe('cue');
-      const before = stateOf('A').markers;
-
-      expect(loops.nudge('A', 'start', 5)).toBe('cue');
-
-      expect(stateOf('A').markers).toBe(before);
-    });
-  });
-
   describe('beat commands', () => {
-    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at 2
-     *  frames (1/12 of a beat), below ⅛. */
+    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at 1/8
+     *  (3 frames): 1/16 would be 1.5 frames, under the 2 every size needs. */
     const GRID: DeckBeatGrid = {
       beatFrames: 24,
       beatOneFrame: 0,
@@ -1026,6 +926,7 @@ describe('DeckLoops', () => {
         loopOf('odd', 100, 200),
         loopOf('big', 0, 768),
         loopOf('tiny', 240, 243),
+        { ...loopOf('off', 600, 700), start: { frame: 600, offsetFrames: 3 } },
       ]);
       await loadOn('A', TUNE_X);
       setGrid(GRID);
@@ -1073,63 +974,6 @@ describe('DeckLoops', () => {
       });
     });
 
-    describe('setting in and out', () => {
-      it('puts the start on the beat nearest the playhead, dropping a nudge', async () => {
-        loops.nudge('A', 'start', 7);
-        await runtime.seekToFrame('A', 250);
-
-        loops.setIn('A');
-
-        expect(markerOf('cue')?.start).toEqual({ frame: 240, offsetFrames: 0 });
-        expect(await savedSpans()).toContainEqual(['cue', 240, null]);
-      });
-
-      it('makes a loop of a cue at the nearest beat, and moves a loop end', async () => {
-        await runtime.seekToFrame('A', 295);
-        loops.setOut('A');
-        expect(spanOf('cue')).toEqual([100, 288]);
-
-        await runtime.seekToFrame('A', 500);
-        loops.setOut('A');
-        expect(spanOf('cue')).toEqual([100, 504]);
-        expect(await savedSpans()).toContainEqual(['cue', 100, 504]);
-      });
-
-      it('takes the playhead as it is with no grid', async () => {
-        setGrid(null);
-        await runtime.seekToFrame('A', 301);
-
-        loops.setOut('A');
-
-        expect(spanOf('cue')).toEqual([100, 301]);
-      });
-
-      it('refuses an end at or before the start and a start at or after the end', async () => {
-        loops.select('A', 'loop');
-        await runtime.seekToFrame('A', 236);
-        loops.setOut('A');
-        await runtime.seekToFrame('A', 340);
-        loops.setIn('A');
-
-        expect(spanOf('loop')).toEqual([240, 336]);
-        expect(refusals()).toHaveLength(2);
-      });
-
-      it("refuses an edge past the tune's length", async () => {
-        setLength(300);
-        await runtime.seekToFrame('A', 296);
-        loops.setOut('A');
-        expect(spanOf('cue')).toEqual([100, 288]);
-        expect(refusals()).toHaveLength(0);
-
-        setLength(250);
-        loops.setOut('A');
-
-        expect(spanOf('cue')).toEqual([100, 288]);
-        expect(refusals()).toHaveLength(1);
-      });
-    });
-
     describe('resizing', () => {
       it('halves and doubles a loop, keeping its start', async () => {
         loops.select('A', 'loop');
@@ -1168,7 +1012,7 @@ describe('DeckLoops', () => {
         loops.resize('A', 'double');
         loops.resize('A', 'double');
         loops.resize('A', 'double');
-        // ⅛ halves once more, to 2 frames (1/12 of the beat), and no further.
+        // 1/8 is the shortest size, so it halves no further: there is no odd division below it.
         loops.select('A', 'tiny');
         loops.resize('A', 'halve');
         loops.resize('A', 'halve');
@@ -1178,9 +1022,27 @@ describe('DeckLoops', () => {
         loops.resize('A', 'double');
 
         expect(spanOf('big')).toEqual([0, 3072]);
-        expect(spanOf('tiny')).toEqual([240, 242]);
+        expect(spanOf('tiny')).toEqual([240, 243]);
         expect(spanOf('loop')).toEqual([240, 432]);
-        expect(refusals()).toHaveLength(3);
+        expect(refusals()).toHaveLength(4);
+      });
+
+      it('halves and doubles through a size whose end falls between two frames', () => {
+        // 28 frames a beat: 1/4 is 7 frames, 1/8 is 3.5, and there is nothing shorter.
+        setGrid({ ...GRID, beatFrames: 28 });
+        loops.select('A', 'tiny');
+
+        // 3 frames is off this ladder: doubling lands on the smallest size above it.
+        loops.resize('A', 'double');
+        expect(spanOf('tiny')).toEqual([240, 243.5]);
+        loops.resize('A', 'double');
+        expect(spanOf('tiny')).toEqual([240, 247]);
+        loops.resize('A', 'halve');
+        expect(spanOf('tiny')).toEqual([240, 243.5]);
+        loops.resize('A', 'halve');
+
+        expect(spanOf('tiny')).toEqual([240, 243.5]);
+        expect(refusals()).toHaveLength(1);
       });
 
       it('does nothing, once, off the grid or outside its span', () => {
@@ -1205,10 +1067,164 @@ describe('DeckLoops', () => {
         expect(spanOf('loop')).toEqual([240, 432]);
       });
 
-      it("refuses a size the grid's beat cannot hold in whole frames", () => {
+      it('refuses a size under 2 frames on the grid, which the ladder lacks', () => {
         loops.select('A', 'loop');
 
+        // 1/16 of a 24-frame beat is 1.5 frames.
         loops.setLength('A', 1 / 16);
+
+        expect(spanOf('loop')).toEqual([240, 336]);
+        expect(refusals()).toHaveLength(1);
+      });
+
+      it('ends a loop between two frames for a size that is not a whole number of them', async () => {
+        setGrid({ ...GRID, beatFrames: 28 });
+        loops.select('A', 'loop');
+
+        loops.setLength('A', 1 / 8);
+
+        expect(spanOf('loop')).toEqual([240, 243.5]);
+        expect(markerOf('loop')?.end).toEqual({ frame: 243.5, offsetFrames: 0 });
+        expect(await savedSpans()).toContainEqual(['loop', 240, 243.5]);
+        expect(refusals()).toHaveLength(0);
+      });
+    });
+
+    describe('stepping a length', () => {
+      const lengthTextOf = () => store.loopsSummary('A')().selected?.lengthText;
+
+      it('gives a loop the next whole beat up or down, keeping its start', async () => {
+        loops.select('A', 'loop');
+
+        loops.stepLength('A', 1);
+        expect(spanOf('loop')).toEqual([240, 360]);
+        expect(lengthTextOf()).toBe('5 BEATS');
+
+        loops.stepLength('A', -1);
+        loops.stepLength('A', -1);
+        expect(spanOf('loop')).toEqual([240, 312]);
+        expect(await savedSpans()).toContainEqual(['loop', 240, 312]);
+        expect(refusals()).toHaveLength(0);
+      });
+
+      it('takes the whole beat above or below a length that is not a whole number of beats', () => {
+        // 100 to 200 is 4 1/6 beats, and its start is off the beats.
+        loops.select('A', 'odd');
+        loops.stepLength('A', -1);
+        expect(spanOf('odd')).toEqual([100, 196]);
+
+        loops.select('A', 'odd');
+        loops.stepLength('A', 1);
+        loops.stepLength('A', 1);
+        expect(spanOf('odd')).toEqual([100, 244]);
+      });
+
+      it('counts beats from the start, not from the beat nearest the end', async () => {
+        setGrid({ ...GRID, beatFrames: 28 });
+        await positions.save(TUNE_X, [loopOf('four', 100, 212)]);
+        await loadOn('A', TUNE_X);
+
+        loops.stepLength('A', 1);
+
+        expect(spanOf('four')).toEqual([100, 240]);
+      });
+
+      it('steps off a whole number of beats on a grid whose beat is not a whole number of frames', async () => {
+        const beatFrames = 24.7351;
+        const end = 13 * beatFrames;
+        setGrid({ ...GRID, beatFrames });
+        await positions.save(TUNE_X, [
+          {
+            ...loopOf('fraction', 0, 0),
+            end: { frame: Math.floor(end), offsetFrames: end - Math.floor(end) },
+          },
+        ]);
+        await loadOn('A', TUNE_X);
+
+        loops.stepLength('A', 1);
+        expect(spanOf('fraction')[1]).toBeCloseTo(14 * beatFrames, 6);
+
+        loops.stepLength('A', -1);
+        loops.stepLength('A', -1);
+        expect(spanOf('fraction')[1]).toBeCloseTo(12 * beatFrames, 6);
+      });
+
+      it('refuses a step to a whole beat shorter than the engine can lap', async () => {
+        setGrid({ ...GRID, beatFrames: 1.5 });
+        await positions.save(TUNE_X, [loopOf('tiny', 100, 103)]);
+        await loadOn('A', TUNE_X);
+
+        loops.stepLength('A', -1);
+
+        expect(spanOf('tiny')).toEqual([100, 103]);
+        expect(refusals()).toHaveLength(1);
+      });
+
+      it('goes from 1/8 and 1/4 of a beat up to 1 beat, and refuses to go below 1', () => {
+        // 28 frames a beat: 1/8 is 3.5 frames.
+        setGrid({ ...GRID, beatFrames: 28 });
+        loops.select('A', 'tiny');
+        loops.setLength('A', 1 / 8);
+        expect(spanOf('tiny')).toEqual([240, 243.5]);
+
+        loops.stepLength('A', -1);
+        expect(spanOf('tiny')).toEqual([240, 243.5]);
+        expect(refusals()).toHaveLength(1);
+
+        loops.stepLength('A', 1);
+        expect(spanOf('tiny')).toEqual([240, 268]);
+
+        loops.stepLength('A', -1);
+        expect(spanOf('tiny')).toEqual([240, 268]);
+        expect(refusals()).toHaveLength(2);
+
+        loops.setLength('A', 1 / 4);
+        loops.stepLength('A', -1);
+        expect(spanOf('tiny')).toEqual([240, 247]);
+        expect(refusals()).toHaveLength(3);
+      });
+
+      it('reaches 24 beats from 16 in eight presses on a 28-frame grid', () => {
+        setGrid({ ...GRID, beatFrames: 28 });
+        loops.select('A', 'big');
+        loops.setLength('A', 16);
+
+        for (let press = 0; press < 8; press++) {
+          loops.stepLength('A', 1);
+        }
+
+        expect(spanOf('big')).toEqual([0, 672]);
+        expect(lengthTextOf()).toBe('24 BEATS');
+      });
+
+      it('ignores the Move step', () => {
+        loops.select('A', 'loop');
+        loops.setMoveStep('A', 8);
+
+        loops.stepLength('A', 1);
+
+        expect(spanOf('loop')).toEqual([240, 360]);
+      });
+
+      it('refuses a cue, and a deck with no grid or a start outside its span', () => {
+        loops.stepLength('A', 1);
+        expect(spanOf('cue')).toEqual([100, null]);
+
+        loops.select('A', 'loop');
+        setGrid({ ...GRID, endFrame: 200 });
+        loops.stepLength('A', 1);
+        setGrid(null);
+        loops.stepLength('A', 1);
+
+        expect(spanOf('loop')).toEqual([240, 336]);
+        expect(refusals()).toHaveLength(3);
+      });
+
+      it("refuses a length past the tune's end", () => {
+        setLength(350);
+        loops.select('A', 'loop');
+
+        loops.stepLength('A', 1);
 
         expect(spanOf('loop')).toEqual([240, 336]);
         expect(refusals()).toHaveLength(1);
@@ -1229,13 +1245,12 @@ describe('DeckLoops', () => {
       });
 
       it('lands a start off the beats on the next beat that way, the end following', () => {
-        loops.select('A', 'loop');
-        loops.nudge('A', 'start', 3);
+        loops.select('A', 'off');
 
         loops.moveLoop('A', 1);
 
-        expect(markerOf('loop')?.start).toEqual({ frame: 264, offsetFrames: 0 });
-        expect(spanOf('loop')).toEqual([264, 357]);
+        expect(markerOf('off')?.start).toEqual({ frame: 624, offsetFrames: 0 });
+        expect(spanOf('off')).toEqual([624, 721]);
       });
 
       it('moves a cue alone', () => {
@@ -1263,41 +1278,6 @@ describe('DeckLoops', () => {
       });
     });
 
-    describe('moving an edge', () => {
-      it('moves the start or the end by the Move step, one edge only', () => {
-        loops.select('A', 'loop');
-
-        loops.moveEdge('A', 'start', 1);
-        loops.moveEdge('A', 'end', -1);
-        expect(spanOf('loop')).toEqual([264, 312]);
-
-        loops.moveEdge('A', 'end', 1);
-        loops.moveEdge('A', 'start', -1);
-        expect(spanOf('loop')).toEqual([240, 336]);
-      });
-
-      it('lands an edge off the beats on the next beat that way', () => {
-        loops.select('A', 'odd');
-
-        loops.moveEdge('A', 'start', 1);
-        loops.moveEdge('A', 'end', -1);
-
-        expect(spanOf('odd')).toEqual([120, 192]);
-      });
-
-      it('refuses a move that puts the start at or after the end, and the end of a cue', () => {
-        loops.select('A', 'loop');
-        loops.setMoveStep('A', 4);
-        loops.moveEdge('A', 'start', 1);
-        loops.select('A', 'cue');
-        loops.moveEdge('A', 'end', 1);
-
-        expect(spanOf('loop')).toEqual([240, 336]);
-        expect(spanOf('cue')).toEqual([100, null]);
-        expect(refusals()).toHaveLength(2);
-      });
-    });
-
     describe('the Move step', () => {
       it('starts at one beat and is kept across loads', async () => {
         expect(store.decks().A.moveStepBeats).toBe(1);
@@ -1321,7 +1301,7 @@ describe('DeckLoops', () => {
         loops.setMoveStep('A', 'frame');
       });
 
-      it('shifts a loop a frame at a time by its nudges, keeping its beats, its length and the grid', async () => {
+      it('shifts a loop a frame at a time by its offsets, keeping its beats, its length and the grid', async () => {
         loops.select('A', 'loop');
 
         loops.moveLoop('A', 1);
@@ -1354,7 +1334,7 @@ describe('DeckLoops', () => {
         expect(spanOf('loop')).toEqual([264, 360]);
       });
 
-      it('stops a second off the beat, as the nudge strips do', () => {
+      it('stops a second off the beat', () => {
         loops.select('A', 'loop');
         const second = oneSecondFrames(store.decks().A.playCallIntervalUs);
         expect(second).toBeGreaterThan(0);
@@ -1367,37 +1347,21 @@ describe('DeckLoops', () => {
         expect(markerOf('loop')?.end).toEqual({ frame: 336, offsetFrames: -second });
         expect(refusals()).toHaveLength(1);
       });
-
-      it('moves one edge by its nudge, and refuses an edge that would meet the other', () => {
-        loops.select('A', 'tiny');
-
-        loops.moveEdge('A', 'end', -1);
-        loops.moveEdge('A', 'start', 1);
-        loops.moveEdge('A', 'start', 1);
-
-        expect(markerOf('tiny')?.start).toEqual({ frame: 240, offsetFrames: 1 });
-        expect(markerOf('tiny')?.end).toEqual({ frame: 243, offsetFrames: -1 });
-        expect(refusals()).toHaveLength(1);
-      });
     });
 
-    it('never seeks or auditions', async () => {
+    it("never seeks or sets the engine's loop", async () => {
       const seek = vi.spyOn(runtime, 'seekToFrame');
       const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
-      const audition = vi.spyOn(loops, 'audition');
       await runtime.seekToFrame('A', 300);
       seek.mockClear();
 
-      loops.setIn('A');
-      loops.setOut('A');
       loops.resize('A', 'double');
       loops.setLength('A', 2);
+      loops.stepLength('A', 1);
       loops.moveLoop('A', 1);
-      loops.moveEdge('A', 'end', -1);
 
       expect(seek).not.toHaveBeenCalled();
       expect(setActiveLoop).not.toHaveBeenCalled();
-      expect(audition).not.toHaveBeenCalled();
     });
   });
 
@@ -1424,12 +1388,17 @@ describe('DeckLoops', () => {
       expect(stateOf('A').selectedId).toBe(idsOf('A')[1]);
     });
 
-    it('takes an end, a nudge and a delete across too', async () => {
-      await placeMarker('A', 100);
-      await runtime.seekToFrame('A', 180);
-      loops.setOut('A');
-      loops.nudge('A', 'start', 10);
-      expect(stateOf('B').markers[0].end).toEqual({ frame: 180, offsetFrames: 0 });
+    it('takes a length, a move and a delete across too', async () => {
+      await positions.save(TUNE_X, [loopOf('a', 100, 180)]);
+      await loadOn('A', TUNE_X);
+      await loadOn('B', TUNE_X);
+      store.setDeckBeatGrid({
+        slot: 'A',
+        beatGrid: { beatFrames: 20, beatOneFrame: 0, startFrame: 0, endFrame: null, source: 'scan' },
+      });
+      loops.stepLength('A', 1);
+      shiftSelected('A', 10);
+      expect(stateOf('B').markers[0].end).toEqual({ frame: 200, offsetFrames: 10 });
       expect(stateOf('B').markers[0].start.offsetFrames).toBe(10);
 
       loops.remove('A');
@@ -1719,7 +1688,7 @@ describe('DeckLoops', () => {
       async function notReady(id: string): Promise<void> {
         gates.A.holding = true;
         loops.select('A', id);
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
       }
 
       it('engages an idle marker at once, with nothing looping', async () => {
@@ -1819,24 +1788,8 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe('b');
         expect(stateOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 325, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(305);
-      });
-
-      it('does not seek again to a changed start the running marker was still waiting for', async () => {
-        await engage('wide');
-        loops.select('A', 'wide');
-        gates.A.holding = true;
-        loops.nudge('A', 'start', 10);
-        loops.audition('A', 'start', 'wide');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.playNow('A', 'wide');
-        await flush();
-        await settle();
-
-        expect(seek).toHaveBeenCalledExactlyOnceWith('A', 600);
-        expect(stateOf('A').runningId).toBe('wide');
       });
 
       it('refuses a marker the deck does not hold', () => {
@@ -1878,7 +1831,7 @@ describe('DeckLoops', () => {
       it('waits for a queued marker that is not ready, and lands it once it is', async () => {
         gates.A.holding = true;
         loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         loops.select('A', 'a');
         await engage('a');
         loops.toggle('A', 'b');
@@ -1892,7 +1845,7 @@ describe('DeckLoops', () => {
         tickUntil('A', () => handOffsOf('A') === 1);
 
         expect(stateOf('A').runningId).toBe('b');
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 325, varispeedStart: 'stop' });
       });
 
       it('moves the selection to the landed marker', async () => {
@@ -1947,7 +1900,7 @@ describe('DeckLoops', () => {
       async function notReady(id: string): Promise<void> {
         gates.A.holding = true;
         loops.select('A', id);
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         expect(stateOf('A').markers.find((marker) => marker.id === id)?.ready).toBe(false);
       }
 
@@ -1966,7 +1919,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').queuedId).toBeNull();
         expect(stateOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 125, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(105);
       });
 
@@ -2033,54 +1986,11 @@ describe('DeckLoops', () => {
     });
 
     describe('editing a running marker', () => {
-      it('applies a new end at once, with no seek', async () => {
-        await engage('a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.nudge('A', 'end', 10);
-
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
-        expect(stateOf('A').runningId).toBe('a');
-        expect(seek).not.toHaveBeenCalled();
-      });
-
-      it('lets the lap in progress run on to the new end before it wraps', async () => {
-        await engage('a');
-        loops.nudge('A', 'end', 10);
-
-        expect(peakBeforeWrap('A')).toBeGreaterThanOrEqual(125);
-      });
-
-      it('holds a new start on the old bounds until it is ready, then applies it with no seek', async () => {
-        await engage('a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-        gates.A.holding = true;
-
-        loops.nudge('A', 'start', 10);
-
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
-        await settle();
-        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
-        expect(stateOf('A').runningId).toBe('a');
-        expect(seek).not.toHaveBeenCalled();
-      });
-
-      it('re-enters at the new start on the next lap', async () => {
-        await engage('a');
-        gates.A.holding = true;
-        loops.nudge('A', 'start', 10);
-        await settle();
-
-        peakBeforeWrap('A');
-
-        expect(runtime.position('A')).toBeGreaterThanOrEqual(110);
-      });
-
       it('keeps a marker queued through the engine when the running loop is edited', async () => {
         await engage('a');
         loops.toggle('A', 'b');
 
-        loops.nudge('A', 'end', 10);
+        shiftSelected('A', 10);
 
         expect(stateOf('A').queuedId).toBe('b');
         expect(engineQueue('A')).toEqual({
@@ -2090,22 +2000,6 @@ describe('DeckLoops', () => {
         });
         tickUntil('A', () => handOffsOf('A') === 1);
         expect(stateOf('A').runningId).toBe('b');
-      });
-
-      it('keeps the queued marker when a start change is applied once ready', async () => {
-        await engage('a');
-        loops.toggle('A', 'b');
-        gates.A.holding = true;
-        loops.nudge('A', 'start', 10);
-
-        await settle();
-
-        expect(engineLoop('A')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
-        expect(engineQueue('A')).toEqual({
-          startFrame: 300,
-          endFrame: 320,
-          varispeedStart: 'stop',
-        });
       });
 
       it('lets a loop go as a stop when its end is cleared', async () => {
@@ -2170,6 +2064,23 @@ describe('DeckLoops', () => {
         expect(engineLoop('A')).toEqual(loopBounds(100, 140));
         expect(engineQueue('A')).toBeNull();
         expect(stateOf('A').runningId).toBe('a');
+        expect(runningBoundsOf('A')).toEqual({ start: 100, end: 140 });
+        expect(setActiveLoop).not.toHaveBeenCalled();
+      });
+
+      it('lands a length step at the end of the pass, on the beat', async () => {
+        await engage('a');
+        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
+
+        loops.stepLength('A', 1);
+
+        expect(engineLoop('A')).toEqual(loopBounds(100, 120));
+        expect(engineQueue('A')).toEqual(loopBounds(100, 140));
+        expect(runningBoundsOf('A')).toEqual({ start: 100, end: 120 });
+
+        tickUntil('A', () => handOffsOf('A') === 1);
+
+        expect(engineLoop('A')).toEqual(loopBounds(100, 140));
         expect(runningBoundsOf('A')).toEqual({ start: 100, end: 140 });
         expect(setActiveLoop).not.toHaveBeenCalled();
       });
@@ -2278,7 +2189,7 @@ describe('DeckLoops', () => {
       it('recognises the edit landing during a wait for another marker to be ready', async () => {
         gates.A.holding = true;
         loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         loops.select('A', 'a');
         await engage('a');
         loops.resize('A', 'double');
@@ -2296,13 +2207,13 @@ describe('DeckLoops', () => {
         await settle();
 
         expect(stateOf('A').runningId).toBe('b');
-        expect(runningBoundsOf('A')).toEqual({ start: 305, end: 320 });
+        expect(runningBoundsOf('A')).toEqual({ start: 305, end: 325 });
       });
 
       it('queues an edit made during a wait for another marker to be ready', async () => {
         gates.A.holding = true;
         loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         loops.select('A', 'a');
         await engage('a');
         loops.playNow('A', 'b');
@@ -2359,10 +2270,10 @@ describe('DeckLoops', () => {
         loops.select('A', 'b');
         const capture = vi.spyOn(scrubRunners[0], 'run');
 
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         await flush();
 
-        expect(engineQueue('A')).toEqual(loopBounds(305, 320));
+        expect(engineQueue('A')).toEqual(loopBounds(305, 325));
         expect(capture).not.toHaveBeenCalled();
       });
 
@@ -2378,39 +2289,6 @@ describe('DeckLoops', () => {
         expect(engineLoop('A')).toEqual(loopBounds(100, 140, 'wrap'));
       });
 
-      it('lets an accepted nudge on the same marker supersede the edit, applying at once', async () => {
-        await engage('a');
-        loops.moveLoop('A', 1);
-        await settle();
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.nudge('A', 'end', 5);
-        loops.audition('A', 'end', 'a');
-        await flush();
-
-        expect(engineLoop('A')).toEqual(loopBounds(120, 145));
-        expect(engineQueue('A')).toBeNull();
-        expect(runningBoundsOf('A')).toEqual({ start: 120, end: 145 });
-        expect(seek).toHaveBeenCalledWith('A', 120);
-        tick('A', 200);
-        expect(handOffsOf('A')).toBe(0);
-      });
-
-      it('leaves no jump queued when a nudge returns the list to the bounds in force', async () => {
-        await engage('a');
-        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
-        loops.resize('A', 'halve');
-        expect(engineQueue('A')).toEqual(loopBounds(100, 110));
-
-        loops.nudge('A', 'end', 10);
-
-        expect(engineQueue('A')).toBeNull();
-        expect(engineLoop('A')).toEqual(loopBounds(100, 120));
-        expect(setActiveLoop).not.toHaveBeenCalled();
-        tick('A', 200);
-        expect(handOffsOf('A')).toBe(0);
-      });
-
       it('lets an edit that brings the list back to the bounds in force clear the pending one', async () => {
         await engage('a');
         loops.resize('A', 'double');
@@ -2423,32 +2301,17 @@ describe('DeckLoops', () => {
         expect(handOffsOf('A')).toBe(0);
       });
 
-      it("leaves the running loop's pending edit alone when another marker is nudged", async () => {
+      it("leaves the running loop's pending edit alone when another marker is moved", async () => {
         await engage('a');
         loops.resize('A', 'double');
         loops.select('A', 'b');
 
-        loops.nudge('A', 'end', 5);
+        shiftSelected('A', 5);
 
         expect(engineQueue('A')).toEqual(loopBounds(100, 140));
         expect(engineLoop('A')).toEqual(loopBounds(100, 120));
         tickUntil('A', () => handOffsOf('A') === 1);
         expect(engineLoop('A')).toEqual(loopBounds(100, 140));
-      });
-
-      it('drops a seek still waiting on an earlier nudge, since it auditions nothing', async () => {
-        await engage('a');
-        gates.A.holding = true;
-        loops.nudge('A', 'start', 10);
-        loops.audition('A', 'start', 'a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.resize('A', 'double');
-        await settle();
-        tickUntil('A', () => handOffsOf('A') === 1);
-
-        expect(engineLoop('A')).toEqual(loopBounds(110, 130));
-        expect(seek).not.toHaveBeenCalled();
       });
 
       it('replaces a pending edit with a newer one, landing only the newest', async () => {
@@ -2468,17 +2331,17 @@ describe('DeckLoops', () => {
         loops.toggle('A', 'b');
         loops.select('A', 'b');
 
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         expect(engineQueue('A')).toEqual({
           startFrame: 305,
-          endFrame: 320,
+          endFrame: 325,
           varispeedStart: 'stop',
         });
 
-        loops.nudge('A', 'end', 10);
+        shiftSelected('A', 10);
         expect(engineQueue('A')).toEqual({
-          startFrame: 305,
-          endFrame: 330,
+          startFrame: 315,
+          endFrame: 335,
           varispeedStart: 'stop',
         });
         expect(stateOf('A').queuedId).toBe('b');
@@ -2511,370 +2374,6 @@ describe('DeckLoops', () => {
       });
     });
 
-    describe('auditioning', () => {
-      it('engages the edited marker from its start, taking over from the running one', async () => {
-        await engage('a');
-        loops.toggle('A', 'c');
-        loops.select('A', 'b');
-
-        loops.audition('A', 'start', 'b');
-        await flush();
-
-        expect(stateOf('A').runningId).toBe('b');
-        expect(stateOf('A').queuedId).toBeNull();
-        expect(engineQueue('A')).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
-        expect(runtime.position('A')).toBe(300);
-      });
-
-      it('waits for a start that is not ready, then engages it', async () => {
-        gates.A.holding = true;
-        loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
-
-        loops.audition('A', 'start', 'b');
-        expect(stateOf('A').runningId).toBeNull();
-        expect(stateOf('A').queuedId).toBe('b');
-
-        await settle();
-
-        expect(stateOf('A').runningId).toBe('b');
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
-      });
-
-      it('drops a marker queued in the engine when it waits instead for a start', async () => {
-        await engage('a');
-        loops.toggle('A', 'c');
-        gates.A.holding = true;
-        loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
-
-        loops.audition('A', 'start', 'b');
-
-        expect(engineQueue('A')).toBeNull();
-        tick('A', 120);
-        expect(handOffsOf('A')).toBe(0);
-        await settle();
-        expect(stateOf('A').runningId).toBe('b');
-      });
-
-      it('arms a loop and lands two seconds before its end', async () => {
-        loops.select('A', 'wide');
-
-        loops.audition('A', 'end', 'wide');
-        await flush();
-
-        expect(stateOf('A').runningId).toBe('wide');
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 800, varispeedStart: 'stop' });
-        expect(runtime.position('A')).toBe(800 - 2 * SECOND);
-      });
-
-      it('lands no earlier than the loop start', async () => {
-        loops.select('A', 'a');
-
-        loops.audition('A', 'end', 'a');
-        await flush();
-
-        expect(runtime.position('A')).toBe(100);
-      });
-
-      it('does nothing for the end of a cue', async () => {
-        loops.select('A', 'c');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.audition('A', 'end', 'c');
-        await flush();
-
-        expect(stateOf('A').runningId).toBeNull();
-        expect(engineLoop('A')).toBeNull();
-        expect(seek).not.toHaveBeenCalled();
-      });
-
-      it('does not start playback', async () => {
-        runtime.pause('A');
-        loops.select('A', 'b');
-
-        loops.audition('A', 'start', 'b');
-        await flush();
-
-        expect(runtime.snapshot('A').transport).toBe('paused');
-        expect(stateOf('A').runningId).toBe('b');
-      });
-
-      it('skips a marker that is no longer the selected one, or is gone', async () => {
-        loops.select('A', 'a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.audition('A', 'start', 'b');
-        loops.audition('A', 'start', 'missing');
-        await flush();
-
-        expect(stateOf('A').runningId).toBeNull();
-        expect(engineLoop('A')).toBeNull();
-        expect(seek).not.toHaveBeenCalled();
-      });
-
-      describe('a queued marker', () => {
-        beforeEach(async () => {
-          await engage('a');
-          loops.toggle('A', 'wide');
-          loops.select('A', 'wide');
-        });
-
-        it('lands at once for an end edit, with nothing left in the engine queue', async () => {
-          loops.nudge('A', 'end', 10);
-          loops.audition('A', 'end', 'wide');
-          await flush();
-
-          expect(stateOf('A').runningId).toBe('wide');
-          expect(stateOf('A').queuedId).toBeNull();
-          expect(engineQueue('A')).toBeNull();
-          expect(engineLoop('A')).toEqual({
-            startFrame: 600,
-            endFrame: 810,
-            varispeedStart: 'stop',
-          });
-          expect(runtime.position('A')).toBe(810 - 2 * SECOND);
-        });
-
-        it('drops the engine queue for a start edit and lands once the start is ready', async () => {
-          gates.A.holding = true;
-          loops.nudge('A', 'start', 10);
-          loops.audition('A', 'start', 'wide');
-
-          expect(engineQueue('A')).toBeNull();
-          expect(stateOf('A').runningId).toBe('a');
-          expect(stateOf('A').queuedId).toBe('wide');
-          tick('A', 120);
-          expect(handOffsOf('A')).toBe(0);
-
-          await settle();
-
-          expect(stateOf('A').runningId).toBe('wide');
-          expect(stateOf('A').queuedId).toBeNull();
-          expect(engineLoop('A')).toEqual({
-            startFrame: 610,
-            endFrame: 800,
-            varispeedStart: 'stop',
-          });
-          expect(runtime.position('A')).toBe(610);
-        });
-      });
-    });
-
-    describe('auditioning a running marker', () => {
-      beforeEach(async () => {
-        await engage('wide');
-        loops.select('A', 'wide');
-      });
-
-      function editStart(offsetFrames: number): void {
-        loops.nudge('A', 'start', offsetFrames);
-        loops.audition('A', 'start', 'wide');
-      }
-
-      function editEnd(offsetFrames: number): void {
-        loops.nudge('A', 'end', offsetFrames);
-        loops.audition('A', 'end', 'wide');
-      }
-
-      it('seeks to two seconds before a new end, leaving the engine on the bounds it holds', async () => {
-        loops.nudge('A', 'end', 10);
-        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
-
-        loops.audition('A', 'end', 'wide');
-        await flush();
-
-        expect(setActiveLoop).not.toHaveBeenCalled();
-        expect(engineLoop('A')).toEqual({ startFrame: 600, endFrame: 810, varispeedStart: 'stop' });
-        expect(stateOf('A').runningId).toBe('wide');
-        expect(runtime.position('A')).toBe(810 - 2 * SECOND);
-      });
-
-      it('drops what is queued, and the loop plays on without handing off', async () => {
-        loops.toggle('A', 'b');
-
-        editEnd(10);
-        await flush();
-        tick('A', 400);
-
-        expect(stateOf('A').queuedId).toBeNull();
-        expect(engineQueue('A')).toBeNull();
-        expect(stateOf('A').runningId).toBe('wide');
-        expect(handOffsOf('A')).toBe(0);
-      });
-
-      it('seeks to a new start at once when it is already ready', async () => {
-        await placeMarker('A', 610);
-        await settle();
-        loops.select('A', 'wide');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        editStart(10);
-        await flush();
-
-        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
-        expect(seek).toHaveBeenCalledTimes(1);
-        expect(seek).toHaveBeenCalledWith('A', 610);
-        expect(stateOf('A').queuedId).toBeNull();
-      });
-
-      describe('while a new start is not ready', () => {
-        let seek: MockInstance<DeckRuntime['seekToFrame']>;
-
-        beforeEach(() => {
-          seek = vi.spyOn(runtime, 'seekToFrame');
-          gates.A.holding = true;
-        });
-
-        it('keeps the old bounds and the running marker, then seeks once to the new start', async () => {
-          const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
-
-          editStart(10);
-          await flush();
-
-          expect(engineLoop('A')).toEqual({
-            startFrame: 600,
-            endFrame: 800,
-            varispeedStart: 'stop',
-          });
-          expect(stateOf('A').runningId).toBe('wide');
-          expect(stateOf('A').queuedId).toBeNull();
-          expect(setActiveLoop).not.toHaveBeenCalled();
-          expect(seek).not.toHaveBeenCalled();
-
-          await settle();
-
-          expect(engineLoop('A')).toEqual({
-            startFrame: 610,
-            endFrame: 800,
-            varispeedStart: 'stop',
-          });
-          expect(setActiveLoop).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenCalledWith('A', 610);
-          expect(runtime.position('A')).toBe(610);
-        });
-
-        it('goes to the newest start when the start is edited again', async () => {
-          editStart(10);
-          editStart(20);
-
-          await settle();
-
-          expect(engineLoop('A')).toEqual({
-            startFrame: 620,
-            endFrame: 800,
-            varispeedStart: 'stop',
-          });
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenCalledWith('A', 620);
-        });
-
-        it('auditions an end edit at once and never jumps back to the start', async () => {
-          editStart(10);
-
-          editEnd(-10);
-          await flush();
-
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenLastCalledWith('A', 790 - 2 * SECOND);
-
-          await settle();
-
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(engineLoop('A')).toEqual({
-            startFrame: 610,
-            endFrame: 790,
-            varispeedStart: 'stop',
-          });
-        });
-
-        it('is dropped by a Stop', async () => {
-          editStart(10);
-
-          loops.stop('A');
-          await settle();
-
-          expect(seek).not.toHaveBeenCalled();
-          expect(stateOf('A').runningId).toBeNull();
-          expect(engineLoop('A')).toBeNull();
-
-          loops.toggle('A', 'wide');
-          await flush();
-
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenCalledWith('A', 610);
-        });
-
-        it('is dropped by a transport stop', async () => {
-          editStart(10);
-
-          runtime.stop('A');
-          await settle();
-
-          expect(seek).not.toHaveBeenCalled();
-          expect(stateOf('A').runningId).toBeNull();
-        });
-
-        it('is dropped by a queued marker landing', async () => {
-          editStart(10);
-          loops.toggle('A', 'b');
-
-          tickUntil('A', () => handOffsOf('A') === 1);
-          await settle();
-
-          expect(stateOf('A').runningId).toBe('b');
-          expect(seek).not.toHaveBeenCalled();
-        });
-
-        it('is dropped by another marker being queued', async () => {
-          editStart(10);
-          loops.toggle('A', 'c');
-
-          await settle();
-
-          expect(stateOf('A').runningId).toBe('wide');
-          expect(stateOf('A').queuedId).toBe('c');
-          expect(seek).not.toHaveBeenCalled();
-        });
-
-        it('is dropped by another marker being engaged', async () => {
-          editStart(10);
-
-          loops.select('A', 'b');
-          loops.audition('A', 'start', 'b');
-          await settle();
-
-          expect(stateOf('A').runningId).toBe('b');
-          expect(seek).toHaveBeenCalledTimes(1);
-          expect(seek).toHaveBeenCalledWith('A', 300);
-        });
-
-        it("is dropped by an edit arriving from the other deck, which never moves this deck's playhead", async () => {
-          await loadOn('B', TUNE_X);
-          editStart(10);
-          seek.mockClear();
-
-          loops.select('B', 'wide');
-          loops.nudge('B', 'end', -10);
-          await settle();
-
-          expect(seek).not.toHaveBeenCalled();
-          expect(engineLoop('A')).toEqual({
-            startFrame: 600,
-            endFrame: 800,
-            varispeedStart: 'stop',
-          });
-          expect(engineQueue('A')).toEqual({
-            startFrame: 610,
-            endFrame: 790,
-            varispeedStart: 'stop',
-          });
-        });
-      });
-    });
-
     describe('the same tune on the other deck', () => {
       beforeEach(async () => {
         await loadOn('B', TUNE_X);
@@ -2885,64 +2384,60 @@ describe('DeckLoops', () => {
       });
 
       const canStopB = () => store.loopsSummary('B')().canStop;
+      /** 20 play calls a beat from frame 0: loop `a` is one beat long. */
+      const ONE_BEAT_GRID: DeckBeatGrid = {
+        beatFrames: 20,
+        beatOneFrame: 0,
+        startFrame: 0,
+        endFrame: null,
+        source: 'scan',
+      };
 
-      it("carries an end changed on one deck to the other deck's engine at the end of its pass", () => {
+      it("carries a length changed on one deck to the other deck's engine at the end of its pass, without moving it", () => {
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: ONE_BEAT_GRID });
         loops.select('A', 'a');
+        const seek = vi.spyOn(runtime, 'seekToFrame');
 
-        loops.nudge('A', 'end', 10);
+        loops.stepLength('A', 1);
 
         expect(stateOf('B').runningId).toBe('a');
         expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         expect(engineQueue('B')).toEqual({
           startFrame: 100,
-          endFrame: 130,
+          endFrame: 140,
           varispeedStart: 'stop',
         });
         expect(stateOf('B').runningBounds).toEqual({ start: 100, end: 120 });
+        expect(seek).not.toHaveBeenCalled();
 
         tickUntil('B', () => handOffsOf('B') === 1);
 
-        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
-        expect(stateOf('B').runningBounds).toEqual({ start: 100, end: 130 });
+        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 140, varispeedStart: 'stop' });
+        expect(stateOf('B').runningBounds).toEqual({ start: 100, end: 140 });
         expect(stateOf('A').runningId).toBeNull();
         expect(engineLoop('A')).toBeNull();
-      });
-
-      it('lands an end set on one deck at the end of the pass on the other, and never moves it', async () => {
-        loops.select('A', 'a');
-        await runtime.seekToFrame('A', 150);
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.setOut('A');
-
-        expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
-        expect(engineQueue('B')).toEqual({
-          startFrame: 100,
-          endFrame: 150,
-          varispeedStart: 'stop',
-        });
-        expect(seek).not.toHaveBeenCalled();
       });
 
       it('lands a start changed on one deck once it is ready, at the end of a pass on the other', async () => {
         gates.B.holding = true;
         loops.select('A', 'a');
 
-        loops.nudge('A', 'start', 10);
+        shiftSelected('A', 10);
 
         expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
         tick('B', 120);
         expect(handOffsOf('B')).toBe(0);
         await settle();
         tickUntil('B', () => handOffsOf('B') === 1);
-        expect(engineLoop('B')).toEqual({ startFrame: 110, endFrame: 120, varispeedStart: 'stop' });
+        expect(engineLoop('B')).toEqual({ startFrame: 110, endFrame: 130, varispeedStart: 'stop' });
       });
 
       it("re-issues the other deck's queue after the edit", () => {
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: ONE_BEAT_GRID });
         loops.toggle('B', 'b');
         loops.select('A', 'a');
 
-        loops.nudge('A', 'end', 10);
+        loops.stepLength('A', 1);
 
         expect(stateOf('B').queuedId).toBe('b');
         expect(engineQueue('B')).toEqual({
@@ -3049,15 +2544,16 @@ describe('DeckLoops', () => {
       });
 
       it('sends later edits to the copy, leaving the original as it was', async () => {
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID_20 });
         await engage('a');
         const copy = duplicate();
 
-        loops.nudge('A', 'end', 10);
+        loops.stepLength('A', 1);
 
         expect(stateOf('A').runningId).toBe(copy.id);
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
+        expect(engineQueue('A')).toEqual({ startFrame: 100, endFrame: 140, varispeedStart: 'stop' });
         expect(listOf('A')[0].end).toEqual({ frame: 120, offsetFrames: 0 });
-        expect(listOf('A')[1].end).toEqual({ frame: 120, offsetFrames: 10 });
+        expect(listOf('A')[1].end).toEqual({ frame: 140, offsetFrames: 0 });
       });
 
       it('carries an end-of-pass edit waiting in the engine over to the copy', async () => {
@@ -3077,28 +2573,6 @@ describe('DeckLoops', () => {
         expect(stateOf('A').runningId).toBe(copy.id);
         expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 140, varispeedStart: 'stop' });
         expect(stateOf('A').runningBounds).toEqual({ start: 100, end: 140 });
-      });
-
-      it('lets a start audition still waiting for its start to be ready follow the copy', async () => {
-        await engage('wide');
-        loops.select('A', 'wide');
-        gates.A.holding = true;
-        loops.nudge('A', 'start', 10);
-        loops.audition('A', 'start', 'wide');
-        const engine = watchEngine();
-
-        const copy = duplicate();
-
-        expect(stateOf('A').runningId).toBe(copy.id);
-        engine.expectUntouched();
-
-        await settle();
-
-        expect(engineLoop('A')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
-        expect(engine.seek).toHaveBeenCalledTimes(1);
-        expect(engine.seek).toHaveBeenCalledWith('A', 610);
-        expect(runtime.position('A')).toBe(610);
-        expect(stateOf('A').runningId).toBe(copy.id);
       });
 
       it('makes the copy of a marker queued in the engine the queued marker, which lands at the end of the lap', async () => {
@@ -3125,7 +2599,7 @@ describe('DeckLoops', () => {
       it('passes the wait of a marker queued for readiness to the copy', async () => {
         gates.A.holding = true;
         loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
         loops.toggle('A', 'b');
         const engine = watchEngine();
 
@@ -3139,7 +2613,7 @@ describe('DeckLoops', () => {
 
         expect(stateOf('A').runningId).toBe(copy.id);
         expect(stateOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
+        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 325, varispeedStart: 'stop' });
         expect(runtime.position('A')).toBe(305);
       });
 
@@ -3168,24 +2642,6 @@ describe('DeckLoops', () => {
           expect(engineQueue('B')).toEqual({ startFrame: 300, endFrame: 320, varispeedStart: 'stop' });
           engine.expectUntouched();
         });
-
-        it('leaves a start audition waiting on the other deck waiting', async () => {
-          loops.toggle('B', 'wide');
-          await flush();
-          gates.B.holding = true;
-          loops.select('B', 'wide');
-          loops.nudge('B', 'start', 10);
-          loops.audition('B', 'start', 'wide');
-          loops.select('A', 'a');
-
-          duplicate();
-          gates.B.holding = false;
-          await settle();
-
-          expect(stateOf('B').runningId).toBe('wide');
-          expect(runtime.position('B')).toBe(610);
-          expect(engineLoop('B')).toEqual({ startFrame: 610, endFrame: 800, varispeedStart: 'stop' });
-        });
       });
     });
 
@@ -3200,6 +2656,227 @@ describe('DeckLoops', () => {
 
       expect(multiplier).toBe(1.25);
       expect(runtime.snapshot('A').tempo.multiplier).toBe(multiplier);
+    });
+  });
+
+  describe('a loop whose length is not a whole number of frames', () => {
+    /** 28 play calls a beat from frame 0: 1/8 is 3.5 frames, and its lines round to 0, 4, 7, 11 …
+     *  A 1/8 loop on an odd line (25, 39) laps 3 frames then 4; on an even one (28), 4 then 3. */
+    const GRID_28: DeckBeatGrid = {
+      beatFrames: 28,
+      beatOneFrame: 0,
+      startFrame: 0,
+      endFrame: null,
+      source: 'scan',
+    };
+
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [
+        loopOf('odd', 25, 53),
+        loopOf('even', 28, 56),
+        loopOf('next', 39, 42.5),
+      ]);
+      await loadOn('A', TUNE_X);
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID_28 });
+      await settle();
+      await runtime.play('A');
+    });
+
+    async function engage(id: string): Promise<void> {
+      loops.toggle('A', id);
+      await flush();
+    }
+
+    /** Plays until the playhead falls back, and returns how many frames that took. */
+    function lapTicks(): number {
+      let previous = Number(runtime.position('A'));
+      for (let ticks = 1; ticks <= 400; ticks++) {
+        tick('A');
+        const position = Number(runtime.position('A'));
+        if (position < previous) {
+          return ticks;
+        }
+        previous = position;
+      }
+      throw new Error('the playhead never wrapped');
+    }
+
+    it('runs a 1/8 Length between two frames at the lap phase of its start line', async () => {
+      loops.select('A', 'odd');
+      loops.setLength('A', 1 / 8);
+      await settle();
+
+      await engage('odd');
+
+      expect(stateOf('A').runningId).toBe('odd');
+      expect(engineLoop('A')).toEqual({
+        startFrame: 25,
+        endFrame: 28.5,
+        varispeedStart: 'stop',
+        lapPhase: 0.5,
+      });
+      expect(stateOf('A').runningBounds).toEqual({ start: 25, end: 28.5, lapPhase: 0.5 });
+      lapTicks();
+      // The 1/8 lines after 28 are 32, 35, 39, 42: laps of 4, 3, 4, 3.
+      expect([lapTicks(), lapTicks(), lapTicks(), lapTicks()]).toEqual([4, 3, 4, 3]);
+    });
+
+    it('arms a loop on a whole-frame line with no lap phase, as it always has', async () => {
+      await engage('even');
+
+      expect(engineLoop('A')).toEqual({ startFrame: 28, endFrame: 56, varispeedStart: 'stop' });
+      expect(stateOf('A').runningBounds).toEqual({ start: 28, end: 56 });
+    });
+
+    it('queues a 1/8 marker with its own lap phase, hands off to it there, and queues it once', async () => {
+      await engage('even');
+
+      loops.toggle('A', 'next');
+
+      expect(engineQueue('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'stop',
+        lapPhase: 0.5,
+      });
+      const queue = vi.spyOn(runtime, 'queueJump');
+      tick('A', 5);
+      loops.reflect('A');
+      expect(queue).not.toHaveBeenCalled();
+      const setLoop = vi.spyOn(runtime, 'setActiveLoop');
+      const changeLoop = vi.spyOn(runtime, 'changeLoopAt');
+
+      tickUntil('A', () => handOffsOf('A') === 1);
+
+      expect(stateOf('A').runningId).toBe('next');
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'stop',
+        lapPhase: 0.5,
+      });
+      expect(stateOf('A').runningBounds).toEqual({ start: 39, end: 42.5, lapPhase: 0.5 });
+      // The landing is left as the engine made it: the lap it laps from is the engine's (it may
+      // carry the clock of the loop it took over on), and a loop set again would restart it.
+      expect(setLoop).not.toHaveBeenCalled();
+      expect(changeLoop).not.toHaveBeenCalled();
+      expect(queue).not.toHaveBeenCalled();
+      // It laps on from the clock of the whole 28..56 loop it took over (phase 0), not from its own
+      // grid phase (0.5, which would lap 3,4,3): a core that re-based hand-offs drifts and fails here.
+      expect(runtime.getLapPhase('A')).toBe(0);
+      expect([lapTicks(), lapTicks(), lapTicks()]).toEqual([4, 3, 4]);
+    });
+
+    it('holds a 1/8 Length on the running loop for the end of the pass with its lap phase, queued once', async () => {
+      await engage('odd');
+      expect(engineLoop('A')).toEqual({ startFrame: 25, endFrame: 53, varispeedStart: 'stop' });
+
+      loops.setLength('A', 1 / 8);
+
+      const edit = { startFrame: 25, endFrame: 28.5, varispeedStart: 'stop', lapPhase: 0.5 };
+      expect(engineQueue('A')).toEqual(edit);
+      const queue = vi.spyOn(runtime, 'queueJump');
+      tick('A', 5);
+      loops.reflect('A');
+      loops.reflect('A');
+      expect(queue).not.toHaveBeenCalled();
+
+      tickUntil('A', () => handOffsOf('A') === 1);
+
+      expect(engineLoop('A')).toEqual(edit);
+      expect(stateOf('A').runningBounds).toEqual({ start: 25, end: 28.5, lapPhase: 0.5 });
+    });
+
+    it('keeps the lap in progress through a WRAP change', async () => {
+      await engage('next');
+      loops.select('A', 'next');
+      lapTicks();
+      tick('A');
+      // The second lap, 4 frames long: phase 0, where the loop's own first lap is at 0.5.
+      expect(runtime.getLapPhase('A')).toBe(0);
+
+      loops.toggleWrap('A');
+
+      expect(engineLoop('A')).toEqual({
+        startFrame: 39,
+        endFrame: 42.5,
+        varispeedStart: 'wrap',
+        lapPhase: 0.5,
+      });
+      expect(runtime.getLapPhase('A')).toBe(0);
+      expect(lapTicks()).toBe(3);
+    });
+  });
+
+  describe('a stored marker of a part frame under two frames long', () => {
+    // No edit here makes one, but a tune memory written elsewhere may hold it. The engine refuses
+    // to lap it, so it plays as a cue: the store never shows it running or queued as a loop while
+    // the engine loops something else.
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [loopOf('beat', 28, 56), loopOf('short', 100, 101.5)]);
+      await loadOn('A', TUNE_X);
+      await settle();
+      await runtime.play('A');
+      loops.toggle('A', 'beat');
+      await flush();
+      expect(engineLoop('A')).toEqual({ startFrame: 28, endFrame: 56, varispeedStart: 'stop' });
+    });
+
+    it('queues as a cue over a running loop, and lands as one', async () => {
+      loops.toggle('A', 'short');
+
+      expect(stateOf('A').queuedId).toBe('short');
+      expect(engineQueue('A')).toEqual({ startFrame: 100, endFrame: null });
+
+      tickUntil('A', () => handOffsOf('A') === 1);
+
+      expect(stateOf('A').runningId).toBeNull();
+      expect(stateOf('A').queuedId).toBeNull();
+      expect(stateOf('A').runningBounds).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(Number(runtime.position('A'))).toBe(100);
+    });
+
+    it('plays now as a cue, running nothing in the store or the engine', async () => {
+      loops.playNow('A', 'short');
+      await flush();
+
+      expect(stateOf('A').runningId).toBeNull();
+      expect(stateOf('A').runningBounds).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(Number(runtime.position('A'))).toBe(100);
+    });
+
+    it('is labelled and treated as a cue', () => {
+      loops.select('A', 'short');
+
+      loops.toggleWrap('A');
+
+      expect(markerKind(stateOf('A').markers[1])).toBe('cue');
+      expect(markerLabel(stateOf('A').markers, 1)).toBe('Cue 1');
+      expect(refusals()).toHaveLength(1);
+    });
+  });
+
+  describe('a stored marker whose end is at or before its start', () => {
+    // No edit here makes one, but a tune memory written elsewhere may hold it. It reads as a cue,
+    // and moving it shifts both edges and keeps what they were, as for any marker.
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [loopOf('inverted', 200, 150)]);
+      await loadOn('A', TUNE_X);
+      await settle();
+      loops.select('A', 'inverted');
+      loops.setMoveStep('A', 'frame');
+    });
+
+    it('moves by a frame with both edges shifted, refusing nothing', () => {
+      expect(markerKind(stateOf('A').markers[0])).toBe('cue');
+
+      loops.moveLoop('A', 1);
+
+      expect(stateOf('A').markers[0].start).toEqual({ frame: 200, offsetFrames: 1 });
+      expect(stateOf('A').markers[0].end).toEqual({ frame: 150, offsetFrames: 1 });
+      expect(refusals()).toHaveLength(0);
     });
   });
 
@@ -3260,6 +2937,24 @@ describe('DeckLoops', () => {
       await loadOn('A', TUNE_X);
       await settle();
       await runtime.play('A');
+    });
+
+    it('replays a running loop whose start was edited away with its settings put in at the press, and a seek without them', async () => {
+      await engage('A', 'a');
+      loops.select('A', 'a');
+      shiftSelected('A', 5);
+      await flush();
+      expect(preparedOn('A')).not.toContain(100);
+      const seek = vi.spyOn(runtime, 'seekToFrame');
+
+      loops.playNow('A', 'a');
+
+      expect(seek).toHaveBeenCalledExactlyOnceWith('A', 100);
+      expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+      expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+      expect(stateOf('A').settingsInPlayId).toBe('a');
+      await flush();
+      expect(runtime.position('A')).toBe(100);
     });
 
     describe('the stored form', () => {
@@ -3520,9 +3215,8 @@ describe('DeckLoops', () => {
         const main = { panel: panelOn('A'), mutes: [false, false, true] };
         await engage('A', 'a');
         const seek = vi.spyOn(runtime, 'seekToFrame');
-        loops.select('A', 'c');
 
-        loops.audition('A', 'start', 'c');
+        loops.playNow('A', 'c');
         await flush();
 
         expect(seek).toHaveBeenCalledWith('A', 500, engineSettingsOf(main.panel, main.mutes));
@@ -3537,9 +3231,8 @@ describe('DeckLoops', () => {
         tweak('A', 250);
         const main = { panel: panelOn('A'), mutes: [false, false, false] };
         await engage('A', 'a');
-        loops.select('A', 'b');
 
-        loops.audition('A', 'start', 'b');
+        loops.playNow('A', 'b');
         await flush();
 
         expect(stateOf('A').settingsInPlayId).toBe('b');
@@ -3556,51 +3249,19 @@ describe('DeckLoops', () => {
         expect(panelOn('A')).toEqual(SETTINGS_A.panel);
         expect(markerOf('A', 'a').settings?.panel.cutoff).toBe(321);
 
-        loops.select('A', 'a');
-        loops.audition('A', 'start', 'a');
+        loops.playNow('A', 'a');
         await flush();
 
         expect(panelOn('A').cutoff).toBe(321);
         expect(stateOf('A').mainSettings?.panel).toBe(HOME_DECK_PANEL);
       });
 
-      it('puts the settings in at the press for a target that is not prepared, and seeks without them', async () => {
-        loops.select('A', 'w');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        loops.audition('A', 'end', 'w');
-
-        expect(seek).toHaveBeenCalledExactlyOnceWith('A', 900);
-        expect(panelOn('A')).toEqual(SETTINGS_B.panel);
-        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
-        expect(stateOf('A').settingsInPlayId).toBe('w');
-        await flush();
-        expect(runtime.position('A')).toBe(900);
-        expect(engineMutes('A')).toEqual(SETTINGS_B.mutes);
-      });
-
-      it('keeps the store and the engine together when a let-go comes before the replay lands', async () => {
-        tweak('A', 250);
-        mute('A', 2, true);
-        const main = { panel: panelOn('A'), mutes: [false, false, true] };
-        loops.select('A', 'w');
-
-        loops.audition('A', 'end', 'w');
-        loops.stop('A');
-        await flush();
-
-        expect(stateOf('A').settingsInPlayId).toBeNull();
-        expect(panelOn('A')).toBe(main.panel);
-        expect(storeMutes('A')).toEqual(main.mutes);
-        expect(engineMutes('A')).toEqual(main.mutes);
-      });
-
       it('waits for a start that is not ready, then lands the settings with it', async () => {
         gates.A.holding = true;
         loops.select('A', 'b');
-        loops.nudge('A', 'start', 5);
+        shiftSelected('A', 5);
 
-        loops.audition('A', 'start', 'b');
+        loops.playNow('A', 'b');
         expect(stateOf('A').settingsInPlayId).toBeNull();
         expect(engineMutes('A')).toEqual([false, false, false]);
 
@@ -3938,15 +3599,19 @@ describe('DeckLoops', () => {
         expect(stateOf('A').settingsInPlayId).toBe('a');
       });
 
-      it('are left alone by Set End, Clear End and a nudge', async () => {
-        await runtime.seekToFrame('A', 750);
+      it('are left alone by Length, Clear End and Move', async () => {
+        store.setDeckBeatGrid({
+          slot: 'A',
+          beatGrid: { beatFrames: 20, beatOneFrame: 0, startFrame: 0, endFrame: null, source: 'scan' },
+        });
         loops.select('A', 'e');
-        loops.setOut('A');
+        loops.resize('A', 'double');
         expect(markerOf('A', 'e')).toMatchObject({ ownSettings: true });
         expect(markerOf('A', 'e').end).not.toBeNull();
         expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
 
-        loops.nudge('A', 'start', 4);
+        loops.stepLength('A', 1);
+        shiftSelected('A', 4);
         expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
 
         loops.clearEnd('A');
@@ -3954,8 +3619,7 @@ describe('DeckLoops', () => {
         expect(markerOf('A', 'e').settings).toEqual(SETTINGS_E);
 
         loops.select('A', 'c');
-        await runtime.seekToFrame('A', 560);
-        loops.setOut('A');
+        loops.resize('A', 'double');
         expect(markerOf('A', 'c')).toMatchObject({ ownSettings: false, settings: null });
       });
     });
@@ -4027,13 +3691,9 @@ describe('DeckLoops', () => {
     });
 
     describe('a settings-only edit', () => {
-      it('declares nothing to the engine and does not wake a start audition waiting on the other deck', async () => {
+      it('declares nothing to the engine', async () => {
         await startDeckB();
         await engage('B', 'd');
-        gates.B.holding = true;
-        loops.select('B', 'd');
-        loops.nudge('B', 'start', 5);
-        loops.audition('B', 'start', 'd');
         await engage('A', 'a');
         const declare = vi.spyOn(runtime, 'setJumpTargets');
 
@@ -4041,26 +3701,6 @@ describe('DeckLoops', () => {
         mute('A', 1, true);
 
         expect(declare).not.toHaveBeenCalled();
-        gates.B.holding = false;
-        await settle();
-        expect(runtime.position('B')).toBe(605);
-        expect(engineLoop('B')).toEqual({ startFrame: 605, endFrame: 620, varispeedStart: 'stop' });
-      });
-
-      it('cancels a start audition waiting on the other deck when a position edit comes from this one', async () => {
-        await startDeckB();
-        await engage('B', 'd');
-        gates.B.holding = true;
-        loops.select('B', 'd');
-        loops.nudge('B', 'start', 5);
-        loops.audition('B', 'start', 'd');
-        loops.select('A', 'b');
-
-        loops.nudge('A', 'start', 3);
-        gates.B.holding = false;
-        await settle();
-
-        expect(runtime.position('B')).not.toBe(605);
       });
     });
 
@@ -4127,9 +3767,7 @@ describe('DeckLoops', () => {
         await engage('B', 'a');
         loops.select('A', 'a');
         loops.toggleGlobal('A');
-        loops.select('B', 'a');
-
-        loops.audition('B', 'start', 'a');
+        loops.playNow('B', 'a');
         await flush();
 
         expect(stateOf('B').settingsInPlayId).toBeNull();
@@ -4192,16 +3830,6 @@ describe('DeckLoops', () => {
         loops.toggleGlobal('A');
         expect(setVoicePitch).toHaveBeenCalledTimes(3);
         expect(setVoicePitch).toHaveBeenCalledWith('A', 0, voicePitchMultiplier(3, 0, 0));
-
-        TestBed.flushEffects();
-        expect(setVoicePitch).toHaveBeenCalledTimes(3);
-      });
-
-      it('applies a non-prepared jump synchronously and not again from the effect', () => {
-        loops.select('A', 'w');
-
-        loops.audition('A', 'end', 'w');
-        expect(setVoicePitch).toHaveBeenCalledTimes(3);
 
         TestBed.flushEffects();
         expect(setVoicePitch).toHaveBeenCalledTimes(3);

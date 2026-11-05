@@ -1,7 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-
-/** A pause this long between wheel events ends the gesture; a partial click does not outlast it. */
-const WHEEL_IDLE_MS = 250;
+import { WheelClicks } from '../shared/wheel-clicks';
 
 /**
  * A vertical fader drawn as hardware: a dark slot, tick marks, an optional magenta home line and a
@@ -58,9 +56,7 @@ export class SynthFaderComponent {
    *  page does not scroll while the fader is enabled; nothing is emitted while disabled. */
   readonly wheelTurn = output<{ clicks: number; timeStampMs: number }>();
 
-  /** Wheel delta not yet worth a whole click, carried between events of one gesture. */
-  private wheelRemainder = 0;
-  private lastWheelMs: number | null = null;
+  private readonly wheelClicks = new WheelClicks();
 
   /** The home line's position along the travel, 0 (bottom) to 1 (top), clamped; `null` for none. */
   protected readonly homeFraction = computed<number | null>(() => {
@@ -72,30 +68,17 @@ export class SynthFaderComponent {
     return Math.min(1, Math.max(0, (home - this.min()) / span));
   });
 
-  /** Turns the wheel's delta into whole clicks: 100 px, 3 lines or one page each. A remainder is
-   *  kept only within one gesture: it is dropped after a pause or a change of direction. */
+  /** Reports the wheel as whole clicks (see `WheelClicks`); the page does not scroll while enabled. */
   protected onWheel(event: WheelEvent): void {
     if (this.disabled()) {
-      this.wheelRemainder = 0;
-      this.lastWheelMs = null;
+      this.wheelClicks.reset();
       return;
     }
     event.preventDefault();
-    const idle = this.lastWheelMs === null || event.timeStamp - this.lastWheelMs > WHEEL_IDLE_MS;
-    const reversed =
-      this.wheelRemainder !== 0 && Math.sign(-event.deltaY) !== Math.sign(this.wheelRemainder);
-    if (idle || reversed) {
-      this.wheelRemainder = 0;
+    const clicks = this.wheelClicks.read(event);
+    if (clicks !== 0) {
+      this.wheelTurn.emit({ clicks, timeStampMs: event.timeStamp });
     }
-    this.lastWheelMs = event.timeStamp;
-    const perClick = event.deltaMode === 1 ? 3 : event.deltaMode === 2 ? 1 : 100;
-    this.wheelRemainder += -event.deltaY / perClick;
-    const clicks = Math.trunc(this.wheelRemainder);
-    if (clicks === 0) {
-      return;
-    }
-    this.wheelRemainder -= clicks;
-    this.wheelTurn.emit({ clicks, timeStampMs: event.timeStamp });
   }
 
   /** Returns the fader to its home value; ignored while disabled or without a home. */

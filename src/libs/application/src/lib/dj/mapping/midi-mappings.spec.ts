@@ -24,7 +24,7 @@ const KEY_B: ControlIdentity = { owner: 'B', control: 'key' };
 const LOOP_SELECT_A: ControlIdentity = { owner: 'A', control: 'loop-select' };
 const PLAY_A: ControlIdentity = { owner: 'A', control: 'play-pause' };
 const SEEK_A: ControlIdentity = { owner: 'A', control: 'seek' };
-const REPEAT_A: ControlIdentity = { owner: 'A', control: 'repeat' };
+const MUTE_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-mute' };
 const HOLD_1_A: ControlIdentity = { owner: 'A', control: 'voice-1-hold' };
 
 const style = (kind: MappingStyle['kind'], amount: number | null = null): MappingStyle => ({
@@ -47,6 +47,7 @@ const SAVED: MidiSettingsRecord = {
   ],
   mappings: [record('m1', 7, 'A', 'speed'), record('m2', 8, 'B', 'speed')],
   deckBindings: [],
+  deckSettings: [],
 };
 
 describe('MidiMappings', () => {
@@ -125,6 +126,28 @@ describe('MidiMappings', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
     });
 
+    it('drops a saved mapping on a retired loop control on load, and leaves it out of the next save', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [
+          record('ok', 7, 'A', 'speed'),
+          record('in', 8, 'A', 'loop-in'),
+          record('snap', 9, 'B', 'loop-start-snap-next'),
+        ],
+      });
+
+      await h.mappings.hydrate();
+
+      expect(h.mappingStore.mappings().map((m) => m.id)).toEqual(['ok']);
+      expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
+      h.mappings.bind(ccSource(10), SPEED_A, style('absolute'));
+      const ids = (await saved()).mappings.map((m) => m.id);
+      expect(ids).toHaveLength(2);
+      expect(ids).toContain('ok');
+      expect(ids).not.toContain('in');
+      expect(ids).not.toContain('snap');
+    });
+
     it('keeps a saved mapping on a set control, and drops one on a control the set does not own', async () => {
       setUp({
         ...SAVED,
@@ -164,6 +187,22 @@ describe('MidiMappings', () => {
         'B:key',
         'A:speed',
       ]);
+    });
+
+    it('drops a mapping saved on the retired Repeat control, and the next save omits it', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [record('old-repeat', 7, 'A', 'repeat'), record('m2', 8, 'B', 'speed')],
+      });
+
+      await h.mappings.hydrate();
+      h.mappings.bind(ccSource(20), SPEED_A, style('absolute'));
+
+      expect(h.mappingStore.mappings().map((m) => `${m.control.owner}:${m.control.control}`)).toEqual([
+        'B:speed',
+        'A:speed',
+      ]);
+      expect((await saved()).mappings.map((m) => m.control)).toEqual(['speed', 'speed']);
     });
 
     it('keeps the first mapping when two saved mappings share a source', async () => {
@@ -223,6 +262,10 @@ describe('MidiMappings', () => {
           },
         ],
         deckBindings: [],
+        deckSettings: [
+          { slot: 'A', slip: true, liveLoopBeats: 4 },
+          { slot: 'B', slip: true, liveLoopBeats: 4 },
+        ],
       });
     });
 
@@ -349,9 +392,9 @@ describe('MidiMappings', () => {
     });
 
     it.each([
-      ['latch-release', REPEAT_A, null],
-      ['on-release', REPEAT_A, null],
-      ['off-release', REPEAT_A, null],
+      ['latch-release', MUTE_1_A, null],
+      ['on-release', MUTE_1_A, null],
+      ['off-release', MUTE_1_A, null],
       ['step-release', KEY_B, 0.1],
     ] as const)('accepts %s on a control that can take it', async (kind, control, amount) => {
       await h.mappings.hydrate();
@@ -446,7 +489,7 @@ describe('MidiMappings', () => {
 
     it('keeps a release kind when the mapping is learned onto another source', async () => {
       await h.mappings.hydrate();
-      const { mapping } = h.mappings.bind(noteSource(36), REPEAT_A, style('on-release'));
+      const { mapping } = h.mappings.bind(noteSource(36), MUTE_1_A, style('on-release'));
 
       h.mappings.replaceSource(mapping.id, noteSource(37), style('latch'));
 

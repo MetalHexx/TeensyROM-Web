@@ -19,7 +19,13 @@ const SERVER_SET: MidiSettingsRecord = {
     },
   ],
   deckBindings: [{ slot: 'B', deviceId: '19277260', lastSeenName: 'TR-2' }],
+  deckSettings: [{ slot: 'A', slip: true, liveLoopBeats: 2 }],
 };
+
+const HOME_DECK_SETTINGS = [
+  { slot: 'A', slip: true, liveLoopBeats: 4 },
+  { slot: 'B', slip: true, liveLoopBeats: 4 },
+];
 
 /** Resolves the next pending call when asked, so a test decides exactly when a request settles. */
 function deferred<T = void>() {
@@ -74,6 +80,36 @@ describe('MidiSettingsPersistence', () => {
     vi.useRealTimers();
   });
 
+  describe('snapshot before the mappings hydrate', () => {
+    it('sends the loaded mappings less any on a control the app no longer has', async () => {
+      const retired = { ...SERVER_SET.mappings[0], id: 'old', control: 'repeat' };
+      repository.load.mockResolvedValue({
+        ...SERVER_SET,
+        mappings: [retired, ...SERVER_SET.mappings],
+      });
+      await persistence.load();
+
+      expect(persistence.snapshot().mappings.map((m) => m.id)).toEqual(['m1']);
+    });
+
+    it('leaves a mapping on a loop control the app has since retired out of the next save', async () => {
+      const retired = { ...SERVER_SET.mappings[0], id: 'old', control: 'loop-in' };
+      repository.load.mockResolvedValue({
+        ...SERVER_SET,
+        mappings: [retired, ...SERVER_SET.mappings],
+      });
+      await persistence.load();
+
+      persistence.scheduleSave();
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(repository.save).toHaveBeenCalledTimes(1);
+      expect(repository.save.mock.calls[0][0].mappings.map((m: { id: string }) => m.id)).toEqual([
+        'm1',
+      ]);
+    });
+  });
+
   describe('load', () => {
     it('fetches once and hands every caller the same promise', async () => {
       const first = persistence.load();
@@ -89,7 +125,7 @@ describe('MidiSettingsPersistence', () => {
 
       const settings = await persistence.load();
 
-      expect(settings).toEqual({ controllers: [], mappings: [], deckBindings: [] });
+      expect(settings).toEqual({ controllers: [], mappings: [], deckBindings: [], deckSettings: [] });
       expect(alertService.warning).toHaveBeenCalledTimes(1);
     });
 
@@ -112,6 +148,17 @@ describe('MidiSettingsPersistence', () => {
 
       expect(persistence.snapshot().deckBindings).toEqual([
         { slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' },
+      ]);
+    });
+
+    it('takes slip and live loop size for both decks from the store', async () => {
+      await persistence.load();
+      store.setDeckSettings({ slot: 'A', slip: false });
+      store.setDeckSettings({ slot: 'B', liveLoopBeats: 0.5 });
+
+      expect(persistence.snapshot().deckSettings).toEqual([
+        { slot: 'A', slip: false, liveLoopBeats: 4 },
+        { slot: 'B', slip: true, liveLoopBeats: 0.5 },
       ]);
     });
 
@@ -176,6 +223,7 @@ describe('MidiSettingsPersistence', () => {
         controllers: SERVER_SET.controllers,
         mappings: SERVER_SET.mappings,
         deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+        deckSettings: HOME_DECK_SETTINGS,
       });
     });
 
@@ -247,6 +295,7 @@ describe('MidiSettingsPersistence', () => {
           controllers: SERVER_SET.controllers,
           mappings: SERVER_SET.mappings,
           deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+          deckSettings: HOME_DECK_SETTINGS,
         },
         { keepalive: true }
       );

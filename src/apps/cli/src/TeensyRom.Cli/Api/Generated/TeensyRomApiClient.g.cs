@@ -765,7 +765,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Last subtune is 1-256; memory subtunes are unique and within 1-256
         /// <br/>- Updated is an ISO-8601 timestamp
         /// <br/>- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores
-        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2
+        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is a finite number 0 or more and may be fractional; offset is within 1000000 either way; 1-3 distinct voices in 0-2
         /// <br/>- Settings values are null or at most 8192 characters of JSON
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -841,7 +841,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Copied-from SID hash equals the SID hash of the row tune
         /// <br/>- Last subtune and each memory subtune are within 1 to the subtune count; memory subtunes are unique
         /// <br/>- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores
-        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2
+        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is a finite number 0 or more and may be fractional; offset is within 1000000 either way; 1-3 distinct voices in 0-2
         /// <br/>- Host and settings values are null or at most 8192 characters of JSON
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -6270,7 +6270,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Last subtune is 1-256; memory subtunes are unique and within 1-256
         /// <br/>- Updated is an ISO-8601 timestamp
         /// <br/>- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores
-        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2
+        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is a finite number 0 or more and may be fractional; offset is within 1000000 either way; 1-3 distinct voices in 0-2
         /// <br/>- Settings values are null or at most 8192 characters of JSON
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -6724,7 +6724,7 @@ namespace TeensyRom.Cli.Api.Generated
         /// <br/>- Copied-from SID hash equals the SID hash of the row tune
         /// <br/>- Last subtune and each memory subtune are within 1 to the subtune count; memory subtunes are unique
         /// <br/>- At most 128 markers per subtune with unique ids of 1-64 letters, digits, hyphens or underscores
-        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is 0 or more; offset is within 1000000 either way; 1-3 distinct voices in 0-2
+        /// <br/>- Marker name is null or 1-48 characters after trimming; frame is a finite number 0 or more and may be fractional; offset is within 1000000 either way; 1-3 distinct voices in 0-2
         /// <br/>- Host and settings values are null or at most 8192 characters of JSON
         /// <br/>
         /// <br/>Anything outside these rules is rejected with a 400 and nothing is written.
@@ -8032,6 +8032,31 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DeckSettingsDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("slot")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Slot { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("slip")]
+        public bool Slip { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("liveLoopBeats")]
+        public double LiveLoopBeats { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class DeleteDjSetResponse
     {
 
@@ -8235,7 +8260,7 @@ namespace TeensyRom.Cli.Api.Generated
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("frame")]
-        public int Frame { get; set; } = default!;
+        public double Frame { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("offsetFrames")]
         public int OffsetFrames { get; set; } = default!;
@@ -8256,7 +8281,7 @@ namespace TeensyRom.Cli.Api.Generated
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("frame")]
-        public int Frame { get; set; } = default!;
+        public double Frame { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("offsetFrames")]
         public int OffsetFrames { get; set; } = default!;
@@ -9094,6 +9119,10 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("deckBindings")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.ICollection<DeckDeviceBindingDto> DeckBindings { get; set; } = new System.Collections.ObjectModel.Collection<DeckDeviceBindingDto>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("deckSettings")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<DeckSettingsDto> DeckSettings { get; set; } = new System.Collections.ObjectModel.Collection<DeckSettingsDto>();
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -10030,6 +10059,9 @@ namespace TeensyRom.Cli.Api.Generated
         [System.Text.Json.Serialization.JsonPropertyName("deckBindings")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.ICollection<DeckDeviceBindingDto> DeckBindings { get; set; } = new System.Collections.ObjectModel.Collection<DeckDeviceBindingDto>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("deckSettings")]
+        public System.Collections.Generic.ICollection<DeckSettingsDto>? DeckSettings { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

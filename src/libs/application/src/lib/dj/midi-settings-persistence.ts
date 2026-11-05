@@ -8,10 +8,11 @@ import { MIDI_SETTINGS_REPOSITORY } from './ports';
 import type {
   ControlMappingRecord,
   DeckDeviceBindingRecord,
+  DeckSettingsRecord,
   IMidiSettingsRepository,
   MidiSettingsRecord,
 } from './ports';
-import type { ControlMapping } from './mapping/mapping.models';
+import { isKnownControl, type ControlMapping } from './mapping/mapping.models';
 import { DECK_SLOTS } from './slot';
 
 const SAVE_DEBOUNCE_MS = 300;
@@ -22,12 +23,18 @@ const KEEPALIVE_WARN_BYTES = 60 * 1024;
 /** The server rejects a longer name. */
 const MAX_LAST_SEEN_NAME_LENGTH = 128;
 
-const EMPTY_SETTINGS: MidiSettingsRecord = { controllers: [], mappings: [], deckBindings: [] };
+const EMPTY_SETTINGS: MidiSettingsRecord = {
+  controllers: [],
+  mappings: [],
+  deckBindings: [],
+  deckSettings: [],
+};
 
 /**
  * The only writer of the whole MIDI settings set. The server stores the set whole, so every save
- * sends all three lists: the deck bindings from `DjStore`, and the controllers and mappings from
- * `MidiMappingStore` once it has loaded them, exactly as `load` returned them until then.
+ * sends every list: the deck bindings and each deck's slip and live loop size from `DjStore`, and the controllers and mappings from
+ * `MidiMappingStore` once it has loaded them, as `load` returned them until then, less any mapping
+ * to a control the app no longer has (the server rejects an unknown control on save).
  *
  * A failed load resolves an empty set and suppresses every save for the rest of the session, so a
  * partial set can never overwrite the server's.
@@ -100,13 +107,29 @@ export class MidiSettingsPersistence {
             },
           ];
     });
+    const decks = this.store.decks();
+    const deckSettings = DECK_SLOTS.map(
+      (slot): DeckSettingsRecord => ({
+        slot,
+        slip: decks[slot].slip,
+        liveLoopBeats: decks[slot].liveLoopBeats,
+      })
+    );
     if (!this.mappingStore.loaded()) {
-      return { controllers: this.loaded.controllers, mappings: this.loaded.mappings, deckBindings };
+      return {
+        controllers: this.loaded.controllers,
+        mappings: this.loaded.mappings.filter((mapping) =>
+          isKnownControl(mapping.owner, mapping.control)
+        ),
+        deckBindings,
+        deckSettings,
+      };
     }
     return {
       controllers: this.mappingStore.controllers(),
       mappings: this.mappingStore.mappings().map(toRecord),
       deckBindings,
+      deckSettings,
     };
   }
 

@@ -34,7 +34,9 @@ import { DeckLoops } from './deck-loops';
 import { DeckMemoryKeeper } from './deck-memory-keeper';
 import { DeckHand } from './deck-hand';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import { DeckBindings } from './deck-bindings';
+import { MidiSettingsPersistence } from './midi-settings-persistence';
 import { MixerApplier } from './mixer-applier';
 import { MixerService } from './mixer.service';
 import { LIVE_PAINT_CLOCK } from './live-paint-clock';
@@ -42,7 +44,15 @@ import { PlayheadPainter } from './playhead-painter';
 import { SidPanelPainter } from './sid-panel-painter';
 import { SidWaveFeed } from './sid-wave-feed';
 import { TuneLoader } from './tune-loader';
-import { DjStore, HOME_DECK_PANEL, type DeckHolding, type DeckMixerSettings } from './dj-store';
+import {
+  DEFAULT_LIVE_LOOP_BEATS,
+  DjStore,
+  HOME_DECK_PANEL,
+  type DeckBeatGrid,
+  type DeckHolding,
+  type DeckMixerSettings,
+} from './dj-store';
+import type { MidiSettingsRecord } from './ports';
 import { decodeMixerSettings, encodeMixerSettings } from './loops/marker-settings-codec';
 import { decodeRowSettings, encodeRowSettings, type DeckRowSettings } from './loops/row-settings-codec';
 import { DjSets } from './sets/dj-sets';
@@ -193,6 +203,10 @@ describe('DeckService', () => {
     enableMidi: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
   };
+  let fakePersistence: {
+    load: ReturnType<typeof vi.fn>;
+    scheduleSave: ReturnType<typeof vi.fn>;
+  };
   let fileContentMock: ReturnType<typeof vi.fn>;
   let insertMock: ReturnType<typeof vi.fn>;
   let resolveMock: ReturnType<typeof vi.fn>;
@@ -290,6 +304,16 @@ describe('DeckService', () => {
       identify: vi.fn(),
     };
 
+    fakePersistence = {
+      load: vi.fn().mockResolvedValue({
+        controllers: [],
+        mappings: [],
+        deckBindings: [],
+        deckSettings: [],
+      } satisfies MidiSettingsRecord),
+      scheduleSave: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         DeckService,
@@ -297,6 +321,7 @@ describe('DeckService', () => {
         TuneLoader,
         DjStore,
         { provide: DeckBindings, useValue: fakeBindings },
+        { provide: MidiSettingsPersistence, useValue: fakePersistence },
         {
           provide: FRAME_CLOCK_FACTORY,
           useValue: (): FakeClock => {
@@ -334,6 +359,8 @@ describe('DeckService', () => {
     });
     runtime = TestBed.inject(DeckRuntime);
     store = TestBed.inject(DjStore);
+    store.setDeckSettings({ slot: 'A', slip: false });
+    store.setDeckSettings({ slot: 'B', slip: false });
   });
 
   afterEach(() => {
@@ -821,13 +848,23 @@ describe('DeckService', () => {
     });
   });
 
-  it('setRepeat reaches the player and the store', () => {
-    const setRepeatSpy = vi.spyOn(runtime, 'setRepeat');
+  it('a built and loaded deck repeats: its position wraps at the track end and it keeps playing', async () => {
+    const fixture = register(makeFixture());
+    const ended = playableOf(fixture);
+    resolveMock.mockResolvedValueOnce({ ...ended, index: { ...ended.index, endedAtFrame: 40 } });
 
-    service.setRepeat('A', false);
+    await service.load('A', fixture.source);
+    expect(runtime.snapshot('A').repeatTrack).toBe(true);
 
-    expect(setRepeatSpy).toHaveBeenCalledWith('A', false);
-    expect(store.deck('A')().repeat).toBe(false);
+    let furthest = 0;
+    for (let i = 1; i <= 120; i++) {
+      clocks[0].tick(milliseconds(i));
+      furthest = Math.max(furthest, runtime.position('A'));
+    }
+
+    expect(furthest).toBeGreaterThan(0);
+    expect(runtime.position('A')).toBeLessThan(120);
+    expect(store.deck('A')().status).toBe('playing');
   });
 
   it('a drop while an older load is awaiting play writes nothing once its play finally resolves', async () => {
@@ -1699,6 +1736,42 @@ describe('DeckService', () => {
       expect(wavesOfA()).toBe(3);
     });
 
+    it("moves the slip's second playhead on frames where the position did not move, and hides it when the departure ends", () => {
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+        lengthFrames: 1000,
+      });
+      const setLiveReturnPosition = vi.fn();
+      const unused = vi.fn();
+      TestBed.inject(PlayheadPainter).attach('A', {
+        transport: {
+          setLivePosition: unused,
+          setLiveReturnPosition,
+          setLiveElapsed: unused,
+          setLiveFrame: unused,
+        },
+        loops: { setLiveProgress: unused },
+        speed: { setLiveBpm: unused },
+      });
+      playheadSpy.mockClear();
+      const returnFrame = vi.spyOn(TestBed.inject(DeckSlip), 'returnFrame');
+      returnFrame.mockReturnValue(600);
+      runFrame(0);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(60);
+
+      returnFrame.mockReturnValue(640);
+      wake();
+      runFrame(2);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(64);
+
+      returnFrame.mockReturnValue(null);
+      wake();
+      runFrame(4);
+      expect(setLiveReturnPosition).toHaveBeenLastCalledWith(null);
+      expect(playheadPaintsOfA()).toBe(1);
+    });
+
     it('does not feed the waveforms of a deck that is neither playing nor in varispeed', async () => {
       await service.togglePlayPause('A');
       TestBed.flushEffects();
@@ -1969,16 +2042,13 @@ describe('DeckService', () => {
       service.selectMarker('A', 'x');
       service.moveMarkerSelection('A', 1);
       service.selectMarkerAt('A', 0);
-      service.setMarkerIn('A');
-      service.setMarkerOut('A');
       service.resizeMarker('A', 'double');
       service.setMarkerLength('A', 4);
+      service.stepMarkerLength('A', 1);
       service.moveMarker('A', 1);
-      service.moveMarkerEdge('A', 'start', 1);
       service.setMoveStep('A', 4);
       service.clearMarkerEnd('A');
       service.deleteMarker('A');
-      await service.nudgeMarker('A', 'start', 5);
       await service.toggleMarker('A');
       service.stopMarkerLoop('A');
       service.toggleMarkerGlobal('A');
@@ -1987,7 +2057,7 @@ describe('DeckService', () => {
       const refusals = vi
         .mocked(logWarn)
         .mock.calls.filter(([message]) => message.startsWith('DeckService'));
-      expect(refusals).toHaveLength(19);
+      expect(refusals).toHaveLength(16);
       expect(markersOf('A')).toEqual([]);
     });
 
@@ -2012,14 +2082,15 @@ describe('DeckService', () => {
       await markAt('A', 300);
 
       service.selectMarkerAt('A', 0);
-      await runtime.seekToFrame('A', 180);
-      service.setMarkerOut('A');
-      await service.nudgeMarker('A', 'start', 7);
+      service.setMoveStep('A', 'frame');
+      for (let press = 0; press < 7; press++) {
+        service.moveMarker('A', 1);
+      }
       service.moveMarkerSelection('A', 1);
       service.deleteMarker('A');
 
       expect(markersOf('A')).toHaveLength(1);
-      expect(markersOf('A')[0]).toMatchObject({ end: { frame: 180 }, start: { offsetFrames: 7 } });
+      expect(markersOf('A')[0]).toMatchObject({ end: null, start: { offsetFrames: 7 } });
       expect(store.loops().A.selectedId).toBe(markersOf('A')[0].id);
     });
   });
@@ -2263,8 +2334,12 @@ describe('DeckService', () => {
 
     it('drops a marker still waiting for its start to be ready when the transport stops', async () => {
       await loadPlayable('A');
-      // The nudge moves the start to a frame the engine has yet to prepare, and its audition waits.
-      await service.nudgeMarker('A', 'start', 5);
+      // A moved start is a frame the engine has yet to prepare, so the marker waits for it.
+      service.setMoveStep('A', 'frame');
+      for (let press = 0; press < 5; press++) {
+        service.moveMarker('A', 1);
+      }
+      await service.toggleMarker('A', 'a');
       expect(loopsOf('A').markers[0].ready).toBe(false);
       expect(loopsOf('A').queuedId).toBe('a');
 
@@ -2278,11 +2353,10 @@ describe('DeckService', () => {
       expect(runtime.position('A')).toBe(stoppedAt);
     });
 
-    it('disengages the marker loop on a scrub and leaves repeat alone', async () => {
+    it('disengages the marker loop on a scrub and leaves the repeating player alone', async () => {
       await loadPlayable('A');
       await service.toggleMarker('A', 'a');
       await service.toggleMarker('A', 'b');
-      expect(store.deck('A')().repeat).toBe(true);
 
       await service.seek('A', 50);
 
@@ -2290,7 +2364,6 @@ describe('DeckService', () => {
       expect(loopsOf('A').queuedId).toBeNull();
       expect(engineLoop('A')).toBeNull();
       expect(engineQueue('A')).toBeNull();
-      expect(store.deck('A')().repeat).toBe(true);
       expect(runtime.snapshot('A').repeatTrack).toBe(true);
     });
 
@@ -2461,86 +2534,35 @@ describe('DeckService', () => {
       });
     });
 
-    describe('auditioning an edit', () => {
+    describe('shaping a loop', () => {
       const refusalsFrom = (source: 'DeckLoops' | 'DeckService') =>
         vi.mocked(logWarn).mock.calls.filter(([message]) => message.startsWith(`${source}:`));
+      const oneBeatGrid = {
+        beatFrames: 20,
+        beatOneFrame: 0,
+        startFrame: 0,
+        endFrame: null,
+        source: 'scan',
+      } as const;
 
-      it('engages the nudged start of an idle marker from its new position', async () => {
+      it('performs the beat commands without starting playback, seeking or engaging a marker', async () => {
         await loadPlayable('A');
-        service.selectMarker('A', 'b');
-
-        await service.nudgeMarker('A', 'start', 5);
-
-        await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
-        expect(engineLoop('A')).toEqual({ startFrame: 305, endFrame: 320, varispeedStart: 'stop' });
-        await vi.waitFor(() => expect(runtime.position('A')).toBe(305));
-      });
-
-      it('arms a nudged end and lands before it', async () => {
-        await loadPlayable('A');
-        service.selectMarker('A', 'b');
-
-        await service.nudgeMarker('A', 'end', 10);
-
-        await vi.waitFor(() => expect(loopsOf('A').runningId).toBe('b'));
-        expect(engineLoop('A')).toEqual({ startFrame: 300, endFrame: 330, varispeedStart: 'stop' });
-      });
-
-      it('seeks a running loop to its nudged end without arming it again', async () => {
-        await loadPlayable('A');
-        await service.toggleMarker('A', 'a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-        const setActiveLoop = vi.spyOn(runtime, 'setActiveLoop');
-
-        await service.nudgeMarker('A', 'end', 10);
-
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
-        expect(setActiveLoop).toHaveBeenCalledTimes(1);
-        expect(seek).toHaveBeenCalledTimes(1);
-        expect(seek).toHaveBeenCalledWith('A', 100);
-      });
-
-      it('seeks a running loop to its nudged start once that start is ready', async () => {
-        await loadPlayable('A');
-        await service.toggleMarker('A', 'a');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        await service.nudgeMarker('A', 'start', 5);
-
-        await vi.waitFor(() => expect(seek).toHaveBeenCalledWith('A', 105));
-        expect(seek).toHaveBeenCalledTimes(1);
-        expect(loopsOf('A').runningId).toBe('a');
-        expect(loopsOf('A').queuedId).toBeNull();
-        expect(engineLoop('A')).toEqual({ startFrame: 105, endFrame: 120, varispeedStart: 'stop' });
-      });
-
-      it('performs the beat commands without starting playback, seeking or auditioning', async () => {
-        await loadPlayable('A');
-        store.setDeckBeatGrid({
-          slot: 'A',
-          beatGrid: {
-            beatFrames: 20,
-            beatOneFrame: 0,
-            startFrame: 0,
-            endFrame: null,
-            source: 'scan',
-          },
-        });
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: oneBeatGrid });
         await service.togglePlayPause('A');
         const play = vi.spyOn(runtime, 'play');
         const seek = vi.spyOn(runtime, 'seekToFrame');
 
         service.moveMarker('A', 1);
         expect(spanOf('a')).toEqual([120, 140]);
+        service.stepMarkerLength('A', 1);
+        expect(spanOf('a')).toEqual([120, 160]);
+        service.stepMarkerLength('A', -1);
+        expect(spanOf('a')).toEqual([120, 140]);
         service.setMoveStep('A', 2);
-        service.moveMarkerEdge('A', 'end', 1);
-        expect(spanOf('a')).toEqual([120, 180]);
-        service.resizeMarker('A', 'halve');
+        service.resizeMarker('A', 'double');
         expect(spanOf('a')).toEqual([120, 160]);
         service.setMarkerLength('A', 1);
         expect(spanOf('a')).toEqual([120, 140]);
-        service.setMarkerOut('A');
-        service.setMarkerIn('A');
 
         expect(store.decks().A.moveStepBeats).toBe(2);
         expect(store.deck('A')().status).toBe('paused');
@@ -2549,87 +2571,43 @@ describe('DeckService', () => {
         expect(loopsOf('A').runningId).toBeNull();
       });
 
-      it('starts a paused deck first, then auditions', async () => {
+      it('refuses a length step on a cue without starting playback or seeking', async () => {
         await loadPlayable('A');
-        await service.togglePlayPause('A');
-        expect(store.deck('A')().status).toBe('paused');
-
-        await service.nudgeMarker('A', 'end', 10);
-
-        expect(store.deck('A')().status).toBe('playing');
-        expect(loopsOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 130, varispeedStart: 'stop' });
-      });
-
-      it('restarts a stopped deck from the top first, then auditions', async () => {
-        await loadPlayable('A');
-        service.stop('A');
-        expect(store.deck('A')().status).toBe('stopped');
-
-        await service.nudgeMarker('A', 'end', 0);
-        await vi.waitFor(() => expect(runtime.position('A')).toBeGreaterThanOrEqual(100));
-
-        expect(store.deck('A')().status).toBe('playing');
-        expect(loopsOf('A').runningId).toBe('a');
-        expect(engineLoop('A')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
-      });
-
-      it('skips the audition when the selection moves while playback starts', async () => {
-        await loadPlayable('A');
-        await service.togglePlayPause('A');
-        const seek = vi.spyOn(runtime, 'seekToFrame');
-
-        const edit = service.nudgeMarker('A', 'end', 10);
-        expect(loopsOf('A').markers[0].end?.offsetFrames).toBe(10);
-        service.selectMarker('A', 'b');
-        await edit;
-
-        expect(store.deck('A')().status).toBe('playing');
-        expect(loopsOf('A').runningId).toBeNull();
-        expect(engineLoop('A')).toBeNull();
-        expect(seek).not.toHaveBeenCalled();
-      });
-
-      it('neither starts playback nor seeks for a refused edit on a paused deck', async () => {
-        await loadPlayable('A');
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: oneBeatGrid });
         await service.togglePlayPause('A');
         service.selectMarker('A', 'c');
         const play = vi.spyOn(runtime, 'play');
         const seek = vi.spyOn(runtime, 'seekToFrame');
         vi.mocked(logWarn).mockClear();
 
-        await service.nudgeMarker('A', 'end', 5);
-        service.moveMarkerEdge('A', 'end', 1);
+        service.stepMarkerLength('A', 1);
 
         expect(store.deck('A')().status).toBe('paused');
         expect(play).not.toHaveBeenCalled();
         expect(seek).not.toHaveBeenCalled();
-        expect(refusalsFrom('DeckLoops')).toHaveLength(2);
+        expect(refusalsFrom('DeckLoops')).toHaveLength(1);
         expect(refusalsFrom('DeckService')).toHaveLength(0);
       });
 
       it("never moves the other deck's playhead on a shared tune", async () => {
         const fixture = register(makeFixture());
-        await keepMarkers(fixture.reference.identity, [
-          loopMarker('a', 100, 120),
-        ]);
+        await keepMarkers(fixture.reference.identity, [loopMarker('a', 100, 120)]);
         await loadAndWait('A', fixture);
         await loadAndWait('B', fixture);
         await vi.waitFor(() => expect(loopsOf('B').markers[0].ready).toBe(true));
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: oneBeatGrid });
         await service.toggleMarker('B', 'a');
         const seek = vi.spyOn(runtime, 'seekToFrame');
 
-        await service.nudgeMarker('A', 'start', 5);
-        await service.nudgeMarker('A', 'end', 10);
+        service.stepMarkerLength('A', 1);
 
-        await vi.waitFor(() => expect(seek).toHaveBeenCalledWith('A', 105));
         expect(runtime.snapshot('B').tune?.queuedJump).toEqual({
-          startFrame: 105,
-          endFrame: 130,
+          startFrame: 100,
+          endFrame: 140,
           varispeedStart: 'stop',
         });
         expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
-        expect(seek.mock.calls.every(([slot]) => slot === 'A')).toBe(true);
+        expect(seek).not.toHaveBeenCalled();
       });
     });
 
@@ -2658,11 +2636,15 @@ describe('DeckService', () => {
       await vi.waitFor(() => expect(loopsOf('B').markers[0].ready).toBe(true));
       await service.toggleMarker('B', 'a');
 
-      await service.nudgeMarker('A', 'end', 10);
+      store.setDeckBeatGrid({
+        slot: 'A',
+        beatGrid: { beatFrames: 20, beatOneFrame: 0, startFrame: 0, endFrame: null, source: 'scan' },
+      });
+      service.stepMarkerLength('A', 1);
       expect(engineLoop('B')).toEqual({ startFrame: 100, endFrame: 120, varispeedStart: 'stop' });
       expect(runtime.snapshot('B').tune?.queuedJump).toEqual({
         startFrame: 100,
-        endFrame: 130,
+        endFrame: 140,
         varispeedStart: 'stop',
       });
 
@@ -2682,12 +2664,10 @@ describe('DeckService', () => {
         mutes: [true, false, false],
       },
       speed: 1.25,
-      repeat: false,
     };
     const OTHER: DeckRowSettings = {
       mixer: { panel: { ...HOME_DECK_PANEL, resonance: 5 }, mutes: [false, true, false] },
       speed: 0.8,
-      repeat: true,
     };
     const HOME_VOICES = [false, false, false];
 
@@ -2745,8 +2725,6 @@ describe('DeckService', () => {
       expect(deck.voices.map((voice) => voice.muted)).toEqual(settings.mixer.mutes);
       expect(runtime.snapshot(slot).tempo.multiplier).toBe(settings.speed);
       expect(deck.faderSpeed).toBe(settings.speed);
-      expect(deck.repeat).toBe(settings.repeat);
-      expect(runtime.snapshot(slot).repeatTrack).toBe(settings.repeat);
     }
 
     function expectHome(slot: 'A' | 'B'): void {
@@ -2802,6 +2780,20 @@ describe('DeckService', () => {
     });
 
     describe('loadRow', () => {
+      it('leaves slip and the live loop size of each deck as they were', async () => {
+        service.setSlip('A', true);
+        service.setLiveLoopBeats('A', 0.5);
+        const fixture = register(makeFixture());
+        await loadAndWait('A', fixture);
+        const held = holdingOf('A');
+
+        await service.loadRow('A', held.setId, held.rowId);
+        await settle();
+
+        expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: 0.5 });
+        expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(2);
+      });
+
       it('loads any open set\'s row at the subtune it was last on, replacing what plays', async () => {
         const first = register(makeFixture({ subtuneCount: 3 }));
         const second = register(makeFixture());
@@ -2976,7 +2968,6 @@ describe('DeckService', () => {
 
         await service.selectSubtune('A', 3);
         expectHome('A');
-        expect(store.deck('A')().repeat).toBe(OTHER.repeat);
       });
 
       it('loads a voice latched muted as muted, and writes nothing back for it', async () => {
@@ -3096,7 +3087,7 @@ describe('DeckService', () => {
     });
 
     describe('a failed load', () => {
-      it('leaves the row it held untouched, also after Repeat is pressed on the failed deck', async () => {
+      it('leaves the row it held untouched, also after a voice is muted on the failed deck', async () => {
         const fixture = register(makeFixture());
         await keepSettings(fixture.reference.identity, SHAPED);
         await loadAndWait('A', fixture);
@@ -3107,7 +3098,7 @@ describe('DeckService', () => {
 
         await service.load('A', makeFixture().source);
         expect(store.deck('A')().status).toBe('failed');
-        service.setRepeat('A', !store.deck('A')().repeat);
+        service.setVoiceMuted('A', 1, true);
         await settle(WRITE_DELAY_MS * 2);
 
         expect(holdingOf('A')).toEqual(held);
@@ -3121,7 +3112,7 @@ describe('DeckService', () => {
         resolveMock.mockRejectedValue(new Error('cannot scan'));
 
         await service.load('A', fixture.source);
-        service.setRepeat('A', true);
+        service.setVoiceMuted('A', 1, true);
         await settle(WRITE_DELAY_MS * 2);
 
         expect(store.deck('A')().status).toBe('failed');
@@ -3139,7 +3130,6 @@ describe('DeckService', () => {
         mixer.setFilterKnob('A', 'cutoff', 600);
         service.setVoiceMuted('A', 1, true);
         service.setSpeed('A', 1.3);
-        service.setRepeat('A', false);
         await settle(WRITE_DELAY_MS);
 
         const held = holdingOf('A');
@@ -3147,7 +3137,6 @@ describe('DeckService', () => {
         expect(keptBy(held)).toEqual({
           mixer: { panel: store.panel().A, mutes: [false, true, false] },
           speed: 1.3,
-          repeat: false,
         });
         expect(store.panel().A.cutoff).toBe(600);
         expect(sets.subtuneSettingsOf({ ...held, subtune: 1 })).toBeUndefined();
@@ -3593,6 +3582,220 @@ describe('DeckService', () => {
     });
   });
 
+  describe('live loops', () => {
+    const grid: DeckBeatGrid = {
+      beatFrames: 24,
+      beatOneFrame: 0,
+      startFrame: 0,
+      endFrame: null,
+      source: 'scan',
+    };
+    const liveOf = (slot: 'A' | 'B') => store.loops()[slot].live;
+    const engineLoop = (slot: 'A' | 'B') => runtime.snapshot(slot).loop;
+    const markerOf = (id: string, start: number, end: number): LoopMarker => ({
+      id,
+      start: { frame: start, offsetFrames: 0 },
+      end: { frame: end, offsetFrames: 0 },
+      voices: [0, 1, 2],
+    });
+    let ticks = 0;
+
+    function tick(slot: 'A' | 'B', count = 1): void {
+      for (let i = 0; i < count; i++) {
+        clocks[slot === 'A' ? 0 : 1].tick(milliseconds(++ticks));
+      }
+    }
+
+    /** Plays a tune on deck A that has `grid`, with the playhead at 30. */
+    async function playingOnGrid(
+      options: {
+        markers?: readonly LoopMarker[];
+        grid?: DeckBeatGrid | null;
+        subtuneCount?: number;
+      } = {}
+    ): Promise<void> {
+      const fixture = register(makeFixture({ subtuneCount: options.subtuneCount }));
+      if (options.markers !== undefined) {
+        await keepMarkers(fixture.reference.identity, options.markers);
+      }
+      await loadAndWait('A', fixture);
+      await vi.waitFor(() => expect(store.loops().A.markers.every((marker) => marker.ready)).toBe(true));
+      store.setDeckBeatGrid({ slot: 'A', beatGrid: options.grid === undefined ? grid : options.grid });
+      TestBed.flushEffects();
+      tick('A', 30);
+    }
+
+    it('pushes a loop of the kept size on the grid and ends it again', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toEqual({ startFrame: 24, endFrame: 48, pendingEndFrame: null });
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 48, varispeedStart: 'wrap' });
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+    });
+
+    it('ends a running live loop on endLiveLoop, and does nothing when none runs', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+
+      service.endLiveLoop('A');
+      expect(engineLoop('A')).toBeNull();
+
+      service.toggleLiveLoop('A');
+      service.endLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+    });
+
+    it('ignores every command on a deck with no grid', async () => {
+      await playingOnGrid({ grid: null });
+
+      service.toggleLiveLoop('A');
+      service.stepLiveLoopSize('A', 'halve');
+      service.endLiveLoop('A');
+
+      expect(liveOf('A')).toBeNull();
+      expect(engineLoop('A')).toBeNull();
+      expect(store.deck('A')().liveLoopBeats).toBe(DEFAULT_LIVE_LOOP_BEATS);
+    });
+
+    it('refuses the commands of a deck with nothing loaded', () => {
+      service.toggleLiveLoop('B');
+      service.stepLiveLoopSize('B', 'double');
+
+      expect(liveOf('B')).toBeNull();
+      expect(store.deck('B')().liveLoopBeats).toBe(DEFAULT_LIVE_LOOP_BEATS);
+    });
+
+    it('steps the kept size one rung at a time, saving it, and stops at the ends', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+      fakePersistence.scheduleSave.mockClear();
+
+      service.stepLiveLoopSize('A', 'halve');
+      expect(store.deck('A')().liveLoopBeats).toBe(0.5);
+      service.stepLiveLoopSize('A', 'double');
+      service.stepLiveLoopSize('A', 'double');
+      expect(store.deck('A')().liveLoopBeats).toBe(2);
+      expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(3);
+
+      service.setLiveLoopBeats('A', 128);
+      fakePersistence.scheduleSave.mockClear();
+      service.stepLiveLoopSize('A', 'double');
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
+      expect(fakePersistence.scheduleSave).not.toHaveBeenCalled();
+    });
+
+    it('resizes a running live loop when the kept size changes', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 1);
+      service.toggleLiveLoop('A');
+
+      service.stepLiveLoopSize('A', 'double');
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 72, varispeedStart: 'wrap' });
+
+      service.setLiveLoopBeats('A', 1);
+      expect(engineLoop('A')).toEqual({ startFrame: 24, endFrame: 48, varispeedStart: 'wrap' });
+      expect(liveOf('A')).toEqual({ startFrame: 24, endFrame: 48, pendingEndFrame: null });
+    });
+
+    it('takes the nearest rung for a kept size the grid lacks, without rewriting the kept size', async () => {
+      await playingOnGrid();
+      service.setLiveLoopBeats('A', 3.1);
+
+      service.toggleLiveLoop('A');
+
+      expect(liveOf('A')).toMatchObject({ startFrame: 24, endFrame: 24 + 96 });
+      expect(store.deck('A')().liveLoopBeats).toBe(3.1);
+      expect(store.liveLoopSummary('A')().sizeText).toBe('4 BEATS');
+    });
+
+    describe('the exits', () => {
+      it('ends with a transport stop', async () => {
+        await playingOnGrid();
+        service.setLiveLoopBeats('A', 1);
+        service.toggleLiveLoop('A');
+
+        service.stop('A');
+
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('ends with a scrub, and the marker underneath with it', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+
+        await service.seek('A', 50);
+
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+        expect(store.loops().A.runningId).toBeNull();
+      });
+
+      it('ends with a load and with a subtune change', async () => {
+        await playingOnGrid({ subtuneCount: 2 });
+        service.setLiveLoopBeats('A', 1);
+        service.toggleLiveLoop('A');
+        expect(liveOf('A')).not.toBeNull();
+
+        await service.selectSubtune('A', 2);
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+
+        store.setDeckBeatGrid({ slot: 'A', beatGrid: grid });
+        TestBed.flushEffects();
+        tick('A', 30);
+        service.toggleLiveLoop('A');
+        expect(liveOf('A')).not.toBeNull();
+
+        await service.load('A', register(makeFixture()).source);
+        expect(liveOf('A')).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('ends the live loop and the marker underneath together on the plate\'s Stop', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+        expect(store.loops().A.runningId).toBe('m');
+
+        service.stopMarkerLoop('A');
+
+        expect(liveOf('A')).toBeNull();
+        expect(store.loops().A.runningId).toBeNull();
+        expect(engineLoop('A')).toBeNull();
+      });
+
+      it('keeps the live loop running when the marker underneath is toggled off', async () => {
+        await playingOnGrid({ markers: [markerOf('m', 48, 96)] });
+        service.setLiveLoopBeats('A', 1);
+        await service.toggleMarker('A', 'm');
+        tick('A', 10);
+        service.toggleLiveLoop('A');
+        const loop = engineLoop('A');
+
+        await service.toggleMarker('A', 'm');
+
+        expect(store.loops().A.runningId).toBeNull();
+        expect(liveOf('A')).not.toBeNull();
+        expect(engineLoop('A')).toEqual(loop);
+      });
+    });
+  });
+
   describe('letting go of the hand', () => {
     let drop: MockInstance<DeckHand['drop']>;
 
@@ -3624,6 +3827,97 @@ describe('DeckService', () => {
       await service.selectSubtune('A', 2);
 
       expect(drop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deck settings', () => {
+    beforeEach(() => {
+      // The spec's own setup turns slip off, so a deck is put back to the defaults it starts with.
+      store.setDeckSettings({ slot: 'A', slip: true });
+      store.setDeckSettings({ slot: 'B', slip: true });
+    });
+
+    function savedWith(deckSettings: MidiSettingsRecord['deckSettings']): void {
+      fakePersistence.load.mockResolvedValue({
+        controllers: [],
+        mappings: [],
+        deckBindings: [],
+        deckSettings,
+      } satisfies MidiSettingsRecord);
+    }
+
+    it('hydrates each deck from its saved entry, before the bindings, without queueing a save', async () => {
+      savedWith([
+        { slot: 'A', slip: true, liveLoopBeats: 0.5 },
+        { slot: 'B', slip: false, liveLoopBeats: 16 },
+      ]);
+      fakeBindings.hydrate.mockImplementation(async () => {
+        expect(store.deck('A')().liveLoopBeats).toBe(0.5);
+      });
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: 0.5 });
+      expect(store.deck('B')()).toMatchObject({ slip: false, liveLoopBeats: 16 });
+      expect(fakePersistence.scheduleSave).not.toHaveBeenCalled();
+    });
+
+    it('keeps the defaults for a deck with no saved entry', async () => {
+      savedWith([{ slot: 'B', slip: true, liveLoopBeats: 2 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+      expect(store.deck('B')()).toMatchObject({ slip: true, liveLoopBeats: 2 });
+    });
+
+    it('starts both decks with slip on and a 4-beat live loop when no deck settings were saved', async () => {
+      savedWith([]);
+
+      await service.hydrate();
+
+      for (const slot of ['A', 'B'] as const) {
+        expect(store.deck(slot)()).toMatchObject({ slip: true, liveLoopBeats: 4 });
+      }
+    });
+
+    it('keeps a saved slip off after a hydrate', async () => {
+      savedWith([{ slot: 'A', slip: false, liveLoopBeats: 4 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')().slip).toBe(false);
+    });
+
+    it.each([0, 129])('keeps the default size when the saved size is %s', async (liveLoopBeats) => {
+      savedWith([{ slot: 'A', slip: true, liveLoopBeats }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')()).toMatchObject({ slip: true, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+    });
+
+    it('keeps a saved size at the server bound', async () => {
+      savedWith([{ slot: 'A', slip: false, liveLoopBeats: 128 }]);
+
+      await service.hydrate();
+
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
+    });
+
+    it('clamps a size above the server bound when set', () => {
+      service.setLiveLoopBeats('A', 129);
+
+      expect(store.deck('A')().liveLoopBeats).toBe(128);
+    });
+
+    it('setSlip and setLiveLoopBeats write one deck and ask for a save each', () => {
+      service.setSlip('A', false);
+      service.setLiveLoopBeats('B', 8);
+
+      expect(store.deck('A')()).toMatchObject({ slip: false, liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS });
+      expect(store.deck('B')()).toMatchObject({ slip: true, liveLoopBeats: 8 });
+      expect(fakePersistence.scheduleSave).toHaveBeenCalledTimes(2);
     });
   });
 

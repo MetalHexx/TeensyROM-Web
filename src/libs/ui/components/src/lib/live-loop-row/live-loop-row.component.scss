@@ -1,0 +1,68 @@
+:host {
+  display: block;
+  container-type: inline-size;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--synth-control-border);
+  border-radius: var(--border-radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+}
+
+// A running live loop lights the tray's border and rim.
+:host([data-running]) {
+  border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+lib-synth-key {
+  flex: 0 0 auto;
+  --synth-key-font-size: 0.53rem;
+  --synth-key-letter-spacing: 0.08em;
+  --synth-key-padding: 0 7px;
+  --synth-key-gap: 4px;
+  --synth-key-icon-size: 12px;
+}
+
+.live {
+  --synth-key-min-width: 58px;
+}
+
+// SLIP takes the same width as GBL and WRAP; its lamp is the key's icon at a lamp's size.
+.slip {
+  --synth-key-min-width: 44px;
+  --synth-key-padding: 0 6px;
+  --synth-key-icon-size: 10px;
+}
+
+.size {
+  flex: 1 1 auto;
+}
+
+// Too narrow for the keys and the size control abreast: the size control takes a line of its own
+// beneath the Live loop and SLIP keys.
+@container (max-width: 20rem) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .size {
+    flex: 1 0 100%;
+    order: 1;
+  }
+
+  .slip {
+    margin-inline-start: auto;
+  }
+}

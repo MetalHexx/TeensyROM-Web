@@ -31,6 +31,7 @@ models/ConnectionType.ts
 models/CreateJobBody.ts
 models/CreateJobResponse.ts
 models/DeckDeviceBindingDto.ts
+models/DeckSettingsDto.ts
 models/DeleteDjSetResponse.ts
 models/DeleteThemeResponse.ts
 models/DeviceSettingsDto.ts

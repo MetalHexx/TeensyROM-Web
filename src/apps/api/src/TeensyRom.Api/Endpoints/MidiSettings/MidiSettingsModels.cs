@@ -134,6 +134,27 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
     }
 
     /// <summary>
+    /// A deck's own settings: slip and the live loop size. They belong to the deck, not to a tune or a set.
+    /// </summary>
+    public record DeckSettingsDto
+    {
+        /// <summary>
+        /// The deck slot: "A" or "B". Each slot may appear once.
+        /// </summary>
+        [Required] public string Slot { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether slip is on for the deck.
+        /// </summary>
+        [Required] public bool Slip { get; set; }
+
+        /// <summary>
+        /// The live loop size in beats: greater than 0 and at most 128.
+        /// </summary>
+        [Required] public double LiveLoopBeats { get; set; }
+    }
+
+    /// <summary>
     /// What the save request accepts. Anything outside these lists is rejected rather than stored.
     /// </summary>
     public static class MidiSettingsAllowLists
@@ -141,6 +162,8 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
         public const int MaxControllers = 64;
         public const int MaxMappings = 1024;
         public const int MaxDeckBindings = 2;
+        public const int MaxDeckSettings = 2;
+        public const double LiveLoopBeatsMax = 128;
 
         public const string MixerOwner = "mixer";
         public const string SetOwner = "set";
@@ -384,6 +407,20 @@ namespace TeensyRom.Api.Endpoints.MidiSettings
             RuleFor(x => x.LastSeenName)
                 .NotNull().WithMessage("Last seen name is required.")
                 .MaximumLength(128).WithMessage("Last seen name must be at most 128 characters.");
+        }
+    }
+
+    public class DeckSettingsValidator : AbstractValidator<DeckSettingsDto>
+    {
+        public DeckSettingsValidator()
+        {
+            RuleFor(x => x.Slot)
+                .Must(slot => slot is not null && MidiSettingsAllowLists.Slots.Contains(slot))
+                .WithMessage("Deck slot must be 'A' or 'B'.");
+
+            RuleFor(x => x.LiveLoopBeats)
+                .Must(beats => double.IsFinite(beats) && beats > 0 && beats <= MidiSettingsAllowLists.LiveLoopBeatsMax)
+                .WithMessage($"Live loop beats must be greater than 0 and at most {MidiSettingsAllowLists.LiveLoopBeatsMax}.");
         }
     }
 }

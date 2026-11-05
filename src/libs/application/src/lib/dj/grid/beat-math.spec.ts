@@ -2,15 +2,17 @@ import { describe, it, expect } from 'vitest';
 import type { DeckBeatGrid } from '../dj-store';
 import {
   beatAt,
-  beatsInReach,
   beatsLabel,
   bpmOf,
   formatBpm,
   inGridSpan,
+  lapPhaseOrNone,
   lengthLadder,
+  loopLapPhase,
   MOVE_STEPS,
   moveStepLabel,
   nearestBeat,
+  nearestRungIndex,
   nextBeat,
   onBeat,
 } from './beat-math';
@@ -104,34 +106,44 @@ describe('nearestBeat', () => {
 });
 
 describe('lengthLadder', () => {
-  it('runs the powers of two up to 128 beats, with the shortest even division of the beat below', () => {
-    const sizes = lengthLadder(24);
-
-    expect(sizes.map((size) => size.beats)).toEqual([
-      2 / 24, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128,
-    ]);
-    expect(sizes.map((size) => size.frames)).toEqual([
-      2, 3, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072,
-    ]);
+  it('runs the powers of two from the shortest of at least 2 frames, whole or not, to 128 beats', () => {
+    expect(lengthLadder(28).map((size) => size.frames).slice(0, 4)).toEqual([3.5, 7, 14, 28]);
+    expect(lengthLadder(24)[0]).toEqual({ beats: 1 / 8, frames: 3 });
+    expect(lengthLadder(40)[0]).toEqual({ beats: 1 / 16, frames: 2.5 });
+    expect(lengthLadder(28).at(-1)).toEqual({ beats: 128, frames: 3584 });
   });
 
-  it('reaches 1/32 of a beat when the beat holds it in at least two whole frames', () => {
-    expect(lengthLadder(64)[0]).toEqual({ beats: 1 / 32, frames: 2 });
-    expect(lengthLadder(64)).toHaveLength(13);
-    // 1/32 of a 32-frame beat is a single frame, which cannot lap in time.
-    expect(lengthLadder(32)[0]).toEqual({ beats: 1 / 16, frames: 2 });
+  it('has no odd division of the beat below the powers of two', () => {
+    expect(lengthLadder(24).map((size) => size.beats)).not.toContain(2 / 24);
+    expect(lengthLadder(28).map((size) => size.beats)).not.toContain(2 / 28);
+  });
+});
+
+describe('nearestRungIndex', () => {
+  const ladder = lengthLadder(24);
+
+  it('finds the rung of a size the ladder holds', () => {
+    expect(ladder[nearestRungIndex(ladder, 4)].beats).toBe(4);
+    expect(ladder[nearestRungIndex(ladder, 0.5)].beats).toBe(0.5);
   });
 
-  it('adds no division a power of two already reaches, nor one longer than the shortest power', () => {
-    expect(lengthLadder(32).map((size) => size.frames)).not.toContain(1);
-    expect(lengthLadder(48).map((size) => size.frames).slice(0, 3)).toEqual([2, 3, 6]);
+  it('takes the nearest rung in beats for a size the ladder lacks, the shorter on a tie', () => {
+    expect(ladder[nearestRungIndex(ladder, 256)].beats).toBe(128);
+    expect(ladder[nearestRungIndex(ladder, 0.01)].beats).toBe(1 / 8);
+    expect(ladder[nearestRungIndex(ladder, 1.5)].beats).toBe(1);
   });
 
-  it('keeps time on an odd beat with a division, and leaves out what is not whole frames', () => {
-    expect(lengthLadder(25).map((size) => size.beats)).toEqual([0.2, 1, 2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(1).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(24.5).map((size) => size.beats)).toEqual([2, 4, 8, 16, 32, 64, 128]);
-    expect(lengthLadder(0)).toEqual([]);
+  it('snaps a size saved at an odd division the ladder no longer has to the nearest rung left', () => {
+    const ladder28 = lengthLadder(28);
+    const ladder40 = lengthLadder(40);
+
+    expect(ladder28[nearestRungIndex(ladder28, 1 / 14)].beats).toBe(1 / 8);
+    expect(ladder[nearestRungIndex(ladder, 1 / 12)].beats).toBe(1 / 8);
+    expect(ladder40[nearestRungIndex(ladder40, 1 / 20)].beats).toBe(1 / 16);
+  });
+
+  it('is -1 for an empty ladder', () => {
+    expect(nearestRungIndex([], 4)).toBe(-1);
   });
 });
 
@@ -143,11 +155,17 @@ describe('beatsLabel', () => {
     expect(beatsLabel(48)).toBe('48 BEATS');
   });
 
-  it('writes the ladder fractions', () => {
-    expect(beatsLabel(0.5)).toBe('½ BEAT');
-    expect(beatsLabel(0.25)).toBe('¼ BEAT');
-    expect(beatsLabel(0.125)).toBe('⅛ BEAT');
+  it('writes the ladder fractions, down to its shortest, 1/16', () => {
+    expect(beatsLabel(0.5)).toBe('1/2 BEAT');
+    expect(beatsLabel(0.25)).toBe('1/4 BEAT');
+    expect(beatsLabel(0.125)).toBe('1/8 BEAT');
     expect(beatsLabel(1 / 16)).toBe('1/16 BEAT');
+    expect(lengthLadder(40).map((size) => beatsLabel(size.beats)).slice(0, 4)).toEqual([
+      '1/16 BEAT',
+      '1/8 BEAT',
+      '1/4 BEAT',
+      '1/2 BEAT',
+    ]);
     expect(beatsLabel(1 / 32)).toBe('1/32 BEAT');
   });
 
@@ -156,6 +174,45 @@ describe('beatsLabel', () => {
     expect(beatsLabel(5 / 25)).toBe('1/5 BEAT');
     expect(beatsLabel(0.375)).toBe('0.375 BEATS');
     expect(beatsLabel(1.5)).toBe('1.5 BEATS');
+  });
+});
+
+describe('lapPhaseOrNone', () => {
+  it('reduces a lap phase to its fractional part, leaving out 0 and null', () => {
+    expect(lapPhaseOrNone(38.5)).toBe(0.5);
+    expect(lapPhaseOrNone(-0.25)).toBe(0.75);
+    expect(lapPhaseOrNone(42)).toBeUndefined();
+    expect(lapPhaseOrNone(0)).toBeUndefined();
+    expect(lapPhaseOrNone(null)).toBeUndefined();
+    expect(lapPhaseOrNone(undefined)).toBeUndefined();
+  });
+});
+
+describe('loopLapPhase', () => {
+  /** 28 frames a beat from frame 0: the 1/8 lines, 3.5 frames apart, round to 0, 4, 7, 11, 14 … */
+  const grid28 = grid({ beatFrames: 28, beatOneFrame: 0 });
+
+  it('is the unrounded position of the line of its own length a loop below a beat starts on', () => {
+    // 4 is line 1 (3.5), 11 is line 3 (10.5): laps of 3 then 4. 7 and 14 are whole lines.
+    expect(loopLapPhase(grid28, 4, 3.5)).toBe(0.5);
+    expect(loopLapPhase(grid28, 11, 3.5)).toBe(0.5);
+    expect(loopLapPhase(grid28, 39, 3.5)).toBe(0.5);
+    expect(loopLapPhase(grid28, 7, 3.5)).toBeUndefined();
+    expect(loopLapPhase(grid28, 14, 3.5)).toBeUndefined();
+  });
+
+  it('reads a beat line for a loop of a beat or more, and the line of its period otherwise', () => {
+    const offBeat = grid({ beatFrames: 28, beatOneFrame: 0.5 });
+
+    expect(loopLapPhase(offBeat, 29, 28)).toBe(0.5);
+    expect(loopLapPhase(offBeat, 29, 56)).toBe(0.5);
+    expect(loopLapPhase(grid28, 28, 28)).toBeUndefined();
+  });
+
+  it('is none for a start on no line of its period, and with no grid', () => {
+    expect(loopLapPhase(grid28, 5, 3.5)).toBeUndefined();
+    expect(loopLapPhase(grid28, 4, 7)).toBeUndefined();
+    expect(loopLapPhase(null, 4, 3.5)).toBeUndefined();
   });
 });
 
@@ -201,17 +258,5 @@ describe('onBeat', () => {
     expect(onBeat(spanned, 110)).toBe(true);
     expect(onBeat(spanned, 111)).toBe(false);
     expect(onBeat(spanned, 35)).toBe(false);
-  });
-});
-
-describe('beatsInReach', () => {
-  it('lists the offsets of the beats within the range either way, ascending', () => {
-    expect(beatsInReach(grid(), 40, 30)).toEqual([-30, -5, 20]);
-    expect(beatsInReach(grid(), 35, 25)).toEqual([-25, 0, 25]);
-  });
-
-  it('leaves out beats outside the span and before 0', () => {
-    expect(beatsInReach(grid({ startFrame: 0, endFrame: 50 }), 40, 30)).toEqual([-30, -5]);
-    expect(beatsInReach(grid({ beatOneFrame: 5 }), 10, 20)).toEqual([-5, 20]);
   });
 });

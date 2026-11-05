@@ -59,15 +59,15 @@ const meta: Meta<DeckTransportComponent & LiveArgs> = {
       description: {
         component:
           "One deck's transport on its own faceplate: a display of what is loaded and where it " +
-          'is, the continuous position bar (still a working scrubber), and the Play/Pause, Stop, ' +
-          'Repeat and subtune keys. Purely presentational. It lays itself out by its own width, ' +
-          'not the viewport’s: three identical keys at the start of the row and the stepper at ' +
-          'the end, labelled from about 436px and icon-only from about 336px; below that the ' +
+          'is, the continuous position bar (still a working scrubber), and the Play/Pause, Stop ' +
+          'and subtune keys. Purely presentational. It lays itself out by its own width, ' +
+          'not the viewport’s: two identical keys at the start of the row and the stepper ' +
+          'filling the rest, labelled from about 436px and icon-only from about 336px; below that the ' +
           'same icon-only keys with the stepper on its own row, and the frame number hidden. ' +
           'Every state story below shows the transport at 560, 400 and 300px. An error replaces ' +
           'the display, and each reason is a `role="alert"` line. The playhead readouts are ' +
-          'not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and ' +
-          '`setLiveFrame`.',
+          'not inputs: a painter sets them through `setLivePosition`, `setLiveReturnPosition`, ' +
+          '`setLiveElapsed` and `setLiveFrame`.',
       },
     },
   },
@@ -83,7 +83,6 @@ const meta: Meta<DeckTransportComponent & LiveArgs> = {
     },
     playPauseClick: { description: 'The Play/Pause key was pressed.' },
     stopClick: { description: 'The Stop key was pressed.' },
-    repeatTrackChange: { description: 'The Repeat key was pressed; carries the new latch.' },
     previousInSet: { description: 'The set row’s previous key was pressed.' },
     nextInSet: { description: 'The set row’s next key was pressed.' },
     previousSubtune: { description: 'The stepper’s previous key was pressed.' },
@@ -112,7 +111,6 @@ function baseModel(): DeckTransportModel {
     scrubAccessibleName: 'Position deck A',
     playPause: { showing: 'play', disabled: false },
     canStop: true,
-    repeatTrack: true,
     subtune: {
       text: '1/3',
       disabled: false,
@@ -123,7 +121,6 @@ function baseModel(): DeckTransportModel {
       play: 'Play deck A',
       pause: 'Pause deck A',
       stop: 'Stop deck A',
-      repeat: 'Repeat track deck A',
     },
     errors: [],
     set: {
@@ -272,7 +269,6 @@ export const Empty: Story = {
       bar: { kind: 'unknown' },
       playPause: { showing: 'play', disabled: true },
       canStop: false,
-      repeatTrack: false,
       subtune: { ...baseModel().subtune, text: '-/-', disabled: true },
     },
     positionPercent: 0,

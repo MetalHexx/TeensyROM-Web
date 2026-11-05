@@ -82,15 +82,15 @@ because a synthetic `pointerdown` throws in `setPointerCapture`.
 
 **Frame A, the view at 1920 x 1080.** Matches: the display with status LED, title, author, elapsed
 and total time and frame count; the position strip with its played fill, loop markers and white
-playhead; Play (Pause while playing), Stop, Repeat and the subtune pager; the Loops / Cues plate
+playhead; Play (Pause while playing), Stop and the subtune pager; the Loops / Cues plate
 beneath; the binding plate at the foot with its Identify and Enable MIDI. A playing deck shows the
 green LED and a green line under Pause; a paused one shows the amber LED and line.
 
 **Frame B, the transport at three widths.** The deck's transport measured 474px at 1920 with the
 bindings panel closed, 404px at 1780, 364px at 1700, 314px at 1600, and 288px at 1920 with the
-bindings panel open. At 404px Stop and Repeat shrink to icon-only buttons and the pager to `1/1`,
-as the mockup's 400px frame draws them. At 288px Play takes a row, Stop and Repeat share the next,
-and the pager takes the last, as the 300px frame draws it; nothing overflows (client width equals
+bindings panel open. At 404px Play and Stop shrink to icon-only buttons and the pager to `1/1`,
+as the mockup's 400px frame draws them. At 288px Play and Stop share a row and the pager takes
+the next, as the 300px frame draws it; nothing overflows (client width equals
 scroll width) and the page does not scroll.
 
 **Frame C, the channel strip.** Matches: V1-V3 buttons with Kill beneath; a muted voice dims and its
@@ -105,7 +105,7 @@ marker; the Nudge caption over the two round pads side by side, under the fader;
   0.950x; releasing both returned the display to white 1.000x. Moving the fader to 1.100 mid-nudge
   with nudge up held read 1.150x, kept the fader at 1.100, and the release landed on 1.100x.
 - **Empty decks.** Each reads "No tune - drop a SID here"; Play, Stop and the pager are disabled;
-  Repeat stays lit; the Loops / Cues plate is empty.
+  the Loops / Cues plate is empty.
 - **Drop highlight.** With a SID drag in flight both transports show a cyan outline and "Drop to
   load - Deck A/B" over the 474 x 151 display area; dragging over deck B's overlay marks only that
   one hot. (The drag was simulated with a `dragenter` carrying the DJ drag type: there is no device
@@ -151,8 +151,8 @@ On your C64s with a real TeensyROM, say whether:
    back into step with the other; release lands where the fader says.
 2. Scrubbing works: dragging the bar and the arrow keys move a playing tune without a glitch, and
    a drop loads a tune onto the deck it lands on.
-3. The narrow transport is usable: with the bindings panel open (about 290-300px) Play, Stop,
-   Repeat and the pager are all easy to hit.
+3. The narrow transport is usable: with the bindings panel open (about 290-300px) Play, Stop
+   and the pager are all easy to hit.
 4. The restyled deck plays as before: voices, Kill, speed and the pad hold behave as they did.
 5. A mapped nudge note held and released, and released by unplugging the controller, ends the
    nudge.
@@ -873,8 +873,8 @@ page the set came back with its four rows, and loading the tune on both decks fr
 - Out pressed at 14528 (beat 302.06) made a loop 14285-14525, five beats, the end on beat 302. In
   pressed at 14735, past the end, changed nothing (refused).
 - Length by the buttons, from a cue: Double gave 4 beats (192 frames). Halve took it through 2, 1,
-  ½, ¼, ⅛ and 1/16 (3 frames) and stayed there (1/32 would be 1.5 frames); Double took it back up
-  through 1/8 ... 32 beats, 1536 frames. The Length menu lists 1/16 ... 32 beats; picking ½ BEAT gave
+  1/2, 1/4, 1/8 and 1/16 (3 frames) and stayed there (1/32 would be 1.5 frames); Double took it back up
+  through 1/8 ... 32 beats, 1536 frames. The Length menu lists 1/16 ... 32 beats; picking 1/2 BEAT gave
   24 frames.
 - Move step menu: 1, 2, 4, 8 and 16 beats. On a 32-beat loop at each step, Move shifted start and end
   together by exactly that many beats with the length kept, and the start and end arrows each moved
@@ -1032,3 +1032,301 @@ and length, and how the drag ghost looks, needs a bench.
 ### Verdict
 
 Pending: the operator's, from the bench.
+
+## Live loops and slip (ASID-DJ-20, 2026-11-04)
+
+Browser check of the built Live loop row, the transport without Repeat and the strip's second
+playhead against `ASID-DJ-ROOT-WIREFRAME-SLIP.html`; the DJ mixer's timing protocol with slip on,
+very short live loops and build-ups, driven against the running dev build; the automated commands;
+and what the operator needs at the bench. The listening verdict is the operator's and is not given
+here.
+
+**How this was driven.** `pnpm nx run teensyrom-ui:serve` (the dev build, so `djBench` exists) on
+`localhost:4200`, and the API from this branch (`dotnet run` in `apps/api/src/TeensyRom.Api`) on the
+default port 10213 with `TEENSYROM_DATA_DIR` pointed at a scratch folder. Claude in Chrome drove the
+tab. The tab's viewport cannot be set to a target size, so the app was loaded into a same-origin
+`<iframe>` of **1920 x 1080** CSS px, with `lib-scaling-container { transform: none }` injected before
+measuring (as in the sections above). The mockup was opened over a local HTTP server (the browser
+tool does not open `file://`) at its own 1920 x 1080 frame A. No cartridge and no MIDI port were
+bound. The tunes were the two bundled with the player POC: `InSID3_Out.sid` on deck A (2x multispeed,
+9975 us a play call, 48 frames a beat, scanned grid) and `Still_Time.sid` on deck B (19950 us a play
+call, 22 frames a beat). They were loaded through `DeckService.load` with the content request
+answered from a small local server (the listing is not what this checks), after one real click on
+the page. Slip, the live loop and its size were driven through `DeckService` (`setSlip`,
+`toggleLiveLoop`, `stepLiveLoopSize`, `endLiveLoop`), not through a pad, a hold or a controller.
+
+### The mockup against the built view (1920 x 1080, deck A)
+
+Built figures are `getBoundingClientRect()` on the live DOM (idle row, deck loaded); mockup figures
+are the same on frame A (the running row, deck A). Both plates are 474 px wide and start at x = 112.
+The browser ran at a device pixel ratio of 1.5625, so the mockup's 1 px borders read 0.64 px.
+
+| | mockup (frame A) | built | outcome |
+| --- | --- | --- | --- |
+| Row order | Live loop key, Size control, Slip key | Live loop key, Size control, Slip key | same |
+| Row box | a bordered tray (6 / 8 px padding, 1 px border, dark fill; green border and inner glow while running), 444.7 x 37.3 | the same tray in the theme's tokens (the selected row's border colour and radius, 6 / 8 px padding, 25% black fill, a success-colour border at 60% and an inner glow at 12% while running), 440.4 x 39.6 | tray added; the 2.3 px of height is the 26 px key scale |
+| Spacing between the three | 8 px | 6 px | finding (part of the key scale) |
+| Live loop key | 110.3 x 24, 9.5 px label, running lamp dot, label "Live loop" | 79.7 x 26, 8.5 px label, running state as the green bar across the key's top (the same as Pause) | finding |
+| Size control | 223.7 x 22: dim "Size" tag, half, readout, double | 299.8 x 22: bright "SIZE" tag, half, readout, double | the tag colour is the shared control's (the Length and Move rows use it too); not changed |
+| Slip key | 77.5 x 24, lamp dot, icon and "Slip" | 49 x 26, lamp ring and "SLIP"; latched cyan with slip on | finding |
+| Transport keys | Pause 92 x 32, Stop 74.9 x 32, step keys 32 x 32 | Pause 80 x 26, Stop 80 x 26, step keys 31.6 x 26 | finding (the same key scale as above) |
+| Transport without Repeat | Pause, Stop, previous, SUB readout, next; no Repeat | Pause, Stop, previous, readout, next; no Repeat | same. The "SUB" caption shows from a 496 px transport container; the container is 440 px here, so only the count reads |
+| Transport plate | 474 x 206.9 | 474 x 181 | follows from the key scale |
+| Strip | 444.7 x 14, playhead 2 px wide | 440.4 x 14, playhead 2 px wide | same |
+| Second playhead | 2 px wide, striped 2 px on / 2 px off, 75% alpha, no glow, to the right of the playhead | 2 px wide, dotted, was 55% alpha, no glow | alpha changed to 75% |
+| Running live loop's mark above the strip | green bracket (fill 55%, glow, at least 5 px wide) | was the plate-loop colour (magenta fill) | changed to the mockup's green |
+
+Fixed in the components: the live loop's bracket now draws in the live (success) colour with its glow
+and a 5 px minimum width, flagged by an optional `live` on `PositionMark` (set by the deck column,
+which until now sent it as an ordinary running loop); the second playhead's opacity went from 0.55 to
+0.75. Checked after the change on the running loop in the browser: the bracket reads green and the
+second playhead's dots are visible beside the playhead.
+
+The first version of the live rule lost its `min-width` to the plain loop rule declared after it (same
+specificity), so the 5 px minimum never applied: a live mark and an ordinary loop mark both computed
+`min-width: 2px`. The live rule now sits after the loop rule. Measured in the dev build on a
+`data-live` loop mark set to 0.012% of the strip width (a 2-frame loop on a 16183-frame tune): computed
+`min-width` 5px, drawn 4.99 px wide, green border `rgb(111, 220, 140)`; the same mark without
+`data-live` computed 2px and drew 2.0 px with the plate-loop border. In the Storybook strip story
+(below) the live mark computed `min-width: 5px` beside ordinary loops at 2px. jsdom does not resolve
+this cascade, so no unit spec can see it; this was read in a real browser.
+
+Findings, not fixed (larger than a small visual difference or not this task's to settle): the built
+row has no lamp dot on its keys (the tray was added afterwards, see the Row box line); its keys follow the page's 26 px key scale where the
+wireframe draws 24 px (live row) and 32 px (transport) keys; the Live loop and Slip keys are narrower
+than the mockup's because their labels are set smaller and the Slip key has no lamp-dot-and-label
+form. Nothing in the idle row clips or leaves its plate at any of the five widths the responsive spec
+covers (see below), but the row does wrap: it holds on one line at 1100 and 768 px, and the Size
+control drops to its own line when the row's container is under 20 rem (the row measured 241 px wide at
+400 px, 136 at 1279 px and 196 at 1400 px, each with Size on a second line). That is the row's
+container-query layout, not a fault. The tray was added in the final-review correction: the row's
+padding and border take 18 px of the container's content width, so the 20 rem threshold now reads the
+content box (the row's controls need about 273 px abreast at the 8 px gap, so it still leaves headroom);
+the five-width responsive spec passes with the tray (47 of 47), and in the 1920 x 1080 frame the running
+tray read a success-green border and inner glow beside the idle tray's grey border.
+
+### Timing protocol with slip on
+
+The protocol in the `asid-dj-diagnostics` skill, run as far as this session allows. Each window:
+both clocks restarted (Pause then Play), `djBench.reset()`, about 10 s with the actions below, then
+`djBench.report()`. "One deck" is deck A playing alone (deck B paused); "two decks" is both playing
+with the same actions on both at once. Slip on in every row after the first; the live loop size
+ladder is 1/24 beat (2 frames on both tunes: 2 of 48 on A, 2 of 22 on B), 1/16, 1/8, 1/4, 1/2, 1 ...
+beats, so the shortest rung is 1/24 beat. A build-up is 1 beat then 1/2 then 1/4, one step every
+1.5 s.
+
+Not comparable to the Performance log's numbers (lag p99 10.5 ms, collapsed 3.8%, on grid 90.8%,
+0 long tasks, on the operator's page with DevTools closed): the page was a tab in a window under
+automation, and Claude in Chrome's debugger was attached. Read them against the baseline rows, which
+were taken the same way. `lag` is `lagMs` p99 / max; `player.worstLagMs` read 44.88 ms on A and
+37.98 ms on B in every row (it does not reset with `djBench.reset()` and was set before the first
+window), so it is not repeated. `longTasks` read `{ count: 0, longestMs: 0 }` in every window.
+
+| window | deck | frames | lag p99 / max (ms) | collapsed | on grid | worst gap (ms) |
+| --- | --- | --- | --- | --- | --- | --- |
+| baseline, both playing, slip off | A | 1003 | 11.41 / 18.38 | 3.5% | 92.8% | 21.5 |
+| | B | 501 | 11.38 / 18.48 | 0% | 93.4% | 20.7 |
+| baseline, both playing, repeated at the end | A | 1003 | 10.18 / 11.48 | 2.2% | 95.8% | 15.1 |
+| | B | 501 | 10.08 / 10.23 | 0% | 95.0% | 15.4 |
+| one deck, baseline, slip off | A | 1004 | 10.28 / 14.96 | 3.3% | 93.6% | 20.2 |
+| one deck, slip on, no departure | A | 1004 | 10.11 / 10.78 | 1.6% | 96.9% | 12.5 |
+| one deck, live loop 1 beat | A | 1003 | 10.11 / 10.63 | 1.9% | 96.4% | 12.5 |
+| one deck, live loop at the shortest rung | A | 1004 | 10.08 / 11.03 | 2.1% | 96.1% | 11.7 |
+| one deck, build-up 1, 1/2, 1/4 | A | 1004 | 13.13 / 19.41 | 3.9% | 92.0% | 20.6 |
+| one deck, slip landing | A | 1003 | 10.11 / 12.56 | 1.8% | 96.0% | 14.1 |
+| one deck, live loop within 2 s of a landing | A | 1004 | 13.91 / 19.86 | 3.7% | 92.6% | 20.8 |
+| two decks, live loop 1 beat on both | A | 1003 | 10.08 / 13.26 | 2.5% | 95.0% | 20.1 |
+| | B | 501 | 10.23 / 10.58 | 0% | 95.4% | 20.3 |
+| two decks, shortest rung on both | A | 1004 | 10.06 / 12.53 | 1.6% | 96.8% | 15.3 |
+| | B | 502 | 10.08 / 11.33 | 0% | 96.8% | 15.4 |
+| two decks, build-up on both | A | 1004 | 15.01 / 19.76 | 2.8% | 93.9% | 20.9 |
+| | B | 502 | 11.18 / 19.53 | 0% | 93.2% | 21.1 |
+| two decks, slip landing on both | A | 1003 | 10.08 / 11.53 | 2.1% | 95.6% | 14.8 |
+| | B | 501 | 10.13 / 10.78 | 0% | 96.2% | 14.7 |
+| two decks, live loop within 2 s of a landing, both | A | 1003 | 10.06 / 11.48 | 1.9% | 96.2% | 14.2 |
+| | B | 502 | 10.18 / 13.08 | 0% | 97.0% | 14.2 |
+
+Read as numbers: the windows with the live loop at 1 beat, at the shortest rung, with a landing, and
+the two-deck loop within 2 s of a landing sit inside the spread of the baselines (p99 10.1-11.4 ms,
+max 10.2-18.5 ms, worst gap 12.5-21.5 ms). The build-up windows (both decks) and the one-deck live
+loop within 2 s of a landing read higher (p99 13.1-15.0 ms, max 19.4-19.9 ms on A), and the
+baselines themselves moved by about as much between runs (max 11.5 to 18.4 ms); one window each is
+not enough to say whether the build-up costs anything or the tab was throttled for those 10 s. They
+are the windows to repeat at the bench.
+
+Not run, and why:
+- **Pops.** Counting them needs the ear, or `send-capture.js` with `send-analysis.js` against a bound
+  cartridge with an operator tapping at each pop; there was no cartridge, no MIDI port and no sound.
+- **DevTools Performance traces** (`trace-compare.mjs`, `trace-long.mjs`): the traces are recorded
+  and saved by the operator in DevTools (the skill's Step 3); the browser tool here cannot record or
+  save one.
+- **Both cartridges connected**, as the protocol asks: the decks' output ticked on its own, so the
+  figures are what the page hands to `send()`, not wire timing.
+- The display's refresh rate and the page's extensions were not recorded; the tab was driven by an
+  extension, and the page was fresh (a few minutes old) when the first window ran.
+- The Slip key, the Live loop key's hold and the push encoder were not driven; the service calls
+  were made directly, so the hold timing and a press are unproven here.
+
+### Responsive spec
+
+`dj-mixer-responsive.cy.ts` gained "the live loop row": at 1400, 1279, 1100, 768 and 400 px it
+asserts that both rows sit inside their plate, do not overflow themselves, and that Live loop, Size
+and Slip each have width and end inside the row. It passes with the Size control wrapped or not, and
+measures the idle row only. Run against the dev server above with
+`cypress run --project apps/teensyrom-ui-e2e --spec src/e2e/dj-mixer/dj-mixer-responsive.cy.ts`:
+47 passing (the 5 new ones included). `pnpm nx e2e teensyrom-ui-e2e` itself was not used (the Cypress
+config starts its own server on port 4200, which this session already held).
+
+### Storybook checks
+
+`pnpm nx run ui-components:build-storybook` passes. The built Storybook was served over a local HTTP
+server and the `Dj/Position strip` "Marks every state" story was opened in the browser: the strip draws
+idle, selected, running, queued and both loop marks, the cues, and the new live mark at its end. A
+live mark was added to that story's `everyMarkState` (it reads green with its glow, computed
+`min-width: 5px`, beside the ordinary loops at 2px). Not run: the strip and the Live loop row stories
+were not compared side by side with the slip mockup in Storybook (the mockup comparison above was
+made on the running app), and the Live loop row stories were not opened.
+
+### Automated commands
+
+| command | result |
+| --- | --- |
+| `pnpm nx run-many -t test -p application ui-components dj-mixer` | printed nothing in about 25 minutes while other nx and pnpm processes were running on the machine; not used. The three projects were run with `vitest run` from each project's folder instead |
+| `vitest run` in `libs/application` | 98 files, 2723 tests passed |
+| `vitest run` in `libs/ui/components` | 136 files, 2342 tests passed (the CSS-parse and shader-mock lines in its output are the suite's usual noise) |
+| `vitest run` in `libs/features/dj-mixer` | 12 files, 352 tests passed |
+| `pnpm nx run-many -t lint -p application ui-components dj-mixer` | 0 errors, 10 warnings (all in `application`, none in files this task touched) |
+| `pnpm nx build teensyrom-ui` | built; initial total 2.44 MB raw (500.71 kB transfer), over the 2.00 MB initial budget by 437.62 kB (a warning; `project.json`'s budgets are unchanged). No baseline was taken: the app was not built at the pre-ASID-DJ-20 commit, so how much of the 437.62 kB overage this iteration added cannot be attributed from this run. The earlier sections' last tabulated overage was 184.77 kB on the branch (143.08 kB on `main`); this phase's own change to shipped code is one optional field, a style rule and an opacity value |
+| `dotnet test apps/api/src/TeensyRom.Api.Tests.Unit` | 1110 passed, 0 failed |
+| `pnpm test` in the `sidablist` root | core 924, asid 63, analysis 209, tunes 77 tests passed |
+
+### Bench checklist (operator, real hardware)
+
+- [ ] A live loop of 2-3 frames (1/24 beat on a 2x tune, 1/16 beat at 125 BPM): stutter or a held
+  note.
+- [ ] A build-up (1, then 1/2, then 1/4) landing on the grid with no seam.
+- [ ] Slip landing after a live loop, after a list loop, and after the hand.
+- [ ] A live loop over a 128-beat list loop, returning into it.
+- [ ] A list loop fired from a build-up.
+- [ ] A live loop pushed with a voice muted, then unmuted (the saved image may keep that voice silent
+  until its next note).
+- [ ] Right after a load, before the register record lands: a live loop over a list loop, ended past
+  that loop's end (the worker-jump exception may land late).
+- [ ] The 4-beat default size: confirm or change.
+- [ ] Toggle and hold on a pad.
+- [ ] A push encoder.
+- [ ] The other deck's timing throughout.
+- [ ] The row beside the mockup on the real display: the key sizes and the Slip key's form
+  (findings above), and the green live bracket.
+- [ ] Playback timing per the timing protocol above and the `asid-dj-diagnostics` skill, with both
+  cartridges connected and DevTools closed, repeating the build-up and the live-loop-after-landing
+  windows.
+
+### Verdict
+
+Pending the operator.
+
+## Whole-beat length steps and No End (ASID-DJ-20, 2026-11-05)
+
+The selected loop's nudge strips, edge arrows, In, Out and Clear End are gone. A loop is shaped by Add,
+Length (1/2, a beat shorter, a beat longer, 2×, a picker with No End first) and Move. The Length row
+reads LENGTH on both the selected row and the live loop row.
+
+### What was checked in a browser
+
+The real DJ view (`/dj-mixer`, the dev server) in Cypress's browser, at the viewports the handoff names, with
+the longest readout text (`128 BEATS` and a caret, as `1/16 BEAT` is the same length) written into the
+Length readout of the selected row, the Move readout and the live row's Length readout. No tune can be
+loaded in this session (it needs a TeensyROM and its file service), so the readouts are the empty rows'
+with that text put in. The widths are the controls' own, in CSS px.
+
+| viewport | selected row | Length control | Move control | live Length control |
+| --- | --- | --- | --- | --- |
+| 1920 | 440 px | 422 px, 1 line | 422 px, 1 line | 271 px, 1 line |
+| 1600 | 280 px | 262 px, 1 line, tight readout | 262 px, 1 line | 262 px, 1 line |
+| 1536 | 264 px | 246 px, 2 lines | 246 px, 1 line | 246 px, 1 line |
+| 1440 | 216 px | 198 px, 2 lines | 198 px, 1 line, tight readout | 198 px, 1 line, tight readout |
+| 1400 | 196 px | 178 px, 2 lines | 178 px, 2 lines | 178 px, 2 lines |
+| 1366 | 179 px | 161 px, 2 lines | 161 px, 2 lines | 161 px, 2 lines |
+| 1300 | 141 px | 123 px, 3 lines | 123 px, 3 lines | 123 px, 3 lines |
+| 1280 | 131 px | 113 px, 3 lines | 113 px, 3 lines | 113 px, 3 lines |
+
+At 1279 px and below the app stacks the decks and the row is wider than at 1280 px (1018 px at 1279 x 900),
+so the narrowest control is the 1280 px one. The 1920 px row's side-by-side layout starts at a 528 px row.
+
+Every width in the table, and 1100, 768 and 400 px, passes the Cypress case below: no readout holds more than
+its width, the text clears every key and tag, and every key, tag and readout stays on the plate.
+
+How the layout was chosen. The old arithmetic assumed a row of 236 to 254 px as the narrowest, which was
+read off Storybook and not off the app: the plate at 1280 x 900 gives a row of 131 to 136 px, and the Length
+control 113 to 118 px, which cannot hold even the four keys beside any readout text. So each control
+sizes itself by its own width (a container query on the control, not on the row it sits in, which is why the
+live row and the Move control follow the same rule). With the real font (Roboto Mono, the longest text
+62.4 px, the readout 83 px roomy and 76 px tight):
+
+- Length with the − and + keys: one line above 272 px; below it the readout takes 2 px padding and gap and the
+  signs 22 px; below 248 px (the tight line needs 245) two lines, the tag and the readout, then the four keys
+  spread across the width; below 128 px three lines, the tag, the readout, the keys.
+- The Move control and the live row's Length control, which need 200 px roomy and 193 px tight: tight below
+  208 px, two lines below 196 px, three below 128 px.
+
+A row that cannot hold its keys beside the text is taller, not squeezed; the page already scrolls at those
+viewport heights. The keys come after the readout in the DOM, so in the two- and three-line layouts they sit
+below the picker while the tab order keeps the DOM order (1/2, −, picker, +, 2×). A text longer than the readout is clipped by the readout, never
+painted over a key.
+
+An earlier pass of this check, on the empty rows at 900 px high in Chrome with a fallback monospace font,
+passed at every width for a text 4 px narrower and missed the 1440 px overflow; the numbers above are with
+the real font.
+
+### Automated
+
+`dj-mixer-responsive.cy.ts` has "the loop rows with the longest readout text": at 1920, 1600, 1536, 1440,
+1400, 1366, 1300, 1280, 1279, 1100, 768 and 400 px it writes the longest text into the selected row's Length
+readout, the Move readout and the live row's Length readout, and asserts for each control that the readout
+holds its text, the text overlaps no key or tag, and every key, tag and readout lies inside the control and
+on the plate. The fixture cannot select a marker (no tune loads in it), so the rows are the empty ones with
+the text put in. Run with `cypress run` from `apps/teensyrom-ui-e2e` against the dev server on 4200: the
+case failed at 1440 and 1280 px before the layout was fixed and passes at every width after.
+
+### Bench checklist (operator, real hardware)
+
+- [ ] `−` and `+` on a running loop land at the end of the pass, on the beat.
+- [ ] No End on an idle loop makes it a cue. On a running loop it lets the loop go at once. With slip
+  on, the deck lands and the second playhead goes.
+- [ ] Deleting a running loop with slip on lands the same way.
+- [ ] A tune with no grid: tap a grid in, then shape a loop.
+- [ ] A settings file with no deck settings starts both decks with slip on. A saved slip off stays
+  off after a refresh.
+- [ ] The three LENGTH, MOVE and live-row LENGTH tags measure the same gap to the next control in
+  the running DJ view at 1920 x 1080, wider, and with the bindings panel open.
+
+## Alternating-lap loops (ASID-DJ-20, 2026-11-05)
+
+A loop whose length is not a whole number of frames (1/8 of a beat on a 28-frame beat is 3.5 frames) now
+plays laps of alternating whole-frame length (4, 3, 4, 3) so it never drifts from the grid. The ladder runs
+from 1/16 to 128 beats with no odd division step, a queued hand-off carries the running lap clock on, and
+loop boundary frames are stored as fractions.
+
+### Automated
+
+The engine's lap arithmetic, the hand-off clock and the shadow count are covered by `sidablist`'s
+`libs/core` and `libs/analysis` specs (lap timing, queued hand-offs and the shadow position). In this
+repo: the deck loops, live loop and runtime specs and the beat-math specs, the DJ library round trip of a fractional boundary
+(Core, API and the infrastructure mapper), and the old integer-frame file read tests.
+
+### By ear and on the bench (operator)
+
+The by-ear check of very short and fractional loops, and the timing protocol's windows for this build,
+are the operator's to run and record. Nothing here claims either was done: the operator's verdict and the
+tunes used are to be added below, and the notes' Outcome in the loop-ladder experiment filled in
+with it.
+
+- [ ] A fractional loop (for example 1/8 on a grid whose beat is not a multiple of 8 frames) holds the beat
+  by ear over a long run, with no drift against the other deck.
+- [ ] Very short live loops sound clean, with no click at the re-entry.
+- [ ] Playback timing per the timing protocol and the `asid-dj-diagnostics` skill for this build.
+
+### Verdict
+
+Pending the operator.

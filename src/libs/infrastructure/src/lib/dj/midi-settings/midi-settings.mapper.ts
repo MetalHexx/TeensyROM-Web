@@ -1,5 +1,6 @@
 import type {
   DeckDeviceBindingDto,
+  DeckSettingsDto,
   GetMidiSettingsResponse,
   KnownMidiControllerDto,
   MidiControlMappingDto,
@@ -8,6 +9,7 @@ import type {
 import type {
   ControlMappingRecord,
   DeckDeviceBindingRecord,
+  DeckSettingsRecord,
   KnownControllerRecord,
   MappingStyleKind,
   MidiSettingsRecord,
@@ -19,6 +21,7 @@ export function toMidiSettingsRecord(dto: GetMidiSettingsResponse): MidiSettings
     controllers: dto.controllers.map(toControllerRecord),
     mappings: dto.mappings.map(toMappingRecord),
     deckBindings: dto.deckBindings.map(toDeckBindingRecord),
+    deckSettings: dto.deckSettings.map(toDeckSettingsRecord),
   };
 }
 
@@ -27,6 +30,7 @@ export function toSaveMidiSettingsRequest(record: MidiSettingsRecord): SaveMidiS
     controllers: record.controllers.map(toControllerDto),
     mappings: record.mappings.map(toMappingDto),
     deckBindings: record.deckBindings.map(toDeckBindingDto),
+    deckSettings: record.deckSettings.map(toDeckSettingsDto),
   };
 }
 
@@ -66,6 +70,10 @@ function toDeckBindingRecord(dto: DeckDeviceBindingDto): DeckDeviceBindingRecord
   };
 }
 
+function toDeckSettingsRecord(dto: DeckSettingsDto): DeckSettingsRecord {
+  return { slot: dto.slot as Slot, slip: dto.slip, liveLoopBeats: dto.liveLoopBeats };
+}
+
 function toControllerDto(record: KnownControllerRecord): KnownMidiControllerDto {
   return {
     id: record.id,
@@ -91,4 +99,8 @@ function toMappingDto(record: ControlMappingRecord): MidiControlMappingDto {
 
 function toDeckBindingDto(record: DeckDeviceBindingRecord): DeckDeviceBindingDto {
   return { slot: record.slot, deviceId: record.deviceId, lastSeenName: record.lastSeenName };
+}
+
+function toDeckSettingsDto(record: DeckSettingsRecord): DeckSettingsDto {
+  return { slot: record.slot, slip: record.slip, liveLoopBeats: record.liveLoopBeats };
 }

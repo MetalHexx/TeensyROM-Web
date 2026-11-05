@@ -72,4 +72,35 @@ public class MidiSettingsMapperTests
 
         response.Mappings.Should().BeEquivalentTo(request.Mappings);
     }
+
+    [Fact]
+    public void SaveThenGet_RoundTripsDeckSettings()
+    {
+        var request = new SaveMidiSettingsRequest
+        {
+            DeckSettings =
+            [
+                new DeckSettingsDto { Slot = "A", Slip = true, LiveLoopBeats = 0.5 },
+                new DeckSettingsDto { Slot = "B", Slip = false, LiveLoopBeats = 4 }
+            ]
+        };
+
+        var entity = new SaveMidiSettingsMapper().ToEntity(request);
+        var response = new GetMidiSettingsMapper().FromEntity(entity);
+
+        entity.DeckSettings.Should().BeEquivalentTo(
+        [
+            new DeckSettings { Slot = "A", Slip = true, LiveLoopBeats = 0.5 },
+            new DeckSettings { Slot = "B", Slip = false, LiveLoopBeats = 4 }
+        ]);
+        response.DeckSettings.Should().BeEquivalentTo(request.DeckSettings);
+    }
+
+    [Fact]
+    public void Save_ToEntity_SavesAnEmptyListWhenDeckSettingsAreNull()
+    {
+        var entity = new SaveMidiSettingsMapper().ToEntity(new SaveMidiSettingsRequest { DeckSettings = null });
+
+        entity.DeckSettings.Should().BeEmpty();
+    }
 }

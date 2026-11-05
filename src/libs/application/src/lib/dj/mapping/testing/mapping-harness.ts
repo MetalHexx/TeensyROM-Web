@@ -51,6 +51,7 @@ export const EMPTY_SETTINGS: MidiSettingsRecord = {
   controllers: [],
   mappings: [],
   deckBindings: [],
+  deckSettings: [],
 };
 
 const TUNE: TuneReference = {

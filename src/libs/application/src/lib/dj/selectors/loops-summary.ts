@@ -1,22 +1,8 @@
 import { computed } from '@angular/core';
-import {
-  DeckBeatGrid,
-  DeckLoopBoundary,
-  DeckLoopMarker,
-  DjState,
-  WritableStore,
-} from '../dj-store';
+import { DeckBeatGrid, DeckLoopMarker, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
+import { markerKind, markerLabel, percentOf, resolvedFrame } from '../loops/loop-marker-math';
 import {
-  clamp,
-  markerKind,
-  markerLabel,
-  oneSecondFrames,
-  resolvedFrame,
-  type LoopBoundaryName,
-} from '../loops/loop-marker-math';
-import {
-  beatsInReach,
   beatsLabel,
   inGridSpan,
   lengthLadder,
@@ -28,8 +14,6 @@ import {
 import { isShapeable } from './mixer';
 import { formatElapsed, formatSeconds } from './transport-time';
 
-export type { LoopBoundaryName };
-
 export type LoopActivity = 'idle' | 'queued' | 'running';
 
 export interface LoopItemSummary {
@@ -37,7 +21,7 @@ export interface LoopItemSummary {
   /** The marker's name, else 'Loop N' or 'Cue N' by its place among the markers of its kind. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
-  /** In beats ('5 BEATS', '½ BEAT') when the start is a beat of the deck's grid and the length is
+  /** In beats ('5 BEATS', '1/2 BEAT') when the start is a beat of the deck's grid and the length is
    *  a whole number of beats or a ladder fraction; else in seconds ('7.8s'). 'CUE' for a cue. */
   readonly lengthText: string;
   readonly activity: LoopActivity;
@@ -49,14 +33,6 @@ export interface LoopItemSummary {
   readonly startPercent: number;
   /** Null for a cue. */
   readonly endPercent: number | null;
-}
-
-export interface LoopBoundarySummary {
-  readonly offsetFrames: number;
-  /** One second of play calls either way. */
-  readonly rangeFrames: number;
-  /** Where each beat of the grid within reach sits on the boundary's ±range track: 0–100. */
-  readonly tickPercents: readonly number[];
 }
 
 /** One size the Length picker offers. */
@@ -89,8 +65,6 @@ export interface LoopSelectionSummary {
   readonly lengthText: string;
   /** The ladder sizes the grid holds in whole frames, ascending; empty with no grid. */
   readonly lengthOptions: readonly LoopLengthOption[];
-  readonly start: LoopBoundarySummary;
-  readonly end: LoopBoundarySummary | null;
 }
 
 export interface DeckLoopsSummary {
@@ -105,12 +79,6 @@ export interface DeckLoopsSummary {
   readonly moveStepOptions: readonly LoopMoveStepOption[];
   readonly items: readonly LoopItemSummary[];
   readonly selected: LoopSelectionSummary | null;
-}
-
-function percentOf(frame: number, lengthFrames: number | null): number {
-  return lengthFrames === null || lengthFrames <= 0
-    ? 0
-    : clamp((frame / lengthFrames) * 100, 0, 100);
 }
 
 /** A loop's length as the lists write it: in beats when its start is a beat of the span and the
@@ -134,22 +102,8 @@ function lengthTextOf(
   return formatSeconds(length, intervalUs);
 }
 
-function boundarySummary(
-  boundary: DeckLoopBoundary,
-  grid: DeckBeatGrid | null,
-  rangeFrames: number
-): LoopBoundarySummary {
-  const ticks =
-    grid !== null && rangeFrames > 0 ? beatsInReach(grid, boundary.frame, rangeFrames) : [];
-  return {
-    offsetFrames: boundary.offsetFrames,
-    rangeFrames,
-    tickPercents: ticks.map((offset) => ((offset + rangeFrames) / (2 * rangeFrames)) * 100),
-  };
-}
-
 /**
- * A deck's loop tiles and its selected marker's boundaries, ready to draw. Reads the deck's fields
+ * A deck's loop tiles and its selected marker, ready to draw. Reads the deck's fields
  * one signal at a time and never the playhead (`positions`), so a sample does not rebuild it — the
  * lap indicator has its own selector for that.
  */
@@ -160,7 +114,7 @@ export function loopsSummary(store: WritableStore<DjState>) {
       const loops = store.loops[slot];
 
       return computed<DeckLoopsSummary>(() => {
-        const { markers, selectedId, runningId, queuedId, settingsInPlayId } = loops();
+        const { markers, selectedId, runningId, queuedId, settingsInPlayId, live } = loops();
         const lengthFrames = deck.lengthFrames();
         const intervalUs = deck.playCallIntervalUs();
         const loaded = deck.loaded();
@@ -196,7 +150,6 @@ export function loopsSummary(store: WritableStore<DjState>) {
         if (selectedIndex >= 0) {
           const marker = markers[selectedIndex];
           const kind = markerKind(marker);
-          const range = oneSecondFrames(intervalUs);
           const startFrame = resolvedFrame(marker.start);
           const startText = formatElapsed(startFrame, intervalUs);
           const length =
@@ -222,8 +175,6 @@ export function loopsSummary(store: WritableStore<DjState>) {
                     label: beatsLabel(size.beats),
                     selected: size.frames === length,
                   })),
-            start: boundarySummary(marker.start, grid, range),
-            end: marker.end === null ? null : boundarySummary(marker.end, grid, range),
           };
         }
 
@@ -237,7 +188,8 @@ export function loopsSummary(store: WritableStore<DjState>) {
           hasTune: loaded !== null,
           canAdd: shapeable,
           canDuplicate: shapeable && selectedId !== null,
-          canStop: runningId !== null || queuedId !== null || settingsInPlayId !== null,
+          canStop:
+            runningId !== null || queuedId !== null || settingsInPlayId !== null || live !== null,
           moveStepText: moveStepLabel(moveStep),
           moveStepOptions: MOVE_STEPS.map((step) => ({
             beats: step,

@@ -78,6 +78,11 @@ public class MidiSettingsServiceTests : IDisposable
         DeckBindings =
         [
             new DeckDeviceBinding { Slot = "A", DeviceId = "19277260", LastSeenName = "TR-2" }
+        ],
+        DeckSettings =
+        [
+            new DeckSettings { Slot = "A", Slip = true, LiveLoopBeats = 0.5 },
+            new DeckSettings { Slot = "B", Slip = false, LiveLoopBeats = 4 }
         ]
     };
 
@@ -105,6 +110,22 @@ public class MidiSettingsServiceTests : IDisposable
         loaded.Controllers.Should().Equal(saved.Controllers);
         loaded.Mappings.Should().Equal(saved.Mappings);
         loaded.DeckBindings.Should().Equal(saved.DeckBindings);
+        loaded.DeckSettings.Should().Equal(saved.DeckSettings);
+    }
+
+    [Fact]
+    public void Get_WhenTheFileHasNoDeckSettings_LoadsAnEmptyList()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        File.WriteAllText(_filePath, """
+            {"controllers":[],"mappings":[],"deckBindings":[{"slot":"A","deviceId":"19277260","lastSeenName":"TR-2"}]}
+            """);
+
+        var settings = new MidiSettingsService(_log).Get();
+
+        settings.DeckBindings.Should().ContainSingle();
+        settings.DeckSettings.Should().BeEmpty();
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
     }
 
     [Fact]
@@ -138,6 +159,21 @@ public class MidiSettingsServiceTests : IDisposable
 
         settings.Mappings.Should().ContainSingle().Which.Style.Should().BeEquivalentTo(
             new MidiMappingStyle { Kind = "relative-offset", Amount = 0.01, Grip = null });
+    }
+
+    [Fact]
+    public void Get_WhenAStoredMappingNamesTheRetiredRepeatControl_LoadsItUnchanged()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        File.WriteAllText(_filePath, """
+            {"mappings":[{"id":"m1","source":{"controllerId":"c1","channel":1,"kind":"note","number":40},
+            "owner":"A","control":"repeat","style":{"kind":"latch","amount":null}}]}
+            """);
+
+        var settings = new MidiSettingsService(_log).Get();
+
+        settings.Mappings.Should().ContainSingle().Which.Control.Should().Be("repeat");
+        _log.DidNotReceive().InternalWarning(Arg.Any<string>(), Arg.Any<string?>());
     }
 
     [Fact]

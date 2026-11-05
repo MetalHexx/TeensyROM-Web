@@ -52,11 +52,19 @@ export interface DeckDeviceBindingRecord {
   readonly lastSeenName: string;
 }
 
+/** A deck's own settings: whether slip is on and the live loop size in beats. */
+export interface DeckSettingsRecord {
+  readonly slot: Slot;
+  readonly slip: boolean;
+  readonly liveLoopBeats: number;
+}
+
 /** The whole MIDI settings set, as the server stores it. It is always read and written whole. */
 export interface MidiSettingsRecord {
   readonly controllers: readonly KnownControllerRecord[];
   readonly mappings: readonly ControlMappingRecord[];
   readonly deckBindings: readonly DeckDeviceBindingRecord[];
+  readonly deckSettings: readonly DeckSettingsRecord[];
 }
 
 /** How a save is sent. `keepalive` asks the transport to complete the request even as the page

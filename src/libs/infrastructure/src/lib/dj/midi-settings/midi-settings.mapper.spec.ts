@@ -42,6 +42,10 @@ const RECORD: MidiSettingsRecord = {
     { slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' },
     { slot: 'B', deviceId: '19277260', lastSeenName: 'TR-2' },
   ],
+  deckSettings: [
+    { slot: 'A', slip: true, liveLoopBeats: 0.5 },
+    { slot: 'B', slip: false, liveLoopBeats: 4 },
+  ],
 };
 
 describe('midi settings mapper', () => {
@@ -64,6 +68,7 @@ describe('midi settings mapper', () => {
         },
       ],
       deckBindings: [],
+      deckSettings: [],
     };
 
     const record = toMidiSettingsRecord(dto);
@@ -90,7 +95,17 @@ describe('midi settings mapper', () => {
       controllers: [],
       mappings: [{ ...request.mappings[0], style: { kind: 'press', amount: null, grip: null } }],
       deckBindings: [],
+      deckSettings: [],
     });
     expect(record.mappings[0].style).toEqual({ kind: 'press', amount: null });
+  });
+
+  it('sends the settings of both decks in the wire shape', () => {
+    const request = toSaveMidiSettingsRequest(RECORD);
+
+    expect(request.deckSettings).toEqual([
+      { slot: 'A', slip: true, liveLoopBeats: 0.5 },
+      { slot: 'B', slip: false, liveLoopBeats: 4 },
+    ]);
   });
 });

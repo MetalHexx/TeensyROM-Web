@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import type { ScrubBarState } from '../scrub-position-bar/scrub-position-bar.component';
-import type { LivePositionIndicator } from '../shared/live-indicator';
+import type { LivePositionIndicator, LiveReturnPositionIndicator } from '../shared/live-indicator';
 
 /** One loop bracket or cue tick drawn in the strip's marks lane. */
 export interface PositionMark {
@@ -24,6 +24,8 @@ export interface PositionMark {
   readonly endPercent: number | null;
   readonly activity: 'idle' | 'queued' | 'running';
   readonly selected: boolean;
+  /** A live loop's bracket: drawn in the live colour, apart from the plate's own loops. */
+  readonly live?: boolean;
 }
 
 /** A mark with its position held to 0–100, ready to draw. */
@@ -40,7 +42,9 @@ const clampPercent = (value: number): number =>
 /** `percent` on the nearest of `pixels` steps across the track, held to 0–100; as it is while the
  *  track is unmeasured (`pixels` 0). */
 function onPixel(percent: number, pixels: number): number {
-  return pixels > 0 ? Math.min(100, (Math.round((percent * pixels) / 100) * 100) / pixels) : percent;
+  return pixels > 0
+    ? Math.min(100, (Math.round((percent * pixels) / 100) * 100) / pixels)
+    : percent;
 }
 
 /**
@@ -59,6 +63,10 @@ function onPixel(percent: number, pixels: number): number {
  * read it from the track's `--playhead-position`, so a bar redrawn for a new state picks it up as
  * it is drawn, and they move by `scale` and `translate` alone: a new position restyles only them
  * and lays nothing out.
+ *
+ * A fainter, dotted second playhead marks where the tune would be in a slip departure. A painter
+ * sets it through `setLiveReturnPosition`, the same way, from the track's `--return-position`;
+ * with null it is hidden. It sits under the playhead and is hidden from assistive technology.
  *
  * Given `marks` (even an empty list) it reserves a lane above the strip and draws a bracket per
  * loop and a tick per cue. The lane ignores the pointer and is hidden from assistive technology;
@@ -83,7 +91,7 @@ function onPixel(percent: number, pixels: number): number {
     '[attr.data-marks]': 'marks() !== null ? "" : null',
   },
 })
-export class PositionStripComponent implements LivePositionIndicator {
+export class PositionStripComponent implements LivePositionIndicator, LiveReturnPositionIndicator {
   /** What the strip draws: how the bar is coloured and whether a loop mark appears. */
   readonly barState = input.required<ScrubBarState>();
   /** Accessible label announced to assistive technology, e.g. 'Position deck A'. */
@@ -131,8 +139,11 @@ export class PositionStripComponent implements LivePositionIndicator {
   private readonly destroyRef = inject(DestroyRef);
   private readonly range = viewChild.required<ElementRef<HTMLInputElement>>('range');
   private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
+  private readonly returnHead = viewChild.required<ElementRef<HTMLElement>>('returnHead');
   /** The position as last shown, held to 0–100. */
   private livePercent = 0;
+  /** The second playhead as last shown, held to 0–100; null while hidden, as it starts. */
+  private liveReturnPercent: number | null = null;
   private liveValueText: string | null = null;
   /** The track's width in device pixels; 0 until it is measured. */
   private trackPixels = 0;
@@ -155,6 +166,25 @@ export class PositionStripComponent implements LivePositionIndicator {
     this.livePercent = shown;
     this.range().nativeElement.value = String(shown);
     this.writeBar(this.toneSplitPercent());
+  }
+
+  /** Sets the second playhead, 0–100 (held and pixel-snapped like the position), or hides it with
+   *  null. Writes the track's `--return-position` and the element's `data-hidden` directly — no
+   *  signal, no change detection — and only when the shown position changed. Valid once the view
+   *  has rendered. */
+  setLiveReturnPosition(percent: number | null): void {
+    const shown = percent === null ? null : onPixel(clampPercent(percent), this.trackPixels);
+    if (shown === this.liveReturnPercent) {
+      return;
+    }
+    this.liveReturnPercent = shown;
+    const head = this.returnHead().nativeElement;
+    if (shown === null) {
+      head.setAttribute('data-hidden', '');
+      return;
+    }
+    this.track().nativeElement.style.setProperty('--return-position', `${shown}%`);
+    head.removeAttribute('data-hidden');
   }
 
   /** Sets the range's `aria-valuetext`, e.g. '01:23.4 of 03:12', so it says the position as time

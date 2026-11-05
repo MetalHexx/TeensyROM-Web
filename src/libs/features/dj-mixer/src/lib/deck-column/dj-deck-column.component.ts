@@ -4,11 +4,9 @@ import {
   DestroyRef,
   afterNextRender,
   computed,
-  effect,
   inject,
   input,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
 import { ScalingContainerComponent } from '@teensyrom-nx/ui/components';
@@ -23,12 +21,11 @@ import type {
   DeckChannelStripModel,
   DeckTransportModel,
   DeckTransportState,
-  LoopBoundaryModel,
-  LoopBoundaryNudge,
-  LoopEdgeMove,
+  LiveLoopRowModel,
   LoopSelectedRowModel,
   LoopTileModel,
   LoopsCuesPlateModel,
+  PositionMark,
 } from '@teensyrom-nx/ui/components/dj';
 import {
   DeckService,
@@ -39,9 +36,8 @@ import {
   SPEED_FADER_RANGE,
   formatSpeedPercent,
   type DeckTransportSummary,
+  type LiveLoopSummary,
   type LoopActivity,
-  type LoopBoundaryName,
-  type LoopBoundarySummary,
   type LoopItemSummary,
   type MoveStep,
   type LoopMoveStepOption,
@@ -93,35 +89,6 @@ function tileSelectName(item: LoopItemSummary, letter: string): string {
     .join(', ');
 }
 
-/** A boundary model from its summary; null is a cue's End or an empty row: drawn empty, inert. The
- *  key is enabled whenever a marker is selected: Out on a cue makes it a loop. */
-function boundaryModel(
-  boundary: LoopBoundaryName,
-  letter: string,
-  name: string,
-  selected: boolean,
-  summary: LoopBoundarySummary | null
-): LoopBoundaryModel {
-  const isStart = boundary === 'start';
-  const word = isStart ? 'start' : 'end';
-  return {
-    key: {
-      label: isStart ? 'In' : 'Out',
-      accessibleName: `Loop ${isStart ? 'in' : 'out'} ${name} deck ${letter}`,
-      control: isStart ? 'loop-in' : 'loop-set-end',
-      disabled: !selected,
-    },
-    empty: summary === null,
-    disabled: !selected,
-    offsetFrames: summary?.offsetFrames ?? 0,
-    rangeFrames: summary?.rangeFrames ?? 0,
-    tickPercents: summary?.tickPercents ?? [],
-    nudgeAccessibleName: `Nudge ${word} deck ${letter}`,
-    earlierAccessibleName: `Move ${word} of ${name} earlier deck ${letter}`,
-    laterAccessibleName: `Move ${word} of ${name} later deck ${letter}`,
-  };
-}
-
 function selectedRowModel(
   selection: LoopSelectionSummary | null,
   moveStepText: string,
@@ -129,7 +96,6 @@ function selectedRowModel(
   letter: string
 ): LoopSelectedRowModel {
   const name = selection?.name ?? 'selected marker';
-  const selected = selection !== null;
   return {
     id: selection?.id ?? null,
     empty: selection === null,
@@ -139,7 +105,6 @@ function selectedRowModel(
     activity: selection?.activity ?? 'idle',
     ready: selection?.ready ?? true,
     triggerDisabled: selection === null,
-    clearEndDisabled: selection?.kind !== 'loop',
     deleteDisabled: selection === null,
     playNowDisabled: selection === null,
     playNowAccessibleName: `Play now ${name} deck ${letter}`,
@@ -152,14 +117,18 @@ function selectedRowModel(
     renameDisabled: selection === null,
     renameLabel: `Rename ${name}`,
     nameMaxLength: MARKER_NAME_MAX_LENGTH,
-    start: boundaryModel('start', letter, name, selected, selection?.start ?? null),
-    end: boundaryModel('end', letter, name, selected, selection?.end ?? null),
     length: {
       text: selection?.lengthText ?? '—',
       options: selection?.lengthOptions ?? [],
       halveAccessibleName: `Halve ${name} deck ${letter}`,
       doubleAccessibleName: `Double ${name} deck ${letter}`,
       pickAccessibleName: `Loop length ${name} deck ${letter}`,
+      steps: {
+        disabled: selection?.kind !== 'loop',
+        downAccessibleName: `Shorten ${name} by a beat deck ${letter}`,
+        upAccessibleName: `Lengthen ${name} by a beat deck ${letter}`,
+      },
+      ...(selection === null ? {} : { noEnd: { label: 'NO END', selected: selection.kind === 'cue' } }),
     },
     move: {
       stepText: moveStepText,
@@ -169,8 +138,27 @@ function selectedRowModel(
       pickAccessibleName: `Move step deck ${letter}`,
     },
     triggerAccessibleName: `Trigger ${name} deck ${letter}`,
-    clearEndAccessibleName: `Clear end of ${name} deck ${letter}`,
     deleteAccessibleName: `Delete ${name} deck ${letter}`,
+  };
+}
+
+/** The live loop row from its summary. With no grid the row is inert and the readout stays blank. */
+function liveLoopRowModel(live: LiveLoopSummary, letter: string): LiveLoopRowModel {
+  return {
+    running: live.running,
+    disabled: !live.available,
+    liveLoopAccessibleName: `Live loop deck ${letter}`,
+    size: {
+      text: live.available ? live.sizeText : '—',
+      options: live.sizeOptions,
+      halveAccessibleName: `Halve live loop deck ${letter}`,
+      doubleAccessibleName: `Double live loop deck ${letter}`,
+      pickAccessibleName: `Live loop length deck ${letter}`,
+    },
+    canHalve: live.canHalve,
+    canDouble: live.canDouble,
+    slip: live.slip,
+    slipAccessibleName: `Slip deck ${letter}`,
   };
 }
 
@@ -223,10 +211,8 @@ export class DjDeckColumnComponent {
   /** Never reads the playhead, so the tiles and the selected row do not rebuild on a frame tick. */
   readonly loops = computed(() => this.djStore.loopsSummary(this.deck().slot)());
 
-  // Non-null only while a nudge strip is being dragged: the pointer's offset pins the boundary
-  // readout until the nudge is committed or the selection moves on.
-  readonly startDragOffset = signal<number | null>(null);
-  readonly endDragOffset = signal<number | null>(null);
+  /** Never reads the playhead either. */
+  private readonly liveLoop = computed(() => this.djStore.liveLoopSummary(this.deck().slot)());
 
   readonly plateModel = computed<LoopsCuesPlateModel>(() => {
     const { letter } = this.deck();
@@ -242,6 +228,7 @@ export class DjDeckColumnComponent {
       stopDisabled: !canStop,
       gridAccessibleName: `Loops deck ${letter}`,
       emptyText: hasTune ? 'Add a cue at the playhead' : 'Load a tune to add loops',
+      live: liveLoopRowModel(this.liveLoop(), letter),
       selected: selectedRowModel(selected, moveStepText, moveStepOptions, letter),
       tiles: items.map(
         (item): LoopTileModel => ({
@@ -262,15 +249,6 @@ export class DjDeckColumnComponent {
   });
 
   constructor() {
-    const selectedId = computed(() => this.loops().selected?.id ?? null);
-    effect(() => {
-      selectedId();
-      untracked(() => {
-        this.startDragOffset.set(null);
-        this.endDragOffset.set(null);
-      });
-    });
-
     let detach: (() => void) | null = null;
     afterNextRender(() => {
       detach = this.playheadPainter.attach(this.deck().slot, {
@@ -303,11 +281,10 @@ export class DjDeckColumnComponent {
       emptyText: 'No tune — drop a SID here',
       totalText: summary.totalText,
       bar: summary.bar,
-      marks: this.loops().items,
+      marks: this.stripMarks(),
       scrubAccessibleName: `Position deck ${letter}`,
       playPause: { showing: summary.showing, disabled: summary.controlsDisabled },
       canStop: summary.canStop,
-      repeatTrack: summary.repeat,
       subtune: {
         text: summary.subtuneCompact,
         disabled: summary.subtuneDisabled,
@@ -318,7 +295,6 @@ export class DjDeckColumnComponent {
         play: `Play deck ${letter}`,
         pause: `Pause deck ${letter}`,
         stop: `Stop deck ${letter}`,
-        repeat: `Repeat track deck ${letter}`,
       },
       // A failed load's reason travels in `label`, not `errors`.
       errors: summary.status === 'failed' && summary.label ? [summary.label] : summary.errors,
@@ -331,6 +307,26 @@ export class DjDeckColumnComponent {
         nextAccessibleName: `Next in the set deck ${letter}`,
       },
     };
+  });
+
+  /** The plate's markers, then a running live loop's bracket; the live loop is never a tile. */
+  private readonly stripMarks = computed<readonly PositionMark[]>(() => {
+    const { items } = this.loops();
+    const { mark } = this.liveLoop();
+    return mark === null
+      ? items
+      : [
+          ...items,
+          {
+            id: 'live',
+            kind: 'loop',
+            startPercent: mark.startPercent,
+            endPercent: mark.endPercent,
+            activity: 'running',
+            selected: false,
+            live: true,
+          },
+        ];
   });
 
   readonly channelModel = computed<DeckChannelStripModel>(() => {
@@ -467,10 +463,6 @@ export class DjDeckColumnComponent {
     this.deckService.stop(this.deck().slot);
   }
 
-  onRepeatTrackChange(on: boolean): void {
-    this.deckService.setRepeat(this.deck().slot, on);
-  }
-
   onPreviousSubtune(): void {
     void this.deckService.previousSubtune(this.deck().slot);
   }
@@ -521,6 +513,38 @@ export class DjDeckColumnComponent {
     void this.deckService.toggleMarker(this.deck().slot);
   }
 
+  onToggleLiveLoop(): void {
+    this.deckService.toggleLiveLoop(this.deck().slot);
+  }
+
+  onEndLiveLoop(): void {
+    this.deckService.endLiveLoop(this.deck().slot);
+  }
+
+  onHalveLiveLoop(): void {
+    this.deckService.stepLiveLoopSize(this.deck().slot, 'halve');
+  }
+
+  onDoubleLiveLoop(): void {
+    this.deckService.stepLiveLoopSize(this.deck().slot, 'double');
+  }
+
+  onPickLiveLoopSize(beats: number): void {
+    this.deckService.setLiveLoopBeats(this.deck().slot, beats);
+  }
+
+  /** One rung per wheel click: up doubles, down halves. */
+  onLiveLoopSizeWheel({ clicks }: { clicks: number; timeStampMs: number }): void {
+    const direction = clicks > 0 ? 'double' : 'halve';
+    for (let i = 0; i < Math.abs(clicks); i++) {
+      this.deckService.stepLiveLoopSize(this.deck().slot, direction);
+    }
+  }
+
+  onToggleSlip(): void {
+    this.deckService.setSlip(this.deck().slot, !this.liveLoop().slip);
+  }
+
   onTriggerTile(id: string): void {
     void this.deckService.toggleMarker(this.deck().slot, id);
   }
@@ -545,20 +569,16 @@ export class DjDeckColumnComponent {
     this.deckService.selectMarker(this.deck().slot, id);
   }
 
-  onSetIn(): void {
-    this.deckService.setMarkerIn(this.deck().slot);
-  }
-
-  onSetOut(): void {
-    this.deckService.setMarkerOut(this.deck().slot);
-  }
-
   onHalve(): void {
     this.deckService.resizeMarker(this.deck().slot, 'halve');
   }
 
   onDouble(): void {
     this.deckService.resizeMarker(this.deck().slot, 'double');
+  }
+
+  onStepLength(direction: -1 | 1): void {
+    this.deckService.stepMarkerLength(this.deck().slot, direction);
   }
 
   onPickLength(beats: number): void {
@@ -587,19 +607,6 @@ export class DjDeckColumnComponent {
 
   onDeleteSelected(): void {
     this.deckService.deleteMarker(this.deck().slot);
-  }
-
-  onMoveEdge({ boundary, direction }: LoopEdgeMove): void {
-    this.deckService.moveMarkerEdge(this.deck().slot, boundary, direction);
-  }
-
-  onNudgeInput({ boundary, offsetFrames }: LoopBoundaryNudge): void {
-    (boundary === 'start' ? this.startDragOffset : this.endDragOffset).set(offsetFrames);
-  }
-
-  onNudgeCommit({ boundary, offsetFrames }: LoopBoundaryNudge): void {
-    void this.deckService.nudgeMarker(this.deck().slot, boundary, offsetFrames);
-    (boundary === 'start' ? this.startDragOffset : this.endDragOffset).set(null);
   }
 
   onSpeedChange(multiplier: number): void {

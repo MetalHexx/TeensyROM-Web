@@ -99,6 +99,63 @@ describe('PositionStripComponent', () => {
     return fixture.nativeElement.querySelector('.loop-mark');
   }
 
+  describe('the second playhead', () => {
+    function returnHead(): HTMLElement {
+      return fixture.nativeElement.querySelector('.return-head');
+    }
+
+    function returnPosition(): string {
+      return track().style.getPropertyValue('--return-position');
+    }
+
+    it('starts hidden, aria-hidden, and a sibling of the playhead in the track', () => {
+      expect(returnHead().hasAttribute('data-hidden')).toBe(true);
+      expect(returnHead().getAttribute('aria-hidden')).toBe('true');
+      expect(returnHead().parentElement).toBe(track());
+    });
+
+    it('shows at the position it is given, written on the track, and hides with null', () => {
+      fixture.componentInstance.setLiveReturnPosition(62.5);
+
+      expect(returnPosition()).toBe('62.5%');
+      expect(returnHead().hasAttribute('data-hidden')).toBe(false);
+
+      fixture.componentInstance.setLiveReturnPosition(null);
+      expect(returnHead().hasAttribute('data-hidden')).toBe(true);
+    });
+
+    it('holds the position to 0–100, and moves apart from the playhead', () => {
+      live(30);
+      fixture.componentInstance.setLiveReturnPosition(140);
+      expect(returnPosition()).toBe('100%');
+
+      fixture.componentInstance.setLiveReturnPosition(-5);
+      expect(returnPosition()).toBe('0%');
+      expect(position()).toBe('30%');
+    });
+
+    it('writes only a changed position, and survives change detection', () => {
+      fixture.componentInstance.setLiveReturnPosition(40);
+      track().style.setProperty('--return-position', '1%');
+
+      fixture.componentInstance.setLiveReturnPosition(40);
+      expect(returnPosition()).toBe('1%');
+
+      fixture.componentInstance.setLiveReturnPosition(41);
+      fixture.detectChanges();
+      expect(returnPosition()).toBe('41%');
+      expect(returnHead().hasAttribute('data-hidden')).toBe(false);
+    });
+
+    it('snaps to the nearest device pixel of the measured track', () => {
+      FakeResizeObserver.last?.resize(200);
+
+      fixture.componentInstance.setLiveReturnPosition(10.4);
+
+      expect(returnPosition()).toBe('10.5%');
+    });
+  });
+
   describe('scrubbing', () => {
     it('maps input to scrubInput and never to a commit', () => {
       drag(37, 'input');
@@ -390,6 +447,17 @@ describe('PositionStripComponent', () => {
       expect(running.dataset['activity']).toBe('running');
       expect(running.hasAttribute('data-selected')).toBe(true);
       expect(selectedCue.hasAttribute('data-selected')).toBe(true);
+    });
+
+    it('flags a live loop’s bracket apart from the plate’s own loops', () => {
+      set('marks', [
+        { ...loop, id: 'plain' },
+        { ...loop, id: 'live', live: true },
+      ]);
+
+      const [plain, live] = marks();
+      expect(plain.hasAttribute('data-live')).toBe(false);
+      expect(live.hasAttribute('data-live')).toBe(true);
     });
 
     it('holds a mark outside 0–100 on the track and never draws a negative width', () => {

@@ -52,8 +52,6 @@ export interface DeckTransportModel {
   readonly playPause: { readonly showing: 'play' | 'pause'; readonly disabled: boolean };
   /** Enables the Stop key. */
   readonly canStop: boolean;
-  /** The Repeat key's latched state. */
-  readonly repeatTrack: boolean;
   /** The subtune stepper's readout, disabled state and both accessible names. */
   readonly subtune: {
     /** The readout between the two keys, e.g. '1/3'. */
@@ -65,13 +63,12 @@ export interface DeckTransportModel {
     /** e.g. 'Next subtune deck A'. */
     readonly nextAccessibleName: string;
   };
-  /** Accessible names for the four keys not composed from anything else. `play` and `pause` are
+  /** Accessible names for the keys not composed from anything else. `play` and `pause` are
    *  both carried — the Play/Pause key's name is whichever matches `playPause.showing`. */
   readonly actionAccessibleNames: {
     readonly play: string;
     readonly pause: string;
     readonly stop: string;
-    readonly repeat: string;
   };
   /** Each rendered as a `role="alert"` line in the display's place; a failed deck's reason
    *  arrives here. Empty renders nothing. */
@@ -82,20 +79,20 @@ export interface DeckTransportModel {
 
 /**
  * One deck's transport on its own faceplate: a display showing what is loaded and where it is, the
- * continuous position bar (still a working scrubber), and the Play/Pause, Stop, Repeat and subtune
+ * continuous position bar (still a working scrubber), and the Play/Pause, Stop and subtune
  * keys, with the set row beneath them. Purely presentational — it holds no state and leaves every gate, label and accessible name
  * to the caller that builds the model.
  *
- * It lays itself out by its own width, not the viewport's. Play/Pause, Stop and Repeat are three
- * identical keys at the start of the row, the stepper at the end: labelled keys from about 436px,
+ * It lays itself out by its own width, not the viewport's. Play/Pause and Stop are two
+ * identical keys at the start of the row, the stepper filling the rest: labelled keys from about 436px,
  * icon-only keys from about 336px, and below that the same icon-only keys with the stepper on its
  * own row beneath them and the frame number hidden. The set row follows the same breakpoints, its
  * keys losing their labels with the others. It shrinks or clips rather than overflowing at
  * any width.
  *
  * The playhead readouts — the bar's position, the elapsed time, the frame and the strip's value
- * text — are not inputs: a painter sets them through `setLivePosition`, `setLiveElapsed` and
- * `setLiveFrame`, straight on the DOM, outside change detection.
+ * text — are not inputs: a painter sets them through `setLivePosition`, `setLiveReturnPosition`,
+ * `setLiveElapsed` and `setLiveFrame`, straight on the DOM, outside change detection.
  *
  * @example
  * ```html
@@ -122,8 +119,6 @@ export class DeckTransportComponent implements LivePlayheadIndicator {
   readonly playPauseClick = output<void>();
   /** The Stop key was pressed. */
   readonly stopClick = output<void>();
-  /** The Repeat key was pressed, carrying the latch it should now have. */
-  readonly repeatTrackChange = output<boolean>();
   /** The stepper's previous key was pressed. */
   readonly previousSubtune = output<void>();
   /** The stepper's next key was pressed. */
@@ -176,6 +171,12 @@ export class DeckTransportComponent implements LivePlayheadIndicator {
    *  rendered. */
   setLivePosition(percent: number): void {
     this.strip().setLivePosition(percent);
+  }
+
+  /** Sets the slip's second playhead on the strip, 0–100, or hides it with null. Written straight
+   *  to the DOM like `setLivePosition`. */
+  setLiveReturnPosition(percent: number | null): void {
+    this.strip().setLiveReturnPosition(percent);
   }
 
   /** Sets the elapsed time on the display, e.g. '01:23.4', and the strip's value text with it —

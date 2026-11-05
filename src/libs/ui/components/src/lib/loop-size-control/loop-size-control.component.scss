@@ -1,0 +1,176 @@
+:host {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px var(--spacing-xs);
+  min-width: 0;
+  // The control sizes itself by its own width, wherever a row puts it. See the end of this file.
+  container-type: inline-size;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// A row that stacks its controls sets `--loop-tag-width` so the tags of the stacked rows share a
+// width and the first keys line up.
+.tag {
+  flex: 0 0 auto;
+  min-width: var(--loop-tag-width, 0);
+  color: var(--synth-legend);
+  font-size: 0.53rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+// 1/2 and 2× are 32 px keys; the single-symbol − and + are 26 px, like the row's other
+// single-symbol keys.
+lib-synth-key {
+  flex: 0 0 auto;
+  --synth-key-height: 22px;
+  --synth-key-min-width: 32px;
+  --synth-key-padding: 0;
+  --synth-key-font-size: 0.69rem;
+  --synth-key-letter-spacing: 0;
+}
+
+lib-synth-key.sign {
+  --synth-key-min-width: 26px;
+}
+
+// The readout: a small display that is a picker's trigger when it has options and plain text when it
+// has none. The dropdown's wrappers are inline blocks; stretch them to the slot.
+lib-dropdown-menu {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  --dropdown-menu-trigger-display: block;
+}
+
+.readout {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  overflow: hidden;
+  padding: 0 var(--spacing-xs);
+  border: 0;
+  border-radius: 4px;
+  background: var(--synth-display-face);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), inset 0 0 0 1px var(--synth-display-border);
+  color: var(--synth-display-text);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.656rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+button.readout {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight);
+    outline-offset: 2px;
+  }
+}
+
+.caret {
+  color: var(--synth-display-dim);
+  font-size: 0.5rem;
+}
+
+// What the control needs beside its longest readout text ('128 BEATS' or '1/16 BEAT' and the caret, 83 px
+// at a roomy readout, 76 px at a compact one):
+//   - with the − and + keys: 260 px roomy, 245 px compact (22 px signs);
+//   - without them: 199 px roomy, 192 px compact.
+// It tightens first. Below the compact width it takes two lines, the tag and the readout and then the
+// keys spread across the width, and below 8rem three: the tag, the readout, the keys. The keys come after
+// the readout in the DOM, so the later lines reorder them visually. A text longer than the readout is
+// clipped, never painted over a key.
+@mixin compact {
+  & .readout {
+    padding: 0 2px;
+    gap: 2px;
+  }
+
+  & lib-synth-key.sign {
+    --synth-key-min-width: 22px;
+  }
+}
+
+@mixin two-lines {
+  & lib-dropdown-menu,
+  & > .readout {
+    order: 1;
+  }
+
+  & lib-synth-key {
+    order: 3;
+    --synth-key-min-width: 28px;
+  }
+
+  & lib-synth-key.sign {
+    --synth-key-min-width: 22px;
+  }
+
+  &::after {
+    content: '';
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+}
+
+@mixin three-lines {
+  & lib-dropdown-menu,
+  & > .readout {
+    order: 2;
+  }
+
+  &::before {
+    content: '';
+    order: 1;
+    flex: 0 0 100%;
+    height: 0;
+  }
+}
+
+@container (max-width: 17rem) {
+  :host([data-steps]) {
+    @include compact;
+  }
+}
+
+@container (max-width: 15.5rem) {
+  :host([data-steps]) {
+    @include two-lines;
+  }
+}
+
+@container (max-width: 13rem) {
+  :host(:not([data-steps])) {
+    @include compact;
+  }
+}
+
+@container (max-width: 12.25rem) {
+  :host(:not([data-steps])) {
+    @include two-lines;
+  }
+}
+
+@container (max-width: 8rem) {
+  :host {
+    @include three-lines;
+  }
+}
+
+:host([data-disabled]) .readout {
+  color: var(--synth-display-dim);
+}

@@ -155,7 +155,7 @@
   white-space: nowrap;
 }
 
-// Play/Pause, Stop and Repeat are three identical fixed-width keys at the start of the row, the
+// Play/Pause and Stop are two identical fixed-width keys at the start of the row, the
 // subtune stepper at the end. A key's host is a column flex box so its button fills the host's
 // width; the width is set on the host, so Play's label changing never moves it. Wide layout: the
 // keys are labelled and the stepper shares the row.
@@ -174,8 +174,7 @@
   }
 
   .play-key,
-  .stop-key,
-  .repeat-key {
+  .stop-key {
     flex: 0 0 var(--transport-key-width);
     width: var(--transport-key-width);
   }
@@ -239,7 +238,6 @@
 
     .play-key,
     .stop-key,
-    .repeat-key,
     .step-key {
       --synth-key-label-display: none;
     }
@@ -258,7 +256,6 @@
 
     .play-key,
     .stop-key,
-    .repeat-key,
     .step-key {
       --synth-key-label-display: none;
     }

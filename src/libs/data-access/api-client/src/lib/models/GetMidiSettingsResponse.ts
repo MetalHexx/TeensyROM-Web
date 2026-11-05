@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { DeckSettingsDto } from './DeckSettingsDto';
+import {
+    DeckSettingsDtoFromJSON,
+    DeckSettingsDtoFromJSONTyped,
+    DeckSettingsDtoToJSON,
+    DeckSettingsDtoToJSONTyped,
+} from './DeckSettingsDto';
 import type { KnownMidiControllerDto } from './KnownMidiControllerDto';
 import {
     KnownMidiControllerDtoFromJSON,
@@ -59,6 +66,12 @@ export interface GetMidiSettingsResponse {
      * @memberof GetMidiSettingsResponse
      */
     deckBindings: Array<DeckDeviceBindingDto>;
+    /**
+     * 
+     * @type {Array<DeckSettingsDto>}
+     * @memberof GetMidiSettingsResponse
+     */
+    deckSettings: Array<DeckSettingsDto>;
 }
 
 /**
@@ -68,6 +81,7 @@ export function instanceOfGetMidiSettingsResponse(value: object): value is GetMi
     if (!('controllers' in value) || value['controllers'] === undefined) return false;
     if (!('mappings' in value) || value['mappings'] === undefined) return false;
     if (!('deckBindings' in value) || value['deckBindings'] === undefined) return false;
+    if (!('deckSettings' in value) || value['deckSettings'] === undefined) return false;
     return true;
 }
 
@@ -84,6 +98,7 @@ export function GetMidiSettingsResponseFromJSONTyped(json: any, ignoreDiscrimina
         'controllers': ((json['controllers'] as Array<any>).map(KnownMidiControllerDtoFromJSON)),
         'mappings': ((json['mappings'] as Array<any>).map(MidiControlMappingDtoFromJSON)),
         'deckBindings': ((json['deckBindings'] as Array<any>).map(DeckDeviceBindingDtoFromJSON)),
+        'deckSettings': ((json['deckSettings'] as Array<any>).map(DeckSettingsDtoFromJSON)),
     };
 }
 
@@ -101,6 +116,7 @@ export function GetMidiSettingsResponseToJSONTyped(value?: GetMidiSettingsRespon
         'controllers': ((value['controllers'] as Array<any>).map(KnownMidiControllerDtoToJSON)),
         'mappings': ((value['mappings'] as Array<any>).map(MidiControlMappingDtoToJSON)),
         'deckBindings': ((value['deckBindings'] as Array<any>).map(DeckDeviceBindingDtoToJSON)),
+        'deckSettings': ((value['deckSettings'] as Array<any>).map(DeckSettingsDtoToJSON)),
     };
 }
 

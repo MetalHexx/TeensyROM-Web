@@ -2,8 +2,9 @@
   display: inline-block;
 }
 
+// A caller that needs the trigger to fill its slot sets --dropdown-menu-trigger-display to block.
 .dropdown-container {
-  display: inline-block;
+  display: var(--dropdown-menu-trigger-display, inline-block);
   cursor: pointer;
 }
 

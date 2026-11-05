@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, type Signal } from '@angular/core';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import { DjStore, type DeckBeatGrid, type DeckLoopsState } from './dj-store';
 import { bpmOf, formatBpm, inGridSpan } from './grid/beat-math';
 import { clamp } from './loops/loop-marker-math';
@@ -54,6 +55,9 @@ interface SlotPaint {
   /** A scrub drag's percent the transport shows instead of the playhead, or null. */
   pin: number | null;
   percent: number;
+  /** Where the second playhead last showed: a percent, null for hidden, `UNPAINTED` before the
+   *  first write. */
+  returnPercent: number | null;
   elapsedText: string | null;
   /** The frame the frame label last showed. */
   labelFrame: number;
@@ -67,6 +71,7 @@ function createSlotPaint(): SlotPaint {
     targets: null,
     pin: null,
     percent: UNPAINTED,
+    returnPercent: UNPAINTED,
     elapsedText: null,
     labelFrame: UNPAINTED,
     lapPercent: UNPAINTED,
@@ -77,10 +82,11 @@ function createSlotPaint(): SlotPaint {
 
 /**
  * Paints a deck's playhead readouts — the transport's bar, elapsed time and frame, the running
- * marker loop's lap and the speed display's BPM, blank where the playhead is off the beat grid —
+ * marker loop's lap, the speed display's BPM, blank where the playhead is off the beat grid, and
+ * the slip's second playhead, hidden outside a departure or where it meets the playhead —
  * straight into their targets, bypassing the store and change detection. The
  * decks' animation-frame loop calls `paint` on the frames it paints on, about 30 a second, when the
- * playhead moved; each paint reads the live position from the engine and writes only the readouts
+ * playhead moved, and `paintReturn` when it did not; each paint reads the live position from the engine and writes only the readouts
  * whose shown value changed. While the deck is not playing that loop does not paint it, so one
  * extra paint is scheduled for anything that changes what the readouts show in the meantime: a
  * stop, pause, seek or load sampling the playhead into the store, the tune's length or play-call
@@ -91,6 +97,7 @@ function createSlotPaint(): SlotPaint {
 export class PlayheadPainter {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
+  private readonly deckSlip = inject(DeckSlip);
   private readonly slots: Record<Slot, SlotPaint> = { A: createSlotPaint(), B: createSlotPaint() };
   private readonly sources: Record<Slot, SlotSources>;
 
@@ -105,6 +112,7 @@ export class PlayheadPainter {
     state.targets = targets;
     state.pin = null;
     state.percent = UNPAINTED;
+    state.returnPercent = UNPAINTED;
     state.elapsedText = null;
     state.labelFrame = UNPAINTED;
     state.lapPercent = UNPAINTED;
@@ -145,6 +153,8 @@ export class PlayheadPainter {
       targets.transport.setLivePosition(percent);
     }
 
+    this.writeReturn(slot, state, targets, position, length);
+
     const elapsedText = formatElapsed(shownFrames, playCallIntervalUs());
     if (state.elapsedText !== elapsedText) {
       state.elapsedText = elapsedText;
@@ -173,6 +183,41 @@ export class PlayheadPainter {
     if (state.bpmText !== bpmText) {
       state.bpmText = bpmText;
       targets.speed.setLiveBpm(bpmText);
+    }
+  }
+
+  /** Paints the second playhead alone, now. It follows the slip's count, which runs on under a
+   *  record held still, so the decks' loop calls it on the frames the playhead did not move. A
+   *  no-op with nothing attached. */
+  paintReturn(slot: Slot): void {
+    const state = this.slots[slot];
+    if (state.targets === null) {
+      return;
+    }
+    this.writeReturn(
+      slot,
+      state,
+      state.targets,
+      this.runtime.position(slot),
+      this.sources[slot].lengthFrames()
+    );
+  }
+
+  /** Writes the second playhead when it changed: hidden with no departure or where it meets the
+   *  playhead, else the return frame's share of the tune. */
+  private writeReturn(
+    slot: Slot,
+    state: SlotPaint,
+    targets: DeckPlayheadTargets,
+    position: number,
+    length: number | null
+  ): void {
+    const returnFrame = this.deckSlip.returnFrame(slot);
+    const returnPercent =
+      returnFrame === null || returnFrame === position ? null : scrubPercent(returnFrame, length);
+    if (state.returnPercent !== returnPercent) {
+      state.returnPercent = returnPercent;
+      targets.transport.setLiveReturnPosition(returnPercent);
     }
   }
 

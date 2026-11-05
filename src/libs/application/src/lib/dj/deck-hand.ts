@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import type { VarispeedRateSource } from '@sidablist/core';
 import { DeckRuntime } from './deck-runtime';
+import { DeckSlip } from './deck-slip';
 import { DjStore } from './dj-store';
 import { PITCH_BEND_CENTRE, PITCH_BEND_MAX } from './ports';
 import type { Slot } from './slot';
@@ -26,8 +27,9 @@ const SAMPLE_CAPACITY = 8;
 const POSITION_EPSILON = 1e-6;
 
 /**
- * `idle`: no finger, the engine is not in varispeed for this deck's hand. `held`: a finger on the
- * strip. `thrown`: the finger lifted and the record is slowing to the deck's speed. `ignoring`: the
+ * `idle`: no finger, the engine is not in varispeed for this deck's hand (a slip landing's handback
+ * is the engine's, not the hand's). `held`: a finger on the strip. `thrown`: the finger lifted and
+ * the record is slowing to the deck's speed. `ignoring`: the
  * strip was touched when it could not be taken, or the hand was dropped under a finger; nothing
  * counts until the strip returns to centre.
  */
@@ -78,6 +80,9 @@ interface SlotHand {
  * loop; a record stopped at the loop's start stays still under a backward throw and climbs from
  * standstill at the strip's grip.
  *
+ * With slip on, a touch is a slip departure, and a lift lands the deck on the count `DeckSlip` kept
+ * instead of throwing; with slip off, or switched off since the touch, it throws.
+ *
  * The strip's messages only record values; the position is worked out on the engine's tick, which
  * has the position that tick starts from.
  */
@@ -85,6 +90,7 @@ interface SlotHand {
 export class DeckHand {
   private readonly runtime = inject(DeckRuntime);
   private readonly store = inject(DjStore);
+  private readonly slip = inject(DeckSlip);
 
   private readonly hands: Record<Slot, SlotHand> = this.buildHands();
 
@@ -184,11 +190,14 @@ export class DeckHand {
     const { slot } = hand;
     if (hand.state === 'idle') {
       const deck = this.store.decks()[slot];
-      if (
-        deck.busy ||
-        deck.loaded === null ||
-        !this.runtime.enterVarispeed(slot, hand.rateSource)
-      ) {
+      if (deck.busy || deck.loaded === null) {
+        hand.state = 'ignoring';
+        return;
+      }
+      // Before the engine enters varispeed, which clears the phase the shadow starts from.
+      this.slip.begin(slot, 'hand');
+      if (!this.runtime.enterVarispeed(slot, hand.rateSource)) {
+        this.slip.release(slot, 'hand');
         hand.state = 'ignoring';
         return;
       }
@@ -222,11 +231,15 @@ export class DeckHand {
   }
 
   private lift(hand: SlotHand, liftTimeMs: number): void {
+    this.store.setDeckHand({ slot: hand.slot, held: false });
+    if (this.slip.land(hand.slot, 'hand')) {
+      hand.state = 'idle';
+      return;
+    }
     hand.releaseSpeed = this.releaseSpeed(hand, liftTimeMs);
     hand.launching = true;
     hand.arrived = false;
     hand.state = 'thrown';
-    this.store.setDeckHand({ slot: hand.slot, held: false });
   }
 
   /** Counts per millisecond between the newest sample and the oldest one within the release

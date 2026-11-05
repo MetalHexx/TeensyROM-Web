@@ -1,0 +1,69 @@
+<span class="tag" aria-hidden="true">Length</span>
+<lib-synth-key
+  class="step"
+  label="1/2"
+  [attr.data-control]="halveControl()"
+  [accessibleName]="model().halveAccessibleName"
+  [disabled]="halveOff()"
+  (press)="halve.emit()"
+/>
+@if (model().steps; as steps) {
+<lib-synth-key
+  class="sign"
+  label="−"
+  [attr.data-control]="stepDownControl()"
+  [accessibleName]="steps.downAccessibleName"
+  [disabled]="stepOff()"
+  (press)="stepLength.emit(-1)"
+/>
+}
+@if (picks()) {
+<lib-dropdown-menu #sizeMenu>
+  <button
+    type="button"
+    class="readout"
+    aria-haspopup="menu"
+    [disabled]="disabled()"
+    [attr.data-control]="readoutControl()"
+    [attr.aria-label]="model().pickAccessibleName + ', ' + model().text"
+    (click)="sizeMenu.toggle()"
+    (wheel)="onWheel($event)"
+  >
+    {{ model().text }}<span class="caret" aria-hidden="true">▾</span>
+  </button>
+  <div dropdown-content>
+    @if (model().noEnd; as noEnd) {
+    <lib-dropdown-menu-item [selected]="noEnd.selected" (itemClick)="pickNoEnd.emit()">
+      {{ noEnd.label }}
+    </lib-dropdown-menu-item>
+    }
+    @for (option of model().options; track option.beats) {
+    <lib-dropdown-menu-item [selected]="option.selected" (itemClick)="pickLength.emit(option.beats)">
+      {{ option.label }}
+    </lib-dropdown-menu-item>
+    }
+  </div>
+</lib-dropdown-menu>
+} @else {
+<span class="readout" [attr.data-control]="readoutControl()" (wheel)="onWheel($event)">{{
+  model().text
+}}</span>
+}
+@if (model().steps; as steps) {
+<lib-synth-key
+  class="sign"
+  label="+"
+  [attr.data-control]="stepUpControl()"
+  [accessibleName]="steps.upAccessibleName"
+  [disabled]="stepOff()"
+  (press)="stepLength.emit(1)"
+/>
+}
+<lib-synth-key
+  class="step"
+  label="2×"
+  [attr.data-control]="doubleControl()"
+  [accessibleName]="model().doubleAccessibleName"
+  [disabled]="doubleOff()"
+  (press)="double.emit()"
+/>

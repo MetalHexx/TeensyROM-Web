@@ -1,6 +1,5 @@
+import { isUsableLoopLength } from '@sidablist/core';
 import type { DeckLoopBoundary, DeckLoopMarker } from '../dj-store';
-
-export type LoopBoundaryName = 'start' | 'end';
 
 export type MarkerKind = 'loop' | 'cue';
 
@@ -8,17 +7,33 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** The frame the engine jumps to for a boundary: its captured frame plus its nudge, never before
+/** `frame` as a share of the tune's length, 0–100; 0 while the length is unknown. */
+export function percentOf(frame: number, lengthFrames: number | null): number {
+  return lengthFrames === null || lengthFrames <= 0
+    ? 0
+    : clamp((frame / lengthFrames) * 100, 0, 100);
+}
+
+/** The frame the engine jumps to for a boundary: its captured frame plus its offset, never before
  *  the start of the tune. */
 export function resolvedFrame(boundary: DeckLoopBoundary): number {
   return Math.max(0, boundary.frame + boundary.offsetFrames);
 }
 
-/** A loop only when its end lies after its start; anything else is a cue. */
+/**
+ * A loop only when its end lies after its start, by a length the engine can lap
+ * (`isUsableLoopLength`); anything else is a cue. A length between two frames that is under
+ * `MIN_FRACTIONAL_LOOP_FRAMES` is one no edit here makes, but a stored marker may hold one: the
+ * engine refuses it as a loop, so it plays as a cue, the way an end at or before the start does,
+ * rather than read as running while the engine loops something else.
+ */
 export function markerKind(marker: DeckLoopMarker): MarkerKind {
-  return marker.end !== null && resolvedFrame(marker.end) > resolvedFrame(marker.start)
-    ? 'loop'
-    : 'cue';
+  if (marker.end === null) {
+    return 'cue';
+  }
+  const start = resolvedFrame(marker.start);
+  const end = resolvedFrame(marker.end);
+  return end > start && isUsableLoopLength(start, end) ? 'loop' : 'cue';
 }
 
 /** The marker's name, else 'Loop N' / 'Cue N' — N its 1-based place among the list's markers of
@@ -44,32 +59,4 @@ export function oneSecondFrames(playCallIntervalUs: number | null): number {
     return 0;
   }
   return Math.round(1_000_000 / playCallIntervalUs);
-}
-
-/**
- * The offsets a nudge may give `boundary`: within one second either way, and never so far that the
- * loop's resolved end is not at least one frame after its resolved start. A start nudge is limited
- * by the end, and an end nudge by the start. A marker with no end has no second boundary to bound
- * its start.
- */
-export function nudgeLimits(
-  marker: DeckLoopMarker,
-  boundary: LoopBoundaryName,
-  oneSecond: number
-): { readonly min: number; readonly max: number } {
-  const earliest = 0 - oneSecond; // not `-oneSecond`, which is -0 while the second is unknown
-  if (boundary === 'start') {
-    const latest =
-      marker.end === null
-        ? oneSecond
-        : Math.min(oneSecond, resolvedFrame(marker.end) - 1 - marker.start.frame);
-    return { min: earliest, max: latest };
-  }
-  if (marker.end === null) {
-    return { min: 0, max: 0 };
-  }
-  return {
-    min: Math.max(earliest, resolvedFrame(marker.start) + 1 - marker.end.frame),
-    max: oneSecond,
-  };
 }

@@ -30,6 +30,7 @@ describe('ApiMidiSettingsRepository', () => {
       controllers: [{ id: 'launchpad', name: 'Launchpad', lastPortId: null, listening: true }],
       mappings: [],
       deckBindings: [{ slot: 'A', deviceId: '14470230', lastSeenName: 'TR-1' }],
+      deckSettings: [{ slot: 'A', slip: true, liveLoopBeats: 0.5 }],
     };
     api.getMidiSettings.mockResolvedValue(response);
 
@@ -43,6 +44,7 @@ describe('ApiMidiSettingsRepository', () => {
       controllers: [{ id: 'launchpad', name: 'Launchpad', lastPortId: 'p1', listening: false }],
       mappings: [],
       deckBindings: [{ slot: 'B', deviceId: '19277260', lastSeenName: 'TR-2' }],
+      deckSettings: [{ slot: 'B', slip: false, liveLoopBeats: 4 }],
     };
 
     await repository.save(settings);
@@ -54,7 +56,7 @@ describe('ApiMidiSettingsRepository', () => {
   });
 
   it('passes keepalive to the client as a request override', async () => {
-    const settings: MidiSettingsRecord = { controllers: [], mappings: [], deckBindings: [] };
+    const settings: MidiSettingsRecord = { controllers: [], mappings: [], deckBindings: [], deckSettings: [] };
 
     await repository.save(settings, { keepalive: true });
 
@@ -74,7 +76,7 @@ describe('ApiMidiSettingsRepository', () => {
     api.saveMidiSettings.mockRejectedValue(new Error('400'));
 
     await expect(
-      repository.save({ controllers: [], mappings: [], deckBindings: [] })
+      repository.save({ controllers: [], mappings: [], deckBindings: [], deckSettings: [] })
     ).rejects.toThrow('400');
   });
 });

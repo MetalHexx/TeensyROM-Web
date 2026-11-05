@@ -24,6 +24,7 @@ const saved = (listening = true): MidiSettingsRecord => ({
     },
   ],
   deckBindings: [],
+  deckSettings: [],
 });
 
 describe('MidiInputRouter', () => {

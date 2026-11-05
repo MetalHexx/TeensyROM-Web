@@ -7,7 +7,6 @@ import { setDeckLoaded } from './set-deck-loaded';
 import { setDeckStructure } from './set-deck-structure';
 import { samplePosition } from './sample-position';
 import { setDeckSubtune } from './set-deck-subtune';
-import { setDeckRepeat } from './set-deck-repeat';
 import { setBinding } from './set-binding';
 import { setMidi } from './set-midi';
 import { markSeen } from './mark-seen';
@@ -23,11 +22,13 @@ import { setDeckTiming } from './set-deck-timing';
 import { setDeckBeatGrid } from './set-deck-beat-grid';
 import { setDeckTapping } from './set-deck-tapping';
 import { setDeckMoveStep } from './set-deck-move-step';
+import { setDeckSettings } from './set-deck-settings';
 import { setDeckLoops } from './set-deck-loops';
 import { setLoopMarkers } from './set-loop-markers';
 import { setLoopSelection } from './set-loop-selection';
 import { setLoopActivity } from './set-loop-activity';
 import { setRunningBounds } from './set-running-bounds';
+import { setLiveLoop } from './set-live-loop';
 import { setSettingsInPlay } from './set-settings-in-play';
 import { setSetsLibrary } from './set-sets-library';
 import { putOpenSet } from './put-open-set';
@@ -53,7 +54,6 @@ export function withDjActions() {
       ...setDeckStructure(writableStore),
       ...samplePosition(writableStore),
       ...setDeckSubtune(writableStore),
-      ...setDeckRepeat(writableStore),
       ...setBinding(writableStore),
       ...setMidi(writableStore),
       ...markSeen(writableStore),
@@ -69,11 +69,13 @@ export function withDjActions() {
       ...setDeckBeatGrid(writableStore),
       ...setDeckTapping(writableStore),
       ...setDeckMoveStep(writableStore),
+      ...setDeckSettings(writableStore),
       ...setDeckLoops(writableStore),
       ...setLoopMarkers(writableStore),
       ...setLoopSelection(writableStore),
       ...setLoopActivity(writableStore),
       ...setRunningBounds(writableStore),
+      ...setLiveLoop(writableStore),
       ...setSettingsInPlay(writableStore),
       ...setSetsLibrary(writableStore),
       ...putOpenSet(writableStore),

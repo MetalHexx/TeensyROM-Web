@@ -1,7 +1,8 @@
 namespace TeensyRom.Core.Settings
 {
     /// <summary>
-    /// The MIDI controller setup: known controllers, their control mappings and the deck-to-cartridge bindings.
+    /// The MIDI controller setup: known controllers, their control mappings, the deck-to-cartridge bindings and each
+    /// deck's own settings.
     /// Persisted on its own in midi-settings.json, independent of Settings.json.
     /// </summary>
     public record MidiSettings
@@ -9,6 +10,7 @@ namespace TeensyRom.Core.Settings
         public List<KnownMidiController> Controllers { get; init; } = [];
         public List<MidiControlMapping> Mappings { get; init; } = [];
         public List<DeckDeviceBinding> DeckBindings { get; init; } = [];
+        public List<DeckSettings> DeckSettings { get; init; } = [];
     }
 
     /// <summary>
@@ -64,5 +66,15 @@ namespace TeensyRom.Core.Settings
         public string Slot { get; init; } = string.Empty;
         public string DeviceId { get; init; } = string.Empty;
         public string LastSeenName { get; init; } = string.Empty;
+    }
+
+    /// <summary>
+    /// A deck's own settings, kept by slot ("A" or "B"): whether slip is on and the live loop size in beats.
+    /// </summary>
+    public record DeckSettings
+    {
+        public string Slot { get; init; } = string.Empty;
+        public bool Slip { get; init; }
+        public double LiveLoopBeats { get; init; }
     }
 }

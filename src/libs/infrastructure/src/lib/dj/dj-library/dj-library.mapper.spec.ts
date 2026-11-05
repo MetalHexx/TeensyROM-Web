@@ -151,6 +151,32 @@ describe('dj library mapper', () => {
     expect(toTuneMemory({ ...toDjTuneMemoryDto(memory), subtunes: [] } satisfies DjTuneMemoryDto).subtunes).toEqual([]);
   });
 
+  it('passes a fractional boundary frame through unchanged both ways', () => {
+    const marker = {
+      ...FULL_SET.rows[0].subtunes[0].markers[0],
+      start: { frame: 0.25, offsetFrames: 0 },
+      end: { frame: 3.5, offsetFrames: -1 },
+    };
+    const memory: TuneMemory = {
+      sidHash: 'h1',
+      lastSubtune: 2,
+      updated: '2026-01-03T00:00:00.000Z',
+      subtunes: [{ ...FULL_SET.rows[0].subtunes[0], markers: [marker] }],
+    };
+
+    const dto = toDjTuneMemoryDto(memory);
+    expect(dto.subtunes[0].markers[0].start).toEqual({ frame: 0.25, offsetFrames: 0 });
+    expect(dto.subtunes[0].markers[0].end).toEqual({ frame: 3.5, offsetFrames: -1 });
+
+    const read = toTuneMemory(dto);
+    expect(read.subtunes[0].markers[0].start.frame).toBe(0.25);
+    expect(read.subtunes[0].markers[0].end?.frame).toBe(3.5);
+    expect(read).toEqual(memory);
+
+    const set: TuneSet = { ...FULL_SET, rows: [{ ...FULL_SET.rows[0], subtunes: memory.subtunes }] };
+    expect(toTuneSet(toDjSetDto(set)).rows[0].subtunes[0].markers[0].end?.frame).toBe(3.5);
+  });
+
   it('round-trips tune beat grids', () => {
     const grids: TuneBeatGrids = {
       sidHash: 'h1',

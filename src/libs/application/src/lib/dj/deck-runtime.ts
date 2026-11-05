@@ -9,6 +9,8 @@ import {
   playCallIntervalUs,
 } from '@sidablist/core';
 import type {
+  ActiveLoop,
+  CrossingLines,
   DeliveryBatch,
   SidPlayer,
   PlayerSnapshot,
@@ -16,6 +18,7 @@ import type {
   FrameClock,
   ReplayRunner,
   JumpSettings,
+  ShadowCount,
   SidField,
   SidModel,
   VarispeedLoopStart,
@@ -64,6 +67,26 @@ export interface SlotRuntime {
   readonly replay: ReplayRunner;
   readonly prepare: ReplayRunner;
   readonly recorder: RegisterRecorder;
+}
+
+/** A loop as the runtime hands it to the engine: its bounds in play calls — the end need not be a
+ *  whole frame — how varispeed holds it, and the lap phase a length that is not a whole number of
+ *  frames alternates its laps from (core's `ActiveLoop`). */
+export interface EngineLoop {
+  readonly startFrame: number;
+  readonly endFrame: number;
+  readonly varispeedStart?: VarispeedLoopStart;
+  readonly lapPhase?: number;
+}
+
+/** `loop` in the engine's units, carrying only the optional fields it has. */
+function engineLoopOf(loop: EngineLoop): Exclude<ActiveLoop, null> {
+  return {
+    startFrame: frames(loop.startFrame),
+    endFrame: frames(loop.endFrame),
+    ...(loop.varispeedStart === undefined ? {} : { varispeedStart: loop.varispeedStart }),
+    ...(loop.lapPhase === undefined ? {} : { lapPhase: loop.lapPhase }),
+  };
 }
 
 /** The façade's mutable target: which port id a slot currently points at, and whether the
@@ -135,6 +158,7 @@ export class DeckRuntime {
     const prepare = this.replayFactory();
     const recorder = this.recorderFactory();
     const player = createSidPlayer({ sink, clock, replayRunner: replay, prepareRunner: prepare });
+    player.setRepeatTrack(true);
 
     this.slots.set(slot, { player, sink, clock, replay, prepare, recorder });
   }
@@ -211,10 +235,6 @@ export class DeckRuntime {
 
   stop(slot: Slot): void {
     this.requireSlot(slot).player.stop();
-  }
-
-  setRepeat(slot: Slot, on: boolean): void {
-    this.requireSlot(slot).player.setRepeatTrack(on);
   }
 
   /** The φ2 of the machine this slot's cartridge sits in, or `null` when it is not known. The player
@@ -327,31 +347,118 @@ export class DeckRuntime {
     return this.requireSlot(slot).player.capturePosition();
   }
 
-  /** Runs a loop between two frames, holding varispeed inside it when `varispeedStart` is given;
-   *  null stops looping. */
-  setActiveLoop(
+  /** Runs a loop between two frames, holding varispeed inside it when `varispeedStart` is given and
+   *  lapping a length that is not a whole number of frames from `lapPhase`; null stops looping. */
+  setActiveLoop(slot: Slot, loop: EngineLoop | null): void {
+    this.requireSlot(slot).player.setActiveLoop(loop === null ? null : engineLoopOf(loop));
+  }
+
+  /** The reduced lap phase of the running loop's lap in progress, or null with no loop running.
+   *  Pulled: it moves every lap of a length that is not a whole number of frames. */
+  getLapPhase(slot: Slot): number | null {
+    return this.requireSlot(slot).player.getLapPhase();
+  }
+
+  /** Declares the lines the engine saves the live machine at as the playhead crosses them,
+   *  replacing the previous set; `[]` frees them. A saved image is what a loop pushed on a line
+   *  starts from. */
+  setCrossingCaptures(slot: Slot, lines: readonly CrossingLines[]): void {
+    this.requireSlot(slot).player.setCrossingCaptures(lines);
+  }
+
+  /** Whether the engine holds an image of the machine at `frame`, from any source. */
+  holdsImageAt(slot: Slot, frame: number): boolean {
+    return this.requireSlot(slot).player.holdsImageAt(frames(frame));
+  }
+
+  /** Names the running loop's replacement for the wrap that ends the lap ending at `frame`, with
+   *  `loop` entered from its start's image. False, changing nothing, when no loop is running or no
+   *  image of `loop`'s start is held. */
+  changeLoopAt(slot: Slot, frame: number, loop: EngineLoop): boolean {
+    return this.requireSlot(slot).player.changeLoopAt(frames(frame), engineLoopOf(loop));
+  }
+
+  /** Lands the playhead on `at` on the register record, then hands back to the machine. A bare
+   *  frame lands with no gate-off pending; a count with `held` lands as it stands, and with its
+   *  `lapPhase` as the running loop's lap in progress. False when there is no record, `at` lies
+   *  past it, or the deck is not playing. */
+  land(
     slot: Slot,
-    loop: { startFrame: number; endFrame: number; varispeedStart?: VarispeedLoopStart } | null
-  ): void {
-    this.requireSlot(slot).player.setActiveLoop(
+    at: number | { frame: number; held: boolean; lapPhase?: number },
+    settings?: JumpSettings
+  ): boolean {
+    const target =
+      typeof at === 'number'
+        ? frames(at)
+        : {
+            frame: frames(at.frame),
+            held: at.held,
+            ...(at.lapPhase === undefined ? {} : { lapPhase: at.lapPhase }),
+          };
+    const { player } = this.requireSlot(slot);
+    return settings === undefined ? player.land(target) : player.land(target, settings);
+  }
+
+  /** Starts, or re-bases, this slot's shadow position: a count that moves a frame a tick wherever
+   *  the playhead goes. It laps `loop` (null: wraps where the track does) as the player laps it,
+   *  counting from `from` — in the lap its `lapPhase` names, else the loop's lap 0 at its own — or,
+   *  with none, from the player's own position, phase and lap. False with no tune loaded. */
+  startShadow(
+    slot: Slot,
+    loop: { startFrame: number; endFrame: number; lapPhase?: number } | null,
+    from?: ShadowCount
+  ): boolean {
+    const { player } = this.requireSlot(slot);
+    const lap =
       loop === null
         ? null
         : {
             startFrame: frames(loop.startFrame),
             endFrame: frames(loop.endFrame),
-            ...(loop.varispeedStart === undefined ? {} : { varispeedStart: loop.varispeedStart }),
-          }
-    );
+            ...(loop.lapPhase === undefined ? {} : { lapPhase: loop.lapPhase }),
+          };
+    return from === undefined ? player.startShadow(lap) : player.startShadow(lap, from);
   }
 
-  /** Queues a jump for the end of the running loop's lap; null cancels. Its `settings` land with
-   *  the jump. */
+  stopShadow(slot: Slot): void {
+    this.requireSlot(slot).player.stopShadow();
+  }
+
+  /** The frame the shadow counts now, or null while it is stopped. Pulled for painting; allocates
+   *  nothing. */
+  getShadowPosition(slot: Slot): Frames | null {
+    return this.requireSlot(slot).player.getShadowPosition();
+  }
+
+  /** The shadow's exact count, frame and phase, or null while it is stopped. */
+  getShadowCount(slot: Slot): ShadowCount | null {
+    return this.requireSlot(slot).player.getShadowCount();
+  }
+
+  /** Ticks counted since the shadow last started or re-based, or null while it is stopped. */
+  getShadowTicks(slot: Slot): number | null {
+    return this.requireSlot(slot).player.getShadowTicks();
+  }
+
+  /** Lands the playhead on the shadow's count, as `land` does, sending nothing when the deck is
+   *  already there. False when there is no record, the count lies past it, the deck is not playing
+   *  or the shadow is stopped. The shadow keeps running. */
+  landOnShadow(slot: Slot, settings?: JumpSettings): boolean {
+    const { player } = this.requireSlot(slot);
+    return settings === undefined ? player.landOnShadow() : player.landOnShadow(settings);
+  }
+
+  /** Queues a jump for the end of the running loop's lap; null cancels. A loop queued (an
+   *  `endFrame`) laps on from the running loop's clock once it lands, so hand-offs never add up
+   *  drift; its own `lapPhase` is used only when it takes over from the track's own loop. Its
+   *  `settings` land with the jump. */
   queueJump(
     slot: Slot,
     target: {
       startFrame: number;
       endFrame: number | null;
       varispeedStart?: VarispeedLoopStart;
+      lapPhase?: number;
       settings?: JumpSettings;
     } | null
   ): void {
@@ -364,6 +471,7 @@ export class DeckRuntime {
             ...(target.varispeedStart === undefined
               ? {}
               : { varispeedStart: target.varispeedStart }),
+            ...(target.lapPhase === undefined ? {} : { lapPhase: target.lapPhase }),
             ...(target.settings === undefined ? {} : { settings: target.settings }),
           }
     );

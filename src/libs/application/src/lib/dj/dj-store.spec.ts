@@ -53,7 +53,6 @@ describe('DjStore', () => {
       expect(store.decks().A.status).toBe('empty');
       expect(store.decks().A.loaded).toBeNull();
       expect(store.decks().A.busy).toBe(false);
-      expect(store.decks().A.repeat).toBe(true);
       expect(store.decks().B).toEqual(store.decks().A);
       expect(store.positions()).toEqual({ A: 0, B: 0 });
 
@@ -62,6 +61,12 @@ describe('DjStore', () => {
 
       expect(store.midi()).toEqual({ accessState: 'idle', ports: [], lastError: null });
       expect(store.seen()).toEqual({});
+    });
+
+    it('starts both decks with slip on and a 4-beat live loop', () => {
+      for (const slot of ['A', 'B'] as const) {
+        expect(store.decks()[slot]).toMatchObject({ slip: true, liveLoopBeats: 4 });
+      }
     });
 
     it('starts both decks with home speed, three unmuted unheld voices, no key and not switching', () => {
@@ -158,11 +163,6 @@ describe('DjStore', () => {
     it('setDeckSubtune sets subtune', () => {
       store.setDeckSubtune({ slot: 'A', subtune: 3 });
       expect(store.decks().A.subtune).toBe(3);
-    });
-
-    it('setDeckRepeat sets repeat', () => {
-      store.setDeckRepeat({ slot: 'A', repeat: false });
-      expect(store.decks().A.repeat).toBe(false);
     });
 
     it('setDeckBusy sets busy, leaving the other slot untouched', () => {
