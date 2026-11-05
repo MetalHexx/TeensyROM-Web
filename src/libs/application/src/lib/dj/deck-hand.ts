@@ -80,8 +80,9 @@ interface SlotHand {
  * loop; a record stopped at the loop's start stays still under a backward throw and climbs from
  * standstill at the strip's grip.
  *
- * With slip on, a touch is a slip departure, and a lift lands the deck on the count `DeckSlip` kept
- * instead of throwing; with slip off, or switched off since the touch, it throws.
+ * With slip on and a live loop running, or inside a slip departure already running, a touch is a
+ * departure of its own, and a lift lands the deck on the count `DeckSlip` kept instead of throwing.
+ * Otherwise it throws: slip off, slip switched off since the touch, or no live loop to return into.
  *
  * The strip's messages only record values; the position is worked out on the engine's tick, which
  * has the position that tick starts from.
@@ -201,6 +202,11 @@ export class DeckHand {
         hand.state = 'ignoring';
         return;
       }
+    } else if (!this.runtime.enterVarispeed(slot, hand.rateSource)) {
+      // Mid-throw, but a slip landing may have taken the record off the hand since the lift, and
+      // the throw's end will never come to bring it back to idle.
+      hand.state = 'ignoring';
+      return;
     }
 
     hand.anchorValue = value;

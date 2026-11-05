@@ -604,20 +604,113 @@ describe('DeckSlip', () => {
   });
 
   describe('the hand', () => {
-    it('lands on the line at the lift when slip is on, and goes idle', async () => {
+    /** Touches the record and moves it `counts` from the touch, the finger staying down. */
+    function strokeBy(counts: number): void {
+      bend(9000, 0);
+      tick();
+      bend(9000 + counts, 10);
+      tick(3);
+    }
+
+    /** Plays on until A's record has handed back to the machine. */
+    async function playUntilHandedBack(): Promise<void> {
+      for (let i = 0; i < 400 && engineVarispeed(); i++) {
+        if (i % 10 === 0) {
+          await settle();
+        }
+        tick();
+      }
+      expect(engineVarispeed()).toBe(false);
+    }
+
+    it.each([
+      ['back', -3000],
+      ['forward', 3000],
+    ])(
+      'moves a playing deck %s for good with slip on and no live loop running',
+      async (_direction, counts) => {
+        await playing();
+
+        strokeBy(counts);
+        expect(deck().handHeld).toBe(true);
+        expect(slip.returnFrame('A')).toBeNull();
+        expect(runtime.getShadowPosition('A')).toBeNull();
+        const liftedAt = position('A');
+        expect(Math.sign(liftedAt - position('B'))).toBe(Math.sign(counts));
+
+        bend(PITCH_BEND_CENTRE, 500);
+
+        expect(deck().handHeld).toBe(false);
+        expect(h.djStore.transportSummary('A')().held).toBe(false);
+        expect(position('A')).toBe(liftedAt);
+
+        // Back to speed at the strip's grip, not at once.
+        tick(5);
+        expect(position('A') - liftedAt).toBeLessThan(5);
+
+        await playUntilHandedBack();
+        const gap = position('A') - position('B');
+        expect(Math.sign(gap)).toBe(Math.sign(counts));
+        tick(20);
+        expect(position('A') - position('B')).toBe(gap);
+      }
+    );
+
+    it('stays where the finger left it on a paused deck with slip on', async () => {
       await playing();
+      await h.deckService.togglePlayPause('A');
+      await settle();
+
+      strokeBy(-3000);
+      expect(slip.returnFrame('A')).toBeNull();
+      const liftedAt = position('A');
+      bend(PITCH_BEND_CENTRE, 500);
+
+      expect(position('A')).toBe(liftedAt);
+    });
+
+    it('is a departure with slip on while a live loop runs: the lift lands, and the loop ends on the line', async () => {
+      await playing();
+      h.deckService.toggleLiveLoop('A');
+      tick(40);
 
       stroke();
       expect(deck().handHeld).toBe(true);
-      expect(slip.returnFrame('A')).toBe(position('B'));
-      expectOffTheLine();
+      const lap = slip.returnFrame('A');
+      expect(lap).not.toBeNull();
+      expect(lap).not.toBe(position('B'));
       bend(PITCH_BEND_CENTRE, 500);
 
       expect(deck().handHeld).toBe(false);
-      expect(h.djStore.transportSummary('A')().held).toBe(false);
+      expect(position('A')).toBe(lap);
+      expect(loopsOf().live).not.toBeNull();
+      expect(slip.returnFrame('A')).toBe(position('B'));
+      tick(10);
+
+      h.deckService.endLiveLoop('A');
+
       expect(slip.returnFrame('A')).toBeNull();
       expectLandedOnTheLine();
-      await playOutTheHandback();
+    });
+
+    it('takes the record back when a touch finds a landing has ended its throw', async () => {
+      await playing();
+      strokeBy(-3000);
+      bend(PITCH_BEND_CENTRE, 500);
+      tick(2);
+
+      // A live loop pushed and ended inside the throw: its landing takes the record off the hand.
+      h.deckService.toggleLiveLoop('A');
+      tick(2);
+      h.deckService.endLiveLoop('A');
+      tick(2);
+
+      strokeBy(3000);
+      const heldAt = position('A');
+      tick(3);
+
+      expect(deck().handHeld).toBe(true);
+      expect(position('A')).toBe(heldAt);
     });
 
     it('nests inside a list marker loop departure: the lift lands at the loop lap point, and the loop ends on the line', async () => {
@@ -655,11 +748,17 @@ describe('DeckSlip', () => {
 
     it('throws at the lift when slip was switched off since the touch', async () => {
       await playing();
+      h.deckService.toggleLiveLoop('A');
+      tick(40);
 
       stroke();
+      expect(runtime.getShadowPosition('A')).not.toBeNull();
       h.deckService.setSlip('A', false);
       expect(runtime.getShadowPosition('A')).toBeNull();
+      const liftedAt = position('A');
       bend(PITCH_BEND_CENTRE, 500);
+
+      expect(position('A')).toBe(liftedAt);
       tick(3);
 
       expectOffTheLine();
@@ -779,9 +878,12 @@ describe('DeckSlip', () => {
   });
 
   describe('an older departure that ends while a newer one nested inside it runs', () => {
-    it('lifting the hand over a live loop pushed in the hold leaves the live loop the line, and its end lands on it', async () => {
+    it('lifting a hand nested in a live loop over a live loop pushed in the hold leaves the newer live loop the line, and its end lands on it', async () => {
       await playing();
+      h.deckService.toggleLiveLoop('A');
+      tick(40);
       stroke();
+      h.deckService.endLiveLoop('A');
       h.deckService.toggleLiveLoop('A');
       tick(5);
       expect(loopsOf().live).not.toBeNull();
@@ -798,6 +900,30 @@ describe('DeckSlip', () => {
       expect(slip.returnFrame('A')).toBeNull();
       expect(runtime.getShadowPosition('A')).toBeNull();
       expectLandedOnTheLine();
+    });
+
+    it('a live loop pushed under a hand that took no departure starts the line where the record is', async () => {
+      await playing();
+      stroke();
+      expect(slip.returnFrame('A')).toBeNull();
+
+      h.deckService.toggleLiveLoop('A');
+      tick(5);
+      expect(loopsOf().live).not.toBeNull();
+      const line = slip.returnFrame('A');
+      expect(line).not.toBeNull();
+      expect(line).not.toBe(position('B'));
+
+      bend(PITCH_BEND_CENTRE, 500);
+      tick(5);
+
+      expect(deck().handHeld).toBe(false);
+      expect(slip.returnFrame('A')).toBe((line as number) + 5);
+
+      h.deckService.endLiveLoop('A');
+
+      expect(slip.returnFrame('A')).toBeNull();
+      expect(position('A')).toBe((line as number) + 5);
     });
 
     it('ending the live loop under a held hand leaves the hand the line, and the lift lands on it', async () => {

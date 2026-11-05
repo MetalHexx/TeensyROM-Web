@@ -49,7 +49,8 @@ interface SlotSlip {
 
 /**
  * Slip, per deck: the second playhead that remembers where the line would be while a live loop, a
- * list marker loop or the hand holds the deck somewhere else, and the landing back on it.
+ * list marker loop or the hand holds the deck somewhere else, and the landing back on it. The hand
+ * counts only over a live loop or inside a running departure; on its own it moves the line itself.
  *
  * A departure begins when slip is on and the deck is taken off the line, always before the engine
  * call that moves the playhead, so the engine's shadow position starts from the frame that was
@@ -86,6 +87,8 @@ export class DeckSlip {
    * Begins a departure, when slip is on. Idle, the shadow starts from the player's position and
    * phase, lapping the loop then running in the lap the player is in (the engine matches the loop
    * by its bounds, and counts from the loop's own lap phase only when it is not the one running).
+   * The hand alone is no departure: idle with no live loop running, a touch starts nothing, so the
+   * record stays where the finger leaves it, as with slip off.
    * Inside a running departure a live loop or the hand nests,
    * and a list marker loop does nothing: the count carries on and `markerLanded` makes the marker
    * the departure. `queued` marks a marker that waits to land.
@@ -97,6 +100,9 @@ export class DeckSlip {
     const state = this.live(slot);
     const run: Run = { kind, returnsInto: this.loopRunning(slot), queued };
     if (state.run === null) {
+      if (kind === 'hand' && this.store.loops()[slot].live === null) {
+        return;
+      }
       if (this.runtime.startShadow(slot, run.returnsInto)) {
         state.run = run;
       }

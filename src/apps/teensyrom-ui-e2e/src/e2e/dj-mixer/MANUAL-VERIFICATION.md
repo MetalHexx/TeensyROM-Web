@@ -1205,7 +1205,9 @@ made on the running app), and the Live loop row stories were not opened.
 - [ ] A live loop of 2-3 frames (1/24 beat on a 2x tune, 1/16 beat at 125 BPM): stutter or a held
   note.
 - [ ] A build-up (1, then 1/2, then 1/4) landing on the grid with no seam.
-- [ ] Slip landing after a live loop, after a list loop, and after the hand.
+- [ ] Slip landing after a live loop, after a list loop, and after the hand touched inside one of
+  them. With neither running, slip on, the hand moves the deck for good: a back cue stays where
+  the finger left it and comes up to speed at the strip's grip, the same as with slip off.
 - [ ] A live loop over a 128-beat list loop, returning into it.
 - [ ] A list loop fired from a build-up.
 - [ ] A live loop pushed with a voice muted, then unmuted (the saved image may keep that voice silent
