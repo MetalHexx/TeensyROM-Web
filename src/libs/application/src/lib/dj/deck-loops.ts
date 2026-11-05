@@ -719,7 +719,7 @@ export class DeckLoops {
   }
 
   /** Gives the selected marker an end exactly `beats` after its start, a ladder size — between two
-   *  frames for a size that is not a whole number of them (⅛ of a 28-frame beat ends 3.5 on). A
+   *  frames for a size that is not a whole number of them (1/8 of a 28-frame beat ends 3.5 on). A
    *  no-op, logged, off the grid or for a size the ladder lacks: one under 2 frames. */
   setLength(slot: Slot, beats: number): void {
     const marker = this.selectedMarker(slot, 'setLength');

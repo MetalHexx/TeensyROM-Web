@@ -19,7 +19,7 @@ export interface LiveLoopRowModel {
   readonly disabled: boolean;
   /** e.g. 'Live loop deck A'. */
   readonly liveLoopAccessibleName: string;
-  /** The size readout, its picker and the names of ½, 2× and the picker. */
+  /** The size readout, its picker and the names of 1/2, 2× and the picker. */
   readonly size: LoopLengthModel;
   /** False at the ladder's shortest rung. */
   readonly canHalve: boolean;
@@ -33,13 +33,13 @@ export interface LiveLoopRowModel {
 /**
  * The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights green
  * (`data-running` on the host) while the loop runs: the Live loop key, the SIZE control
- * (½, a size picker, 2×) and the latching SLIP key. Purely presentational: the caller owns the loop,
+ * (1/2, a size picker, 2×) and the latching SLIP key. Purely presentational: the caller owns the loop,
  * the size and the slip, and supplies every label.
  *
  * The Live loop key acts on press, not release. A quick click leaves the loop running; a press held
  * for `LIVE_LOOP_HOLD_MS` or longer ends the loop it started when it is released. Enter and Space
  * behave the same. Pressing while the loop already runs only toggles it off. The size readout takes
- * the mouse wheel, and ½ and 2× disable at the ends of the ladder. The keys carry the `data-control`
+ * the mouse wheel, and 1/2 and 2× disable at the ends of the ladder. The keys carry the `data-control`
  * ids `live-loop`, `live-loop-size`, `live-loop-halve`, `live-loop-double` and `slip`.
  *
  * @example
@@ -73,7 +73,7 @@ export class LiveLoopRowComponent {
   readonly toggleLiveLoop = output<void>();
   /** Emits when a press that started the loop is released after `LIVE_LOOP_HOLD_MS` or more. */
   readonly endLiveLoop = output<void>();
-  /** Emits when the ½ key is pressed. */
+  /** Emits when the 1/2 key is pressed. */
   readonly halve = output<void>();
   /** Emits when the 2× key is pressed. */
   readonly double = output<void>();

@@ -109,7 +109,7 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly toggleLiveLoop = output<void>();
   /** Emits when a Live loop press that started the loop is released after a hold. */
   readonly endLiveLoop = output<void>();
-  /** Emits when the live loop's ½ key is pressed. */
+  /** Emits when the live loop's 1/2 key is pressed. */
   readonly halveLiveLoop = output<void>();
   /** Emits when the live loop's 2× key is pressed. */
   readonly doubleLiveLoop = output<void>();
@@ -131,7 +131,7 @@ export class LoopsCuesPlateComponent implements LiveProgressIndicator {
   readonly setIn = output<void>();
   /** Emits when the selected row's Out key is pressed. */
   readonly setOut = output<void>();
-  /** Emits when the selected row's ½ key is pressed. */
+  /** Emits when the selected row's 1/2 key is pressed. */
   readonly halve = output<void>();
   /** Emits when the selected row's 2× key is pressed. */
   readonly double = output<void>();

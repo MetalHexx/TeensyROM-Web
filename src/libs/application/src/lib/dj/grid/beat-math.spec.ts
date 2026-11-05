@@ -157,15 +157,15 @@ describe('beatsLabel', () => {
   });
 
   it('writes the ladder fractions, down to its shortest, 1/16', () => {
-    expect(beatsLabel(0.5)).toBe('½ BEAT');
-    expect(beatsLabel(0.25)).toBe('¼ BEAT');
-    expect(beatsLabel(0.125)).toBe('⅛ BEAT');
+    expect(beatsLabel(0.5)).toBe('1/2 BEAT');
+    expect(beatsLabel(0.25)).toBe('1/4 BEAT');
+    expect(beatsLabel(0.125)).toBe('1/8 BEAT');
     expect(beatsLabel(1 / 16)).toBe('1/16 BEAT');
     expect(lengthLadder(40).map((size) => beatsLabel(size.beats)).slice(0, 4)).toEqual([
       '1/16 BEAT',
-      '⅛ BEAT',
-      '¼ BEAT',
-      '½ BEAT',
+      '1/8 BEAT',
+      '1/4 BEAT',
+      '1/2 BEAT',
     ]);
     expect(beatsLabel(1 / 32)).toBe('1/32 BEAT');
   });
@@ -190,7 +190,7 @@ describe('lapPhaseOrNone', () => {
 });
 
 describe('loopLapPhase', () => {
-  /** 28 frames a beat from frame 0: the ⅛ lines, 3.5 frames apart, round to 0, 4, 7, 11, 14 … */
+  /** 28 frames a beat from frame 0: the 1/8 lines, 3.5 frames apart, round to 0, 4, 7, 11, 14 … */
   const grid28 = grid({ beatFrames: 28, beatOneFrame: 0 });
 
   it('is the unrounded position of the line of its own length a loop below a beat starts on', () => {

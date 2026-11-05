@@ -114,7 +114,7 @@ const LAMP_OFF = 'radio_button_unchecked';
  * The selected loop or cue, across both columns of the plate: a trigger key, a small display of the
  * name, kind and span, a play-now key, the GBL and WRAP switches, the Clear End and Delete keys, and
  * beneath them the Start and End boundaries side by side, each headed by its In or Out key, and under
- * those the Length row (½, a size picker, 2×) and the Move row (move earlier, a step picker, move later).
+ * those the Length row (1/2, a size picker, 2×) and the Move row (move earlier, a step picker, move later).
  * A cue's End boundary keeps an enabled Out key, which makes the cue a loop.
  * The GBL switch draws a lamp beside its label, a ringed dot while the marker shares the main
  * track's settings and an empty ring while it has its own, and is a plain disabled key (no pressed
@@ -123,7 +123,7 @@ const LAMP_OFF = 'radio_button_unchecked';
  * no drag value. The caller supplies every label and the drag offsets.
  *
  * The name is renamed in place — click it, type, Enter; an empty name is allowed. With
- * `model.empty` the display is blank and every key and boundary is disabled, as are ½ and 2×; the
+ * `model.empty` the display is blank and every key and boundary is disabled, as are 1/2 and 2×; the
  * Move row stays live, as the Move step belongs to the deck. A picker opens a list of its `options`
  * and emits the picked beats; with no options (no grid) its readout is plain text. The display's
  * accessible text carries the running, queued, not-ready, own-settings and wraps state in words.
@@ -191,7 +191,7 @@ export class LoopSelectedRowComponent {
   readonly setIn = output<void>();
   /** Emits when the Out key is pressed. */
   readonly setOut = output<void>();
-  /** Emits when the ½ key is pressed. */
+  /** Emits when the 1/2 key is pressed. */
   readonly halve = output<void>();
   /** Emits when the 2× key is pressed. */
   readonly double = output<void>();

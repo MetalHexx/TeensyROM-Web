@@ -996,7 +996,7 @@ describe('DeckLoops', () => {
   });
 
   describe('beat commands', () => {
-    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at ⅛
+    /** 24 play calls a beat from frame 0: beats sit on multiples of 24, and the ladder starts at 1/8
      *  (3 frames): 1/16 would be 1.5 frames, under the 2 every size needs. */
     const GRID: DeckBeatGrid = {
       beatFrames: 24,
@@ -1183,7 +1183,7 @@ describe('DeckLoops', () => {
         loops.resize('A', 'double');
         loops.resize('A', 'double');
         loops.resize('A', 'double');
-        // ⅛ is the shortest size, so it halves no further: there is no odd division below it.
+        // 1/8 is the shortest size, so it halves no further: there is no odd division below it.
         loops.select('A', 'tiny');
         loops.resize('A', 'halve');
         loops.resize('A', 'halve');
@@ -1199,7 +1199,7 @@ describe('DeckLoops', () => {
       });
 
       it('halves and doubles through a size whose end falls between two frames', () => {
-        // 28 frames a beat: ¼ is 7 frames, ⅛ is 3.5, and there is nothing shorter.
+        // 28 frames a beat: 1/4 is 7 frames, 1/8 is 3.5, and there is nothing shorter.
         setGrid({ ...GRID, beatFrames: 28 });
         loops.select('A', 'tiny');
 
@@ -3250,8 +3250,8 @@ describe('DeckLoops', () => {
   });
 
   describe('a loop whose length is not a whole number of frames', () => {
-    /** 28 play calls a beat from frame 0: ⅛ is 3.5 frames, and its lines round to 0, 4, 7, 11 …
-     *  A ⅛ loop on an odd line (25, 39) laps 3 frames then 4; on an even one (28), 4 then 3. */
+    /** 28 play calls a beat from frame 0: 1/8 is 3.5 frames, and its lines round to 0, 4, 7, 11 …
+     *  A 1/8 loop on an odd line (25, 39) laps 3 frames then 4; on an even one (28), 4 then 3. */
     const GRID_28: DeckBeatGrid = {
       beatFrames: 28,
       beatOneFrame: 0,
@@ -3291,7 +3291,7 @@ describe('DeckLoops', () => {
       throw new Error('the playhead never wrapped');
     }
 
-    it('runs a ⅛ Length between two frames at the lap phase of its start line', async () => {
+    it('runs a 1/8 Length between two frames at the lap phase of its start line', async () => {
       loops.select('A', 'odd');
       loops.setLength('A', 1 / 8);
       await settle();
@@ -3307,7 +3307,7 @@ describe('DeckLoops', () => {
       });
       expect(stateOf('A').runningBounds).toEqual({ start: 25, end: 28.5, lapPhase: 0.5 });
       lapTicks();
-      // The ⅛ lines after 28 are 32, 35, 39, 42: laps of 4, 3, 4, 3.
+      // The 1/8 lines after 28 are 32, 35, 39, 42: laps of 4, 3, 4, 3.
       expect([lapTicks(), lapTicks(), lapTicks(), lapTicks()]).toEqual([4, 3, 4, 3]);
     });
 
@@ -3318,7 +3318,7 @@ describe('DeckLoops', () => {
       expect(stateOf('A').runningBounds).toEqual({ start: 28, end: 56 });
     });
 
-    it('queues a ⅛ marker with its own lap phase, hands off to it there, and queues it once', async () => {
+    it('queues a 1/8 marker with its own lap phase, hands off to it there, and queues it once', async () => {
       await engage('even');
 
       loops.toggle('A', 'next');
@@ -3357,7 +3357,7 @@ describe('DeckLoops', () => {
       expect([lapTicks(), lapTicks(), lapTicks()]).toEqual([4, 3, 4]);
     });
 
-    it('holds a ⅛ Length on the running loop for the end of the pass with its lap phase, queued once', async () => {
+    it('holds a 1/8 Length on the running loop for the end of the pass with its lap phase, queued once', async () => {
       await engage('odd');
       expect(engineLoop('A')).toEqual({ startFrame: 25, endFrame: 53, varispeedStart: 'stop' });
 

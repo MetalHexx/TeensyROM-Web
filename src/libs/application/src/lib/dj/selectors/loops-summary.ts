@@ -37,7 +37,7 @@ export interface LoopItemSummary {
   /** The marker's name, else 'Loop N' or 'Cue N' by its place among the markers of its kind. */
   readonly name: string;
   readonly kind: 'loop' | 'cue';
-  /** In beats ('5 BEATS', '½ BEAT') when the start is a beat of the deck's grid and the length is
+  /** In beats ('5 BEATS', '1/2 BEAT') when the start is a beat of the deck's grid and the length is
    *  a whole number of beats or a ladder fraction; else in seconds ('7.8s'). 'CUE' for a cue. */
   readonly lengthText: string;
   readonly activity: LoopActivity;

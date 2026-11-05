@@ -14,7 +14,7 @@ const meta: Meta<LoopSelectedRowComponent> = {
           'name, kind and span, the GBL switch (lit and pressed while the marker shares the main ' +
           "track's settings), an icon-only Clear End key and Delete, and beneath them the Start and " +
           "End boundaries, each headed by its In or Out key with edge-move arrows and a beat-tick nudge " +
-          'strip, and under them the Length row (½, a size picker, 2×) and the Move row (earlier, a ' +
+          'strip, and under them the Length row (1/2, a size picker, 2×) and the Move row (earlier, a ' +
           "step picker, later). A cue's End keeps an enabled Out key. With nothing selected the " +
           'display is blank and every key and boundary is disabled, but the Move row stays live. The ' +
           "display's accessible text carries the running, queued, not-ready and " +
@@ -35,7 +35,7 @@ const meta: Meta<LoopSelectedRowComponent> = {
     toggleWrap: { description: 'Emits when the WRAP switch is pressed.' },
     setIn: { description: 'Emits when the In key is pressed.' },
     setOut: { description: 'Emits when the Out key is pressed.' },
-    halve: { description: 'Emits when the ½ key is pressed.' },
+    halve: { description: 'Emits when the 1/2 key is pressed.' },
     double: { description: 'Emits when the 2× key is pressed.' },
     pickLength: { description: 'Emits the picked size in beats.' },
     moveEarlier: { description: 'Emits when the Move earlier key is pressed.' },

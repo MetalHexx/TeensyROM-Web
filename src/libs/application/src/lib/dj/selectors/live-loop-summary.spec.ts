@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DjStore, EMPTY_DECK_LOOPS, type DeckBeatGrid } from '../dj-store';
 
-/** 24 play calls a beat from frame 0: the ladder runs ⅛ beat (3 frames; 1/16 would be 1.5) up to
+/** 24 play calls a beat from frame 0: the ladder runs 1/8 beat (3 frames; 1/16 would be 1.5) up to
  *  128 beats. */
 const GRID: DeckBeatGrid = {
   beatFrames: 24,
@@ -56,10 +56,10 @@ describe('liveLoopSummary', () => {
     const result = summary();
 
     expect(result.available).toBe(true);
-    expect(result.sizeText).toBe('½ BEAT');
-    expect(result.sizeOptions[0]).toEqual({ beats: 1 / 8, label: '⅛ BEAT', selected: false });
+    expect(result.sizeText).toBe('1/2 BEAT');
+    expect(result.sizeOptions[0]).toEqual({ beats: 1 / 8, label: '1/8 BEAT', selected: false });
     expect(result.sizeOptions.filter((option) => option.selected)).toEqual([
-      { beats: 0.5, label: '½ BEAT', selected: true },
+      { beats: 0.5, label: '1/2 BEAT', selected: true },
     ]);
     expect(result.sizeOptions.at(-1)?.label).toBe('128 BEATS');
   });
@@ -76,8 +76,8 @@ describe('liveLoopSummary', () => {
     withGrid({ ...GRID, beatFrames: 28 });
     store.setDeckSettings({ slot: 'A', liveLoopBeats: 1 / 14 });
 
-    expect(summary().sizeText).toBe('⅛ BEAT');
-    expect(summary().sizeOptions[0]).toEqual({ beats: 1 / 8, label: '⅛ BEAT', selected: true });
+    expect(summary().sizeText).toBe('1/8 BEAT');
+    expect(summary().sizeOptions[0]).toEqual({ beats: 1 / 8, label: '1/8 BEAT', selected: true });
     expect(summary()).toMatchObject({ canHalve: false, canDouble: true });
   });
 

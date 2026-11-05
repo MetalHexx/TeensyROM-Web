@@ -15,7 +15,7 @@ export interface LiveLoopSummary {
   /** The deck has a tune with a grid and a non-empty ladder of sizes. */
   readonly available: boolean;
   readonly running: boolean;
-  /** The size the live loop takes, as the screen writes it: '½ BEAT', '4 BEATS'. */
+  /** The size the live loop takes, as the screen writes it: '1/2 BEAT', '4 BEATS'. */
   readonly sizeText: string;
   /** The ladder sizes the grid holds in whole frames, ascending; empty when unavailable. */
   readonly sizeOptions: readonly LiveLoopSizeOption[];

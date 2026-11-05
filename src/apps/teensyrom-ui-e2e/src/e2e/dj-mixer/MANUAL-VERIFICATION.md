@@ -873,8 +873,8 @@ page the set came back with its four rows, and loading the tune on both decks fr
 - Out pressed at 14528 (beat 302.06) made a loop 14285-14525, five beats, the end on beat 302. In
   pressed at 14735, past the end, changed nothing (refused).
 - Length by the buttons, from a cue: Double gave 4 beats (192 frames). Halve took it through 2, 1,
-  ½, ¼, ⅛ and 1/16 (3 frames) and stayed there (1/32 would be 1.5 frames); Double took it back up
-  through 1/8 ... 32 beats, 1536 frames. The Length menu lists 1/16 ... 32 beats; picking ½ BEAT gave
+  1/2, 1/4, 1/8 and 1/16 (3 frames) and stayed there (1/32 would be 1.5 frames); Double took it back up
+  through 1/8 ... 32 beats, 1536 frames. The Length menu lists 1/16 ... 32 beats; picking 1/2 BEAT gave
   24 frames.
 - Move step menu: 1, 2, 4, 8 and 16 beats. On a 32-beat loop at each step, Move shifted start and end
   together by exactly that many beats with the length kept, and the start and end arrows each moved

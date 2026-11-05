@@ -100,20 +100,14 @@ export function nearestRungIndex(ladder: readonly LadderSize[], beats: number): 
  *  grid's beat length, not a real fraction. */
 const WHOLE_FRAME_TOLERANCE = 1e-9;
 
-const FRACTION_LABELS: ReadonlyMap<number, string> = new Map([
-  [2, '½ BEAT'],
-  [4, '¼ BEAT'],
-  [8, '⅛ BEAT'],
-]);
-
-/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `½ BEAT`, `1/16 BEAT`. */
+/** A length in beats as the screen writes it: `1 BEAT`, `5 BEATS`, `1/2 BEAT`, `1/16 BEAT`. */
 export function beatsLabel(beats: number): string {
   if (Number.isInteger(beats)) {
     return `${beats} ${beats === 1 ? 'BEAT' : 'BEATS'}`;
   }
   const parts = Math.round(1 / beats);
   if (beats < 1 && Math.abs(parts * beats - 1) < WHOLE_FRAME_TOLERANCE) {
-    return FRACTION_LABELS.get(parts) ?? `1/${parts} BEAT`;
+    return `1/${parts} BEAT`;
   }
   return `${Number(beats.toFixed(3))} BEATS`;
 }

@@ -23,7 +23,7 @@ export interface LoopLengthModel {
 }
 
 /**
- * A size control: a tag, a ½ key, a readout that opens a picker of sizes, and a 2× key. It is the one
+ * A size control: a tag, a 1/2 key, a readout that opens a picker of sizes, and a 2× key. It is the one
  * size control of the mixer's loop rows (the selected loop's Length and the live loop's Size). Purely
  * presentational: the caller supplies every label, the options and which end of the ladder is reached.
  * With no options (no grid) the readout is plain text.
@@ -63,7 +63,7 @@ export class LoopSizeControlComponent {
   readonly model = input.required<LoopLengthModel>();
   /** Disables both keys and the picker, and dims the readout. Defaults to false. */
   readonly disabled = input<boolean>(false);
-  /** Disables the ½ key alone, e.g. at the ladder's shortest rung. Defaults to false. */
+  /** Disables the 1/2 key alone, e.g. at the ladder's shortest rung. Defaults to false. */
   readonly halveDisabled = input<boolean>(false);
   /** Disables the 2× key alone, e.g. at the ladder's longest rung. Defaults to false. */
   readonly doubleDisabled = input<boolean>(false);
@@ -74,11 +74,11 @@ export class LoopSizeControlComponent {
   readonly wheel = input<boolean>(false);
   /** The `data-control` id on the readout, e.g. 'loop-length'. */
   readonly readoutControl = input<string | null>(null);
-  /** The `data-control` id on the ½ key. */
+  /** The `data-control` id on the 1/2 key. */
   readonly halveControl = input<string | null>(null);
   /** The `data-control` id on the 2× key. */
   readonly doubleControl = input<string | null>(null);
-  /** Emits when the ½ key is pressed. */
+  /** Emits when the 1/2 key is pressed. */
   readonly halve = output<void>();
   /** Emits when the 2× key is pressed. */
   readonly double = output<void>();

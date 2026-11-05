@@ -11,7 +11,7 @@ const meta: Meta<LiveLoopRowComponent> = {
         component:
           "The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights " +
           'green while the loop runs: the Live loop key, the SIZE ' +
-          'control (½, a size picker, 2×, with the mouse wheel on the readout) and the latching SLIP ' +
+          'control (1/2, a size picker, 2×, with the mouse wheel on the readout) and the latching SLIP ' +
           'key. The Live loop key acts on press: a quick click leaves the loop running, and a press ' +
           'held for 300 ms or more ends the loop it started when released. Presentational only.',
       },
@@ -21,7 +21,7 @@ const meta: Meta<LiveLoopRowComponent> = {
     model: { description: "The row's state: running, disabled, size, ladder ends, slip and names." },
     toggleLiveLoop: { description: 'Emits when the Live loop key goes down.' },
     endLiveLoop: { description: 'Emits when a press that started the loop is released after a hold.' },
-    halve: { description: 'Emits when ½ is pressed.' },
+    halve: { description: 'Emits when 1/2 is pressed.' },
     double: { description: 'Emits when 2× is pressed.' },
     pickSize: { description: 'Emits the picked size in beats.' },
     sizeWheel: { description: 'Emits whole wheel clicks over the size readout, upward positive.' },

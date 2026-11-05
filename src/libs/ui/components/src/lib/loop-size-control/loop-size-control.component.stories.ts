@@ -9,7 +9,7 @@ const meta: Meta<LoopSizeControlComponent> = {
     docs: {
       description: {
         component:
-          'The size control of the mixer loop rows: a tag, a ½ key, a readout that opens a picker of ' +
+          'The size control of the mixer loop rows: a tag, a 1/2 key, a readout that opens a picker of ' +
           'sizes, and a 2× key. The selected loop row draws it as Length, the live loop row as Size. ' +
           'Presentational only. With no options (no grid) the readout is plain text. The readout takes ' +
           'the mouse wheel only when `wheel` is on.',
@@ -19,14 +19,14 @@ const meta: Meta<LoopSizeControlComponent> = {
   argTypes: {
     model: { description: 'The readout text, the picker options and the accessible names.' },
     disabled: { description: 'Disables both keys and dims the readout.' },
-    halveDisabled: { description: "Disables ½ alone, e.g. at the ladder's shortest rung." },
+    halveDisabled: { description: "Disables 1/2 alone, e.g. at the ladder's shortest rung." },
     doubleDisabled: { description: "Disables 2× alone, e.g. at the ladder's longest rung." },
     tag: { description: 'The decorative caption before the keys.' },
     wheel: { description: 'Whether the readout takes the mouse wheel.' },
     readoutControl: { description: 'The data-control id on the readout.' },
-    halveControl: { description: 'The data-control id on the ½ key.' },
+    halveControl: { description: 'The data-control id on the 1/2 key.' },
     doubleControl: { description: 'The data-control id on the 2× key.' },
-    halve: { description: 'Emits when ½ is pressed.' },
+    halve: { description: 'Emits when 1/2 is pressed.' },
     double: { description: 'Emits when 2× is pressed.' },
     pickLength: { description: 'Emits the picked size in beats.' },
     wheelTurn: { description: 'Emits whole wheel clicks over the readout, upward positive.' },
@@ -76,7 +76,7 @@ export const Idle: Story = {
   },
 };
 
-/** At the shortest rung ½ is disabled alone. */
+/** At the shortest rung 1/2 is disabled alone. */
 export const AtShortest: Story = {
   args: { ...Idle.args, halveDisabled: true, model: { ...size, text: '1 BEAT' } },
 };

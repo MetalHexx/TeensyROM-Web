@@ -168,14 +168,14 @@ describe('LiveLoopRowComponent', () => {
   });
 
   describe('the size control', () => {
-    it('relays ½ and 2×', () => {
+    it('relays 1/2 and 2×', () => {
       byName('Halve live loop deck A').click();
       byName('Double live loop deck A').click();
 
       expect(emitted).toEqual(['halve', 'double']);
     });
 
-    it('disables ½ and 2× alone at the ends of the ladder', () => {
+    it('disables 1/2 and 2× alone at the ends of the ladder', () => {
       set({ ...row, canHalve: false });
       expect(byName('Halve live loop deck A').disabled).toBe(true);
       expect(byName('Double live loop deck A').disabled).toBe(false);

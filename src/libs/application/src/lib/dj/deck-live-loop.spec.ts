@@ -37,7 +37,7 @@ vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
 
 const INTERVAL_US = 20_000;
 
-/** A grid of 24 frames a beat from frame 0, so the ladder runs 3, 6, 12, 24, 48, 96 … frames: ⅛ is
+/** A grid of 24 frames a beat from frame 0, so the ladder runs 3, 6, 12, 24, 48, 96 … frames: 1/8 is
  *  the shortest, 1/16 being 1.5 frames. Every size is a whole number of frames. */
 const GRID: DeckBeatGrid = {
   beatFrames: 24,
@@ -47,8 +47,8 @@ const GRID: DeckBeatGrid = {
   source: 'scan',
 };
 
-/** 28 frames a beat from frame 0: ⅛ is 3.5 frames, ¼ 7, ½ 14, and there is no 1/16 (1.75). The ⅛
- *  lines round to 0, 4, 7, 11, 14, 18, 21, 25, 28, 32, 35, 39, 42, 46, 49 … so a ⅛ loop on an odd
+/** 28 frames a beat from frame 0: 1/8 is 3.5 frames, 1/4 7, 1/2 14, and there is no 1/16 (1.75). The 1/8
+ *  lines round to 0, 4, 7, 11, 14, 18, 21, 25, 28, 32, 35, 39, 42, 46, 49 … so a 1/8 loop on an odd
  *  line (39) laps 3, 4, 3, 4 frames and one on an even line (28) 4, 3, 4, 3. */
 const GRID_28: DeckBeatGrid = { ...GRID, beatFrames: 28 };
 
@@ -1032,7 +1032,7 @@ describe('DeckLiveLoop', () => {
   });
 
   describe('a size that is not a whole number of frames', () => {
-    it("pushes ⅛ of a 28-frame beat with its end between two frames and its start line's lap phase", async () => {
+    it("pushes 1/8 of a 28-frame beat with its end between two frames and its start line's lap phase", async () => {
       await play('A', { beats: 1 / 8, grid: GRID_28 });
       playTo('A', 38);
 
@@ -1052,19 +1052,19 @@ describe('DeckLiveLoop', () => {
       });
     });
 
-    it('laps a pushed ⅛ in alternating lengths that end on its lines and add up to the beat', async () => {
+    it('laps a pushed 1/8 in alternating lengths that end on its lines and add up to the beat', async () => {
       await play('A', { beats: 1 / 8, grid: GRID_28 });
       playTo('A', 38);
       live.toggle('A');
 
       const laps = Array.from({ length: 8 }, () => lapTicks('A'));
 
-      // From 38 the loop wraps where the ⅛ lines after 39 fall: 42, 46, 49, 53, 56 …
+      // From 38 the loop wraps where the 1/8 lines after 39 fall: 42, 46, 49, 53, 56 …
       expect(laps).toEqual([3, 4, 3, 4, 3, 4, 3, 4]);
       expect(laps.reduce((sum, lap) => sum + lap, 0)).toBe(28);
     });
 
-    it('pushes ⅛ on a whole-frame line with no lap phase, lapping 4 then 3', async () => {
+    it('pushes 1/8 on a whole-frame line with no lap phase, lapping 4 then 3', async () => {
       await play('A', { beats: 1 / 8, grid: GRID_28 });
       playTo('A', 27);
 
@@ -1086,7 +1086,7 @@ describe('DeckLiveLoop', () => {
       expect(live.steppedBeats('A', 'double')).toBe(1 / 4);
       expect(store.decks()['A'].liveLoopBeats).toBe(1 / 14);
 
-      // The old 2-frame rung of a 24-frame beat (1/12) is now its ⅛, 3 frames.
+      // The old 2-frame rung of a 24-frame beat (1/12) is now its 1/8, 3 frames.
       await play('B', { beats: 1 / 12 });
       playTo('B', 31);
       live.toggle('B');
@@ -1099,7 +1099,7 @@ describe('DeckLiveLoop', () => {
       live.toggle('A');
       lapTicks('A');
       lapTicks('A');
-      // The third lap: phase 0.5, where ¼'s own line phase at 39 would be 0.
+      // The third lap: phase 0.5, where 1/4's own line phase at 39 would be 0.
       const lapPhase = vi.spyOn(runtime, 'getLapPhase');
 
       turnTo('A', 1 / 4);
@@ -1131,7 +1131,7 @@ describe('DeckLiveLoop', () => {
     });
 
     it('shrinks at once from the lap in progress, carrying the alternation on exactly', async () => {
-      // 22 frames a beat: ¼ is 5.5 frames, its lines round to 33, 39, 44, 50; ⅛ is 2.75, its lines
+      // 22 frames a beat: 1/4 is 5.5 frames, its lines round to 33, 39, 44, 50; 1/8 is 2.75, its lines
       // round to 39, 41, 44, 47, 50, 52.
       await play('A', { beats: 1 / 4, grid: { ...GRID, beatFrames: 22 } });
       playTo('A', 32);
@@ -1163,7 +1163,7 @@ describe('DeckLiveLoop', () => {
 
       turnTo('A', 1 / 8);
 
-      // ⅛ laps from 28 end at 32, 35, 39: the first after the next frame is three laps on, at
+      // 1/8 laps from 28 end at 32, 35, 39: the first after the next frame is three laps on, at
       // phase 0.5.
       expect(loopChange('A')).toMatchObject({
         atFrame: 39,
@@ -1195,7 +1195,7 @@ describe('DeckLiveLoop', () => {
       expect([lapTicks('A'), lapTicks('A'), lapTicks('A'), lapTicks('A')]).toEqual([3, 4, 3, 4]);
     });
 
-    it('keeps a live ⅛ as a marker with its end and lap phase, its laps running on', async () => {
+    it('keeps a live 1/8 as a marker with its end and lap phase, its laps running on', async () => {
       await play('A', { beats: 1 / 8, grid: GRID_28 });
       await flush();
       playTo('A', 38);
@@ -1220,7 +1220,7 @@ describe('DeckLiveLoop', () => {
   });
 
   describe('returning into a marker whose length is not a whole number of frames', () => {
-    /** ⅛ from beat 1, at phase 0: laps of 4, 3, 4, 3 frames, ending at 32, 35, 39, 42. */
+    /** 1/8 from beat 1, at phase 0: laps of 4, 3, 4, 3 frames, ending at 32, 35, 39, 42. */
     const M = loopOf('m', 28, 31.5);
 
     /** Deck A running `m`, with a half-beat live loop pushed over it from its start. */

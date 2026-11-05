@@ -316,7 +316,7 @@ describe('MappableControls', () => {
   });
 
   describe('live loop and slip', () => {
-    /** 24 play calls a beat: eleven sizes, ⅛ beat (3 frames) up to 128 beats; 4 beats is index 5. */
+    /** 24 play calls a beat: eleven sizes, 1/8 beat (3 frames) up to 128 beats; 4 beats is index 5. */
     const GRID = {
       beatFrames: 24,
       beatOneFrame: 0,
@@ -485,7 +485,7 @@ describe('MappableControls', () => {
     });
 
     describe('loop-length', () => {
-      /** 24 play calls a beat: the ladder runs ⅛ (3 frames) to 128 beats, eleven sizes; 4 beats
+      /** 24 play calls a beat: the ladder runs 1/8 (3 frames) to 128 beats, eleven sizes; 4 beats
        *  (96 frames) is index 5. */
       const GRID = {
         beatFrames: 24,
@@ -563,7 +563,7 @@ describe('MappableControls', () => {
           },
         });
 
-        // 28 frames a beat: ⅛ (3.5 frames) is the shortest size.
+        // 28 frames a beat: 1/8 (3.5 frames) is the shortest size.
         expect(length().read()).toBe(0);
         expect(length().max).toBe(10);
       });
