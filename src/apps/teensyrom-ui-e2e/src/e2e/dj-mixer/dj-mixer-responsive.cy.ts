@@ -171,35 +171,93 @@ describe('DJ Mixer — responsive layout', () => {
       });
     });
 
-    // No tune loads in this fixture, so the selected row is the empty one: its Length readout is
-    // plain text and cannot show the longest text a loop gives it. The loaded row is measured in
-    // MANUAL-VERIFICATION.md.
-    describe('the selected loop row', () => {
-      NO_OVERFLOW_WIDTHS.forEach((width) => {
-        it(`keeps the Length readout and its keys whole inside the row at ${width}px wide`, () => {
+    // No tune loads in this fixture, so the Length and Move readouts show a dash. Each width writes the
+    // longest text a loop gives them ('128 BEATS' and a caret) into the readouts before measuring.
+    describe('the loop rows with the longest readout text', () => {
+      const LOOP_ROW_WIDTHS = [
+        1920,
+        1600,
+        1536,
+        1440,
+        1400,
+        1366,
+        1300,
+        1280,
+        1279,
+        1100,
+        VIEWPORT.TABLET.width,
+        400,
+      ] as const;
+      const LONGEST_READOUT_TEXT = '128 BEATS';
+      const CONTROLS = [
+        'lib-loop-selected-row lib-loop-size-control',
+        'lib-loop-selected-row .controls .control',
+        'lib-live-loop-row lib-loop-size-control',
+      ];
+
+      function boxOf(element: Element | Range): DOMRect {
+        return element.getBoundingClientRect();
+      }
+
+      function overlaps(a: DOMRect, b: DOMRect): boolean {
+        return (
+          a.left < b.right - 0.5 &&
+          a.right > b.left + 0.5 &&
+          a.top < b.bottom - 0.5 &&
+          a.bottom > b.top + 0.5
+        );
+      }
+
+      LOOP_ROW_WIDTHS.forEach((width) => {
+        it(`keeps every readout's text clear of the keys and every control on its plate at ${width}px wide`, () => {
           cy.viewport(width, 900);
 
-          cy.get('lib-loop-selected-row').should('have.length', 2);
-          cy.get('lib-loop-selected-row').should(($rows) => {
-            $rows.each((_, row) => {
-              const rowRect = row.getBoundingClientRect();
-              const readout = row.querySelector('[data-control="loop-length"]') as HTMLElement;
-              expect(readout, 'the Length readout is drawn').to.not.equal(null);
-              expect(readout.scrollWidth, 'the readout text fits').to.be.at.most(
+          cy.get('lib-loops-cues-plate').should('have.length', 2);
+          cy.get(CONTROLS.join(', ')).should('have.length', 6);
+          cy.get(CONTROLS.join(', ')).then(($controls) => {
+            $controls.each((_, control) => {
+              const readout = control.querySelector('.readout') as HTMLElement;
+              const caret = control.ownerDocument.createElement('span');
+              caret.textContent = '▾';
+              caret.style.fontSize = '0.5rem';
+              readout.replaceChildren(
+                control.ownerDocument.createTextNode(LONGEST_READOUT_TEXT),
+                caret
+              );
+            });
+          });
+
+          // Retried via `.should()`: the plates animate in, so a single read can catch them mid-scale.
+          cy.get(CONTROLS.join(', ')).should(($controls) => {
+            $controls.each((_, control) => {
+              const plate = boxOf(control.closest('lib-synth-panel') as Element);
+              const readout = control.querySelector('.readout') as HTMLElement;
+              const text = control.ownerDocument.createRange();
+              text.selectNodeContents(readout.firstChild as Node);
+              const textBox = boxOf(text);
+              const controlBox = boxOf(control);
+
+              expect(textBox.width, 'the text is drawn').to.be.greaterThan(0);
+              expect(readout.scrollWidth, 'the readout holds its text').to.be.at.most(
                 readout.clientWidth
               );
 
-              row
-                .querySelectorAll(':scope .controls lib-loop-size-control > *')
-                .forEach((control) => {
-                  const rect = control.getBoundingClientRect();
-                  expect(rect.left, 'the control starts inside the row').to.be.at.least(
-                    rowRect.left - 0.5
-                  );
-                  expect(rect.right, 'the control ends inside the row').to.be.at.most(
-                    rowRect.right + 0.5
-                  );
-                });
+              const parts = Array.from(control.querySelectorAll('lib-synth-key, .tag'));
+              expect(parts.length, 'tag and keys').to.be.at.least(3);
+              [...parts, readout].forEach((part) => {
+                const box = boxOf(part);
+                expect(box.left, 'starts inside the plate').to.be.at.least(plate.left - 0.5);
+                expect(box.right, 'ends inside the plate').to.be.at.most(plate.right + 0.5);
+                expect(box.bottom, 'ends above the plate bottom').to.be.at.most(plate.bottom + 0.5);
+                expect(box.left, 'starts inside its control').to.be.at.least(controlBox.left - 0.5);
+                expect(box.right, 'ends inside its control').to.be.at.most(controlBox.right + 0.5);
+              });
+              parts.forEach((part) => {
+                expect(
+                  overlaps(textBox, boxOf(part)),
+                  `the text is clear of ${part.getAttribute('label') ?? part.className}`
+                ).to.equal(false);
+              });
             });
           });
         });

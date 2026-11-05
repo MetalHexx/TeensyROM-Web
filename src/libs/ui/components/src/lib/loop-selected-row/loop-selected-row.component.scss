@@ -133,15 +133,20 @@ lib-synth-key[data-control='loop-delete'] {
   gap: 10px;
 }
 
+// The Move control sizes itself by its own width, as the Length control does.
 .control {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-xs);
+  justify-content: space-between;
+  gap: 2px var(--spacing-xs);
   min-width: 0;
+  container-type: inline-size;
 }
 
 .tag {
   flex: 0 0 auto;
+  min-width: var(--loop-tag-width, 0);
   color: var(--synth-legend);
   font-size: 0.53rem;
   font-weight: 600;
@@ -162,20 +167,21 @@ lib-synth-key.step {
 // plain text when it has none. The dropdown's wrappers are inline blocks; stretch them to the slot.
 lib-dropdown-menu {
   display: block;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   --dropdown-menu-trigger-display: block;
 }
 
 .readout {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 5px;
   width: 100%;
   min-width: 0;
   height: 22px;
+  overflow: hidden;
   padding: 0 var(--spacing-xs);
   box-sizing: border-box;
   border: 0;
@@ -203,17 +209,61 @@ button.readout {
   font-size: 0.5rem;
 }
 
-// Too narrow for the Length and Move rows abreast: stack them. The Length column needs 252.5 px for
-// its tag, four keys and the longest readout text (77 px: '128 BEATS' or '1/16 BEAT' with its caret);
-// two of them and the 10 px gap come to 515 px, so below 33rem (528 px) the readout would run over
-// the keys. Stacked, MOVE takes LENGTH's tag width so the two rows' first keys line up.
+// Too narrow for the Length and Move rows abreast: stack them. The Length column needs 252 px for
+// its tag, four keys and the longest readout text ('128 BEATS' or '1/16 BEAT' with its caret); two of
+// them and the 10 px gap come to 514 px, so below 33rem (528 px) the Length control would have to
+// shrink. Stacked, the two tags take one width so the rows' first keys line up.
 @container (max-width: 33rem) {
   .controls {
     grid-template-columns: minmax(0, 1fr);
+    --loop-tag-width: 4.8em;
   }
+}
 
-  .control .tag {
-    min-width: 2.47rem;
+// The Move control sizes itself as the Length control does (see its stylesheet): 200 px roomy and 193 px
+// compact beside '128 BEATS' or '1/16 BEAT', then two lines (the tag and the readout, the arrows at the
+// two ends) and below 8rem three. The arrows come either side of the readout in the DOM, so the later
+// lines reorder them visually. A text longer than the readout is clipped, never painted over a key.
+@container (max-width: 13rem) {
+  .control .readout {
+    padding: 0 2px;
+    gap: 2px;
+  }
+}
+
+@container (max-width: 12.25rem) {
+  .control {
+    & lib-dropdown-menu,
+    & > .readout {
+      order: 1;
+    }
+
+    & lib-synth-key.step {
+      order: 3;
+    }
+
+    &::after {
+      content: '';
+      order: 2;
+      flex: 0 0 100%;
+      height: 0;
+    }
+  }
+}
+
+@container (max-width: 8rem) {
+  .control {
+    & lib-dropdown-menu,
+    & > .readout {
+      order: 2;
+    }
+
+    &::before {
+      content: '';
+      order: 1;
+      flex: 0 0 100%;
+      height: 0;
+    }
   }
 }
 

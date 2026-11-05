@@ -548,7 +548,7 @@ describe('DjDeckColumnComponent', () => {
         emptyLoopsSummary({
           hasTune: true,
           items: [loopItem()],
-          selected: selection({ kind: 'cue', end: null }),
+          selected: selection({ kind: 'cue' }),
         })
       );
       fixture.detectChanges();
@@ -770,7 +770,7 @@ describe('DjDeckColumnComponent', () => {
         loops: {
           hasTune: true,
           items: [loopItem({ kind: 'cue', endPercent: null })],
-          selected: selection({ kind: 'cue', end: null, lengthText: 'NO END', lengthOptions: [] }),
+          selected: selection({ kind: 'cue', lengthText: 'NO END', lengthOptions: [] }),
         },
       });
       const { length } = plate(fixture).model().selected;
@@ -815,6 +815,7 @@ describe('DjDeckColumnComponent', () => {
           true,
         ]);
         expect([live.size.text, live.size.options]).toEqual(['4 BEATS', LADDER]);
+        expect([live.size.steps, live.size.noEnd]).toEqual([undefined, undefined]);
         expect([
           live.liveLoopAccessibleName,
           live.size.halveAccessibleName,

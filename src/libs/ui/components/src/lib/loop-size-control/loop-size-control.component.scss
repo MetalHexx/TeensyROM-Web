@@ -1,16 +1,23 @@
 :host {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-xs);
+  justify-content: space-between;
+  gap: 2px var(--spacing-xs);
   min-width: 0;
+  // The control sizes itself by its own width, wherever a row puts it. See the end of this file.
+  container-type: inline-size;
 }
 
 * {
   box-sizing: border-box;
 }
 
+// A row that stacks its controls sets `--loop-tag-width` so the tags of the stacked rows share a
+// width and the first keys line up.
 .tag {
   flex: 0 0 auto;
+  min-width: var(--loop-tag-width, 0);
   color: var(--synth-legend);
   font-size: 0.53rem;
   font-weight: 600;
@@ -37,20 +44,21 @@ lib-synth-key.sign {
 // has none. The dropdown's wrappers are inline blocks; stretch them to the slot.
 lib-dropdown-menu {
   display: block;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   --dropdown-menu-trigger-display: block;
 }
 
 .readout {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 5px;
   width: 100%;
   min-width: 0;
   height: 22px;
+  overflow: hidden;
   padding: 0 var(--spacing-xs);
   border: 0;
   border-radius: 4px;
@@ -77,19 +85,89 @@ button.readout {
   font-size: 0.5rem;
 }
 
-// With the − and + keys the row needs 252 px beside its longest readout text ('128 BEATS' or
-// '1/16 BEAT'). On the narrowest plate, which gives a row about 236 px, the readout and the − and +
-// keys give a little so the text stays clear of the keys.
+// What the control needs beside its longest readout text ('128 BEATS' or '1/16 BEAT' and the caret, 83 px
+// at a roomy readout, 76 px at a compact one):
+//   - with the − and + keys: 260 px roomy, 245 px compact (22 px signs);
+//   - without them: 199 px roomy, 192 px compact.
+// It tightens first. Below the compact width it takes two lines, the tag and the readout and then the
+// keys spread across the width, and below 8rem three: the tag, the readout, the keys. The keys come after
+// the readout in the DOM, so the later lines reorder them visually. A text longer than the readout is
+// clipped, never painted over a key.
+@mixin compact {
+  & .readout {
+    padding: 0 2px;
+    gap: 2px;
+  }
+
+  & lib-synth-key.sign {
+    --synth-key-min-width: 22px;
+  }
+}
+
+@mixin two-lines {
+  & lib-dropdown-menu,
+  & > .readout {
+    order: 1;
+  }
+
+  & lib-synth-key {
+    order: 3;
+    --synth-key-min-width: 28px;
+  }
+
+  & lib-synth-key.sign {
+    --synth-key-min-width: 22px;
+  }
+
+  &::after {
+    content: '';
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+}
+
+@mixin three-lines {
+  & lib-dropdown-menu,
+  & > .readout {
+    order: 2;
+  }
+
+  &::before {
+    content: '';
+    order: 1;
+    flex: 0 0 100%;
+    height: 0;
+  }
+}
+
 @container (max-width: 17rem) {
   :host([data-steps]) {
-    .readout {
-      padding: 0 2px;
-      gap: 2px;
-    }
+    @include compact;
+  }
+}
 
-    lib-synth-key.sign {
-      --synth-key-min-width: 22px;
-    }
+@container (max-width: 15.5rem) {
+  :host([data-steps]) {
+    @include two-lines;
+  }
+}
+
+@container (max-width: 13rem) {
+  :host(:not([data-steps])) {
+    @include compact;
+  }
+}
+
+@container (max-width: 12.25rem) {
+  :host(:not([data-steps])) {
+    @include two-lines;
+  }
+}
+
+@container (max-width: 8rem) {
+  :host {
+    @include three-lines;
   }
 }
 

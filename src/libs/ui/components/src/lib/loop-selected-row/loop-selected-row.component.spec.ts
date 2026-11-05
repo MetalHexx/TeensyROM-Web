@@ -192,7 +192,7 @@ describe('LoopSelectedRowComponent', () => {
     const items = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')
     );
-    expect(items.map((item) => item.textContent?.replace(/^s*checks*/, '').trim())).toEqual([
+    expect(items.map((item) => item.textContent?.replace(/^\s*check\s*/, '').trim())).toEqual([
       'NO END',
     ]);
     expect(items[0].classList.contains('selected')).toBe(true);

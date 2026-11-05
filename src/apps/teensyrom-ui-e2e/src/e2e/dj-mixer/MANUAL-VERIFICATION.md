@@ -1234,35 +1234,60 @@ reads LENGTH on both the selected row and the live loop row.
 
 ### What was checked in a browser
 
-Storybook (`pnpm nx run ui-components:storybook:ci`, port 4400), `dj-loops-cues-plate--loop-on-grid`
-and `dj-loop-selected-row--loop-sharing-global`, in Chrome. **The DJ view itself was not used**: a
-tune cannot be loaded in this session (it needs a TeensyROM and its file service), so the numbers
-below are the components' own, with the plate's row 440 px wide as it is at 1920 x 1080. They have not
-been repeated against the running app.
+The real DJ view (`/dj-mixer`, the dev server) in Cypress's browser, at the viewports the handoff names, with
+the longest readout text (`128 BEATS` and a caret, as `1/16 BEAT` is the same length) written into the
+Length readout of the selected row, the Move readout and the live row's Length readout. No tune can be
+loaded in this session (it needs a TeensyROM and its file service), so the readouts are the empty rows'
+with that text put in. The widths are the controls' own, in CSS px.
 
-| check | result |
-| --- | --- |
-| gap from the tag to the next control: live row LENGTH, selected row LENGTH, MOVE | 4 / 4 / 4 px |
-| tag widths: live LENGTH, selected LENGTH, stacked MOVE | 39.5 / 39.5 / 39.5 px |
-| stacked Length and Move rows, x of the first key | 85.1 and 85.1 |
-| Length keys, left to right (w) | 1/2 32, − 26, + 26, 2× 32 |
-| row 440 px (1920 x 1080): layout | Length and Move on their own lines, three lines with the top one, as before |
-| row 666 px: layout | Length and Move side by side, MOVE tag 28.2 px |
-| switch from stacked to side by side | between a 545 px and a 546 px row; the Length readout is then 83.7 px against the 77 px its longest text (`128 BEATS ▾`, `1/16 BEAT ▾`) needs |
-| longest text, readout scroll width against client width, row 270 to 700 px | whole at every width tried, and clear of the − and + keys |
-| narrowest plate, 288 px with the bindings panel open (row 254 px) | the readout was 61.3 px and `128 BEATS ▾` needed 65, so the text ran over the keys. Below a 17 rem plate content the readout takes 2 px padding and gap, and − and + take 22 px: the readout is then 69.3 px, the text 66 px, clear of both keys with 3.3 px to spare |
+| viewport | selected row | Length control | Move control | live Length control |
+| --- | --- | --- | --- | --- |
+| 1920 | 440 px | 422 px, 1 line | 422 px, 1 line | 271 px, 1 line |
+| 1600 | 280 px | 262 px, 1 line, tight readout | 262 px, 1 line | 262 px, 1 line |
+| 1536 | 264 px | 246 px, 2 lines | 246 px, 1 line | 246 px, 1 line |
+| 1440 | 216 px | 198 px, 2 lines | 198 px, 1 line, tight readout | 198 px, 1 line, tight readout |
+| 1400 | 196 px | 178 px, 2 lines | 178 px, 2 lines | 178 px, 2 lines |
+| 1366 | 179 px | 161 px, 2 lines | 161 px, 2 lines | 161 px, 2 lines |
+| 1300 | 141 px | 123 px, 3 lines | 123 px, 3 lines | 123 px, 3 lines |
+| 1280 | 131 px | 113 px, 3 lines | 113 px, 3 lines | 113 px, 3 lines |
 
-The container rule that stacks the rows is at 33 rem of the row's content width (528 px): the Length
-column needs 252.5 px (tag, four keys, the 77 px readout, five 4 px gaps), two of them and the 10 px
-gap come to 515 px. The handoff's arithmetic said about 34 rem.
+At 1279 px and below the app stacks the decks and the row is wider than at 1280 px (1018 px at 1279 x 900),
+so the narrowest control is the 1280 px one. The 1920 px row's side-by-side layout starts at a 528 px row.
+
+Every width in the table, and 1100, 768 and 400 px, passes the Cypress case below: no readout holds more than
+its width, the text clears every key and tag, and every key, tag and readout stays on the plate.
+
+How the layout was chosen. The old arithmetic assumed a row of 236 to 254 px as the narrowest, which was
+read off Storybook and not off the app: the plate at 1280 x 900 gives a row of 131 to 136 px, and the Length
+control 113 to 118 px, which cannot hold even the four keys beside any readout text. So each control
+sizes itself by its own width (a container query on the control, not on the row it sits in, which is why the
+live row and the Move control follow the same rule). With the real font (Roboto Mono, the longest text
+62.4 px, the readout 83 px roomy and 76 px tight):
+
+- Length with the − and + keys: one line above 272 px; below it the readout takes 2 px padding and gap and the
+  signs 22 px; below 248 px (the tight line needs 245) two lines, the tag and the readout, then the four keys
+  spread across the width; below 128 px three lines, the tag, the readout, the keys.
+- The Move control and the live row's Length control, which need 200 px roomy and 193 px tight: tight below
+  208 px, two lines below 196 px, three below 128 px.
+
+A row that cannot hold its keys beside the text is taller, not squeezed; the page already scrolls at those
+viewport heights. The keys come after the readout in the DOM, so in the two- and three-line layouts they sit
+below the picker while the tab order keeps the DOM order (1/2, −, picker, +, 2×). A text longer than the readout is clipped by the readout, never
+painted over a key.
+
+An earlier pass of this check, on the empty rows at 900 px high in Chrome with a fallback monospace font,
+passed at every width for a text 4 px narrower and missed the 1440 px overflow; the numbers above are with
+the real font.
 
 ### Automated
 
-`dj-mixer-responsive.cy.ts` gained "the selected loop row": at 1400, 1279, 1100, 768 and 400 px
-it asserts the Length readout does not overflow (scroll width at most client width) and that the
-Length row's controls end inside the row. The e2e fixture cannot select a marker (no tune loads in
-it), so it measures the empty row, whose readout is plain text; it cannot show the longest text.
-The loaded row is what the table above measures. The Cypress specs were not run in this session.
+`dj-mixer-responsive.cy.ts` has "the loop rows with the longest readout text": at 1920, 1600, 1536, 1440,
+1400, 1366, 1300, 1280, 1279, 1100, 768 and 400 px it writes the longest text into the selected row's Length
+readout, the Move readout and the live row's Length readout, and asserts for each control that the readout
+holds its text, the text overlaps no key or tag, and every key, tag and readout lies inside the control and
+on the plate. The fixture cannot select a marker (no tune loads in it), so the rows are the empty ones with
+the text put in. Run with `cypress run` from `apps/teensyrom-ui-e2e` against the dev server on 4200: the
+case failed at 1440 and 1280 px before the layout was fixed and passes at every width after.
 
 ### Bench checklist (operator, real hardware)
 

@@ -183,12 +183,6 @@ const SELECTED_CUE: DeckLoopsSummary = {
     spanText: '00:01.0',
     lengthText: 'NO END',
     lengthOptions: [],
-    start: {
-      offsetFrames: 0,
-      rangeFrames: 0,
-      tickPercents: [],
-    },
-    end: null,
   },
 };
 

@@ -1129,6 +1129,37 @@ describe('DeckLoops', () => {
         expect(spanOf('four')).toEqual([100, 240]);
       });
 
+      it('steps off a whole number of beats on a grid whose beat is not a whole number of frames', async () => {
+        const beatFrames = 24.7351;
+        const end = 13 * beatFrames;
+        setGrid({ ...GRID, beatFrames });
+        await positions.save(TUNE_X, [
+          {
+            ...loopOf('fraction', 0, 0),
+            end: { frame: Math.floor(end), offsetFrames: end - Math.floor(end) },
+          },
+        ]);
+        await loadOn('A', TUNE_X);
+
+        loops.stepLength('A', 1);
+        expect(spanOf('fraction')[1]).toBeCloseTo(14 * beatFrames, 6);
+
+        loops.stepLength('A', -1);
+        loops.stepLength('A', -1);
+        expect(spanOf('fraction')[1]).toBeCloseTo(12 * beatFrames, 6);
+      });
+
+      it('refuses a step to a whole beat shorter than the engine can lap', async () => {
+        setGrid({ ...GRID, beatFrames: 1.5 });
+        await positions.save(TUNE_X, [loopOf('tiny', 100, 103)]);
+        await loadOn('A', TUNE_X);
+
+        loops.stepLength('A', -1);
+
+        expect(spanOf('tiny')).toEqual([100, 103]);
+        expect(refusals()).toHaveLength(1);
+      });
+
       it('goes from 1/8 and 1/4 of a beat up to 1 beat, and refuses to go below 1', () => {
         // 28 frames a beat: 1/8 is 3.5 frames.
         setGrid({ ...GRID, beatFrames: 28 });
@@ -2884,6 +2915,24 @@ describe('DeckLoops', () => {
       await loadOn('A', TUNE_X);
       await settle();
       await runtime.play('A');
+    });
+
+    it('replays a running loop whose start was edited away with its settings put in at the press, and a seek without them', async () => {
+      await engage('A', 'a');
+      loops.select('A', 'a');
+      shiftSelected('A', 5);
+      await flush();
+      expect(preparedOn('A')).not.toContain(100);
+      const seek = vi.spyOn(runtime, 'seekToFrame');
+
+      loops.playNow('A', 'a');
+
+      expect(seek).toHaveBeenCalledExactlyOnceWith('A', 100);
+      expect(panelOn('A')).toEqual(SETTINGS_A.panel);
+      expect(engineMutes('A')).toEqual(SETTINGS_A.mutes);
+      expect(stateOf('A').settingsInPlayId).toBe('a');
+      await flush();
+      expect(runtime.position('A')).toBe(100);
     });
 
     describe('the stored form', () => {

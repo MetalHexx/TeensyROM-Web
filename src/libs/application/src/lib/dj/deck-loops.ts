@@ -54,6 +54,10 @@ const ALL_VOICES: readonly number[] = [0, 1, 2];
 /** The length a cue gains when a Length press has no loop to halve or double. */
 const CUE_BEATS = 4;
 
+/** How far from a whole number of beats a length may fall and still count as one: float noise from a
+ *  fractional beat length, not a real fraction. */
+const WHOLE_BEAT_TOLERANCE = 1e-9;
+
 const COPY_SUFFIX = ' copy';
 
 /** A copy's name: `label` cut to leave room for the suffix, which is never the part cut off. */
@@ -690,7 +694,10 @@ export class DeckLoops {
       return;
     }
     const length = (resolvedFrame(marker.end) - start) / grid.beatFrames;
-    const beats = direction === 1 ? Math.floor(length) + 1 : Math.ceil(length) - 1;
+    const beats =
+      direction === 1
+        ? Math.floor(length + WHOLE_BEAT_TOLERANCE) + 1
+        : Math.ceil(length - WHOLE_BEAT_TOLERANCE) - 1;
     if (beats < 1) {
       this.refuse(slot, 'stepLength', 'has no whole beat below a length of 1 beat');
       return;
@@ -1033,12 +1040,11 @@ export class DeckLoops {
   }
 
   /**
-   * Keeps the engine on the running marker's bounds as its entry changes, by one of two rules
-   * chosen by whether an end-of-pass edit is held. With none, a changed end or WRAP mode applies
-   * at once, taking effect at the next wrap; a changed start is held until its frame is ready and
-   * takes effect at the next re-entry. With one, the list's bounds never reach the engine until
-   * the pass ends. None seeks. A marker that is gone, or no longer a loop, is let go. Under a live
-   * loop or a hold the bounds are only noted, for `resumeRunning` to arm.
+   * Keeps the engine on the running marker's bounds as its entry changes. Every position edit is
+   * held for the end of the pass, so the list's bounds never reach the engine before then, and a
+   * WRAP change alone applies at once, on the bounds in force. None seeks. A marker that is gone, or
+   * no longer a loop, is let go. Under a live loop or a hold the bounds are only noted, for
+   * the resume to arm.
    */
   private syncRunning(slot: Slot): void {
     const { markers, runningId } = this.loopsOf(slot);
@@ -1057,34 +1063,15 @@ export class DeckLoops {
       this.syncEndOfPass(slot, edit, desired.varispeedStart);
       return;
     }
-    const startFrame = marker.ready ? desired.startFrame : engaged.startFrame;
-    const sameSpan = startFrame === engaged.startFrame && desired.endFrame === engaged.endFrame;
-    // The same span keeps the lap phase the engine runs it at — a live loop kept as a marker keeps
-    // the live loop's — so a WRAP change alone carries the lap in progress on.
-    const next: LoopBounds = {
-      startFrame,
-      endFrame: desired.endFrame,
-      varispeedStart: desired.varispeedStart,
-      ...lapPhaseField(
-        sameSpan
-          ? engaged.lapPhase
-          : loopLapPhase(this.gridOf(slot), startFrame, desired.endFrame - startFrame)
-      ),
-    };
-    const unchanged = sameSpan && next.varispeedStart === engaged.varispeedStart;
-    if (
-      !unchanged &&
-      next.endFrame > next.startFrame &&
-      isUsableLoopLength(next.startFrame, next.endFrame)
-    ) {
-      this.setEngaged(slot, next);
-      if (!this.defersToEngine(slot)) {
-        // Accepted transient: a changed span restarts the loop at its lap 0 mid-lap, so one lap of
-        // an alternating length may be a frame off; the laps after it add up exactly.
-        this.runtime.setActiveLoop(slot, next);
-        // `setActiveLoop` drops the engine's queue.
-        this.syncQueued(slot);
-      }
+    if (desired.varispeedStart === engaged.varispeedStart) {
+      return;
+    }
+    const next: LoopBounds = { ...engaged, varispeedStart: desired.varispeedStart };
+    this.setEngaged(slot, next);
+    if (!this.defersToEngine(slot)) {
+      this.runtime.setActiveLoop(slot, next);
+      // setActiveLoop drops the engine's queue.
+      this.syncQueued(slot);
     }
   }
 
@@ -1605,10 +1592,9 @@ export class DeckLoops {
 
   /**
    * Puts `start` and `end` on the selected marker as an end-of-pass edit. Refused, changing
-   * nothing, when an edge would fall before the start of the tune or past its length, the end at
-   * or before the start, or a length that is not a whole number of frames under
-   * `MIN_FRACTIONAL_LOOP_FRAMES`, which the engine cannot lap. An edit that leaves both boundaries
-   * as they were does nothing.
+   * nothing, when an edge would fall before the start of the tune or past its length, or a length
+   * that is not a whole number of frames under `MIN_FRACTIONAL_LOOP_FRAMES`, which the engine cannot
+   * lap. An edit that leaves both boundaries as they were does nothing.
    */
   private place(
     slot: Slot,
@@ -1625,8 +1611,6 @@ export class DeckLoops {
       this.refuse(slot, command, 'would put an edge before the start of the tune');
     } else if (lengthFrames !== null && edges.some((edge) => edge > lengthFrames)) {
       this.refuse(slot, command, "would put an edge past the tune's length");
-    } else if (end !== null && edges[1] <= edges[0]) {
-      this.refuse(slot, command, 'would put the end at or before the start');
     } else if (end !== null && !isUsableLoopLength(edges[0], edges[1])) {
       this.refuse(
         slot,

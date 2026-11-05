@@ -89,6 +89,20 @@ describe('LiveLoopRowComponent', () => {
     expect(wheel.defaultPrevented).toBe(true);
   });
 
+  it('draws only the ladder: no step keys and no No End item', () => {
+    expect(el.querySelectorAll('lib-loop-size-control lib-synth-key').length).toBe(2);
+    expect(control('loop-length-down')).toBeNull();
+    expect(control('loop-length-up')).toBeNull();
+
+    (control('live-loop-size') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const items = Array.from(
+      document.querySelectorAll('.cdk-overlay-container .dropdown-menu-item')
+    ).map((item) => (item.textContent ?? '').replace(/^\s*check\s*/, '').trim());
+    expect(items).toEqual(['2 BEATS', '4 BEATS']);
+  });
+
   describe('the Live loop key', () => {
     it('pushes on pointer down, before release', () => {
       liveKey().dispatchEvent(pointer('pointerdown'));

@@ -339,7 +339,7 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
 export const DEFAULT_LIVE_LOOP_BEATS = 4;
 
 /** Whether a deck's slip starts on, until a saved record says otherwise. */
-export const DEFAULT_SLIP = true;
+const DEFAULT_SLIP = true;
 
 /** The largest live loop size, in beats, the server accepts in the saved MIDI settings. */
 export const MAX_LIVE_LOOP_BEATS = 128;

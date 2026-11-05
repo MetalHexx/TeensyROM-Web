@@ -60,7 +60,7 @@ describe('LoopSizeControlComponent', () => {
   const pickerItems = (): string[] =>
     Array.from(
       document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')
-    ).map((item) => (item.textContent ?? '').replace(/^s*checks*/, '').trim());
+    ).map((item) => (item.textContent ?? '').replace(/^\s*check\s*/, '').trim());
 
   it('shows the tag as decoration and the readout text', () => {
     expect(el.querySelector('.tag')?.textContent).toBe('Length');
@@ -155,7 +155,7 @@ describe('LoopSizeControlComponent', () => {
       expect(
         Array.from(
           document.querySelectorAll('.cdk-overlay-container .dropdown-menu-item.selected')
-        ).map((item) => (item.textContent ?? '').replace(/^s*checks*/, '').trim())
+        ).map((item) => (item.textContent ?? '').replace(/^\s*check\s*/, '').trim())
       ).toEqual(['NO END']);
       first?.click();
 
