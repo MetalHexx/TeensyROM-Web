@@ -741,6 +741,20 @@ namespace TeensyRom.Cli.Api.Generated
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Get the HTTPS Status
+        /// </summary>
+        /// <remarks>
+        /// Reports whether the engine is serving https in this run, and the certificate behind it.
+        /// <br/>
+        /// <br/>- The values describe the engine run as a whole, so a created or re-issued certificate is reported until the engine restarts.
+        /// <br/>- When https is not being served, **problem** says why and the engine keeps serving http.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<GetHttpsStatusResponse> GetHttpsStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Save Tune Memory
         /// </summary>
         /// <remarks>
@@ -6166,6 +6180,86 @@ namespace TeensyRom.Cli.Api.Generated
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Get the HTTPS Status
+        /// </summary>
+        /// <remarks>
+        /// Reports whether the engine is serving https in this run, and the certificate behind it.
+        /// <br/>
+        /// <br/>- The values describe the engine run as a whole, so a created or re-issued certificate is reported until the engine restarts.
+        /// <br/>- When https is not being served, **problem** says why and the engine keeps serving http.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<GetHttpsStatusResponse> GetHttpsStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/engine/https"
+                    urlBuilder_.Append("api/engine/https");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<GetHttpsStatusResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Save Tune Memory
         /// </summary>
         /// <remarks>
@@ -8952,6 +9046,46 @@ namespace TeensyRom.Cli.Api.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class GetHttpsStatusResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("port")]
+        public int Port { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("listening")]
+        public bool Listening { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("problem")]
+        public string? Problem { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("names")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Names { get; set; } = new System.Collections.ObjectModel.Collection<string>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("issuedAt")]
+        public System.DateTimeOffset? IssuedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("expiresAt")]
+        public System.DateTimeOffset? ExpiresAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("change")]
+        public HttpsCertificateChange Change { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("changeReason")]
+        public NullableOfHttpsCertificateChangeReason? ChangeReason { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class GetJobResponse
     {
 
@@ -9141,6 +9275,21 @@ namespace TeensyRom.Cli.Api.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"TeensyRomPlus")]
         TeensyRomPlus = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum HttpsCertificateChange
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Created")]
+        Created = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Reissued")]
+        Reissued = 2,
 
     }
 
@@ -9545,6 +9694,24 @@ namespace TeensyRom.Cli.Api.Generated
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
         }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.4.0.0 (NJsonSchema v11.3.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum NullableOfHttpsCertificateChangeReason
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Unreadable")]
+        Unreadable = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Expiring")]
+        Expiring = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"HostNameChanged")]
+        HostNameChanged = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"NewAddress")]
+        NewAddress = 3,
 
     }
 

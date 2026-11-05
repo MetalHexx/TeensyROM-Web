@@ -21,6 +21,9 @@ export * from './alert.contract';
 // Settings contracts
 export * from './settings.contract';
 
+// HTTPS status contracts
+export * from './https-status.contract';
+
 // Version contracts
 export * from './version.contract';
 

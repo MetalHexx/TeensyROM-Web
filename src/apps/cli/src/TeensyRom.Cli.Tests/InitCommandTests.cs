@@ -73,6 +73,49 @@ public sealed class InitCommandTests
         Problems(report).Should().BeEmpty();
     }
 
+    private static void ReportHttps(TestHost host, CertificateChange change)
+    {
+        var https = new EngineHttps(
+            10214, true, null, ["localhost"], null, new DateTimeOffset(2028, 11, 1, 10, 0, 0, TimeSpan.Zero), change, null, HttpsNotice.For(change, null, 10214));
+
+        host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(new EngineStatus(
+            true, CliVersion, CliVersion, true, "localhost:10213", null, Https: https));
+    }
+
+    [Fact]
+    public async Task Init_Json_CarriesTheEnginesHttps_AndTheNoticeIsNotAProblem()
+    {
+        using var host = NewHost(devices: Device());
+        ReportHttps(host, CertificateChange.Created);
+
+        var exitCode = await host.RunAsync("init", "--json");
+
+        exitCode.Should().Be(0);
+        var report = Parse(host);
+        var https = report.GetProperty("engine").GetProperty("https");
+        https.GetProperty("change").GetString().Should().Be("created");
+        https.GetProperty("notice").GetString().Should().Contain("created a security certificate");
+        host.Consoles.StdErr.Should().Contain("created a security certificate");
+        Problems(report).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Init_WithoutJson_ShowsTheSecureAddress_AndPrintsTheNoticeOnlyWhenThisRunChangedTheCertificate()
+    {
+        using var created = NewHost(devices: Device());
+        ReportHttps(created, CertificateChange.Created);
+        using var reused = NewHost(devices: Device());
+        ReportHttps(reused, CertificateChange.None);
+
+        await created.RunAsync("init");
+        await reused.RunAsync("init");
+
+        created.Consoles.StdOut.Should().Contain("Secure address: https://localhost:10214");
+        created.Consoles.StdErr.Should().Contain("created a security certificate");
+        reused.Consoles.StdOut.Should().Contain("Secure address: https://localhost:10214");
+        reused.Consoles.StdErr.Should().NotContain("certificate");
+    }
+
     [Fact]
     public async Task Init_WhenTheEngineCannotStart_WritesTheReportThenExitsThree()
     {

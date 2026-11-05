@@ -20,6 +20,7 @@ internal static class PlatformRid
         if (platform == OSPlatform.OSX && architecture == Architecture.X64) return "osx-x64";
         if (platform == OSPlatform.OSX && architecture == Architecture.Arm64) return "osx-arm64";
         if (platform == OSPlatform.Linux && architecture == Architecture.X64) return "linux-x64";
+        if (platform == OSPlatform.Linux && architecture == Architecture.Arm64) return "linux-arm64";
 
         return null;
     }

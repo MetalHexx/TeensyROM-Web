@@ -48,6 +48,8 @@ Write the release notes at the top of `CHANGELOG.md` (repo root), under a headin
 ## [{version}](https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v{version}) - {YYYY-MM-DD}
 ```
 
+If `CHANGELOG.md` has a `## [Unreleased]` section, fold its notes into this new version heading and remove the `[Unreleased]` heading; `changelog-section.sh` only extracts `## [<version>]` sections.
+
 Everything under it, up to the next `## [` heading, becomes the GitHub release body (`.github/scripts/changelog-section.sh` extracts it); use `###` and lower inside. Lead with what users will notice, grouped by product area, and leave out internal changes. End with this:
 
 ````markdown
@@ -55,11 +57,12 @@ Everything under it, up to the next `## [` heading, becomes the GitHub release b
 - Already on a suite release: `trom update` (`trom update --check` only looks).
 - Installed with Homebrew: `brew update && brew upgrade teensyrom-suite`.
 - Fresh install on a Mac: `brew tap MetalHexx/TeensyROM-Suite https://github.com/MetalHexx/TeensyROM-Suite`, then `brew install teensyrom-suite` and `trom ui`.
-- Fresh install on Windows or Linux: download the package below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
+- Fresh install on Windows, Linux or a Raspberry Pi: download the package below, unpack it and run `cli/trom ui` (`cli\trom ui` on Windows).
 
 ### Downloads
 - Windows x64: `TeensyROM-Suite-{version}-win-x64.zip`
 - Linux x64: `TeensyROM-Suite-{version}-linux-x64.tar.gz`
+- Linux ARM64 (Raspberry Pi with a 64-bit OS): `TeensyROM-Suite-{version}-linux-arm64.tar.gz`
 - macOS: install with Homebrew, above. The `osx-arm64` and `osx-x64` packages are the ones Homebrew installs.
 
 Docs: https://github.com/MetalHexx/TeensyROM-Suite/blob/main/docs/getting-started.md
@@ -74,7 +77,7 @@ git push origin main
 
 ### Step 2: Run Package Test on main
 
-`Package Test` (`.github/workflows/package-test.yml`) builds the packages and installs them: through a real Homebrew install on macOS (arm64 and x64), from the tarball on Linux and from the zip on Windows, each smoke-tested with `.github/scripts/package-smoke.sh`. It runs on pull requests that touch packaging, and on demand. Run it on `main`:
+`Package Test` (`.github/workflows/package-test.yml`) builds the packages and installs them: through a real Homebrew install on macOS (arm64 and x64), from the tarball on Linux (x64 and ARM64) and from the zip on Windows, each smoke-tested with `.github/scripts/package-smoke.sh`. It runs on pull requests that touch packaging, and on demand. Run it on `main`:
 
 ```bash
 git fetch origin && git rev-parse origin/main    # {sha}, the commit to release
@@ -96,7 +99,7 @@ git push origin v{version}
 
 ### Step 4: Watch the Release Workflow
 
-The workflow builds the 4 packages, commits the Homebrew formula to `main`, and creates the GitHub Release. It takes about 15-20 minutes. Give the user the run's URL, `https://github.com/MetalHexx/TeensyROM-Suite/actions/runs/<run-id>`.
+The workflow builds the 5 packages, commits the Homebrew formula to `main`, and creates the GitHub Release. It takes about 15-20 minutes. Give the user the run's URL, `https://github.com/MetalHexx/TeensyROM-Suite/actions/runs/<run-id>`.
 
 ```bash
 gh run list -R MetalHexx/TeensyROM-Suite --workflow release.yml --branch v{version} --commit {sha} -L 1 --json databaseId,status,createdAt
@@ -111,7 +114,7 @@ Once the workflow finishes, `gh release view v{version}` shows:
 - Title: `TeensyROM Suite v{version}`
 - Tag: `v{version}`
 - Pre-release flag (if the version contains `-`)
-- The 4 platform packages (each holds `README.txt`, `api/` and `cli/`)
+- The 5 platform packages (each holds `README.txt`, `api/` and `cli/`)
 - The notes: the version's `CHANGELOG.md` section
 
 To change the notes afterwards, edit `CHANGELOG.md` on `main`, then republish the section:
@@ -122,7 +125,7 @@ bash .github/scripts/changelog-section.sh {version} > notes.md && gh release edi
 
 ### Step 6: Post-Release Checks
 
-1. `gh release view v{version} --json assets`: exactly the 4 assets, each with a `digest` (`sha256:<hex>`).
+1. `gh release view v{version} --json assets`: exactly the 5 assets, each with a `digest` (`sha256:<hex>`).
 2. The `chore: update Homebrew formula for v{version}` commit is on `main`, with the version, both `sha256` values and `TeensyROM-Suite` URLs set. The `release` job runs even when `update-formula` fails, so check it every time.
 3. Download one package from the release page and smoke-test it. Point `TEENSYROM_DATA_DIR` at a temp folder, unpack, run `cli/trom --version` (prints `trom {version}`) and `cli/trom ui --no-open --json`, then `cli/trom api stop`.
 4. From an older install, `trom update --check` reports the new release. On `1.0.0-beta.1`, the first release with `trom update`, run it on the new install instead: it reports current.
@@ -169,6 +172,7 @@ Agent: [Runs the post-release checks, then opens the tr-plugin-marketplace PR fo
   - `TeensyROM-Suite-{version}-osx-x64.tar.gz`
   - `TeensyROM-Suite-{version}-osx-arm64.tar.gz`
   - `TeensyROM-Suite-{version}-linux-x64.tar.gz`
+  - `TeensyROM-Suite-{version}-linux-arm64.tar.gz`
 
 ## Error Handling
 
@@ -188,7 +192,7 @@ If you need to retry:
 
 - Workflow file: `.github/workflows/release.yml` (jobs `validate`, `build`, `update-formula`, `release`). `build` calls the reusable `.github/workflows/build-packages.yml`, which builds Trom UI once and then one package per platform with `.github/scripts/package.sh`. `update-formula` runs `.github/scripts/update-formula.sh`, which sets the version and checksums and points the URLs at `TeensyROM-Suite`
 - Version source: `src/apps/Version.props` (imported by the engine and the CLI projects)
-- Build platforms: win-x64, osx-x64, osx-arm64, linux-x64
+- Build platforms: win-x64, osx-x64, osx-arm64, linux-x64, linux-arm64
 - Build time: ~15-20 minutes (parallel matrix builds)
 - Artifact retention: 5 days in GitHub Actions, permanent in Releases
 - Repository: MetalHexx/TeensyROM-Suite

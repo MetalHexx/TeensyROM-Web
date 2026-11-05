@@ -15,6 +15,8 @@ namespace TeensyRom.Core.Common
         /// <summary>Lives in <c>&lt;api&gt;/Assets</c>; holds the engine version the assets were last copied for.</summary>
         public const string PackageVersionFileName = ".package-version";
 
+        public const string HttpsFolderName = "Https";
+
         /// <summary>
         /// The home rule: a non-blank <paramref name="dataDir"/> made absolute, else <c>&lt;userProfile&gt;/.teensyrom</c>.
         /// </summary>
@@ -32,6 +34,9 @@ namespace TeensyRom.Core.Common
 
         /// <summary>Everything the engine writes lives under this folder.</summary>
         public static string ApiPath => Path.Combine(Root, ApiFolderName);
+
+        /// <summary>The engine's HTTPS certificate folder. Outside every folder the engine serves over HTTP.</summary>
+        public static string HttpsPath => Path.Combine(ApiPath, HttpsFolderName);
 
         /// <summary>The single-instance lock file; a running engine holds it open.</summary>
         public static string EngineLockPath => Path.Combine(ApiPath, EngineLockFileName);

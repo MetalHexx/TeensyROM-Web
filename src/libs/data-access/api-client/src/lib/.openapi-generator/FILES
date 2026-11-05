@@ -67,6 +67,7 @@ models/GetDeviceThemeResponse.ts
 models/GetDirectoryResponse.ts
 models/GetDjLibraryStateResponse.ts
 models/GetDjSetResponse.ts
+models/GetHttpsStatusResponse.ts
 models/GetJobResponse.ts
 models/GetMidiSettingsResponse.ts
 models/GetSettingsResponse.ts
@@ -77,6 +78,7 @@ models/GetVersionResponse.ts
 models/GetWatchFoldersResponse.ts
 models/HardwareVariant.ts
 models/HttpValidationProblemDetails.ts
+models/HttpsCertificateChange.ts
 models/IndexAllResponse.ts
 models/IndexResponse.ts
 models/IndexingStatusDto.ts
@@ -93,6 +95,7 @@ models/MachineType.ts
 models/MidiControlMappingDto.ts
 models/MidiMappingStyleDto.ts
 models/MidiSourceDto.ts
+models/NullableOfHttpsCertificateChangeReason.ts
 models/NullableOfTeensyFilterType.ts
 models/PingDeviceResponse.ts
 models/PlayerSettingsDto.ts

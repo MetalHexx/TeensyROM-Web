@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { of, throwError, type Observable } from 'rxjs';
+import { HTTPS_STATUS_SERVICE } from '@teensyrom-nx/domain';
 import { MidiAccessService } from './midi-access.service';
 
 interface FakeMidiOutput {
@@ -89,6 +91,10 @@ function stubPermissionsQuery(
   });
 }
 
+function stubSecureContext(value: boolean): void {
+  Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value });
+}
+
 describe('MidiAccessService', () => {
   let service: MidiAccessService;
 
@@ -104,6 +110,69 @@ describe('MidiAccessService', () => {
     vi.restoreAllMocks();
     stubRequestMidiAccess(undefined);
     stubPermissionsQuery(undefined);
+    delete (globalThis as unknown as Record<string, unknown>)['isSecureContext'];
+  });
+
+  describe('when the browser hides Web MIDI', () => {
+    function serviceWithEngineAnswering(securePort$: Observable<number | null>) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          MidiAccessService,
+          { provide: HTTPS_STATUS_SERVICE, useValue: { getSecurePort: () => securePort$ } },
+        ],
+      });
+      return TestBed.inject(MidiAccessService);
+    }
+
+    it('on a secure page still blames the browser', async () => {
+      stubSecureContext(true);
+      stubRequestMidiAccess(undefined);
+
+      await service.queryPermission();
+
+      expect(service.lastError()).toBe('Web MIDI is not available in this browser. Try Chrome or Edge.');
+    });
+
+    it('on an insecure page asks for the https link built from the page host and the engine port', async () => {
+      stubSecureContext(false);
+      stubRequestMidiAccess(undefined);
+      const insecure = serviceWithEngineAnswering(of(10214));
+
+      await insecure.queryPermission();
+      await Promise.resolve();
+
+      expect(insecure.accessState()).toBe('unsupported');
+      expect(insecure.lastError()).toBe(
+        `Web MIDI needs a secure address. Open this page over https at https://${location.hostname}:10214.`
+      );
+      expect(insecure.lastError()).not.toContain('Try Chrome or Edge');
+    });
+
+    it('on an insecure page falls back to the trom ui address when the engine reports no secure port', async () => {
+      stubSecureContext(false);
+      stubRequestMidiAccess(undefined);
+      const insecure = serviceWithEngineAnswering(of(null));
+
+      await insecure.requestAccess();
+      await Promise.resolve();
+      await insecure.requestAccess();
+
+      expect(insecure.lastError()).toBe(
+        'Web MIDI needs a secure address. Open this page over https at the secure address that trom ui lists.'
+      );
+    });
+
+    it('on an insecure page falls back the same way when the engine cannot be asked', async () => {
+      stubSecureContext(false);
+      stubRequestMidiAccess(undefined);
+      const insecure = serviceWithEngineAnswering(throwError(() => new Error('unreachable')));
+
+      await insecure.queryPermission();
+      await Promise.resolve();
+
+      expect(insecure.lastError()).toContain('the secure address that trom ui lists');
+    });
   });
 
   it('starts idle with no ports', () => {

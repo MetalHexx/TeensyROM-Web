@@ -2763,6 +2763,28 @@
         }
       }
     },
+    "/api/engine/https": {
+      "get": {
+        "tags": [
+          "Engine"
+        ],
+        "summary": "Get the HTTPS Status",
+        "description": "Reports whether the engine is serving https in this run, and the certificate behind it.\n\n- The values describe the engine run as a whole, so a created or re-issued certificate is reported until the engine restarts.\n- When https is not being served, **problem** says why and the engine keeps serving http.",
+        "operationId": "GetHttpsStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetHttpsStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dj/tunes/{sidHash}/memory": {
       "put": {
         "tags": [
@@ -4531,6 +4553,50 @@
           }
         }
       },
+      "GetHttpsStatusResponse": {
+        "required": [
+          "port",
+          "listening",
+          "names",
+          "change"
+        ],
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listening": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "change": {
+            "$ref": "#/components/schemas/HttpsCertificateChange"
+          },
+          "changeReason": {
+            "$ref": "#/components/schemas/NullableOfHttpsCertificateChangeReason"
+          }
+        }
+      },
       "GetJobResponse": {
         "required": [
           "job"
@@ -4664,6 +4730,13 @@
           "Unknown",
           "TeensyRom",
           "TeensyRomPlus"
+        ]
+      },
+      "HttpsCertificateChange": {
+        "enum": [
+          "None",
+          "Created",
+          "Reissued"
         ]
       },
       "HttpValidationProblemDetails": {
@@ -4972,6 +5045,16 @@
             "format": "int32"
           }
         }
+      },
+      "NullableOfHttpsCertificateChangeReason": {
+        "enum": [
+          "Unreadable",
+          "Expiring",
+          "HostNameChanged",
+          "NewAddress",
+          null
+        ],
+        "nullable": true
       },
       "NullableOfJsonElement": {
         "nullable": true

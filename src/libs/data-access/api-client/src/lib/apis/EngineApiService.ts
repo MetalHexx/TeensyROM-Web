@@ -15,10 +15,13 @@
 
 import * as runtime from '../runtime';
 import type {
+  GetHttpsStatusResponse,
   ProblemDetails,
   StopEngineResponse,
 } from '../models/index';
 import {
+    GetHttpsStatusResponseFromJSON,
+    GetHttpsStatusResponseToJSON,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
     StopEngineResponseFromJSON,
@@ -29,6 +32,34 @@ import {
  * 
  */
 export class EngineApiService extends runtime.BaseAPI {
+
+    /**
+     * Reports whether the engine is serving https in this run, and the certificate behind it.  - The values describe the engine run as a whole, so a created or re-issued certificate is reported until the engine restarts. - When https is not being served, **problem** says why and the engine keeps serving http.
+     * Get the HTTPS Status
+     */
+    async getHttpsStatusRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetHttpsStatusResponse>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/engine/https`,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GetHttpsStatusResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Reports whether the engine is serving https in this run, and the certificate behind it.  - The values describe the engine run as a whole, so a created or re-issued certificate is reported until the engine restarts. - When https is not being served, **problem** says why and the engine keeps serving http.
+     * Get the HTTPS Status
+     */
+    async getHttpsStatus(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetHttpsStatusResponse> {
+        const response = await this.getHttpsStatusRaw(initOverrides);
+        return await response.value();
+    }
 
     /**
      * Gracefully shuts the TeensyROM engine down, ending its process and releasing its instance lock.  - Only callers on the machine the engine runs on are accepted; any other caller receives a 403 and the engine keeps running. - The response is sent before the engine begins stopping.

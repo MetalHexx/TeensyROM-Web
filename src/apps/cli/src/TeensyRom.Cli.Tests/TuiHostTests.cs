@@ -44,6 +44,7 @@ public sealed class TuiHostTests : IDisposable
             services.AddSingleton(_locator);
         });
         _host.Engine.EnsureRunningAsync(Arg.Any<CancellationToken>()).Returns(EngineReady.Ready);
+        _host.Engine.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(new EngineStatus(true, "1.0.0", "1.0.0", true, "localhost:10213", null));
     }
 
     public void Dispose() => _host.Dispose();

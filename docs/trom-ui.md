@@ -44,7 +44,7 @@ New here? [Getting started](getting-started.md) covers installing the suite and 
 Video is optional but recommended.
 
 - **Modern meets retro:** streaming-style controls laid over an authentic CRT picture.
-- **Live video:** shows the picture from a connected video capture device.
+- **Live video:** shows the picture from a connected video capture device. From another device, use the [secure address](#secure-address-for-midi-and-video).
 - **CRT effects:**
   - **Scanlines:** with size and intensity controls.
   - **Vignette:** darkened edges that follow the screen's curve.
@@ -153,6 +153,12 @@ Change the colors of your C64's menu.
 - **Apply to your carts:** apply to one cart or to all of them.
 
 Applying a theme resets the C64. A theme you save here also shows up in [Trom Terminal](trom-terminal.md).
+
+## Secure address for MIDI and video
+
+From another device, MIDI controllers and capture-card video need Trom UI's secure address, `https://<computer address>:10214`. `trom ui` lists it beside each network address, for example `https://192.168.1.20:10214`. Browsers offer MIDI and video capture only on a secure address.
+
+The certificate is made by Trom API on your computer and isn't signed by a public authority, so the browser warns once; accept the warning to continue. It warns again after the computer gets a new network address or name. On the computer itself, `http://localhost:10213` works. [Getting started](getting-started.md#secure-address) has the details.
 
 ## DJ Mixer
 

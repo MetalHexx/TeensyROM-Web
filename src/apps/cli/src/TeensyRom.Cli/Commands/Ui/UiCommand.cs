@@ -38,6 +38,7 @@ internal sealed class UiCommand(ICliOutput output, IEngineControl engine, UiLaun
         {
             Output.Notice("Devices on your network reach Trom UI through this computer's Windows address, not the WSL address above.");
         }
+        if (report.Https?.Notice is { } notice) Output.Notice(notice);
         return 0;
     }
 
@@ -51,7 +52,11 @@ internal sealed class UiCommand(ICliOutput output, IEngineControl engine, UiLaun
 
         List<(string Label, string Value)> fields = [("Trom UI", report.Address)];
 
-        fields.AddRange(report.NetworkAddresses.Select(address => ("On your network", address)));
+        for (var i = 0; i < report.NetworkAddresses.Count; i++)
+        {
+            fields.Add(("On your network", report.NetworkAddresses[i]));
+            if (i < report.SecureNetworkAddresses.Count) fields.Add(("Secure, for MIDI and video", report.SecureNetworkAddresses[i]));
+        }
         if (!report.Available) fields.Add(("Status", "not available"));
         Output.Fields(fields);
     }

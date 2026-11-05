@@ -60,6 +60,7 @@ public sealed class PackageStagerTests : IDisposable
     [Theory]
     [InlineData("win-x64")]
     [InlineData("linux-x64")]
+    [InlineData("linux-arm64")]
     [InlineData("osx-arm64")]
     public async Task Stage_DownloadsUnpacksAndChecksTheTromTheyHold(string rid)
     {

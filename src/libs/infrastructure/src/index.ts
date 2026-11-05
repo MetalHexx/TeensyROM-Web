@@ -21,6 +21,9 @@ export * from './lib/player/providers';
 // Settings implementations
 export * from './lib/settings';
 
+// HTTPS status implementations
+export * from './lib/https-status';
+
 // Version implementations
 export * from './lib/version/version.service';
 export * from './lib/version/providers';

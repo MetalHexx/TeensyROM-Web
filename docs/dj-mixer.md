@@ -33,6 +33,8 @@ The DJ Mixer is part of Trom UI.
 
 Allow MIDI access when the browser asks, then pick the TeensyROM each deck plays through.
 
+To use the mixer from another device, open the secure address `https://<computer address>:10214` that `trom ui` lists. MIDI controllers and capture-card video need that address from another device. The browser warns once, because the certificate is made by Trom API on your computer; see [Secure address for MIDI and video](trom-ui.md#secure-address-for-midi-and-video).
+
 ## Load tunes
 
 Browse the SD and USB storage of every connected cart, along with your saved sets, or search the storage you have open. Load a tune onto either deck, or load a whole set onto a deck.

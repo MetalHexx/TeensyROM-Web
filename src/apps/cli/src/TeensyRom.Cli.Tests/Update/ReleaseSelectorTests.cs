@@ -37,11 +37,13 @@ public sealed class ReleaseSelectorTests
             Release("1.0.0", false, "win-x64", "linux-x64"),
             Release("1.1.0", false, "linux-x64"),
             Release("1.2.0", false, "win-x64"),
-            Release("1.0.5", false, "win-x64")
+            Release("1.0.5", false, "win-x64"),
+            Release("1.1.5", false, "linux-arm64")
         };
 
         ReleaseSelector.Newest(releases, SemVersionTests.V("1.0.0"), "win-x64")!.Tag.Should().Be("1.2.0");
         ReleaseSelector.Newest(releases, SemVersionTests.V("1.0.0"), "linux-x64")!.Tag.Should().Be("1.1.0");
+        ReleaseSelector.Newest(releases, SemVersionTests.V("1.0.0"), "linux-arm64")!.Tag.Should().Be("1.1.5");
         ReleaseSelector.Newest(releases, SemVersionTests.V("1.0.0"), "osx-arm64").Should().BeNull();
     }
 
@@ -64,9 +66,10 @@ public sealed class ReleaseSelectorTests
     [Fact]
     public void PackageFor_FindsTheAssetByTheNameTheWorkflowGivesIt()
     {
-        var release = Release("v1.0.0-beta.1", true, "win-x64", "linux-x64");
+        var release = Release("v1.0.0-beta.1", true, "win-x64", "linux-x64", "linux-arm64");
 
         ReleaseSelector.PackageFor(release, "linux-x64")!.Name.Should().Be("TeensyROM-Suite-1.0.0-beta.1-linux-x64.tar.gz");
+        ReleaseSelector.PackageFor(release, "linux-arm64")!.Name.Should().Be("TeensyROM-Suite-1.0.0-beta.1-linux-arm64.tar.gz");
         ReleaseSelector.PackageFor(release, "osx-x64").Should().BeNull();
     }
 }

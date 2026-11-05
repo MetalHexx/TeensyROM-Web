@@ -37,6 +37,7 @@ internal sealed record EngineReady(bool Ok, string? FailureMessage)
 /// <param name="Problem">Why no engine is running, as a sentence for the user; null when one is.</param>
 /// <param name="LogFolder">The folder the engine writes its logs to.</param>
 /// <param name="LogFile">The engine's newest log file; null unless an engine answers and has written one.</param>
+/// <param name="Https">The running engine's HTTPS; null when no engine answers or an older engine has none to report.</param>
 internal sealed record EngineStatus(
     bool Running,
     string? Version,
@@ -45,7 +46,26 @@ internal sealed record EngineStatus(
     string Address,
     string? Problem,
     string? LogFolder = null,
-    string? LogFile = null);
+    string? LogFile = null,
+    EngineHttps? Https = null);
+
+/// <summary>What the engine did to its security certificate during the current run.</summary>
+internal enum CertificateChange { None, Created, Reissued }
+
+/// <summary>Why the engine replaced an existing certificate.</summary>
+internal enum CertificateChangeReason { Unreadable, Expiring, HostNameChanged, NewAddress }
+
+/// <summary>The engine's HTTPS for its current run; Notice is set only when this run created or re-issued the certificate.</summary>
+internal sealed record EngineHttps(
+    int Port,
+    bool Listening,
+    string? Problem,
+    IReadOnlyList<string> Names,
+    DateTimeOffset? IssuedAt,
+    DateTimeOffset? ExpiresAt,
+    CertificateChange Change,
+    CertificateChangeReason? ChangeReason,
+    string? Notice);
 
 internal enum EngineStopOutcome
 {

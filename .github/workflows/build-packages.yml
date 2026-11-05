@@ -14,7 +14,7 @@ on:
         description: 'JSON array of runtime identifiers to package'
         type: string
         required: false
-        default: '["win-x64","osx-x64","osx-arm64","linux-x64"]'
+        default: '["win-x64","osx-x64","osx-arm64","linux-x64","linux-arm64"]'
       retention-days:
         description: 'Days to keep the package artifacts'
         type: number

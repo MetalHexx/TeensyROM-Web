@@ -109,7 +109,8 @@ internal sealed class EngineControl(
         return await probe.ProbeAsync(ct) switch
         {
             EngineProbeResult.Engine running => new EngineStatus(
-                true, running.Version, ownVersion, SameVersion(running.Version), address, null, TeensyRomHome.EngineLogsPath, NewestEngineLog()),
+                true, running.Version, ownVersion, SameVersion(running.Version), address, null, TeensyRomHome.EngineLogsPath, NewestEngineLog(),
+                await probe.GetHttpsAsync(ct)),
             EngineProbeResult.NotReady => NotRunning(address,
                 $"Trom API is listening on {address} but isn't answering yet — run `trom api status` again in a moment."),
             EngineProbeResult.Foreign foreign => NotRunning(address,
