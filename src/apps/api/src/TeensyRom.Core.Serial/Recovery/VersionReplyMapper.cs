@@ -13,7 +13,7 @@ namespace TeensyRom.Core.Serial.Recovery
         public static void Apply(VersionReply reply, Cart cart)
         {
             cart.DeviceId = reply.ChipId;
-            cart.FwVersion = reply.FirmwareVersion?.ToString() ?? "";
+            cart.FwVersion = reply.FirmwareVersionText;
             cart.IsCompatible = VersionReplyParser.IsCompatible(reply) && !reply.IsMinimalFirmware;
             cart.HardwareVariant = reply.HardwareVariant;
             cart.IsMinimalFirmware = reply.IsMinimalFirmware;

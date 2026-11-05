@@ -53,7 +53,8 @@ internal interface IDeviceService
 
 /// <summary>
 /// A TeensyROM as tr-web reports it. <c>SdIndexed</c> and <c>UsbIndexed</c> say whether tr-web holds a full index of that
-/// storage; search and random only see the files it has cached until one exists.
+/// storage; search and random only see the files it has cached until one exists. <c>FirmwareVersion</c> is the whole version
+/// the board reported, such as <c>0.9-pr65*</c>: a tag and <c>*</c> for a dirty tree appear only on those builds.
 /// </summary>
 internal sealed record DeviceSummary(
     string Id,
@@ -64,7 +65,8 @@ internal sealed record DeviceSummary(
     bool SdAvailable = false,
     bool UsbAvailable = false,
     bool SdIndexed = false,
-    bool UsbIndexed = false)
+    bool UsbIndexed = false,
+    string FirmwareVersion = "")
 {
     /// <summary>Whether tr-web holds a full index of <paramref name="storage"/>.</summary>
     public bool IsIndexed(TeensyStorageType storage) => storage == TeensyStorageType.USB ? UsbIndexed : SdIndexed;

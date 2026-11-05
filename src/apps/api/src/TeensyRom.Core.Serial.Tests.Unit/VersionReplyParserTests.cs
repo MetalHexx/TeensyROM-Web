@@ -73,6 +73,118 @@ namespace TeensyRom.Core.Serial.Tests.Unit
             VersionReplyParser.IsCompatible(reply).Should().BeFalse();
         }
 
+        [Theory]
+        [InlineData("v0.9", "0.9", "")]
+        [InlineData("v0.9*", "0.9", "*")]
+        [InlineData("v0.9-pr65", "0.9", "-pr65")]
+        [InlineData("v0.9-pr65*", "0.9", "-pr65*")]
+        [InlineData("v0.8.0.9-rc.1", "0.8.0.9", "-rc.1")]
+        [InlineData("v0.9-1.2.3", "0.9", "-1.2.3")]
+        [InlineData("v0.9-v2.0.0*", "0.9", "-v2.0.0*")]
+        [InlineData("v0.9-busy", "0.9", "-busy")]
+        [InlineData("v0.9-minimal", "0.9", "-minimal")]
+        public void Parse_TaggedOrDirtyBuild_KeepsTheSuffixAndStaysCompatible(string token, string number, string suffix)
+        {
+            var parsed = VersionReplyParser.Parse(
+                $"\n  FW: TeensyROM+ {token}\r\n      Sep 18 2026, 09:41:32\r\n  Teensy: 816MHz  59.1C  UID: 19307720\r\n  C128  NTSC Vid  60 Hz\n");
+
+            parsed.IsTeensyRom.Should().BeTrue();
+            parsed.HardwareVariant.Should().Be(HardwareVariant.TeensyRomPlus);
+            parsed.FirmwareVersion.Should().Be(Version.Parse(number));
+            parsed.VersionSuffix.Should().Be(suffix);
+            parsed.FirmwareVersionText.Should().Be(token[1..]);
+            parsed.IsMinimalFirmware.Should().BeFalse();
+            parsed.BuildTimestamp.Should().Be("Sep 18 2026, 09:41:32");
+            parsed.ChipId.Should().Be("19307720");
+            VersionReplyParser.IsCompatible(parsed).Should().BeTrue();
+        }
+
+        [Theory]
+        [InlineData("v0.9(minimal)", "0.9", "")]
+        [InlineData("v0.9*(minimal)", "0.9", "*")]
+        [InlineData("v0.9-pr65*(minimal)", "0.9", "-pr65*")]
+        [InlineData("v0.9-minimal(minimal)", "0.9", "-minimal")]
+        public void Parse_TaggedOrDirtyMinimalBuild_StopsTheSuffixAtTheMinimalMarker(string token, string number, string suffix)
+        {
+            var parsed = VersionReplyParser.Parse(
+                $"\n  FW: TeensyROM+ {token}\r\n      Sep 18 2026, 09:41:32\r\n  Teensy: 816MHz  59.1C  UID: 19307720\r\n");
+
+            parsed.IsMinimalFirmware.Should().BeTrue();
+            parsed.FirmwareVersion.Should().Be(Version.Parse(number));
+            parsed.VersionSuffix.Should().Be(suffix);
+            VersionReplyParser.IsCompatible(parsed).Should().BeTrue();
+        }
+
+        [Fact]
+        public void Parse_ATagNamedMinimal_IsNotAMinimalBuild()
+        {
+            var parsed = VersionReplyParser.Parse("FW: TeensyROM+ v0.9-minimal\r\n");
+
+            parsed.IsMinimalFirmware.Should().BeFalse();
+        }
+
+        [Fact]
+        public void Parse_TheLongestTagTheBannerFits_KeepsTheChipIdAndTheWholeTag()
+        {
+            // "TeensyROM+ v0.9-" and the "*" leave 23 of the firmware's 40 columns for the tag.
+            var tag = new string('W', 23);
+
+            var parsed = VersionReplyParser.Parse(
+                $"\n  FW: TeensyROM+ v0.9-{tag}*\r\n      Sep 18 2026, 09:41:32\r\n  Teensy: 816MHz  59.1C  UID: 19307720\r\n  C128  NTSC Vid  60 Hz\n");
+
+            parsed.FirmwareVersionText.Should().Be($"0.9-{tag}*");
+            parsed.ChipId.Should().Be("19307720");
+        }
+
+        [Theory]
+        [InlineData("v0.9trailer")]
+        [InlineData("v0.9_bad")]
+        [InlineData("v0.9 -pr65")]
+        public void Parse_TextThatIsNotASuffix_LeavesTheVersionAlone(string token)
+        {
+            var parsed = VersionReplyParser.Parse($"FW: TeensyROM+ {token}\r\n");
+
+            parsed.FirmwareVersion.Should().Be(new Version(0, 9));
+            parsed.VersionSuffix.Should().BeEmpty();
+            parsed.FirmwareVersionText.Should().Be("0.9");
+        }
+
+        [Fact]
+        public void Parse_PreLabeledLegacyReply_HasNoSuffix()
+        {
+            var parsed = VersionReplyParser.Parse(PreLabeledReply);
+
+            parsed.VersionSuffix.Should().BeEmpty();
+            parsed.FirmwareVersionText.Should().Be("0.7.2.7");
+        }
+
+        [Fact]
+        public void Parse_ReleaseReply_ReadsExactlyAsItDidBefore()
+        {
+            VersionReplyParser.Parse(FullReply).FirmwareVersionText.Should().Be("0.8.0.9");
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("garbage")]
+        public void Parse_AReplyWithNoVersion_HasEmptyVersionText(string? text)
+        {
+            var parsed = VersionReplyParser.Parse(text);
+
+            parsed.VersionSuffix.Should().BeEmpty();
+            parsed.FirmwareVersionText.Should().BeEmpty();
+        }
+
+        [Fact]
+        public void IsCompatible_ATagDoesNotRaiseAVersionBelowTheFloor()
+        {
+            var parsed = VersionReplyParser.Parse("FW: TeensyROM+ v0.8.0.8-pr65*\r\n");
+
+            parsed.FirmwareVersion.Should().Be(new Version(0, 8, 0, 8));
+            VersionReplyParser.IsCompatible(parsed).Should().BeFalse();
+        }
+
         [Fact]
         public void Parse_FullReplyWithZeroHzLine_MachineFieldsAreUnknown()
         {

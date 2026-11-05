@@ -35,6 +35,11 @@
   min-width: 0;
 }
 
+// A long build tag has no spaces to wrap at, so let it break anywhere rather than leave its column.
+.firmware-fact {
+  overflow-wrap: anywhere;
+}
+
 .device-storage {
   display: grid;
   grid-template-columns: 1fr 1fr;

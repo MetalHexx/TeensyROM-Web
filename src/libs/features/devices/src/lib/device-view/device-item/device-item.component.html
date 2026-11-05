@@ -64,9 +64,12 @@
             [label]="'Hardware: ' + hardware"
           ></lib-icon-label>
         }
+        <!-- Not truncated: a build tag and its dirty marker are what tell two builds apart -->
         <lib-icon-label
+          class="firmware-fact"
           icon="developer_board"
           data-testid="device-firmware-label"
+          [truncate]="false"
           [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
         ></lib-icon-label>
         <lib-icon-label

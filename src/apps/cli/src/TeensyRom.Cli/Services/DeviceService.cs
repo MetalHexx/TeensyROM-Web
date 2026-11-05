@@ -61,5 +61,6 @@ internal sealed class DeviceService(ITeensyRomApiClient api) : IDeviceService
         cart.SdStorage.Available,
         cart.UsbStorage.Available,
         cart.SdStorage.IndexExists,
-        cart.UsbStorage.IndexExists);
+        cart.UsbStorage.IndexExists,
+        cart.FwVersion);
 }

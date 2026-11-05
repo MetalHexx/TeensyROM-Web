@@ -26,7 +26,8 @@ public class DeviceServiceTests
         DeviceState = state,
         ConnectionType = connection,
         ComPort = "COM3",
-        IpAddress = "10.0.0.7"
+        IpAddress = "10.0.0.7",
+        FwVersion = string.Empty
     };
 
     [Fact]
@@ -141,6 +142,21 @@ public class DeviceServiceTests
 
         found.Should().ContainSingle().Which.Should().Match<DeviceSummary>(d => d.SdAvailable && !d.UsbAvailable);
     }
+
+    [Theory]
+    [InlineData("0.9")]
+    [InlineData("0.9-pr65*")]
+    public async Task Find_ReportsTheWholeFirmwareVersion(string fwVersion)
+    {
+        var cart = Cart("a", "Alpha", DeviceState.Connected);
+        cart.FwVersion = fwVersion;
+        ApiKnowsDevices(cart);
+
+        var found = await _sut.FindAsync(fullScan: false);
+
+        found.Should().ContainSingle().Which.FirmwareVersion.Should().Be(fwVersion);
+    }
+
     [Fact]
     public async Task ReconnectDevice_ReturnsTheDeviceAfterwards()
     {
