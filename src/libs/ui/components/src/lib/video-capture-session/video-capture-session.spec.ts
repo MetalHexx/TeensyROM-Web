@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { of } from 'rxjs';
+import { HTTPS_STATUS_SERVICE } from '@teensyrom-nx/domain';
 import { VideoCaptureSession } from './video-capture-session';
 
 function createStream() {
@@ -208,5 +210,63 @@ describe('VideoCaptureSession', () => {
 
     expect(streams[0].stop).toHaveBeenCalled();
     expect(session.stream()).toBe(streams[1].stream);
+  });
+
+  describe('on a page that is not a secure context', () => {
+    function sessionWithEngineAnswering(port: number | null): VideoCaptureSession {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          VideoCaptureSession,
+          { provide: HTTPS_STATUS_SERVICE, useValue: { getSecurePort: () => of(port) } },
+        ],
+      });
+      return TestBed.inject(VideoCaptureSession);
+    }
+
+    function stubSecureContext(value: boolean): void {
+      Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value });
+    }
+
+    afterEach(() => {
+      delete (globalThis as unknown as Record<string, unknown>)['isSecureContext'];
+    });
+
+    it('asks for the https link built from the page host and the engine port, without prompting for a camera', async () => {
+      stubSecureContext(false);
+      const { getUserMedia } = mockMediaDevices([{ deviceId: 'cam-a', label: 'A' }]);
+      const insecure = sessionWithEngineAnswering(10214);
+
+      await insecure.start(() => '');
+
+      expect(insecure.secureAddressRequired()).toBe(true);
+      expect(insecure.secureAddressAdvice()).toBe(
+        `Open this page over https at https://${location.hostname}:10214.`
+      );
+      expect(getUserMedia).not.toHaveBeenCalled();
+      expect(insecure.hasEnumerated()).toBe(false);
+    });
+
+    it('falls back to the trom ui address when the engine reports no secure port', async () => {
+      stubSecureContext(false);
+      const insecure = sessionWithEngineAnswering(null);
+
+      await insecure.start(() => '');
+
+      expect(insecure.secureAddressRequired()).toBe(true);
+      expect(insecure.secureAddressAdvice()).toBe(
+        'Open this page over https at the secure address that trom ui lists.'
+      );
+    });
+
+    it('does not ask for a secure address when the page is secure', async () => {
+      stubSecureContext(true);
+      mockMediaDevices([]);
+
+      await session.start(() => '');
+
+      expect(session.secureAddressRequired()).toBe(false);
+      expect(session.hasEnumerated()).toBe(true);
+    });
   });
 });

@@ -82,6 +82,8 @@ export class VideoCaptureComponent {
   devices = computed(() => this.session.devices());
   hasDevices = computed(() => this.session.hasDevices());
   isPermissionDenied = computed(() => this.session.permissionDenied());
+  secureAddressRequired = computed(() => this.session.secureAddressRequired());
+  secureAddressAdvice = computed(() => this.session.secureAddressAdvice());
   hasStream = computed(() => this.session.stream() !== null);
   selectedDevice = computed(() => this.session.selectedDeviceId());
 

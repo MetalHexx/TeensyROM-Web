@@ -8,6 +8,7 @@ export * from './lib/contracts';
 export * from './lib/utils/file-utils';
 export * from './lib/utils/midi-port-device';
 export * from './lib/utils/crt-video-standard';
+export * from './lib/utils/secure-address';
 
 // Validation
 export * from './lib/validation/preset-name-validation';

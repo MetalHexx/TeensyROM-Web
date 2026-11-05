@@ -66,6 +66,11 @@
     <p>Camera permission denied</p>
     <p class="error-hint">Please allow camera access in your browser settings</p>
   </div>
+} @else if (secureAddressRequired()) {
+  <div class="error-message">
+    <p>Video capture needs a secure address</p>
+    <p class="error-hint">{{ secureAddressAdvice() }}</p>
+  </div>
 } @else {
   <div class="no-devices-message">
     <p>No video capture devices detected</p>
