@@ -10,7 +10,7 @@ const meta: Meta<LiveLoopRowComponent> = {
       description: {
         component:
           "The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights " +
-          'green while the loop runs: the Live loop key, the SIZE ' +
+          'green while the loop runs: the Live loop key, the LENGTH ' +
           'control (1/2, a size picker, 2×, with the mouse wheel on the readout) and the latching SLIP ' +
           'key. The Live loop key acts on press: a quick click leaves the loop running, and a press ' +
           'held for 300 ms or more ends the loop it started when released. Presentational only.',
@@ -54,7 +54,7 @@ const idle: LiveLoopRowModel = {
     ],
     halveAccessibleName: 'Halve live loop deck A',
     doubleAccessibleName: 'Double live loop deck A',
-    pickAccessibleName: 'Live loop size deck A',
+    pickAccessibleName: 'Live loop length deck A',
   },
   canHalve: true,
   canDouble: true,

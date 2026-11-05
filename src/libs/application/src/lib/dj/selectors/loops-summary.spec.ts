@@ -314,7 +314,6 @@ describe('loopsSummary', () => {
         name: 'Cue 1',
         kind: 'cue',
         spanText: '00:02.0',
-        end: null,
       });
     });
 
@@ -322,32 +321,6 @@ describe('loopsSummary', () => {
       setLoops([marker('a', 100)], { selectedId: 'gone' });
 
       expect(store.loopsSummary('A')().selected).toBeNull();
-    });
-
-    it("lays the beats within reach on each boundary's one-second track", () => {
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
-      setLoops([marker('a', 100, 300)]);
-
-      const { start, end } = store.loopsSummary('A')().selected ?? {};
-
-      expect(start).toEqual({ offsetFrames: 0, rangeFrames: 50, tickPercents: [22, 46, 70, 94] });
-      expect(end?.tickPercents.map(Math.round)).toEqual([14, 38, 62, 86]);
-    });
-
-    it('draws no ticks with no grid, no beat of its span in reach or while the interval is unknown', () => {
-      setLoops([marker('a', 100, 300)]);
-      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
-
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: { ...GRID, endFrame: 40 } });
-      expect(store.loopsSummary('A')().selected?.start.tickPercents).toEqual([]);
-
-      store.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
-      store.setDeckTiming({ slot: 'A', playCallIntervalUs: null });
-      expect(store.loopsSummary('A')().selected?.start).toEqual({
-        offsetFrames: 0,
-        rangeFrames: 0,
-        tickPercents: [],
-      });
     });
   });
 

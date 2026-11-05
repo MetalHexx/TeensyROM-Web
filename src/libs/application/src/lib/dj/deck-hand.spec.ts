@@ -276,6 +276,8 @@ describe('DeckHand', () => {
 
     h = setUpMappingHarness(undefined, new FakeReplayRunner());
     runtime = TestBed.inject(DeckRuntime);
+    h.djStore.setDeckSettings({ slot: 'A', slip: false });
+    h.djStore.setDeckSettings({ slot: 'B', slip: false });
     h.resolve.mockImplementation(async (identity: TuneIdentity) => playableOf(identity));
     traceRates();
     seedRows();
@@ -742,6 +744,8 @@ describe('DeckHand', () => {
           new FakeReplayRunner()
         );
         runtime = TestBed.inject(DeckRuntime);
+        h.djStore.setDeckSettings({ slot: 'A', slip: false });
+        h.djStore.setDeckSettings({ slot: 'B', slip: false });
         h.resolve.mockImplementation(async (identity: TuneIdentity) => playableOf(identity));
         traceRates();
         seedRows();

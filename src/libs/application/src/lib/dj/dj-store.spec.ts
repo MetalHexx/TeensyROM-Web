@@ -63,6 +63,12 @@ describe('DjStore', () => {
       expect(store.seen()).toEqual({});
     });
 
+    it('starts both decks with slip on and a 4-beat live loop', () => {
+      for (const slot of ['A', 'B'] as const) {
+        expect(store.decks()[slot]).toMatchObject({ slip: true, liveLoopBeats: 4 });
+      }
+    });
+
     it('starts both decks with home speed, three unmuted unheld voices, no key and not switching', () => {
       for (const slot of ['A', 'B'] as const) {
         const deck = store.decks()[slot];

@@ -33,7 +33,6 @@ import { decodeRowHost } from './sets/row-host';
 import { DECK_SLOTS, type Slot } from './slot';
 import type { LoadSource } from './load-source';
 import type { MoveStep } from './grid/beat-math';
-import type { LoopBoundaryName } from './selectors/loops-summary';
 
 /** `error instanceof Error ? error.message : String(error)` — a local helper, not core's
  *  `describeError`. This file imports nothing from `@sidablist/*`; every type it touches flows in
@@ -480,21 +479,6 @@ export class DeckService {
     }
   }
 
-  /** Sets the selected marker's start at the playhead, on the nearest beat. Auditions nothing. */
-  setMarkerIn(slot: Slot): void {
-    if (this.canShape(slot, 'setMarkerIn')) {
-      this.loops.setIn(slot);
-    }
-  }
-
-  /** Sets the selected marker's end at the playhead, on the nearest beat: a cue becomes a loop, a
-   *  loop's end moves. Auditions nothing. */
-  setMarkerOut(slot: Slot): void {
-    if (this.canShape(slot, 'setMarkerOut')) {
-      this.loops.setOut(slot);
-    }
-  }
-
   /** Halves or doubles the selected loop, keeping its start; a cue gains a 4-beat end. */
   resizeMarker(slot: Slot, direction: 'halve' | 'double'): void {
     if (this.canShape(slot, 'resizeMarker')) {
@@ -516,14 +500,14 @@ export class DeckService {
     }
   }
 
-  /** Moves one edge of the selected marker by the deck's Move step. */
-  moveMarkerEdge(slot: Slot, boundary: LoopBoundaryName, direction: -1 | 1): void {
-    if (this.canShape(slot, 'moveMarkerEdge')) {
-      this.loops.moveEdge(slot, boundary, direction);
+  /** Gives the selected loop one more or one fewer whole beat, keeping its start. */
+  stepMarkerLength(slot: Slot, direction: -1 | 1): void {
+    if (this.canShape(slot, 'stepMarkerLength')) {
+      this.loops.stepLength(slot, direction);
     }
   }
 
-  /** Sets how far the deck's Move controls shift a loop or an edge: beats, or one frame. */
+  /** Sets how far the deck's Move controls shift a loop: beats, or one frame. */
   setMoveStep(slot: Slot, step: MoveStep): void {
     if (this.canShape(slot, 'setMoveStep')) {
       this.loops.setMoveStep(slot, step);
@@ -555,15 +539,6 @@ export class DeckService {
   toggleMarkerWrap(slot: Slot): void {
     if (this.canShape(slot, 'toggleMarkerWrap')) {
       this.loops.toggleWrap(slot);
-    }
-  }
-
-  /** Sets a boundary of the selected marker to `offsetFrames` from where it was captured, then
-   *  auditions it on this deck, whatever is running or queued. The edit lands before the first
-   *  await; a deck that is not playing is started first, as `toggleMarker` does. */
-  async nudgeMarker(slot: Slot, boundary: LoopBoundaryName, offsetFrames: number): Promise<void> {
-    if (this.canShape(slot, 'nudgeMarker')) {
-      await this.auditionEdit(slot, boundary, this.loops.nudge(slot, boundary, offsetFrames));
     }
   }
 
@@ -688,7 +663,9 @@ export class DeckService {
   }
 
   /** Seeds each deck's slip and live loop size from the saved MIDI settings; a deck with no entry,
-   *  or a size outside `(0, MAX_LIVE_LOOP_BEATS]`, keeps its defaults. Writes the store only, so it never queues a save. */
+   *  or a size outside `(0, MAX_LIVE_LOOP_BEATS]`, keeps its defaults (slip on, `DEFAULT_LIVE_LOOP_BEATS`).
+   *  A saved record overrides them, so a saved slip off stays off. Writes the store only, so it
+   *  never queues a save. */
   private async hydrateDeckSettings(): Promise<void> {
     const settings = await this.persistence.load();
     for (const record of settings.deckSettings) {
@@ -1010,27 +987,6 @@ export class DeckService {
       this.runtime.setVoiceHeld(slot, voice, false);
     }
     this.reflectEngineControls(slot);
-  }
-
-  /** Auditions the boundary of marker `edited` — the marker an accepted edit just changed; null for
-   *  a refused one, which starts nothing. A deck that is not playing is started first, which
-   *  resumes a pause and restarts a stop from the top. The marker is fixed up front, since a
-   *  selection change can land during that wait, and `DeckLoops` skips it then. */
-  private async auditionEdit(
-    slot: Slot,
-    boundary: LoopBoundaryName,
-    edited: string | null
-  ): Promise<void> {
-    if (edited === null) {
-      return;
-    }
-    if (this.store.deck(slot)().status !== 'playing') {
-      await this.togglePlayPause(slot);
-      if (this.store.deck(slot)().status !== 'playing') {
-        return;
-      }
-    }
-    this.loops.audition(slot, boundary, edited);
   }
 
   /** Drops the live loop and the marker loop, anything queued behind it or waiting for readiness,

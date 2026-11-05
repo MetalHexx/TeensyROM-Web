@@ -133,32 +133,13 @@ export function nextBeat(grid: DeckBeatGrid, frame: number, direction: -1 | 1): 
   return beatFrame >= 0 && inGridSpan(grid, beatFrame) ? beatFrame : null;
 }
 
-/** The offsets from `anchor`, ascending, of every beat of the span within `rangeFrames` either
- *  way: what the boundary's track draws its ticks from. */
-export function beatsInReach(
-  grid: DeckBeatGrid,
-  anchor: number,
-  rangeFrames: number
-): readonly number[] {
-  const first = Math.ceil((anchor - rangeFrames - grid.beatOneFrame) / grid.beatFrames);
-  const last = Math.floor((anchor + rangeFrames - grid.beatOneFrame) / grid.beatFrames);
-  const offsets: number[] = [];
-  for (let beat = first; beat <= last; beat++) {
-    const beatFrame = grid.beatOneFrame + beat * grid.beatFrames;
-    if (beatFrame >= 0 && inGridSpan(grid, beatFrame)) {
-      offsets.push(beatFrame - anchor);
-    }
-  }
-  return offsets;
-}
-
-/** The whole-beat distances the Move controls can shift a loop or an edge by. */
+/** The whole-beat distances the Move controls can shift a loop by. */
 export type MoveStepBeats = 1 | 2 | 4 | 8 | 16;
 
 /**
- * A Move step: a whole number of beats, or `'frame'`, one play call. A frame step moves an edge by
- * its nudge rather than its beat, so the edge keeps the beat it sits on and the grid never moves. It
- * is a bench experiment (2026-11-01) for setting a very short loop onto a transient.
+ * A Move step: a whole number of beats, or `'frame'`, one play call. A frame step moves a loop by
+ * its edges' offsets rather than its beats, so each edge keeps the beat it sits on and the grid
+ * never moves. It is a bench experiment (2026-11-01) for setting a very short loop onto a transient.
  */
 export type MoveStep = 'frame' | MoveStepBeats;
 

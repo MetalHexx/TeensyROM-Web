@@ -152,7 +152,7 @@ export interface DeckState {
   detectedKey: DeckDetectedKey | null;
   /** The grid the deck plays to, or null when the tune has none. */
   beatGrid: DeckBeatGrid | null;
-  /** How far the Move controls shift a loop or an edge: a whole number of beats, or `'frame'` for
+  /** How far the Move controls shift a loop: a whole number of beats, or `'frame'` for
    *  one play call by the edges' nudges. Kept across loads. */
   moveStepBeats: MoveStep;
   /** Whether slip is on. A setting of the deck, not of a tune or a set: it is kept on the host
@@ -338,6 +338,9 @@ export const EMPTY_DECK_LOOPS: DeckLoopsState = {
 /** A deck's live loop size, in beats, until the host says otherwise. */
 export const DEFAULT_LIVE_LOOP_BEATS = 4;
 
+/** Whether a deck's slip starts on, until a saved record says otherwise. */
+export const DEFAULT_SLIP = true;
+
 /** The largest live loop size, in beats, the server accepts in the saved MIDI settings. */
 export const MAX_LIVE_LOOP_BEATS = 128;
 
@@ -363,7 +366,7 @@ const initialDeckState: DeckState = {
   detectedKey: null,
   beatGrid: null,
   moveStepBeats: 1,
-  slip: false,
+  slip: DEFAULT_SLIP,
   liveLoopBeats: DEFAULT_LIVE_LOOP_BEATS,
   tapping: false,
   switching: false,

@@ -43,25 +43,19 @@
 
     <lib-loop-selected-row
       [model]="model().selected"
-      [startDragOffset]="startDragOffset()"
-      [endDragOffset]="endDragOffset()"
       (trigger)="toggleSelected.emit()"
       (playNow)="playNowSelected.emit()"
       (toggleGlobal)="toggleGlobal.emit()"
       (toggleWrap)="toggleWrap.emit()"
-      (setIn)="setIn.emit()"
-      (setOut)="setOut.emit()"
       (halve)="halve.emit()"
       (double)="double.emit()"
+      (stepLength)="stepLength.emit($event)"
       (pickLength)="pickLength.emit($event)"
       (moveEarlier)="moveEarlier.emit()"
       (moveLater)="moveLater.emit()"
       (pickMoveStep)="pickMoveStep.emit($event)"
       (clearEnd)="clearEnd.emit()"
       (deleteMarker)="deleteSelected.emit()"
-      (nudgeInput)="nudgeInput.emit($event)"
-      (nudgeCommit)="nudgeCommit.emit($event)"
-      (moveEdge)="moveEdge.emit($event)"
       (rename)="rename.emit($event)"
     />
 

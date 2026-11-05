@@ -9,25 +9,32 @@ const meta: Meta<LoopSizeControlComponent> = {
     docs: {
       description: {
         component:
-          'The size control of the mixer loop rows: a tag, a 1/2 key, a readout that opens a picker of ' +
-          'sizes, and a 2× key. The selected loop row draws it as Length, the live loop row as Size. ' +
-          'Presentational only. With no options (no grid) the readout is plain text. The readout takes ' +
-          'the mouse wheel only when `wheel` is on.',
+          'The length control of the mixer loop rows: a LENGTH tag, a 1/2 key, optionally − and + ' +
+          'whole-beat keys, a readout that opens a picker of lengths, and a 2× key. The selected loop ' +
+          'row gives it the step keys and a No End item; the live loop row gives it neither. ' +
+          'Presentational only. With no options and no No End (no grid) the readout is plain text. The ' +
+          'readout takes the mouse wheel only when `wheel` is on.',
       },
     },
   },
   argTypes: {
-    model: { description: 'The readout text, the picker options and the accessible names.' },
+    model: {
+      description:
+        'The readout text, the picker options, the accessible names, and optionally the step keys (`steps`) and the No End item (`noEnd`).',
+    },
     disabled: { description: 'Disables both keys and dims the readout.' },
     halveDisabled: { description: "Disables 1/2 alone, e.g. at the ladder's shortest rung." },
     doubleDisabled: { description: "Disables 2× alone, e.g. at the ladder's longest rung." },
-    tag: { description: 'The decorative caption before the keys.' },
     wheel: { description: 'Whether the readout takes the mouse wheel.' },
     readoutControl: { description: 'The data-control id on the readout.' },
     halveControl: { description: 'The data-control id on the 1/2 key.' },
     doubleControl: { description: 'The data-control id on the 2× key.' },
+    stepDownControl: { description: 'The data-control id on the − key.' },
+    stepUpControl: { description: 'The data-control id on the + key.' },
     halve: { description: 'Emits when 1/2 is pressed.' },
     double: { description: 'Emits when 2× is pressed.' },
+    stepLength: { description: 'Emits -1 for the − key and 1 for the + key.' },
+    pickNoEnd: { description: "Emits when the picker's No End item is picked." },
     pickLength: { description: 'Emits the picked size in beats.' },
     wheelTurn: { description: 'Emits whole wheel clicks over the readout, upward positive.' },
   },
@@ -37,7 +44,6 @@ const meta: Meta<LoopSizeControlComponent> = {
       <div style="width: 230px">
         <lib-loop-size-control
           [model]="model"
-          [tag]="tag"
           [disabled]="disabled"
           [halveDisabled]="halveDisabled"
           [doubleDisabled]="doubleDisabled"
@@ -61,14 +67,13 @@ const size: LoopLengthModel = {
   ],
   halveAccessibleName: 'Halve live loop deck A',
   doubleAccessibleName: 'Double live loop deck A',
-  pickAccessibleName: 'Live loop size deck A',
+  pickAccessibleName: 'Live loop length deck A',
 };
 
-/** A size on the ladder, with the wheel on. */
+/** A length on the ladder, with the wheel on. */
 export const Idle: Story = {
   args: {
     model: size,
-    tag: 'Size',
     wheel: true,
     disabled: false,
     halveDisabled: false,
@@ -86,9 +91,40 @@ export const NoGrid: Story = {
   args: { ...Idle.args, disabled: true, model: { ...size, text: '—', options: [] } },
 };
 
-/** The Length caption, as the selected loop row draws it. */
-export const Length: Story = {
-  args: { ...Idle.args, tag: 'Length', wheel: false },
+/** As the selected loop row draws it: the − and + keys, and No End first in the picker. */
+export const WithStepsAndNoEnd: Story = {
+  args: {
+    ...Idle.args,
+    wheel: false,
+    model: {
+      ...size,
+      steps: {
+        disabled: false,
+        downAccessibleName: 'Shorten Loop 1 by a beat deck A',
+        upAccessibleName: 'Lengthen Loop 1 by a beat deck A',
+      },
+      noEnd: { label: 'NO END', selected: false },
+    },
+  },
+};
+
+/** A cue on a tune with no grid: the readout is still a picker, for No End alone, and the step keys are off. */
+export const CueWithNoGrid: Story = {
+  args: {
+    ...Idle.args,
+    wheel: false,
+    model: {
+      ...size,
+      text: 'NO END',
+      options: [],
+      steps: {
+        disabled: true,
+        downAccessibleName: 'Shorten Cue 1 by a beat deck A',
+        upAccessibleName: 'Lengthen Cue 1 by a beat deck A',
+      },
+      noEnd: { label: 'NO END', selected: true },
+    },
+  },
 };
 
 /** A narrow slot. */
@@ -98,7 +134,7 @@ export const Narrow: Story = {
     props: args,
     template: `
       <div style="width: 170px">
-        <lib-loop-size-control [model]="model" [tag]="tag" [wheel]="wheel" />
+        <lib-loop-size-control [model]="model" [wheel]="wheel" />
       </div>
     `,
   }),

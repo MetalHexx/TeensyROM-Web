@@ -126,6 +126,28 @@ describe('MidiMappings', () => {
       expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
     });
 
+    it('drops a saved mapping on a retired loop control on load, and leaves it out of the next save', async () => {
+      setUp({
+        ...SAVED,
+        mappings: [
+          record('ok', 7, 'A', 'speed'),
+          record('in', 8, 'A', 'loop-in'),
+          record('snap', 9, 'B', 'loop-start-snap-next'),
+        ],
+      });
+
+      await h.mappings.hydrate();
+
+      expect(h.mappingStore.mappings().map((m) => m.id)).toEqual(['ok']);
+      expect(vi.mocked(logWarn)).toHaveBeenCalledTimes(2);
+      h.mappings.bind(ccSource(10), SPEED_A, style('absolute'));
+      const ids = (await saved()).mappings.map((m) => m.id);
+      expect(ids).toHaveLength(2);
+      expect(ids).toContain('ok');
+      expect(ids).not.toContain('in');
+      expect(ids).not.toContain('snap');
+    });
+
     it('keeps a saved mapping on a set control, and drops one on a control the set does not own', async () => {
       setUp({
         ...SAVED,
@@ -241,8 +263,8 @@ describe('MidiMappings', () => {
         ],
         deckBindings: [],
         deckSettings: [
-          { slot: 'A', slip: false, liveLoopBeats: 4 },
-          { slot: 'B', slip: false, liveLoopBeats: 4 },
+          { slot: 'A', slip: true, liveLoopBeats: 4 },
+          { slot: 'B', slip: true, liveLoopBeats: 4 },
         ],
       });
     });

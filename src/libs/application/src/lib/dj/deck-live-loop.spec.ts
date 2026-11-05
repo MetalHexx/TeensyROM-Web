@@ -262,7 +262,7 @@ describe('DeckLiveLoop', () => {
     runtime.load(slot, playableOf(TUNE));
     store.setDeckTiming({ slot, playCallIntervalUs: INTERVAL_US });
     store.setDeckBeatGrid({ slot, beatGrid: options.grid === undefined ? GRID : options.grid });
-    store.setDeckSettings({ slot, liveLoopBeats: options.beats ?? 1 });
+    store.setDeckSettings({ slot, slip: false, liveLoopBeats: options.beats ?? 1 });
     TestBed.flushEffects();
     await loops.attach(slot, {
       placementKey: 'set-1:row-1',
@@ -810,16 +810,17 @@ describe('DeckLiveLoop', () => {
 
       const position = Number(runtime.position('A'));
 
-      loops.nudge('A', 'end', 4);
-      loops.audition('A', 'end', 'm');
+      loops.setLength('A', 8);
 
       expect(liveOf('A')).not.toBeNull();
       expect(engineLoop('A')).toMatchObject({ startFrame: 48, endFrame: 72, varispeedStart: 'wrap' });
+      expect(engineQueue('A')).toBeNull();
       expect(Number(runtime.position('A'))).toBe(position);
 
       live.end('A');
 
-      expect(engineLoop('A')).toEqual({ ...M_LOOP, endFrame: 100 });
+      expect(engineLoop('A')).toEqual(M_LOOP);
+      expect(engineQueue('A')).toEqual({ ...M_LOOP, endFrame: 48 + 192 });
     });
 
     it('stops the marker underneath when it is toggled off, leaving the live loop running', async () => {

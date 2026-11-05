@@ -1,29 +1,29 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LoopSelectedRowComponent, type LoopSelectedRowModel } from './loop-selected-row.component';
-import type { LoopBoundaryModel } from '../loop-boundary/loop-boundary.component';
+import {
+  LoopSelectedRowComponent,
+  type LoopLengthModel,
+  type LoopSelectedRowModel,
+} from './loop-selected-row.component';
 
-function boundary(tag: 'Start' | 'End', overrides: Partial<LoopBoundaryModel> = {}): LoopBoundaryModel {
-  const isStart = tag === 'Start';
-  return {
-    key: {
-      label: isStart ? 'In' : 'Out',
-      accessibleName: isStart ? 'Loop in' : 'Loop out',
-      control: isStart ? 'loop-in' : 'loop-set-end',
-      disabled: false,
-    },
-    empty: false,
-    disabled: false,
-    offsetFrames: 0,
-    rangeFrames: 50,
-    tickPercents: [],
-    nudgeAccessibleName: `Nudge ${tag}`,
-    earlierAccessibleName: `Move ${tag} earlier`,
-    laterAccessibleName: `Move ${tag} later`,
-    ...overrides,
-  };
-}
+const loopSteps = {
+  disabled: false,
+  downAccessibleName: 'Shorten Loop 3 by a beat',
+  upAccessibleName: 'Lengthen Loop 3 by a beat',
+};
+
+const loopLength: LoopLengthModel = {
+  text: '16 BEATS',
+  options: [
+    { beats: 8, label: '8 BEATS', selected: false },
+    { beats: 16, label: '16 BEATS', selected: true },
+  ],
+  halveAccessibleName: 'Halve Loop 3',
+  doubleAccessibleName: 'Double Loop 3',
+  pickAccessibleName: 'Loop length Loop 3',
+  steps: loopSteps,
+};
 
 const loop: LoopSelectedRowModel = {
   id: 'm3',
@@ -34,20 +34,8 @@ const loop: LoopSelectedRowModel = {
   activity: 'idle',
   ready: true,
   triggerDisabled: false,
-  clearEndDisabled: false,
   deleteDisabled: false,
-  start: boundary('Start'),
-  end: boundary('End'),
-  length: {
-    text: '16 BEATS',
-    options: [
-      { beats: 8, label: '8 BEATS', selected: false },
-      { beats: 16, label: '16 BEATS', selected: true },
-    ],
-    halveAccessibleName: 'Halve Loop 3',
-    doubleAccessibleName: 'Double Loop 3',
-    pickAccessibleName: 'Loop length Loop 3',
-  },
+  length: { ...loopLength, noEnd: { label: 'NO END', selected: false } },
   move: {
     stepText: '1 BEAT',
     options: [
@@ -59,7 +47,6 @@ const loop: LoopSelectedRowModel = {
     pickAccessibleName: 'Move step',
   },
   triggerAccessibleName: 'Trigger Loop 3',
-  clearEndAccessibleName: 'Clear end of Loop 3',
   deleteAccessibleName: 'Delete Loop 3',
   playNowDisabled: false,
   playNowAccessibleName: 'Play now Loop 3',
@@ -81,9 +68,13 @@ function pointerDown(button: number): Event {
 
 const cue: Partial<LoopSelectedRowModel> = {
   kindLabel: 'CUE',
-  clearEndDisabled: true,
-  end: boundary('End', { empty: true }),
-  length: { ...loop.length, text: 'NO END', options: [] },
+  length: {
+    ...loopLength,
+    text: 'NO END',
+    options: [],
+    steps: { ...loopSteps, disabled: true },
+    noEnd: { label: 'NO END', selected: true },
+  },
 };
 
 describe('LoopSelectedRowComponent', () => {
@@ -108,8 +99,6 @@ describe('LoopSelectedRowComponent', () => {
     el().querySelector(`${selector} button`) as HTMLButtonElement;
   const named = (label: string): HTMLButtonElement =>
     el().querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement;
-  const range = (control: string): HTMLInputElement =>
-    el().querySelector(`[data-control="${control}"] input[type="range"]`) as HTMLInputElement;
   const display = (): HTMLElement => el().querySelector('.display') as HTMLElement;
 
   it('emits each key press on its own output', () => {
@@ -119,14 +108,12 @@ describe('LoopSelectedRowComponent', () => {
     c.playNow.subscribe(() => emitted.push('playNow'));
     c.toggleGlobal.subscribe(() => emitted.push('toggleGlobal'));
     c.toggleWrap.subscribe(() => emitted.push('toggleWrap'));
-    c.clearEnd.subscribe(() => emitted.push('clearEnd'));
     c.deleteMarker.subscribe(() => emitted.push('delete'));
     for (const control of [
       'loop-toggle',
       'loop-play-now',
       'loop-global',
       'loop-wrap',
-      'loop-clear-end',
       'loop-delete',
     ]) {
       button(`[data-control="${control}"]`).click();
@@ -136,7 +123,6 @@ describe('LoopSelectedRowComponent', () => {
       'playNow',
       'toggleGlobal',
       'toggleWrap',
-      'clearEnd',
       'delete',
     ]);
   });
@@ -175,23 +161,6 @@ describe('LoopSelectedRowComponent', () => {
     }
   });
 
-  it('relays the In and Out keys, each from its own boundary', () => {
-    const emitted: string[] = [];
-    fixture.componentInstance.setIn.subscribe(() => emitted.push('setIn'));
-    fixture.componentInstance.setOut.subscribe(() => emitted.push('setOut'));
-    button('[data-control="loop-in"]').click();
-    button('[data-control="loop-set-end"]').click();
-    expect(emitted).toEqual(['setIn', 'setOut']);
-    expect(el().querySelector('[data-control="loop-start"] [data-control="loop-in"]')).not.toBeNull();
-    expect(el().querySelector('[data-control="loop-end"] [data-control="loop-set-end"]')).not.toBeNull();
-  });
-
-  it("keeps an enabled Out key on a cue's empty End row", () => {
-    setModel(cue);
-    expect(button('[data-control="loop-set-end"]').disabled).toBe(false);
-    expect(range('loop-end').disabled).toBe(true);
-  });
-
   it('relays the halve and double keys', () => {
     const emitted: string[] = [];
     fixture.componentInstance.halve.subscribe(() => emitted.push('halve'));
@@ -199,6 +168,37 @@ describe('LoopSelectedRowComponent', () => {
     named('Halve Loop 3').click();
     named('Double Loop 3').click();
     expect(emitted).toEqual(['halve', 'double']);
+  });
+
+  it('relays the one-beat keys as -1 and 1, each with its own control id', () => {
+    const emitted: number[] = [];
+    fixture.componentInstance.stepLength.subscribe((direction) => emitted.push(direction));
+
+    button('[data-control="loop-length-down"]').click();
+    button('[data-control="loop-length-up"]').click();
+
+    expect(emitted).toEqual([-1, 1]);
+  });
+
+  it('relays the Length picker\'s No End item on clearEnd, marked selected on a cue', () => {
+    const emitted: string[] = [];
+    fixture.componentInstance.clearEnd.subscribe(() => emitted.push('clearEnd'));
+    setModel(cue);
+    expect(button('[data-control="loop-length-down"]').disabled).toBe(true);
+    expect(button('[data-control="loop-length-up"]').disabled).toBe(true);
+
+    (el().querySelector('button[data-control="loop-length"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const items = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')
+    );
+    expect(items.map((item) => item.textContent?.replace(/^s*checks*/, '').trim())).toEqual([
+      'NO END',
+    ]);
+    expect(items[0].classList.contains('selected')).toBe(true);
+    items[0].click();
+
+    expect(emitted).toEqual(['clearEnd']);
   });
 
   it('follows sharesGlobal in the GBL switch and the display text', () => {
@@ -233,41 +233,11 @@ describe('LoopSelectedRowComponent', () => {
     expect(display().getAttribute('aria-label')).toContain('wraps');
   });
 
-  it('makes Clear End icon-only', () => {
-    const clear = button('[data-control="loop-clear-end"]');
-    expect(clear.textContent?.trim()).toBe('close');
-    expect(clear.querySelector('.text')).toBeNull();
-  });
-
   it('disables play now, GBL and WRAP from the model', () => {
     setModel({ playNowDisabled: true, globalDisabled: true, wrapDisabled: true });
     expect(button('[data-control="loop-play-now"]').disabled).toBe(true);
     expect(button('[data-control="loop-global"]').disabled).toBe(true);
     expect(button('[data-control="loop-wrap"]').disabled).toBe(true);
-  });
-
-  it('tags nudges with the boundary they came from', () => {
-    const inputs: unknown[] = [];
-    const commits: unknown[] = [];
-    fixture.componentInstance.nudgeInput.subscribe((v) => inputs.push(v));
-    fixture.componentInstance.nudgeCommit.subscribe((v) => commits.push(v));
-    range('loop-end').value = '8';
-    range('loop-end').dispatchEvent(new Event('input'));
-    range('loop-start').value = '-4';
-    range('loop-start').dispatchEvent(new Event('change'));
-    expect(inputs).toEqual([{ boundary: 'end', offsetFrames: 8 }]);
-    expect(commits).toEqual([{ boundary: 'start', offsetFrames: -4 }]);
-  });
-
-  it('tags edge moves with the boundary and direction', () => {
-    const moves: unknown[] = [];
-    fixture.componentInstance.moveEdge.subscribe((v) => moves.push(v));
-    button('[data-control="loop-start"] [data-part="move-earlier"]').click();
-    button('[data-control="loop-end"] [data-part="move-later"]').click();
-    expect(moves).toEqual([
-      { boundary: 'start', direction: -1 },
-      { boundary: 'end', direction: 1 },
-    ]);
   });
 
   describe('the Length and Move rows', () => {
@@ -305,7 +275,11 @@ describe('LoopSelectedRowComponent', () => {
       fixture.componentInstance.pickLength.subscribe((beats) => picked.push(beats));
       expect(picker('loop-length').textContent).toContain('16 BEATS');
       openPicker('loop-length');
-      expect(menuItems().map((item) => item.classList.contains('selected'))).toEqual([false, true]);
+      expect(menuItems().map((item) => item.classList.contains('selected'))).toEqual([
+        false,
+        false,
+        true,
+      ]);
       menuItems().find((item) => item.textContent?.includes('8 BEATS'))?.click();
       expect(picked).toEqual([8]);
     });
@@ -320,7 +294,7 @@ describe('LoopSelectedRowComponent', () => {
 
     it('draws a readout with no options as plain text that keeps its control id', () => {
       setModel({
-        length: { ...loop.length, text: '7.8s', options: [] },
+        length: { ...loopLength, text: '7.8s', options: [] },
         move: { ...loop.move, options: [] },
       });
       for (const [control, text] of [
@@ -338,16 +312,6 @@ describe('LoopSelectedRowComponent', () => {
         'Loop length Loop 3, 16 BEATS'
       );
     });
-  });
-
-  it('feeds each drag offset to its own boundary', () => {
-    fixture.componentRef.setInput('startDragOffset', 5);
-    fixture.componentRef.setInput('endDragOffset', -9);
-    fixture.detectChanges();
-    const readout = (control: string): string =>
-      el().querySelector(`[data-control="${control}"] .readout`)?.textContent?.trim() ?? '';
-    expect(readout('loop-start')).toBe('+5 fr');
-    expect(readout('loop-end')).toBe('−9 fr');
   });
 
   it('carries running, queued and not-ready in the display text', () => {
@@ -502,21 +466,13 @@ describe('LoopSelectedRowComponent', () => {
     });
   });
 
-  it('disables Clear End on a cue and the empty End boundary with it', () => {
-    setModel(cue);
-    expect(button('[data-control="loop-clear-end"]').disabled).toBe(true);
-    expect(button('[data-control="loop-set-end"]').disabled).toBe(false);
-    expect(range('loop-start').disabled).toBe(false);
-  });
-
-  it('blanks the display and disables every key and boundary but the Move row when nothing is selected', () => {
+  it('blanks the display and disables every key but the Move row when nothing is selected', () => {
     setModel({
       empty: true,
       name: '',
       kindLabel: '',
       spanText: '',
-      end: boundary('End', { empty: true }),
-      length: { ...loop.length, text: '—', options: [] },
+      length: { ...loopLength, text: '—', options: [], steps: { ...loopSteps, disabled: true } },
     });
     expect(display().getAttribute('aria-label')).toBe('nothing selected');
     expect(display().textContent?.trim()).toBe('');
@@ -528,7 +484,7 @@ describe('LoopSelectedRowComponent', () => {
       'loop-move-step',
       'loop-move-later',
     ]);
-    for (const control of ['loop-in', 'loop-set-end']) {
+    for (const control of ['loop-length-down', 'loop-length-up']) {
       expect(button(`[data-control="${control}"]`).disabled).toBe(true);
     }
     expect(el().querySelector('[data-control="loop-length"]')).not.toBeNull();

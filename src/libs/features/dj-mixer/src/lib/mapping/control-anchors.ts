@@ -24,10 +24,6 @@ const ANCHOR_OVERRIDES: Partial<Record<ControlId, string>> = {
   'speed-jump-up': '[data-control="jump-up"]',
   'speed-jump-home': '[data-control="jump-home"]',
   'speed-jump-down': '[data-control="jump-down"]',
-  'loop-start-snap-previous': '[data-control="loop-start"] [data-part="move-earlier"]',
-  'loop-start-snap-next': '[data-control="loop-start"] [data-part="move-later"]',
-  'loop-end-snap-previous': '[data-control="loop-end"] [data-part="move-earlier"]',
-  'loop-end-snap-next': '[data-control="loop-end"] [data-part="move-later"]',
   ...VOICE_SWITCH_ANCHORS,
 };
 

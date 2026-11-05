@@ -95,11 +95,11 @@ describe('liveLoopSummary', () => {
   });
 
   it('follows the deck\'s slip', () => {
-    expect(summary().slip).toBe(false);
-
-    store.setDeckSettings({ slot: 'A', slip: true });
-
     expect(summary().slip).toBe(true);
+
+    store.setDeckSettings({ slot: 'A', slip: false });
+
+    expect(summary().slip).toBe(false);
   });
 
   it('marks a running live loop for the strip, as shares of the tune\'s length', () => {

@@ -23,8 +23,8 @@ const SERVER_SET: MidiSettingsRecord = {
 };
 
 const HOME_DECK_SETTINGS = [
-  { slot: 'A', slip: false, liveLoopBeats: 4 },
-  { slot: 'B', slip: false, liveLoopBeats: 4 },
+  { slot: 'A', slip: true, liveLoopBeats: 4 },
+  { slot: 'B', slip: true, liveLoopBeats: 4 },
 ];
 
 /** Resolves the next pending call when asked, so a test decides exactly when a request settles. */
@@ -91,6 +91,23 @@ describe('MidiSettingsPersistence', () => {
 
       expect(persistence.snapshot().mappings.map((m) => m.id)).toEqual(['m1']);
     });
+
+    it('leaves a mapping on a loop control the app has since retired out of the next save', async () => {
+      const retired = { ...SERVER_SET.mappings[0], id: 'old', control: 'loop-in' };
+      repository.load.mockResolvedValue({
+        ...SERVER_SET,
+        mappings: [retired, ...SERVER_SET.mappings],
+      });
+      await persistence.load();
+
+      persistence.scheduleSave();
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(repository.save).toHaveBeenCalledTimes(1);
+      expect(repository.save.mock.calls[0][0].mappings.map((m: { id: string }) => m.id)).toEqual([
+        'm1',
+      ]);
+    });
   });
 
   describe('load', () => {
@@ -136,12 +153,12 @@ describe('MidiSettingsPersistence', () => {
 
     it('takes slip and live loop size for both decks from the store', async () => {
       await persistence.load();
-      store.setDeckSettings({ slot: 'A', slip: true });
+      store.setDeckSettings({ slot: 'A', slip: false });
       store.setDeckSettings({ slot: 'B', liveLoopBeats: 0.5 });
 
       expect(persistence.snapshot().deckSettings).toEqual([
-        { slot: 'A', slip: true, liveLoopBeats: 4 },
-        { slot: 'B', slip: false, liveLoopBeats: 0.5 },
+        { slot: 'A', slip: false, liveLoopBeats: 4 },
+        { slot: 'B', slip: true, liveLoopBeats: 0.5 },
       ]);
     });
 

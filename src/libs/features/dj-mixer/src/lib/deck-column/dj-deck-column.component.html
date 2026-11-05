@@ -32,8 +32,6 @@
   <lib-scaling-container class="loops-slot" animationEntry="from-bottom">
     <lib-loops-cues-plate
       [model]="plateModel()"
-      [startDragOffset]="startDragOffset()"
-      [endDragOffset]="endDragOffset()"
       (addMarker)="onAddMarker()"
       (duplicateMarker)="onDuplicateMarker()"
       (stopLoop)="onStopLoop()"
@@ -48,10 +46,9 @@
       (playNowSelected)="onPlayNowSelected()"
       (toggleGlobal)="onToggleGlobal()"
       (toggleWrap)="onToggleWrap()"
-      (setIn)="onSetIn()"
-      (setOut)="onSetOut()"
       (halve)="onHalve()"
       (double)="onDouble()"
+      (stepLength)="onStepLength($event)"
       (pickLength)="onPickLength($event)"
       (moveEarlier)="onMoveEarlier()"
       (moveLater)="onMoveLater()"
@@ -62,9 +59,6 @@
       (triggerTile)="onTriggerTile($event)"
       (playNowTile)="onPlayNowTile($event)"
       (selectTile)="onSelectTile($event)"
-      (nudgeInput)="onNudgeInput($event)"
-      (nudgeCommit)="onNudgeCommit($event)"
-      (moveEdge)="onMoveEdge($event)"
     ></lib-loops-cues-plate>
   </lib-scaling-container>
 

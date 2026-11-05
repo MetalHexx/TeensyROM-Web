@@ -11,31 +11,42 @@ export interface LoopLengthOptionModel {
   readonly selected: boolean;
 }
 
-/** The size row: halve and double keys around a readout that opens a picker of sizes. */
+/** The length row: halve and double keys, and optionally whole-beat step keys, around a readout
+ *  that opens a picker of lengths. */
 export interface LoopLengthModel {
   /** '16 BEATS' | '7.8s' | 'NO END'. */
   readonly text: string;
-  /** Empty when there is no grid: the readout is then plain text with no list. */
+  /** Empty when there is no grid: the readout is then plain text unless `noEnd` makes it a picker. */
   readonly options: readonly LoopLengthOptionModel[];
   readonly halveAccessibleName: string;
   readonly doubleAccessibleName: string;
   readonly pickAccessibleName: string;
+  /** The whole-beat keys either side of the readout. Absent: the control draws none. */
+  readonly steps?: {
+    readonly disabled: boolean;
+    readonly downAccessibleName: string;
+    readonly upAccessibleName: string;
+  };
+  /** The picker's first item, which takes the end away. Absent: no such item. Its presence alone
+   *  makes the readout a picker, even with no sizes (no grid). */
+  readonly noEnd?: { readonly label: string; readonly selected: boolean };
 }
 
 /**
- * A size control: a tag, a 1/2 key, a readout that opens a picker of sizes, and a 2× key. It is the one
- * size control of the mixer's loop rows (the selected loop's Length and the live loop's Size). Purely
- * presentational: the caller supplies every label, the options and which end of the ladder is reached.
- * With no options (no grid) the readout is plain text.
+ * A length control: a LENGTH tag, a 1/2 key, optionally − and + keys, a readout that opens a picker of
+ * lengths, and a 2× key. It is the one length control of the mixer's loop rows (the selected loop's and
+ * the live loop's). Purely presentational: the caller supplies every label, the options and which end
+ * of the ladder is reached. The − and + keys draw only with `model.steps`, and the picker offers No
+ * End first only with `model.noEnd`. With neither options nor No End (no grid) the readout is plain
+ * text.
  *
  * The readout takes the mouse wheel only while `wheel()` is true, reported as whole clicks upward
- * positive; only then does it stop the page from scrolling. The readout and the two keys carry the
+ * positive; only then does it stop the page from scrolling. The readout and the keys carry the
  * `data-control` ids the caller gives them, so the mapping overlay can resolve each.
  *
  * @example
  * ```html
  * <lib-loop-size-control
- *   tag="Size"
  *   [model]="size()"
  *   [halveDisabled]="!canHalve()"
  *   [doubleDisabled]="!canDouble()"
@@ -56,6 +67,7 @@ export interface LoopLengthModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[attr.data-disabled]': 'disabled() ? "" : null',
+    '[attr.data-steps]': 'model().steps ? "" : null',
   },
 })
 export class LoopSizeControlComponent {
@@ -67,9 +79,6 @@ export class LoopSizeControlComponent {
   readonly halveDisabled = input<boolean>(false);
   /** Disables the 2× key alone, e.g. at the ladder's longest rung. Defaults to false. */
   readonly doubleDisabled = input<boolean>(false);
-  /** The caption before the keys, e.g. 'Length' or 'Size'. Decorative: hidden from assistive
-   *  technology. */
-  readonly tag = input.required<string>();
   /** Whether the readout takes the mouse wheel. Defaults to false. */
   readonly wheel = input<boolean>(false);
   /** The `data-control` id on the readout, e.g. 'loop-length'. */
@@ -78,10 +87,18 @@ export class LoopSizeControlComponent {
   readonly halveControl = input<string | null>(null);
   /** The `data-control` id on the 2× key. */
   readonly doubleControl = input<string | null>(null);
+  /** The `data-control` id on the − key. */
+  readonly stepDownControl = input<string | null>(null);
+  /** The `data-control` id on the + key. */
+  readonly stepUpControl = input<string | null>(null);
   /** Emits when the 1/2 key is pressed. */
   readonly halve = output<void>();
   /** Emits when the 2× key is pressed. */
   readonly double = output<void>();
+  /** Emits -1 when the − key is pressed and 1 for the + key. */
+  readonly stepLength = output<-1 | 1>();
+  /** Emits when the picker's No End item is picked. */
+  readonly pickNoEnd = output<void>();
   /** Emits the picked size in beats. */
   readonly pickLength = output<number>();
   /** Emits whole wheel clicks over the readout, upward positive, with the event's `timeStamp`. Only
@@ -92,6 +109,13 @@ export class LoopSizeControlComponent {
 
   protected readonly halveOff = computed(() => this.disabled() || this.halveDisabled());
   protected readonly doubleOff = computed(() => this.disabled() || this.doubleDisabled());
+  protected readonly stepOff = computed(
+    () => this.disabled() || (this.model().steps?.disabled ?? true)
+  );
+  protected readonly picks = computed(() => {
+    const { options, noEnd } = this.model();
+    return options.length > 0 || noEnd !== undefined;
+  });
 
   /** Reports the wheel as whole clicks and keeps the page from scrolling; does nothing unless
    *  `wheel()` is true, so an unbound readout never swallows page scroll. */

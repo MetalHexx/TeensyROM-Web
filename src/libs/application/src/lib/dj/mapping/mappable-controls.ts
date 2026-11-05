@@ -403,23 +403,8 @@ export class MappableControls {
       trigger(id('loop-add'), 'Add cue', () => decks.addMarker(slot)),
       trigger(id('loop-duplicate'), 'Duplicate', () => decks.duplicateMarker(slot)),
       trigger(id('loop-stop'), 'Stop loop', () => decks.stopMarkerLoop(slot)),
-      trigger(id('loop-in'), 'Loop in', () => decks.setMarkerIn(slot)),
-      trigger(id('loop-set-end'), 'Loop out', () => decks.setMarkerOut(slot)),
-      trigger(id('loop-clear-end'), 'Clear loop end', () => decks.clearMarkerEnd(slot)),
       trigger(id('loop-global'), 'Loop GBL', () => decks.toggleMarkerGlobal(slot)),
       trigger(id('loop-wrap'), 'Loop WRAP', () => decks.toggleMarkerWrap(slot)),
-      trigger(id('loop-start-snap-previous'), 'Move loop start earlier', () =>
-        decks.moveMarkerEdge(slot, 'start', -1)
-      ),
-      trigger(id('loop-start-snap-next'), 'Move loop start later', () =>
-        decks.moveMarkerEdge(slot, 'start', 1)
-      ),
-      trigger(id('loop-end-snap-previous'), 'Move loop end earlier', () =>
-        decks.moveMarkerEdge(slot, 'end', -1)
-      ),
-      trigger(id('loop-end-snap-next'), 'Move loop end later', () =>
-        decks.moveMarkerEdge(slot, 'end', 1)
-      ),
       wholeStepValue(
         id('loop-length'),
         'Loop length',
@@ -440,6 +425,10 @@ export class MappableControls {
           }
         }
       ),
+      trigger(id('loop-length-down'), 'Loop length down a beat', () =>
+        decks.stepMarkerLength(slot, -1)
+      ),
+      trigger(id('loop-length-up'), 'Loop length up a beat', () => decks.stepMarkerLength(slot, 1)),
       trigger(id('loop-move-earlier'), 'Move loop earlier', () => decks.moveMarker(slot, -1)),
       trigger(id('loop-move-later'), 'Move loop later', () => decks.moveMarker(slot, 1)),
       wholeStepValue(
@@ -468,7 +457,7 @@ export class MappableControls {
       ),
       wholeStepValue(
         id('live-loop-size'),
-        'Live loop size',
+        'Live loop length',
         () => liveLoop().sizeOptions.length,
         () => Math.max(0, liveLoop().sizeOptions.findIndex((option) => option.selected)),
         (index) => {

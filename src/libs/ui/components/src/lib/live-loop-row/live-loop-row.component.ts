@@ -32,8 +32,8 @@ export interface LiveLoopRowModel {
 
 /**
  * The live loop row at the top of a deck's loops/cues plate, in a bordered tray that lights green
- * (`data-running` on the host) while the loop runs: the Live loop key, the SIZE control
- * (1/2, a size picker, 2×) and the latching SLIP key. Purely presentational: the caller owns the loop,
+ * (`data-running` on the host) while the loop runs: the Live loop key, the LENGTH control
+ * (1/2, a length picker, 2×) and the latching SLIP key. Purely presentational: the caller owns the loop,
  * the size and the slip, and supplies every label.
  *
  * The Live loop key acts on press, not release. A quick click leaves the loop running; a press held

@@ -289,6 +289,7 @@ describe('DeckSlip', () => {
     h.djStore.setDeckBeatGrid({ slot: 'A', beatGrid: GRID });
     h.deckService.setLiveLoopBeats('A', options.beats ?? 1);
     h.deckService.setSlip('A', options.slipOn ?? true);
+    h.deckService.setSlip('B', false);
     await settle();
     await vi.waitFor(() =>
       expect(
@@ -503,6 +504,58 @@ describe('DeckSlip', () => {
       expectOffTheLine();
     });
 
+    describe.each([
+      ['losing its end (No End)', (): void => h.deckService.clearMarkerEnd('A')],
+      ['being deleted', (): void => h.deckService.deleteMarker('A')],
+    ])('when the running loop is let go by %s', (_name, letGo) => {
+      it('lands the deck on the line and ends the departure with slip on', async () => {
+        await playing({ markers });
+        await toggleMarker('m');
+        tick(40);
+        expect(slip.returnFrame('A')).toBe(position('B'));
+
+        letGo();
+
+        expect(loopsOf().runningId).toBeNull();
+        expect(engineLoop()).toBeNull();
+        expect(slip.returnFrame('A')).toBeNull();
+        expect(runtime.getShadowPosition('A')).toBeNull();
+        expectLandedOnTheLine();
+        await playOutTheHandback();
+      });
+
+      it('counts the next marker from its own start, not the departure it ended', async () => {
+        await playing({ markers });
+        await toggleMarker('m');
+        tick(40);
+        letGo();
+        expectLandedOnTheLine();
+        await playOutTheHandback();
+
+        const firedAt = tickCount;
+        await toggleMarker('n');
+        tick(5);
+
+        expect(loopsOf().runningId).toBe('n');
+        expect(position('A')).toBeGreaterThanOrEqual(300);
+        expect(slip.returnFrame('A')).toBe(position('B'));
+        expect(runtime.getShadowTicks('A')).toBe(tickCount - firedAt);
+      });
+
+      it('lets the deck play on where it is with slip off', async () => {
+        await playing({ markers, slipOn: false });
+        await toggleMarker('m');
+        tick(40);
+
+        letGo();
+        tick();
+
+        expect(loopsOf().runningId).toBeNull();
+        expect(engineVarispeed()).toBe(false);
+        expectOffTheLine();
+      });
+    });
+
     it('begins as it is queued behind a loop running before slip, and a cancelled queue stops the shadow', async () => {
       await playing({ markers, slipOn: false });
       await toggleMarker('m');
@@ -646,6 +699,21 @@ describe('DeckSlip', () => {
 
       await toggleMarker('m');
 
+      expect(slip.returnFrame('A')).toBeNull();
+      expectLandedOnTheLine();
+    });
+
+    it('keeps the live loop going when the marker under it loses its end', async () => {
+      await loopOverMarker();
+
+      h.deckService.clearMarkerEnd('A');
+
+      expect(loopsOf().runningId).toBeNull();
+      expect(loopsOf().live).not.toBeNull();
+
+      h.deckService.endLiveLoop('A');
+
+      expect(loopsOf().live).toBeNull();
       expect(slip.returnFrame('A')).toBeNull();
       expectLandedOnTheLine();
     });

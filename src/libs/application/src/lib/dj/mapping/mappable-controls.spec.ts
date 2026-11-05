@@ -55,15 +55,15 @@ describe('MappableControls', () => {
   }
 
   describe('the list', () => {
-    it('holds 93 controls per deck and 3 for the set, 189 in all, each deck carrying the whole list', () => {
-      expect(h.controls.all).toHaveLength(189);
-      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(189);
+    it('holds 88 controls per deck and 3 for the set, 179 in all, each deck carrying the whole list', () => {
+      expect(h.controls.all).toHaveLength(179);
+      expect(new Set(h.controls.all.map((c) => controlKey(c.identity))).size).toBe(179);
 
       for (const owner of ['A', 'B'] as const) {
         const ids = h.controls.all
           .filter((c) => c.identity.owner === owner)
           .map((c) => c.identity.control);
-        expect(ids).toHaveLength(93);
+        expect(ids).toHaveLength(88);
         expect([...ids].sort()).toEqual([...DECK_CONTROL_IDS].sort());
       }
     });
@@ -372,11 +372,11 @@ describe('MappableControls', () => {
         const slip = pick('A', 'slip', 'state');
         const set = vi.spyOn(h.deckService, 'setSlip');
 
-        slip.set(true);
+        slip.set(false);
 
-        expect(set).toHaveBeenCalledWith('A', true);
-        expect(slip.read()).toBe(true);
-        expect(pick('B', 'slip', 'state').read()).toBe(false);
+        expect(set).toHaveBeenCalledWith('A', false);
+        expect(slip.read()).toBe(false);
+        expect(pick('B', 'slip', 'state').read()).toBe(true);
       });
     });
 
@@ -454,15 +454,10 @@ describe('MappableControls', () => {
       ['loop-add', 'addMarker', []],
       ['loop-duplicate', 'duplicateMarker', []],
       ['loop-stop', 'stopMarkerLoop', []],
-      ['loop-in', 'setMarkerIn', []],
-      ['loop-set-end', 'setMarkerOut', []],
-      ['loop-clear-end', 'clearMarkerEnd', []],
+      ['loop-length-down', 'stepMarkerLength', [-1]],
+      ['loop-length-up', 'stepMarkerLength', [1]],
       ['loop-move-earlier', 'moveMarker', [-1]],
       ['loop-move-later', 'moveMarker', [1]],
-      ['loop-start-snap-previous', 'moveMarkerEdge', ['start', -1]],
-      ['loop-start-snap-next', 'moveMarkerEdge', ['start', 1]],
-      ['loop-end-snap-previous', 'moveMarkerEdge', ['end', -1]],
-      ['loop-end-snap-next', 'moveMarkerEdge', ['end', 1]],
     ] as const)('%s fires deckService.%s for its own deck', (id, command, extra) => {
       const spy = vi
         .spyOn(h.deckService, command)

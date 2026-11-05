@@ -41,11 +41,10 @@ lib-synth-key {
   --synth-key-icon-size: 12px;
 }
 
-// The trigger, play-now, clear-end and delete keys are icon-only: the width comes from `min-width`,
-// not padding.
+// The trigger, play-now and delete keys are icon-only: the width comes from `min-width`, not
+// padding.
 .trigger,
 .play-now,
-lib-synth-key[data-control='loop-clear-end'],
 lib-synth-key[data-control='loop-delete'] {
   --synth-key-min-width: 26px;
   --synth-key-padding: 0;
@@ -128,7 +127,6 @@ lib-synth-key[data-control='loop-delete'] {
   white-space: nowrap;
 }
 
-.boundaries,
 .controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -144,7 +142,6 @@ lib-synth-key[data-control='loop-delete'] {
 
 .tag {
   flex: 0 0 auto;
-  min-width: 38px;
   color: var(--synth-legend);
   font-size: 0.53rem;
   font-weight: 600;
@@ -152,7 +149,7 @@ lib-synth-key[data-control='loop-delete'] {
   text-transform: uppercase;
 }
 
-// The Move arrows: square keys that sit level with the boundary rows' arrows.
+// The Move arrows: square keys that sit level with the Length row's keys.
 lib-synth-key.step {
   --synth-key-height: 22px;
   --synth-key-min-width: 32px;
@@ -206,14 +203,23 @@ button.readout {
   font-size: 0.5rem;
 }
 
-// Too narrow for two boundaries abreast: stack them, and give the display a line of its own so the
-// span is never truncated.
-@container (max-width: 26rem) {
-  .boundaries,
+// Too narrow for the Length and Move rows abreast: stack them. The Length column needs 252.5 px for
+// its tag, four keys and the longest readout text (77 px: '128 BEATS' or '1/16 BEAT' with its caret);
+// two of them and the 10 px gap come to 515 px, so below 33rem (528 px) the readout would run over
+// the keys. Stacked, MOVE takes LENGTH's tag width so the two rows' first keys line up.
+@container (max-width: 33rem) {
   .controls {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .control .tag {
+    min-width: 2.47rem;
+  }
+}
+
+// Too narrow for the top row on one line: give the display a line of its own so the span is never
+// truncated.
+@container (max-width: 26rem) {
   .top {
     flex-wrap: wrap;
   }

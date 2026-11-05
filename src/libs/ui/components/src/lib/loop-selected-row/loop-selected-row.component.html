@@ -63,14 +63,6 @@
   />
   <lib-synth-key
     class="icon-only"
-    data-control="loop-clear-end"
-    icon="close"
-    [accessibleName]="model().clearEndAccessibleName"
-    [disabled]="model().empty || model().clearEndDisabled"
-    (press)="clearEnd.emit()"
-  />
-  <lib-synth-key
-    class="icon-only"
     data-control="loop-delete"
     icon="delete"
     [accessibleName]="model().deleteAccessibleName"
@@ -78,36 +70,17 @@
     (press)="deleteMarker.emit()"
   />
 </div>
-<div class="boundaries">
-  <lib-loop-boundary
-    data-control="loop-start"
-    [model]="startBoundary()"
-    [dragOffsetFrames]="startDragOffset()"
-    (keyPress)="setIn.emit()"
-    (nudgeInput)="nudgeInput.emit({ boundary: 'start', offsetFrames: $event })"
-    (nudgeCommit)="nudgeCommit.emit({ boundary: 'start', offsetFrames: $event })"
-    (moveEarlier)="moveEdge.emit({ boundary: 'start', direction: -1 })"
-    (moveLater)="moveEdge.emit({ boundary: 'start', direction: 1 })"
-  />
-  <lib-loop-boundary
-    data-control="loop-end"
-    [model]="endBoundary()"
-    [dragOffsetFrames]="endDragOffset()"
-    (keyPress)="setOut.emit()"
-    (nudgeInput)="nudgeInput.emit({ boundary: 'end', offsetFrames: $event })"
-    (nudgeCommit)="nudgeCommit.emit({ boundary: 'end', offsetFrames: $event })"
-    (moveEarlier)="moveEdge.emit({ boundary: 'end', direction: -1 })"
-    (moveLater)="moveEdge.emit({ boundary: 'end', direction: 1 })"
-  />
-</div>
 <div class="controls">
   <lib-loop-size-control
-    tag="Length"
     readoutControl="loop-length"
+    stepDownControl="loop-length-down"
+    stepUpControl="loop-length-up"
     [model]="model().length"
     [disabled]="model().empty"
     (halve)="halve.emit()"
     (double)="double.emit()"
+    (stepLength)="stepLength.emit($event)"
+    (pickNoEnd)="clearEnd.emit()"
     (pickLength)="pickLength.emit($event)"
   />
   <div class="control">

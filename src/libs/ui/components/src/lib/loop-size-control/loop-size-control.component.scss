@@ -11,7 +11,6 @@
 
 .tag {
   flex: 0 0 auto;
-  min-width: 38px;
   color: var(--synth-legend);
   font-size: 0.53rem;
   font-weight: 600;
@@ -19,7 +18,8 @@
   text-transform: uppercase;
 }
 
-// 1/2 and 2×: square keys that sit level with the boundary rows' arrows.
+// 1/2 and 2× are 32 px keys; the single-symbol − and + are 26 px, like the row's other
+// single-symbol keys.
 lib-synth-key {
   flex: 0 0 auto;
   --synth-key-height: 22px;
@@ -27,6 +27,10 @@ lib-synth-key {
   --synth-key-padding: 0;
   --synth-key-font-size: 0.69rem;
   --synth-key-letter-spacing: 0;
+}
+
+lib-synth-key.sign {
+  --synth-key-min-width: 26px;
 }
 
 // The readout: a small display that is a picker's trigger when it has options and plain text when it
@@ -71,6 +75,22 @@ button.readout {
 .caret {
   color: var(--synth-display-dim);
   font-size: 0.5rem;
+}
+
+// With the − and + keys the row needs 252 px beside its longest readout text ('128 BEATS' or
+// '1/16 BEAT'). On the narrowest plate, which gives a row about 236 px, the readout and the − and +
+// keys give a little so the text stays clear of the keys.
+@container (max-width: 17rem) {
+  :host([data-steps]) {
+    .readout {
+      padding: 0 2px;
+      gap: 2px;
+    }
+
+    lib-synth-key.sign {
+      --synth-key-min-width: 22px;
+    }
+  }
 }
 
 :host([data-disabled]) .readout {

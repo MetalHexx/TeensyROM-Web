@@ -150,7 +150,7 @@ const NO_LOOPS: DeckLoopsSummary = {
   selected: null,
 };
 
-/** A deck with one cue, selected: its Out key makes it a loop. */
+/** A deck with one cue, selected. */
 const SELECTED_CUE: DeckLoopsSummary = {
   hasTune: true,
   canAdd: true,
@@ -1321,7 +1321,7 @@ describe('DjMixerViewComponent', () => {
         .filter(({ matches }) => matches !== 1)
         .map(({ identity, matches }) => ({ identity, matches }));
 
-      expect(ALL_IDENTITIES).toHaveLength(186);
+      expect(ALL_IDENTITIES).toHaveLength(176);
       expect(mismatched).toEqual([]);
     });
 
@@ -1339,15 +1339,17 @@ describe('DjMixerViewComponent', () => {
       }
     });
 
-    it("finds each deck's Out key as exactly one element once a cue is selected", () => {
+    it("finds each deck's length step keys as exactly one element each, with a cue selected", () => {
       const { fixture } = render([], {}, { loops: SELECTED_CUE });
       const grid: HTMLElement = fixture.nativeElement.querySelector('.mixer-grid');
 
-      const matches = DECK_SLOTS.map(
-        (owner) => grid.querySelectorAll(anchorFor({ owner, control: 'loop-set-end' })).length
+      const matches = DECK_SLOTS.flatMap((owner) =>
+        (['loop-length-down', 'loop-length-up'] as const).map(
+          (control) => grid.querySelectorAll(anchorFor({ owner, control })).length
+        )
       );
 
-      expect(matches).toEqual([1, 1]);
+      expect(matches).toEqual([1, 1, 1, 1]);
     });
   });
 

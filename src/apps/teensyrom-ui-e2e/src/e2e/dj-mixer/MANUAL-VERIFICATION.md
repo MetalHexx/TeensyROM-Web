@@ -1225,3 +1225,53 @@ made on the running app), and the Live loop row stories were not opened.
 ### Verdict
 
 Pending the operator.
+
+## Whole-beat length steps and No End (ASID-DJ-20, 2026-11-05)
+
+The selected loop's nudge strips, edge arrows, In, Out and Clear End are gone. A loop is shaped by Add,
+Length (1/2, a beat shorter, a beat longer, 2×, a picker with No End first) and Move. The Length row
+reads LENGTH on both the selected row and the live loop row.
+
+### What was checked in a browser
+
+Storybook (`pnpm nx run ui-components:storybook:ci`, port 4400), `dj-loops-cues-plate--loop-on-grid`
+and `dj-loop-selected-row--loop-sharing-global`, in Chrome. **The DJ view itself was not used**: a
+tune cannot be loaded in this session (it needs a TeensyROM and its file service), so the numbers
+below are the components' own, with the plate's row 440 px wide as it is at 1920 x 1080. They have not
+been repeated against the running app.
+
+| check | result |
+| --- | --- |
+| gap from the tag to the next control: live row LENGTH, selected row LENGTH, MOVE | 4 / 4 / 4 px |
+| tag widths: live LENGTH, selected LENGTH, stacked MOVE | 39.5 / 39.5 / 39.5 px |
+| stacked Length and Move rows, x of the first key | 85.1 and 85.1 |
+| Length keys, left to right (w) | 1/2 32, − 26, + 26, 2× 32 |
+| row 440 px (1920 x 1080): layout | Length and Move on their own lines, three lines with the top one, as before |
+| row 666 px: layout | Length and Move side by side, MOVE tag 28.2 px |
+| switch from stacked to side by side | between a 545 px and a 546 px row; the Length readout is then 83.7 px against the 77 px its longest text (`128 BEATS ▾`, `1/16 BEAT ▾`) needs |
+| longest text, readout scroll width against client width, row 270 to 700 px | whole at every width tried, and clear of the − and + keys |
+| narrowest plate, 288 px with the bindings panel open (row 254 px) | the readout was 61.3 px and `128 BEATS ▾` needed 65, so the text ran over the keys. Below a 17 rem plate content the readout takes 2 px padding and gap, and − and + take 22 px: the readout is then 69.3 px, the text 66 px, clear of both keys with 3.3 px to spare |
+
+The container rule that stacks the rows is at 33 rem of the row's content width (528 px): the Length
+column needs 252.5 px (tag, four keys, the 77 px readout, five 4 px gaps), two of them and the 10 px
+gap come to 515 px. The handoff's arithmetic said about 34 rem.
+
+### Automated
+
+`dj-mixer-responsive.cy.ts` gained "the selected loop row": at 1400, 1279, 1100, 768 and 400 px
+it asserts the Length readout does not overflow (scroll width at most client width) and that the
+Length row's controls end inside the row. The e2e fixture cannot select a marker (no tune loads in
+it), so it measures the empty row, whose readout is plain text; it cannot show the longest text.
+The loaded row is what the table above measures. The Cypress specs were not run in this session.
+
+### Bench checklist (operator, real hardware)
+
+- [ ] `−` and `+` on a running loop land at the end of the pass, on the beat.
+- [ ] No End on an idle loop makes it a cue. On a running loop it lets the loop go at once. With slip
+  on, the deck lands and the second playhead goes.
+- [ ] Deleting a running loop with slip on lands the same way.
+- [ ] A tune with no grid: tap a grid in, then shape a loop.
+- [ ] A settings file with no deck settings starts both decks with slip on. A saved slip off stays
+  off after a refresh.
+- [ ] The three LENGTH, MOVE and live-row LENGTH tags measure the same gap to the next control in
+  the running DJ view at 1920 x 1080, wider, and with the bindings panel open.

@@ -1,22 +1,8 @@
 import { computed } from '@angular/core';
-import {
-  DeckBeatGrid,
-  DeckLoopBoundary,
-  DeckLoopMarker,
-  DjState,
-  WritableStore,
-} from '../dj-store';
+import { DeckBeatGrid, DeckLoopMarker, DjState, WritableStore } from '../dj-store';
 import type { Slot } from '../slot';
+import { markerKind, markerLabel, percentOf, resolvedFrame } from '../loops/loop-marker-math';
 import {
-  markerKind,
-  markerLabel,
-  oneSecondFrames,
-  percentOf,
-  resolvedFrame,
-  type LoopBoundaryName,
-} from '../loops/loop-marker-math';
-import {
-  beatsInReach,
   beatsLabel,
   inGridSpan,
   lengthLadder,
@@ -27,8 +13,6 @@ import {
 } from '../grid/beat-math';
 import { isShapeable } from './mixer';
 import { formatElapsed, formatSeconds } from './transport-time';
-
-export type { LoopBoundaryName };
 
 export type LoopActivity = 'idle' | 'queued' | 'running';
 
@@ -49,14 +33,6 @@ export interface LoopItemSummary {
   readonly startPercent: number;
   /** Null for a cue. */
   readonly endPercent: number | null;
-}
-
-export interface LoopBoundarySummary {
-  readonly offsetFrames: number;
-  /** One second of play calls either way. */
-  readonly rangeFrames: number;
-  /** Where each beat of the grid within reach sits on the boundary's ±range track: 0–100. */
-  readonly tickPercents: readonly number[];
 }
 
 /** One size the Length picker offers. */
@@ -89,8 +65,6 @@ export interface LoopSelectionSummary {
   readonly lengthText: string;
   /** The ladder sizes the grid holds in whole frames, ascending; empty with no grid. */
   readonly lengthOptions: readonly LoopLengthOption[];
-  readonly start: LoopBoundarySummary;
-  readonly end: LoopBoundarySummary | null;
 }
 
 export interface DeckLoopsSummary {
@@ -128,22 +102,8 @@ function lengthTextOf(
   return formatSeconds(length, intervalUs);
 }
 
-function boundarySummary(
-  boundary: DeckLoopBoundary,
-  grid: DeckBeatGrid | null,
-  rangeFrames: number
-): LoopBoundarySummary {
-  const ticks =
-    grid !== null && rangeFrames > 0 ? beatsInReach(grid, boundary.frame, rangeFrames) : [];
-  return {
-    offsetFrames: boundary.offsetFrames,
-    rangeFrames,
-    tickPercents: ticks.map((offset) => ((offset + rangeFrames) / (2 * rangeFrames)) * 100),
-  };
-}
-
 /**
- * A deck's loop tiles and its selected marker's boundaries, ready to draw. Reads the deck's fields
+ * A deck's loop tiles and its selected marker, ready to draw. Reads the deck's fields
  * one signal at a time and never the playhead (`positions`), so a sample does not rebuild it — the
  * lap indicator has its own selector for that.
  */
@@ -190,7 +150,6 @@ export function loopsSummary(store: WritableStore<DjState>) {
         if (selectedIndex >= 0) {
           const marker = markers[selectedIndex];
           const kind = markerKind(marker);
-          const range = oneSecondFrames(intervalUs);
           const startFrame = resolvedFrame(marker.start);
           const startText = formatElapsed(startFrame, intervalUs);
           const length =
@@ -216,8 +175,6 @@ export function loopsSummary(store: WritableStore<DjState>) {
                     label: beatsLabel(size.beats),
                     selected: size.frames === length,
                   })),
-            start: boundarySummary(marker.start, grid, range),
-            end: marker.end === null ? null : boundarySummary(marker.end, grid, range),
           };
         }
 

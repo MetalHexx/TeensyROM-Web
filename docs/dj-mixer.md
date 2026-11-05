@@ -65,13 +65,11 @@ The settings show the chip's live values as the tune plays, and every voice has 
 
 Each deck keeps a list of loops and cues for the tune it holds. When the tune has a beat grid, they land on beats.
 
-- **Live loop:** press the Live loop key to loop the beats just played, without setting a marker first. Tap it, or hold it and let go to end the loop. Halve or double its size, or pick one, at any time.
-- **Slip:** with SLIP on, the tune carries on underneath a loop or a hand hold, and playing returns to where it would have been when you let go.
+- **Live loop:** press the Live loop key to loop the beats just played, without setting a marker first. Tap it, or hold it and let go to end the loop. Halve or double its length, or pick one, at any time.
+- **Slip:** SLIP starts on, and stays as you last set it. With SLIP on, the tune carries on underneath a loop or a hand hold, and playing returns to where it would have been when you let go.
 - **Set:** add a marker at the current position. Give it an end to make it a loop, or leave it as a cue. Stop a running loop at any time.
-- **Start and end:** set a marker's start or end at the current position.
-- **Length:** halve or double a loop, or set its length in beats, up to 128.
-- **Move:** move a loop, or just its start or end, by 1, 2, 4, 8 or 16 beats.
-- **Fine tune:** nudge a marker's start or end by up to a second.
+- **Length:** halve or double a loop, make it a beat shorter or longer, or set its length in beats, up to 128. Pick No End to turn a loop back into a cue.
+- **Move:** move a loop by 1, 2, 4, 8 or 16 beats, or by 1 frame at a time with the 1 FRAME step.
 - **Name:** rename any marker.
 - **Jump:** jump to a marker, or start it right away.
 - **Own mixer settings:** a marker follows the deck's settings by default. Give it voice, filter and key settings of its own, and the list shows which markers have them.

@@ -19,7 +19,7 @@ const row: LiveLoopRowModel = {
     ],
     halveAccessibleName: 'Halve live loop deck A',
     doubleAccessibleName: 'Double live loop deck A',
-    pickAccessibleName: 'Live loop size deck A',
+    pickAccessibleName: 'Live loop length deck A',
   },
   canHalve: true,
   canDouble: true,
@@ -79,7 +79,7 @@ describe('LiveLoopRowComponent', () => {
   });
 
   it('draws the size through the shared size control with the wheel on', () => {
-    expect(el.querySelector('lib-loop-size-control .tag')?.textContent).toBe('Size');
+    expect(el.querySelector('lib-loop-size-control .tag')?.textContent).toBe('Length');
     expect(control('live-loop-size')?.textContent).toContain('4 BEATS');
 
     const wheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
@@ -186,7 +186,7 @@ describe('LiveLoopRowComponent', () => {
     });
 
     it('relays a picked size in beats', () => {
-      byName('Live loop size deck A, 4 BEATS').click();
+      byName('Live loop length deck A, 4 BEATS').click();
       fixture.detectChanges();
       const item = Array.from(
         document.querySelectorAll<HTMLButtonElement>('.cdk-overlay-container .dropdown-menu-item')

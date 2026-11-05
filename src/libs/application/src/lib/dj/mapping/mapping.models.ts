@@ -56,16 +56,11 @@ export type DeckControlId =
   | 'loop-add'
   | 'loop-duplicate'
   | 'loop-stop'
-  | 'loop-in'
-  | 'loop-set-end'
-  | 'loop-clear-end'
   | 'loop-global'
   | 'loop-wrap'
-  | 'loop-start-snap-previous'
-  | 'loop-start-snap-next'
-  | 'loop-end-snap-previous'
-  | 'loop-end-snap-next'
   | 'loop-length'
+  | 'loop-length-down'
+  | 'loop-length-up'
   | 'loop-move-earlier'
   | 'loop-move-later'
   | 'loop-move-step'
@@ -108,16 +103,11 @@ export const DECK_CONTROL_IDS: readonly DeckControlId[] = [
   'loop-add',
   'loop-duplicate',
   'loop-stop',
-  'loop-in',
-  'loop-set-end',
-  'loop-clear-end',
   'loop-global',
   'loop-wrap',
-  'loop-start-snap-previous',
-  'loop-start-snap-next',
-  'loop-end-snap-previous',
-  'loop-end-snap-next',
   'loop-length',
+  'loop-length-down',
+  'loop-length-up',
   'loop-move-earlier',
   'loop-move-later',
   'loop-move-step',

@@ -4,7 +4,7 @@ import { DjState, WritableStore } from '../dj-store';
 import type { MoveStep } from '../grid/beat-math';
 import type { Slot } from '../slot';
 
-/** Sets how far the deck's Move controls shift a loop or an edge: beats, or one frame. */
+/** Sets how far the deck's Move controls shift a loop: beats, or one frame. */
 export function setDeckMoveStep(store: WritableStore<DjState>) {
   return {
     setDeckMoveStep: ({

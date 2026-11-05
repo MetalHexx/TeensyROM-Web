@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { DeckBeatGrid } from '../dj-store';
 import {
   beatAt,
-  beatsInReach,
   beatsLabel,
   bpmOf,
   formatBpm,
@@ -259,17 +258,5 @@ describe('onBeat', () => {
     expect(onBeat(spanned, 110)).toBe(true);
     expect(onBeat(spanned, 111)).toBe(false);
     expect(onBeat(spanned, 35)).toBe(false);
-  });
-});
-
-describe('beatsInReach', () => {
-  it('lists the offsets of the beats within the range either way, ascending', () => {
-    expect(beatsInReach(grid(), 40, 30)).toEqual([-30, -5, 20]);
-    expect(beatsInReach(grid(), 35, 25)).toEqual([-25, 0, 25]);
-  });
-
-  it('leaves out beats outside the span and before 0', () => {
-    expect(beatsInReach(grid({ startFrame: 0, endFrame: 50 }), 40, 30)).toEqual([-30, -5]);
-    expect(beatsInReach(grid({ beatOneFrame: 5 }), 10, 20)).toEqual([-5, 20]);
   });
 });

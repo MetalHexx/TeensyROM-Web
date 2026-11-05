@@ -93,15 +93,6 @@ function loopItem(overrides: Partial<LoopItemSummary> = {}): LoopItemSummary {
   };
 }
 
-function boundarySummary(overrides: Partial<LoopSelectionSummary['start']> = {}) {
-  return {
-    offsetFrames: 0,
-    rangeFrames: 50,
-    tickPercents: [25, 75],
-    ...overrides,
-  };
-}
-
 function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelectionSummary {
   return {
     id: 'm1',
@@ -117,8 +108,6 @@ function selection(overrides: Partial<LoopSelectionSummary> = {}): LoopSelection
       { beats: 8, label: '8 BEATS', selected: false },
       { beats: 16, label: '16 BEATS', selected: true },
     ],
-    start: boundarySummary(),
-    end: boundarySummary(),
     ...overrides,
   };
 }
@@ -176,16 +165,13 @@ function createDeckServiceStub() {
     toggleMarkerGlobal: vi.fn(),
     toggleMarkerWrap: vi.fn(),
     selectMarker: vi.fn(),
-    setMarkerIn: vi.fn(),
-    setMarkerOut: vi.fn(),
     resizeMarker: vi.fn(),
     setMarkerLength: vi.fn(),
+    stepMarkerLength: vi.fn(),
     moveMarker: vi.fn(),
-    moveMarkerEdge: vi.fn(),
     setMoveStep: vi.fn(),
     clearMarkerEnd: vi.fn(),
     deleteMarker: vi.fn(),
-    nudgeMarker: vi.fn(),
     renameMarker: vi.fn(),
     previousRow: vi.fn().mockResolvedValue(undefined),
     nextRow: vi.fn().mockResolvedValue(undefined),
@@ -716,54 +702,30 @@ describe('DjDeckColumnComponent', () => {
         'LOOP',
         '00:01.0–00:08.8',
       ]);
-      expect([row.clearEndDisabled, row.deleteDisabled]).toEqual([false, false]);
-      expect([row.start.disabled, row.start.key.disabled, row.end.key.disabled]).toEqual([
-        false,
-        false,
-        false,
-      ]);
-      expect(row.start.nudgeAccessibleName).toBe('Nudge start deck B');
+      expect(row.deleteDisabled).toBe(false);
+      expect(row.length.steps?.disabled).toBe(false);
       expect(row.triggerAccessibleName).toBe('Trigger Loop 1 deck B');
 
       loopsSummary.set(
         emptyLoopsSummary({
           hasTune: true,
           items: [loopItem({ kind: 'cue', endPercent: null })],
-          selected: selection({
-            kind: 'cue',
-            end: null,
-            start: boundarySummary({ rangeFrames: 0 }),
-          }),
+          selected: selection({ kind: 'cue' }),
         })
       );
       fixture.detectChanges();
       row = plate(fixture).model().selected;
 
-      expect(row.clearEndDisabled).toBe(true);
-      expect([row.end.empty, row.end.disabled]).toEqual([true, false]);
-      expect(row.end.key.disabled).toBe(false);
+      expect(row.length.steps?.disabled).toBe(true);
+      expect(row.length.noEnd).toEqual({ label: 'NO END', selected: true });
     });
 
-    it('names the In and Out keys, the edge arrows and the Length row with the item and the deck', () => {
+    it('names the Length row keys and picker with the item and the deck, and offers No End on a selection', () => {
       const { fixture } = render(DECK_B, {
         loops: { hasTune: true, canAdd: true, items: [loopItem()], selected: selection() },
       });
       const row = plate(fixture).model().selected;
 
-      expect([row.start.key.label, row.start.key.control, row.start.key.accessibleName]).toEqual([
-        'In',
-        'loop-in',
-        'Loop in Loop 1 deck B',
-      ]);
-      expect([row.end.key.label, row.end.key.control, row.end.key.accessibleName]).toEqual([
-        'Out',
-        'loop-set-end',
-        'Loop out Loop 1 deck B',
-      ]);
-      expect([row.start.earlierAccessibleName, row.end.laterAccessibleName]).toEqual([
-        'Move start of Loop 1 earlier deck B',
-        'Move end of Loop 1 later deck B',
-      ]);
       expect(row.length).toEqual({
         text: '16 BEATS',
         options: [
@@ -773,6 +735,12 @@ describe('DjDeckColumnComponent', () => {
         halveAccessibleName: 'Halve Loop 1 deck B',
         doubleAccessibleName: 'Double Loop 1 deck B',
         pickAccessibleName: 'Loop length Loop 1 deck B',
+        steps: {
+          disabled: false,
+          downAccessibleName: 'Shorten Loop 1 by a beat deck B',
+          upAccessibleName: 'Lengthen Loop 1 by a beat deck B',
+        },
+        noEnd: { label: 'NO END', selected: false },
       });
       expect(row.move).toEqual({
         stepText: '1 BEAT',
@@ -783,18 +751,16 @@ describe('DjDeckColumnComponent', () => {
       });
     });
 
-    it('keeps the Move row live with nothing selected, and leaves the keys and Length inert', () => {
+    it('keeps the Move row live with nothing selected, and leaves the keys and Length inert, with no No End', () => {
       const { fixture } = render(DECK_B, {
         loops: { hasTune: true, moveStepText: '4 BEATS' },
       });
       const row = plate(fixture).model().selected;
 
-      expect([row.start.key.disabled, row.end.key.disabled, row.start.disabled]).toEqual([
-        true,
-        true,
-        true,
-      ]);
+      expect(row.triggerDisabled).toBe(true);
       expect([row.length.text, row.length.options]).toEqual(['—', []]);
+      expect(row.length.steps?.disabled).toBe(true);
+      expect(row.length.noEnd).toBeUndefined();
       expect(row.move.stepText).toBe('4 BEATS');
       expect(row.move.options).toEqual(MOVE_STEP_OPTIONS);
     });
@@ -859,7 +825,7 @@ describe('DjDeckColumnComponent', () => {
           'Live loop deck B',
           'Halve live loop deck B',
           'Double live loop deck B',
-          'Live loop size deck B',
+          'Live loop length deck B',
           'Slip deck B',
         ]);
       });
@@ -930,17 +896,16 @@ describe('DjDeckColumnComponent', () => {
       ['toggleGlobal', 'toggleMarkerGlobal', undefined, ['B']],
       ['toggleWrap', 'toggleMarkerWrap', undefined, ['B']],
       ['selectTile', 'selectMarker', 'm2', ['B', 'm2']],
-      ['setIn', 'setMarkerIn', undefined, ['B']],
-      ['setOut', 'setMarkerOut', undefined, ['B']],
       ['halve', 'resizeMarker', undefined, ['B', 'halve']],
       ['double', 'resizeMarker', undefined, ['B', 'double']],
+      ['stepLength', 'stepMarkerLength', -1, ['B', -1]],
+      ['stepLength', 'stepMarkerLength', 1, ['B', 1]],
       ['pickLength', 'setMarkerLength', 16, ['B', 16]],
       ['moveEarlier', 'moveMarker', undefined, ['B', -1]],
       ['moveLater', 'moveMarker', undefined, ['B', 1]],
       ['pickMoveStep', 'setMoveStep', 4, ['B', 4]],
       ['clearEnd', 'clearMarkerEnd', undefined, ['B']],
       ['deleteSelected', 'deleteMarker', undefined, ['B']],
-      ['moveEdge', 'moveMarkerEdge', { boundary: 'end', direction: 1 }, ['B', 'end', 1]],
     ] as const)(
       'routes the plate output %s to DeckService.%s with the slot',
       (output, method, payload, args) => {
@@ -950,52 +915,6 @@ describe('DjDeckColumnComponent', () => {
         expect(deckService[method]).toHaveBeenCalledWith(...args);
       }
     );
-
-    describe('the nudge pins', () => {
-      const withSelection = (id: string) =>
-        emptyLoopsSummary({
-          hasTune: true,
-          items: [loopItem({ id, selected: true })],
-          selected: selection({ id }),
-        });
-
-      it('follow the strip while it is dragged, per boundary', () => {
-        const { fixture } = render(DECK_B, { loops: withSelection('m1') });
-
-        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
-        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
-        fixture.detectChanges();
-
-        expect(fixture.componentInstance.startDragOffset()).toBe(12);
-        expect(fixture.componentInstance.endDragOffset()).toBe(-7);
-        expect(plate(fixture).startDragOffset()).toBe(12);
-        expect(plate(fixture).endDragOffset()).toBe(-7);
-      });
-
-      it('commit the nudge to the deck service and clear that pin only', () => {
-        const { fixture, deckService } = render(DECK_B, { loops: withSelection('m1') });
-        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
-        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
-
-        plate(fixture).nudgeCommit.emit({ boundary: 'start', offsetFrames: 12 });
-
-        expect(deckService.nudgeMarker).toHaveBeenCalledWith('B', 'start', 12);
-        expect(fixture.componentInstance.startDragOffset()).toBeNull();
-        expect(fixture.componentInstance.endDragOffset()).toBe(-7);
-      });
-
-      it('clear when the selection moves to another marker', () => {
-        const { fixture, loopsSummary } = render(DECK_B, { loops: withSelection('m1') });
-        plate(fixture).nudgeInput.emit({ boundary: 'start', offsetFrames: 12 });
-        plate(fixture).nudgeInput.emit({ boundary: 'end', offsetFrames: -7 });
-
-        loopsSummary.set(withSelection('m2'));
-        fixture.detectChanges();
-
-        expect(fixture.componentInstance.startDragOffset()).toBeNull();
-        expect(fixture.componentInstance.endDragOffset()).toBeNull();
-      });
-    });
   });
 
   describe('the transport', () => {

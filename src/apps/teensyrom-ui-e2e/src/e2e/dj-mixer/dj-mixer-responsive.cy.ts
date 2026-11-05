@@ -171,6 +171,41 @@ describe('DJ Mixer — responsive layout', () => {
       });
     });
 
+    // No tune loads in this fixture, so the selected row is the empty one: its Length readout is
+    // plain text and cannot show the longest text a loop gives it. The loaded row is measured in
+    // MANUAL-VERIFICATION.md.
+    describe('the selected loop row', () => {
+      NO_OVERFLOW_WIDTHS.forEach((width) => {
+        it(`keeps the Length readout and its keys whole inside the row at ${width}px wide`, () => {
+          cy.viewport(width, 900);
+
+          cy.get('lib-loop-selected-row').should('have.length', 2);
+          cy.get('lib-loop-selected-row').should(($rows) => {
+            $rows.each((_, row) => {
+              const rowRect = row.getBoundingClientRect();
+              const readout = row.querySelector('[data-control="loop-length"]') as HTMLElement;
+              expect(readout, 'the Length readout is drawn').to.not.equal(null);
+              expect(readout.scrollWidth, 'the readout text fits').to.be.at.most(
+                readout.clientWidth
+              );
+
+              row
+                .querySelectorAll(':scope .controls lib-loop-size-control > *')
+                .forEach((control) => {
+                  const rect = control.getBoundingClientRect();
+                  expect(rect.left, 'the control starts inside the row').to.be.at.least(
+                    rowRect.left - 0.5
+                  );
+                  expect(rect.right, 'the control ends inside the row').to.be.at.most(
+                    rowRect.right + 0.5
+                  );
+                });
+            });
+          });
+        });
+      });
+    });
+
     describe('the live loop row', () => {
       NO_OVERFLOW_WIDTHS.forEach((width) => {
         it(`fits inside its plate with every control whole at ${width}px wide`, () => {
@@ -196,7 +231,7 @@ describe('DJ Mixer — responsive layout', () => {
               );
 
               const controls = row.querySelectorAll(':scope > .row > *');
-              expect(controls.length, 'Live loop, Size and Slip').to.equal(3);
+              expect(controls.length, 'Live loop, Length and Slip').to.equal(3);
               controls.forEach((control) => {
                 const rect = control.getBoundingClientRect();
                 expect(rect.width, 'the control has width').to.be.greaterThan(0);
