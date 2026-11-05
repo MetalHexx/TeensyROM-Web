@@ -14,10 +14,11 @@ namespace TeensyRom.Core.Serial
     {
         private const int MaxInputLength = 4096;
 
-        // What a firmware build may add straight after the version: "-<tag>" for a tagged build, then
-        // "*" for a build from a dirty tree, e.g. "v0.9-pr65*". Empty on a release build. The firmware
-        // limits a tag to letters, digits, '.' and '-', and the whole version to 40 columns.
-        private const string VersionSuffixPattern = @"(?<suffix>(?:-[A-Za-z0-9.-]{1,40})?\*?)";
+        // What a build adds straight after the version number: "-<tag>" for a tagged build, "*" for a
+        // build from a dirty tree, e.g. "v0.9-pr65*". Empty on a release build. The firmware says to read
+        // the version up to the first space or '(', and limits it to 40 columns. This also stops at any
+        // character a version can't hold, so stray bytes from a garbled reply stay out of it.
+        private const string VersionSuffixPattern = @"(?<suffix>[A-Za-z0-9.*-]{0,40})";
 
         // "FW:" label followed, anywhere later on the line, by a version token. The text between the
         // label and the version is the hardware variant.

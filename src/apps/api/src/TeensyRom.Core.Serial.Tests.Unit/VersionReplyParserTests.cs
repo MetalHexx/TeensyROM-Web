@@ -83,6 +83,8 @@ namespace TeensyRom.Core.Serial.Tests.Unit
         [InlineData("v0.9-v2.0.0*", "0.9", "-v2.0.0*")]
         [InlineData("v0.9-busy", "0.9", "-busy")]
         [InlineData("v0.9-minimal", "0.9", "-minimal")]
+        [InlineData("v0.9t", "0.9", "t")]
+        [InlineData("v0.9t-pr65*", "0.9", "t-pr65*")]
         public void Parse_TaggedOrDirtyBuild_KeepsTheSuffixAndStaysCompatible(string token, string number, string suffix)
         {
             var parsed = VersionReplyParser.Parse(
@@ -137,9 +139,9 @@ namespace TeensyRom.Core.Serial.Tests.Unit
         }
 
         [Theory]
-        [InlineData("v0.9trailer")]
         [InlineData("v0.9_bad")]
         [InlineData("v0.9 -pr65")]
+        [InlineData("v0.9\u0001\u001b[31m")]
         public void Parse_TextThatIsNotASuffix_LeavesTheVersionAlone(string token)
         {
             var parsed = VersionReplyParser.Parse($"FW: TeensyROM+ {token}\r\n");
@@ -176,12 +178,14 @@ namespace TeensyRom.Core.Serial.Tests.Unit
             parsed.FirmwareVersionText.Should().BeEmpty();
         }
 
-        [Fact]
-        public void IsCompatible_ATagDoesNotRaiseAVersionBelowTheFloor()
+        [Theory]
+        [InlineData("v0.8.0.8-pr65*", "0.8.0.8")]
+        [InlineData("v0.8.0.6t", "0.8.0.6")]
+        public void IsCompatible_ASuffixDoesNotRaiseAVersionBelowTheFloor(string token, string number)
         {
-            var parsed = VersionReplyParser.Parse("FW: TeensyROM+ v0.8.0.8-pr65*\r\n");
+            var parsed = VersionReplyParser.Parse($"FW: TeensyROM+ {token}\r\n");
 
-            parsed.FirmwareVersion.Should().Be(new Version(0, 8, 0, 8));
+            parsed.FirmwareVersion.Should().Be(Version.Parse(number));
             VersionReplyParser.IsCompatible(parsed).Should().BeFalse();
         }
 

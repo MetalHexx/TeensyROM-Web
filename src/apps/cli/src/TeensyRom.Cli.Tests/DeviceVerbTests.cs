@@ -59,6 +59,16 @@ public sealed class DeviceVerbTests : IDisposable
     }
 
     [Fact]
+    public async Task Reconnect_ShowsTheWholeFirmwareVersionAfterwards()
+    {
+        _host.Devices.ReconnectDeviceAsync("c-3", Arg.Any<CancellationToken>()).Returns(Charlie with { FirmwareVersion = "0.9-pr65*" });
+
+        await _host.RunAsync("device", "reconnect", "--device", "Charlie");
+
+        StdOut.Should().Contain("Firmware: 0.9-pr65*");
+    }
+
+    [Fact]
     public async Task Rename_ReachesAnOfflineDevice_AndShowsTheNewName()
     {
         _host.Devices.RenameDeviceAsync("c-3", "Bench", Arg.Any<CancellationToken>()).Returns(Charlie with { Name = "Bench" });
