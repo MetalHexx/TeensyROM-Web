@@ -94,8 +94,10 @@ jobs:
       - name: Restore .NET dependencies
         run: pnpm exec nx run-many --target=restore --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Core.Serial.Tests.Unit,TeensyRom.Api.Tests.Unit,TeensyRom.Api.Tests.Integration
 
+      # One build at a time: the two API test projects both write the API project's static-web-assets
+      # cache (rpswa.dswa.cache.json), and built in parallel one can fail on the locked file.
       - name: Build .NET test projects
-        run: pnpm exec nx run-many --target=build --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Core.Serial.Tests.Unit,TeensyRom.Api.Tests.Unit,TeensyRom.Api.Tests.Integration
+        run: pnpm exec nx run-many --target=build --parallel=1 --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Core.Serial.Tests.Unit,TeensyRom.Api.Tests.Unit,TeensyRom.Api.Tests.Integration
 
       - name: Run .NET Unit Tests
         run: pnpm exec nx run-many --target=test --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Core.Serial.Tests.Unit,TeensyRom.Api.Tests.Unit
