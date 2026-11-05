@@ -1300,3 +1300,33 @@ case failed at 1440 and 1280 px before the layout was fixed and passes at every 
   off after a refresh.
 - [ ] The three LENGTH, MOVE and live-row LENGTH tags measure the same gap to the next control in
   the running DJ view at 1920 x 1080, wider, and with the bindings panel open.
+
+## Alternating-lap loops (ASID-DJ-20, 2026-11-05)
+
+A loop whose length is not a whole number of frames (1/8 of a beat on a 28-frame beat is 3.5 frames) now
+plays laps of alternating whole-frame length (4, 3, 4, 3) so it never drifts from the grid. The ladder runs
+from 1/16 to 128 beats with no odd division step, a queued hand-off carries the running lap clock on, and
+loop boundary frames are stored as fractions.
+
+### Automated
+
+The engine's lap arithmetic, the hand-off clock and the shadow count are covered by `sidablist`'s
+`libs/core` and `libs/analysis` specs (lap timing, queued hand-offs and the shadow position). In this
+repo: the deck loops, live loop and runtime specs and the beat-math specs, the DJ library round trip of a fractional boundary
+(Core, API and the infrastructure mapper), and the old integer-frame file read tests.
+
+### By ear and on the bench (operator)
+
+The by-ear check of very short and fractional loops, and the timing protocol's windows for this build,
+are the operator's to run and record. Nothing here claims either was done: the operator's verdict and the
+tunes used are to be added below, and the notes' Outcome in the loop-ladder experiment filled in
+with it.
+
+- [ ] A fractional loop (for example 1/8 on a grid whose beat is not a multiple of 8 frames) holds the beat
+  by ear over a long run, with no drift against the other deck.
+- [ ] Very short live loops sound clean, with no click at the re-entry.
+- [ ] Playback timing per the timing protocol and the `asid-dj-diagnostics` skill for this build.
+
+### Verdict
+
+Pending the operator.

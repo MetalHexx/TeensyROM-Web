@@ -2858,6 +2858,28 @@ describe('DeckLoops', () => {
     });
   });
 
+  describe('a stored marker whose end is at or before its start', () => {
+    // No edit here makes one, but a tune memory written elsewhere may hold it. It reads as a cue,
+    // and moving it shifts both edges and keeps what they were, as for any marker.
+    beforeEach(async () => {
+      await positions.save(TUNE_X, [loopOf('inverted', 200, 150)]);
+      await loadOn('A', TUNE_X);
+      await settle();
+      loops.select('A', 'inverted');
+      loops.setMoveStep('A', 'frame');
+    });
+
+    it('moves by a frame with both edges shifted, refusing nothing', () => {
+      expect(markerKind(stateOf('A').markers[0])).toBe('cue');
+
+      loops.moveLoop('A', 1);
+
+      expect(stateOf('A').markers[0].start).toEqual({ frame: 200, offsetFrames: 1 });
+      expect(stateOf('A').markers[0].end).toEqual({ frame: 150, offsetFrames: 1 });
+      expect(refusals()).toHaveLength(0);
+    });
+  });
+
   describe('marker settings', () => {
     const SETTINGS_A: DeckMixerSettings = { panel: panelOf(3), mutes: [true, false, false] };
     const SETTINGS_B: DeckMixerSettings = { panel: panelOf(-2), mutes: [false, true, false] };
