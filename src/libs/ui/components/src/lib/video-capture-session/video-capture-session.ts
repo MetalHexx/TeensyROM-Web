@@ -1,4 +1,6 @@
-import { Injectable, OnDestroy, Signal, computed, signal } from '@angular/core';
+import { Injectable, OnDestroy, Signal, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { HTTPS_STATUS_SERVICE, isInsecureContext, openOverHttpsAdvice } from '@teensyrom-nx/domain';
 import { VideoDevice } from '../video-device-selector/video-device-selector.component';
 
 /** Opens a camera by exact device id, without audio. */
@@ -26,6 +28,9 @@ export class VideoCaptureSession implements OnDestroy {
   private readonly streamSignal = signal<MediaStream | null>(null);
   private readonly permissionDeniedSignal = signal<boolean>(false);
   private readonly hasEnumeratedSignal = signal<boolean>(false);
+  private readonly secureAddressRequiredSignal = signal<boolean>(false);
+  private readonly secureAddressAdviceSignal = signal<string>('');
+  private readonly httpsStatus = inject(HTTPS_STATUS_SERVICE, { optional: true });
   private openTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   /** Bumped by stop() and every open(); an async step that sees a newer value is stale and discards its result. */
@@ -38,16 +43,26 @@ export class VideoCaptureSession implements OnDestroy {
   readonly hasDevices: Signal<boolean> = computed(() => this.devicesSignal().length > 0);
   /** True once a start() finished listing, whether or not any camera was found. */
   readonly hasEnumerated: Signal<boolean> = this.hasEnumeratedSignal.asReadonly();
+  /** True when the page is not a secure context, where the browser hides cameras entirely. */
+  readonly secureAddressRequired: Signal<boolean> = this.secureAddressRequiredSignal.asReadonly();
+  /** How to reach this page over https; the link names the engine's secure port once it is known. */
+  readonly secureAddressAdvice: Signal<string> = this.secureAddressAdviceSignal.asReadonly();
 
   /**
    * Stops any stream it holds, asks permission, lists video inputs, picks the
    * preferred camera if present else the first, and opens it after 100 ms.
    * `preferredDeviceId` is read after enumeration, so it may read inputs that are
-   * not yet available at construction.
+   * not yet available at construction. On a page that is not a secure context it lists
+   * nothing and sets `secureAddressRequired` instead.
    */
   async start(preferredDeviceId: () => string): Promise<void> {
     this.stop();
     const generation = this.generation;
+
+    if (isInsecureContext()) {
+      await this.explainInsecureContext(generation);
+      return;
+    }
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -119,6 +134,16 @@ export class VideoCaptureSession implements OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     this.stop();
+  }
+
+  private async explainInsecureContext(generation: number): Promise<void> {
+    this.secureAddressRequiredSignal.set(true);
+    this.secureAddressAdviceSignal.set(openOverHttpsAdvice(null));
+    if (!this.httpsStatus) return;
+
+    const port = await firstValueFrom(this.httpsStatus.getSecurePort()).catch(() => null);
+    if (this.destroyed || generation !== this.generation) return;
+    this.secureAddressAdviceSignal.set(openOverHttpsAdvice(port));
   }
 
   private async open(deviceId: string): Promise<void> {

@@ -121,6 +121,33 @@ async function renderAndSettle(
 }
 
 describe('VideoCaptureComponent', () => {
+  describe('on a page that is not a secure context', () => {
+    afterEach(() => {
+      delete (globalThis as unknown as Record<string, unknown>)['isSecureContext'];
+    });
+
+    it('asks for a secure address instead of reporting no devices', async () => {
+      Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value: false });
+
+      const { fixture } = await renderAndSettle([]);
+      const text = (fixture.nativeElement as HTMLElement).textContent;
+
+      expect(text).toContain('Video capture needs a secure address');
+      expect(text).toContain('Open this page over https');
+      expect(text).not.toContain('No video capture devices detected');
+    });
+
+    it('keeps the no-devices message when the page is secure', async () => {
+      Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value: true });
+
+      const { fixture } = await renderAndSettle([]);
+      const text = (fixture.nativeElement as HTMLElement).textContent;
+
+      expect(text).toContain('No video capture devices detected');
+      expect(text).not.toContain('secure address');
+    });
+  });
+
   it('creates', async () => {
     const { component } = await renderAndSettle([]);
 

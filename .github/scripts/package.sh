@@ -4,7 +4,7 @@
 #   package.sh publish  <rid> <version> <dir>        dotnet publish the API into <dir>/api and the CLI into <dir>/cli
 #   package.sh assemble <rid> <version> <dir> <out>  turn <dir> into <out>/TeensyROM-Suite-<version>-<rid>.zip|.tar.gz
 #
-# <rid> is win-x64, osx-x64, osx-arm64 or linux-x64. assemble prints the archive path as its last line.
+# <rid> is win-x64, osx-x64, osx-arm64, linux-x64 or linux-arm64. assemble prints the archive path as its last line.
 # Runs on Linux, macOS, Git Bash and WSL; assemble works in a temp folder on the local file system because
 # chmod does nothing on /mnt/c.
 set -euo pipefail
@@ -32,8 +32,8 @@ python_cmd() {
 
 check_rid() {
   case "$1" in
-    win-x64|osx-x64|osx-arm64|linux-x64) ;;
-    *) die "Unsupported rid '$1'. Use win-x64, osx-x64, osx-arm64 or linux-x64." ;;
+    win-x64|osx-x64|osx-arm64|linux-x64|linux-arm64) ;;
+    *) die "Unsupported rid '$1'. Use win-x64, osx-x64, osx-arm64, linux-x64 or linux-arm64." ;;
   esac
 }
 
@@ -145,6 +145,7 @@ host_rid() {
   arch="$(uname -m)"
   case "$os/$arch" in
     Linux/x86_64) echo linux-x64 ;;
+    Linux/aarch64|Linux/arm64) echo linux-arm64 ;;
     Darwin/arm64) echo osx-arm64 ;;
     Darwin/x86_64) echo osx-x64 ;;
     MINGW*/x86_64|MSYS*/x86_64|CYGWIN*/x86_64) echo win-x64 ;;

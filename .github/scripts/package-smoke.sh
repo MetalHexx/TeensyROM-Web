@@ -71,10 +71,18 @@ out="$(trom_out api start --json)"
 echo "$out"
 json_assert "$out" "d['running'] is True and d['version'] == '$version' and d['matches'] is True" "Trom API did not start at $version"
 
+json_assert "$out" "d['https']['listening'] is True and d['https']['change'] == 'created'" "Trom API did not create its certificate and serve HTTPS"
+https_port="$(printf '%s' "$out" | "$py" -I -c 'import sys, json; print(json.loads(sys.stdin.read())["https"]["port"])' | tr -d '\015')"
+
 step "GET $base/api/version"
 out="$(curl -fsS --max-time 10 "$base/api/version")"
 echo "$out"
 json_assert "$out" "d['version'] == '$version'" "Trom API reports the wrong version"
+
+step "GET https://localhost:$https_port/api/version"
+out="$(curl -kfsS --max-time 10 "https://localhost:$https_port/api/version")"
+echo "$out"
+json_assert "$out" "d['version'] == '$version'" "Trom API reports the wrong version over HTTPS"
 
 step "GET $base/"
 headers="$(curl -fsS --max-time 10 -D - -o /dev/null "$base/")"
@@ -85,6 +93,7 @@ step "trom ui --no-open --json"
 out="$(trom_out ui --no-open --json)"
 echo "$out"
 json_assert "$out" "d['available'] is True and d['opened'] is False" "Trom UI is not available"
+json_assert "$out" "isinstance(d['secureNetworkAddresses'], list)" "trom ui does not list secureNetworkAddresses"
 
 step "trom init --json"
 out="$(trom_out init --json)"

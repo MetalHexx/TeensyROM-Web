@@ -4,6 +4,27 @@ Release notes for TeensyROM Suite, newest first. Releases before 1.0.0-beta.1 sh
 
 <!-- release.yml publishes the section under each "## [version]" heading as that release's GitHub notes. Write it before tagging: the release fails without it. -->
 
+## [Unreleased]
+
+### 🍓 Raspberry Pi and Linux ARM64
+
+The suite now ships for 64-bit ARM Linux, so a Raspberry Pi can run Trom API, Trom UI and Trom Terminal.
+
+- **New package**: `TeensyROM-Suite-{version}-linux-arm64.tar.gz`, for a Raspberry Pi with a 64-bit Raspberry Pi OS. The Pi 5 is tested, and the Pi 3, 4 and Zero 2 W are expected to work.
+- **Updates and Trom Agent**: `trom update` and Trom Agent pick the ARM64 package on a Pi.
+
+---
+
+### 🔒 Secure address for MIDI and video
+
+Trom API serves the same app over HTTPS on port 10214, beside http on 10213. From another device, open the secure address that `trom ui` lists for MIDI controllers and capture-card video.
+
+- **Self-signed certificate**: Trom API makes it on your computer and keeps it in your data home. The browser warns once, and again after the computer gets a new address or name.
+- **Notices**: `trom api start`, `trom api status`, `trom ui` and `trom init` show the secure address, the certificate's expiry and a notice when a certificate is created or re-issued.
+- **Trusted local networks only**: HTTPS protects against passive snooping on your home network. It is not for exposing Trom API to the internet.
+
+---
+
 ## [1.0.0-beta.1](https://github.com/MetalHexx/TeensyROM-Suite/releases/tag/v1.0.0-beta.1) - 2026-11-02
 
 > **Firmware Requirement**: TeensyROM firmware **0.8.0.9** or later is required for this release.

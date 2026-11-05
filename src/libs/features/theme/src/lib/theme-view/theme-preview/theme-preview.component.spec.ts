@@ -21,6 +21,8 @@ describe('ThemePreviewComponent', () => {
     permissionDenied: ReturnType<typeof signal<boolean>>;
     hasDevices: ReturnType<typeof signal<boolean>>;
     hasEnumerated: ReturnType<typeof signal<boolean>>;
+    secureAddressRequired: ReturnType<typeof signal<boolean>>;
+    secureAddressAdvice: ReturnType<typeof signal<string>>;
     start: ReturnType<typeof vi.fn>;
     select: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
@@ -38,6 +40,8 @@ describe('ThemePreviewComponent', () => {
       permissionDenied: signal(false),
       hasDevices: signal(true),
       hasEnumerated: signal(true),
+      secureAddressRequired: signal(false),
+      secureAddressAdvice: signal(''),
       start: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
@@ -127,6 +131,18 @@ describe('ThemePreviewComponent', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('No video capture device');
     expect(el.querySelectorAll('[title]').length).toBe(0);
+  });
+
+  it('asks for a secure address, naming the https link, instead of reporting no device', () => {
+    session.devices.set([]);
+    session.hasDevices.set(false);
+    session.secureAddressRequired.set(true);
+    session.secureAddressAdvice.set('Open this page over https at https://192.168.1.220:10214.');
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Video capture needs a secure address');
+    expect(el.textContent).toContain('https://192.168.1.220:10214');
+    expect(el.textContent).not.toContain('No video capture device');
   });
 
   it('shows the permission state when the camera is denied', () => {

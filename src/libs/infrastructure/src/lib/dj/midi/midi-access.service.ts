@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { HTTPS_STATUS_SERVICE, isInsecureContext, openOverHttpsAdvice } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import type {
   IMidiAccess,
@@ -61,7 +63,11 @@ export class MidiAccessService implements IMidiAccess {
   readonly inputPorts = signal<readonly MidiInputPort[]>([], { equal: samePorts });
   readonly lastError = signal<string | null>(null);
 
+  private readonly httpsStatus = inject(HTTPS_STATUS_SERVICE, { optional: true });
   private access: MIDIAccessLike | null = null;
+  /** The engine's https port once looked up for the insecure-page message; null while unknown. */
+  private securePort: number | null = null;
+  private securePortLookup: Promise<void> | null = null;
   /** portId → the id of the holder currently holding it. A holder holds at most one port at a
    *  time — `claim()` releases whatever the calling holder held before recording the new one. */
   private readonly claims = new Map<string, string>();
@@ -243,17 +249,43 @@ export class MidiAccessService implements IMidiAccess {
     return port;
   }
 
-  /** `false` when `navigator.requestMIDIAccess` is missing — Web MIDI is unsupported in this
-   *  browser — after setting `accessState`/`lastError` to say so; shared by `queryPermission` and
-   *  `requestAccess` so the two never disagree about what "unsupported" looks like. */
+  /** `false` when `navigator.requestMIDIAccess` is missing — Web MIDI is unavailable here — after
+   *  setting `accessState`/`lastError` to say why; shared by `queryPermission` and
+   *  `requestAccess` so the two never disagree about what "unsupported" looks like. Browsers hide
+   *  the API on an insecure page, so that case says to use the https address, not to change browser. */
   private ensureSupported(): boolean {
     if (typeof navigator.requestMIDIAccess === 'function') {
       return true;
     }
     this.accessState.set('unsupported');
-    this.lastError.set('Web MIDI is not available in this browser. Try Chrome or Edge.');
-    logWarn('MIDI: navigator.requestMIDIAccess is unavailable — Web MIDI unsupported here.');
+    if (isInsecureContext()) {
+      this.lastError.set(this.insecureContextMessage());
+      this.lookUpSecurePort();
+      logWarn('MIDI: navigator.requestMIDIAccess is hidden because this page is not a secure context.');
+    } else {
+      this.lastError.set('Web MIDI is not available in this browser. Try Chrome or Edge.');
+      logWarn('MIDI: navigator.requestMIDIAccess is unavailable — Web MIDI unsupported here.');
+    }
     return false;
+  }
+
+  private insecureContextMessage(): string {
+    return `Web MIDI needs a secure address. ${openOverHttpsAdvice(this.securePort)}`;
+  }
+
+  /** Asks the engine for its https port once and, if the message is still showing, names the link. */
+  private lookUpSecurePort(): void {
+    if (this.securePortLookup !== null || this.httpsStatus === null) {
+      return;
+    }
+    this.securePortLookup = firstValueFrom(this.httpsStatus.getSecurePort())
+      .catch(() => null)
+      .then((port) => {
+        this.securePort = port;
+        if (this.accessState() === 'unsupported') {
+          this.lastError.set(this.insecureContextMessage());
+        }
+      });
   }
 
   private refreshPorts(): void {

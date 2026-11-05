@@ -1,6 +1,6 @@
 # Trom Terminal
 
-Trom Terminal is the command line of TeensyROM Suite. Use `trom` as a guided, BBS-style menu, or run one-line commands for scripts and automation. It works on Windows, macOS and Linux, and it controls the same carts as [Trom UI](trom-ui.md).
+Trom Terminal is the command line of TeensyROM Suite. Use `trom` as a guided, BBS-style menu, or run one-line commands for scripts and automation. It works on Windows, macOS, Linux and Raspberry Pi (64-bit OS), and it controls the same carts as [Trom UI](trom-ui.md).
 
 `trom` starts Trom API for you when it needs it, and shares it with Trom UI. Whatever you do in one, the other sees.
 
@@ -121,9 +121,11 @@ trom update --check
 trom update
 ```
 
-- **Trom UI:** `trom ui` starts Trom API if it isn't running, opens Trom UI in your browser, and prints the addresses your phone or tablet can use. `--no-open` prints them without opening the browser.
+- **Trom UI:** `trom ui` starts Trom API if it isn't running, opens Trom UI in your browser, and prints the addresses your phone or tablet can use. Each network address comes with its secure `https` address, labelled "Secure, for MIDI and video". `--no-open` prints them without opening the browser. See [secure address](getting-started.md#secure-address).
 - **Trom API:** `trom api start` starts it in the background, `trom api status` shows whether it is running, and `trom api stop` stops it. See [Trom API](trom-api.md#run-it).
 - **Updates:** `trom update` installs the newest release, and `--check` only reports it. `trom` checks once a day and prints a line when a new release is out. See [update](getting-started.md#update).
+
+`trom api start` and `trom api status` also show the secure address (`https://localhost:10214`), the certificate's expiry date and, when this run created or re-issued the certificate, a notice saying so. The JSON form has an `https` object with `port`, `listening`, `problem`, `names`, `issuedAt`, `expiresAt`, `change` (`none`, `created` or `reissued`), `changeReason` (`unreadable`, `expiring`, `hostNameChanged` or `newAddress`) and `notice`. `trom init --json` carries the same object as `engine.https`, and `trom ui --json` lists the secure addresses as `secureNetworkAddresses`, beside `networkAddresses`.
 
 ## Generate ASID presets for Chipsynth
 

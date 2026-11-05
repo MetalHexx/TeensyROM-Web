@@ -5,6 +5,7 @@ using TeensyRom.Api.Endpoints.Audio.Hub;
 using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Endpoints.Transfers.Hub;
 using TeensyRom.Api.Http;
+using TeensyRom.Api.Https;
 using TeensyRom.Api.Middleware;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Startup;
@@ -65,7 +66,14 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
     options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+builder.AddEngineHttps(enabled: !isBuildTimeDocumentGeneration);
+
 var app = builder.Build();
+
+if (!isBuildTimeDocumentGeneration)
+{
+    app.ReportEngineHttps();
+}
 
 // Global exception middleware - catches HTTP request exceptions
 app.UseMiddleware<ExceptionMiddleware>();

@@ -12,6 +12,9 @@ internal interface IEngineProbe
 
     /// <summary>Asks a running engine to stop; the engine answers before it begins stopping.</summary>
     Task<EngineStopRequest> RequestStopAsync(CancellationToken ct);
+
+    /// <summary>The engine's HTTPS state, or null when it has none to report (an older engine's 404, or any failure).</summary>
+    Task<EngineHttps?> GetHttpsAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -111,6 +114,40 @@ internal sealed class EngineProbe : IEngineProbe
         catch (HttpRequestException ex)
         {
             return IsNothingListening(ex) ? EngineStopRequest.Gone : EngineStopRequest.Failed;
+        }
+    }
+
+    public async Task<EngineHttps?> GetHttpsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var response = await _api.GetHttpsStatusAsync(ct);
+            if (!Enum.TryParse<CertificateChange>(response.Change.ToString(), out var change))
+            {
+                return null;
+            }
+
+            CertificateChangeReason? reason = null;
+            if (response.ChangeReason is { } value)
+            {
+                if (!Enum.TryParse<CertificateChangeReason>(value.ToString(), out var parsed))
+                {
+                    return null;
+                }
+                reason = parsed;
+            }
+
+            return new EngineHttps(
+                response.Port, response.Listening, response.Problem, [.. response.Names],
+                response.IssuedAt, response.ExpiresAt, change, reason, HttpsNotice.For(change, reason, response.Port));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ApiException or HttpRequestException)
+        {
+            return null;
         }
     }
 

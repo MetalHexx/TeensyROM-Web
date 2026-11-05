@@ -561,6 +561,43 @@ public class EngineControlTests
         status.LogFile.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Status_OfARunningEngine_CarriesItsHttps_AsTheEngineReportedItThisRun()
+    {
+        var https = new EngineHttps(10214, true, null, ["localhost"], null, null, CertificateChange.Created, null, "created");
+        _world.Answer = OwnEngine;
+        _world.Https = https;
+
+        var first = await _sut.GetStatusAsync(default);
+        var second = await _sut.GetStatusAsync(default);
+
+        first.Https.Should().Be(https);
+        second.Https.Should().Be(https);
+    }
+
+    [Fact]
+    public async Task Status_OfAnEngineWithoutHttps_HasNone()
+    {
+        _world.Answer = OwnEngine;
+        _world.Https = null;
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Running.Should().BeTrue();
+        status.Https.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Status_WhenNoEngineAnswers_NeverAsksForHttps()
+    {
+        _world.Https = new EngineHttps(10214, true, null, [], null, null, CertificateChange.None, null, null);
+
+        var status = await _sut.GetStatusAsync(default);
+
+        status.Https.Should().BeNull();
+        _world.HttpsReads.Should().Be(0);
+    }
+
     private static void ClearEngineLogs()
     {
         if (Directory.Exists(TeensyRomHome.EngineLogsPath)) Directory.Delete(TeensyRomHome.EngineLogsPath, recursive: true);
@@ -651,6 +688,8 @@ internal sealed class FakeEngineWorld : IEngineProbe, IEngineLock, IEngineLocato
     public EngineProbeResult Answer { get; set; } = new EngineProbeResult.Unreachable();
     public bool LockHeld { get; set; }
     public int Probes { get; private set; }
+    public EngineHttps? Https { get; set; }
+    public int HttpsReads { get; private set; }
 
     /// <summary>Runs on every probe with the probe's number, so a test can change the world over time.</summary>
     public Action<int>? OnProbe { get; set; }
@@ -698,6 +737,12 @@ internal sealed class FakeEngineWorld : IEngineProbe, IEngineLock, IEngineLocato
             LockHeld = false;
         }
         return Task.FromResult(StopRequest);
+    }
+
+    public Task<EngineHttps?> GetHttpsAsync(CancellationToken ct)
+    {
+        HttpsReads++;
+        return Task.FromResult(Https);
     }
 
     public bool IsHeld() => LockHeld;

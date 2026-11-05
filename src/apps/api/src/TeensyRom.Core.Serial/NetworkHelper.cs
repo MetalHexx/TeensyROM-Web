@@ -52,26 +52,19 @@ public static class NetworkHelper
 
         foreach (var adapter in adapters)
         {
-            if (adapter.Status != OperationalStatus.Up
-                || adapter.Type is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel
-                || (IsVirtual(adapter) && !adapter.HasIPv4Gateway))
+            if (!IsRealNetworkAdapter(adapter))
             {
                 continue;
             }
 
             foreach (var address in adapter.IPv4Addresses)
             {
-                if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+                if (!IsUsableIPv4Address(address))
                 {
                     continue;
                 }
 
                 var bytes = address.GetAddressBytes();
-
-                if (bytes[0] == 169 && bytes[1] == 254)
-                {
-                    continue;
-                }
 
                 bytes[3] = 1;
                 var start = new IPAddress(bytes);
@@ -87,6 +80,53 @@ public static class NetworkHelper
         }
 
         return ranges;
+    }
+
+    /// <summary>
+    /// This machine's real-network IPv4 addresses: the adapters the device sweep uses (up, not loopback or
+    /// tunnel, not a gateway-less virtual switch), without loopback or 169.254 addresses. Distinct, in adapter order.
+    /// </summary>
+    public static List<IPAddress> SelectAddresses(IEnumerable<LocalAdapter> adapters) =>
+        adapters
+            .Where(IsRealNetworkAdapter)
+            .SelectMany(adapter => adapter.IPv4Addresses)
+            .Where(IsUsableIPv4Address)
+            .Distinct()
+            .ToList();
+
+    /// <summary>
+    /// Reads the machine's adapters and returns <see cref="SelectAddresses"/> for them.
+    /// </summary>
+    /// <param name="onReadFailure">Called with the exception when the adapters cannot be read, so the caller can say why the list is empty.</param>
+    /// <returns>Empty when no adapter qualifies or the adapters cannot be read.</returns>
+    public static List<IPAddress> GetLocalAddresses(Action<Exception>? onReadFailure = null)
+    {
+        try
+        {
+            return SelectAddresses(ReadAdapters());
+        }
+        catch (Exception ex)
+        {
+            onReadFailure?.Invoke(ex);
+            return [];
+        }
+    }
+
+    private static bool IsRealNetworkAdapter(LocalAdapter adapter) =>
+        adapter.Status == OperationalStatus.Up
+        && adapter.Type is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+        && !(IsVirtual(adapter) && !adapter.HasIPv4Gateway);
+
+    private static bool IsUsableIPv4Address(IPAddress address)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+
+        return !(bytes[0] == 169 && bytes[1] == 254);
     }
 
     private static bool IsVirtual(LocalAdapter adapter)

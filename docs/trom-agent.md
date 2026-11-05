@@ -75,7 +75,7 @@ See [themes](trom-terminal.md#themes).
 
 ### Install and update the suite
 
-Trom Agent installs TeensyROM Suite from its newest release: with Homebrew on a Mac, and from a checked download on Windows and Linux, with `trom` put on your PATH. When a newer release is out, it tells you as a session starts and updates once you agree.
+Trom Agent installs TeensyROM Suite from its newest release: with Homebrew on a Mac, and from a checked download on Windows, Linux and Raspberry Pi, with `trom` put on your PATH. When a newer release is out, it tells you as a session starts and updates once you agree.
 
 - "install TeensyROM Suite"
 - "is there a newer release?"

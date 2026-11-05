@@ -28,7 +28,14 @@
       />
     </lib-content-overlay-container>
 
-    @if (session.permissionDenied()) {
+    @if (session.secureAddressRequired()) {
+      <lib-empty-state-message
+        class="preview-message"
+        icon="lock"
+        [title]="'Video capture needs a secure address'"
+        [message]="session.secureAddressAdvice()"
+      />
+    } @else if (session.permissionDenied()) {
       <lib-empty-state-message
         class="preview-message"
         icon="videocam_off"
