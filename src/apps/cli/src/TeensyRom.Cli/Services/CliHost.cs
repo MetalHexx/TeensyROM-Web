@@ -109,7 +109,7 @@ internal static class CliHost
         ], Aliases: ["api"]),
         new("device", "List, reconnect, rename, forget, ping or reset TeensyROM devices.",
         [
-            PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices Trom API already knows, and whether each storage is fully indexed (sdIndexed and usbIndexed in --json).", ["device", "list"]),
+            PublicVerb.Of<DeviceListCommand, DeviceListSettings>("list", "List the TeensyROM devices Trom API already knows, each with its firmware version (firmwareVersion in --json), and whether each storage is fully indexed (sdIndexed and usbIndexed in --json).", ["device", "list"]),
             PublicVerb.Of<DeviceListCommand, DeviceListSettings>(DeviceListCommand.DiscoverVerb, "Scan for TeensyROM devices, then list them.", ["device", DeviceListCommand.DiscoverVerb]),
             PublicVerb.Of<DeviceReconnectCommand, DeviceSettings>("reconnect", "Reconnect a TeensyROM, even one that is offline.", ["device", "reconnect", "--device", "Bench"]),
             PublicVerb.Of<DeviceRenameCommand, DeviceRenameSettings>("rename", "Give a TeensyROM a new name, even one that is offline.", ["device", "rename", "Bench", "--device", "TeensyROM"]),
@@ -180,7 +180,7 @@ internal static class CliHost
     /// <summary>Commands that sit beside the nouns: <c>trom init</c>, <c>trom ui</c>, <c>trom update</c> and <c>trom wait</c>.</summary>
     internal static readonly PublicCommand[] PublicCommands =
     [
-        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, whether a newer release is out, Trom API, Trom UI, devices, storage and index state, commands and problems. Changes nothing on your devices or settings; exits 3 only when Trom API can't be made ready.", ["init"]),
+        PublicCommand.Of<InitCommand, InitSettings>("init", "Report everything an agent needs to get started — versions, whether a newer release is out, Trom API, Trom UI, devices with their firmware, storage and index state, commands and problems. Changes nothing on your devices or settings; exits 3 only when Trom API can't be made ready.", ["init"]),
         PublicCommand.Of<UiCommand, UiSettings>("ui", "Open Trom UI in your browser, starting Trom API first if needed, and list the addresses it answers at on this computer and on your network. --no-open only lists them. Exits 1 when Trom API doesn't serve Trom UI.", ["ui"]),
         PublicCommand.Of<UpdateCommand, UpdateSettings>("update", "Install the newest TeensyROM Suite release, restarting Trom API if it was running; --check only looks for one. Homebrew installs update through brew, source builds through git.", ["update", "--check"]),
         PublicCommand.Of<WaitCommand, WaitSettings>("wait", "Wait for a duration, then exit — a timer for scripts and agents. With --device, the countdown holds while that TeensyROM's song is paused through trom.", ["wait", "3m20s"])

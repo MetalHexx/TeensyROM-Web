@@ -44,8 +44,8 @@ public sealed class InitCommandTests
     }
 
     private static DeviceSummary Device(
-        string name = "Bench", bool online = true, bool sd = true, bool usb = false, bool sdIndexed = true, bool usbIndexed = false) =>
-        new("id-" + name, name, online, "USB COM3", "Connected", sd, usb, sdIndexed, usbIndexed);
+        string name = "Bench", bool online = true, bool sd = true, bool usb = false, bool sdIndexed = true, bool usbIndexed = false, string firmware = "") =>
+        new("id-" + name, name, online, "USB COM3", "Connected", sd, usb, sdIndexed, usbIndexed, firmware);
 
     private static JsonElement Parse(TestHost host) => JsonDocument.Parse(host.Consoles.StdOut).RootElement;
 
@@ -310,6 +310,51 @@ public sealed class InitCommandTests
         exitCode.Should().Be(0);
         host.Consoles.StdOut.Should().Contain("Trom API").And.Contain("Trom UI").And.Contain("Bench");
         host.Consoles.StdErr.Should().Contain("No TeensyROM is online.");
+    }
+
+    // ---- the firmware version ---------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("0.9")]
+    [InlineData("0.9-pr65*")]
+    public async Task Init_ReportsEachDevicesWholeFirmwareVersionInItsJson(string firmware)
+    {
+        using var host = NewHost(devices: Device(firmware: firmware));
+
+        await host.RunAsync("init", "--json");
+
+        Parse(host).GetProperty("devices").EnumerateArray().Single()
+            .GetProperty("firmwareVersion").GetString().Should().Be(firmware);
+    }
+
+    [Fact]
+    public async Task Init_Redirected_NamesTheFirmwareOnTheDeviceLine()
+    {
+        using var host = NewHost(devices: Device(firmware: "0.9-pr65*"));
+
+        await host.RunAsync("init");
+
+        host.Consoles.StdOut.Should().Contain("Device: Bench (Connected, online, USB COM3, firmware 0.9-pr65*)");
+    }
+
+    [Fact]
+    public async Task Init_Redirected_LeavesTheFirmwareOffTheDeviceLine_WhenItIsNotKnown()
+    {
+        using var host = NewHost(devices: Device());
+
+        await host.RunAsync("init");
+
+        host.Consoles.StdOut.Should().Contain("Device: Bench (Connected, online, USB COM3)");
+    }
+
+    [Fact]
+    public async Task Init_OnATerminal_ShowsTheFirmwareInTheDeviceTable()
+    {
+        using var host = NewHost(terminal: true, devices: Device(firmware: "0.9-pr65*"));
+
+        await host.RunAsync("init");
+
+        host.Consoles.StdOut.Should().Contain("Firmware").And.Contain("0.9-pr65*");
     }
 
     // ---- the update report ----------------------------------------------------------------------------------

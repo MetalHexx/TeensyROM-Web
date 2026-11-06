@@ -156,6 +156,13 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
         _ => "unknown"
     };
 
+    private static string DescribeDevice(DeviceSummary device)
+    {
+        var firmware = string.IsNullOrEmpty(device.FirmwareVersion) ? string.Empty : $", firmware {device.FirmwareVersion}";
+
+        return $"{device.Name} ({device.State}, {(device.IsOnline ? "online" : "offline")}, {device.Connection}{firmware})";
+    }
+
     private void Write(InitReport report)
     {
         if (Output.Mode == OutputMode.Json)
@@ -180,7 +187,7 @@ internal sealed class InitCommand(ICliOutput output, IEngineControl engine, IDev
 
         if (Output.Mode == OutputMode.Plain)
         {
-            fields.AddRange(report.Devices.Select(device => ("Device", $"{device.Name} ({device.State}, {(device.IsOnline ? "online" : "offline")}, {device.Connection})")));
+            fields.AddRange(report.Devices.Select(device => ("Device", DescribeDevice(device))));
             fields.AddRange(report.Commands.Select(command => ("Command", command.Name)));
             fields.AddRange(report.Problems.Select(problem => ("Problem", problem)));
             Output.Fields(fields);

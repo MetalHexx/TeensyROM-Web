@@ -112,6 +112,18 @@ public sealed class HelpSurfaceTests
         host.Consoles.StdOut.Should().Contain(expected);
     }
 
+    [Theory]
+    [InlineData("firmwareVersion", "device", "list")]
+    [InlineData("firmware", "init")]
+    public async Task Help_SaysWhereToFindTheFirmwareVersion(string expected, params string[] command)
+    {
+        using var host = new TestHost();
+
+        await host.RunAsync([.. command, "--help"]);
+
+        host.Consoles.StdOut.Should().Contain(expected);
+    }
+
     [Fact]
     public async Task RootHelp_SaysStderrCanEndWithAJsonErrorOrNoticeObject()
     {

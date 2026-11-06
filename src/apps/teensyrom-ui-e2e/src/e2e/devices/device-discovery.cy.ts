@@ -25,8 +25,43 @@ import {
   unavailableStorageDevice,
   mixedStateDevices,
 } from '../../support/test-data/fixtures';
+import { generateDevice } from '../../support/test-data/generators/device.generators';
 
 describe('Device Discovery E2E Tests', () => {
+  // =========================================================================
+  // TAGGED FIRMWARE
+  // =========================================================================
+  describe('Tagged Firmware', () => {
+    // The longest tag the firmware's 40-column banner allows, in its widest letter.
+    const fwVersion = `0.9-${'W'.repeat(24)}*`;
+
+    // 1280 is the narrowest width with two fact columns; 375 is a phone.
+    [1280, 375].forEach((width) => {
+      it(`should show a long tagged version in full, inside its column, at ${width}px`, () => {
+        cy.viewport(width, 800);
+        interceptFindDevices({ fixture: { devices: [generateDevice({ fwVersion })] } });
+        navigateToDeviceView();
+        waitForFindDevices();
+
+        getDeviceCard(0).within(() => {
+          cy.get(DEVICE_CARD_SELECTORS.firmwareLabel)
+            .should('contain.text', `Firmware: ${fwVersion}`)
+            .then(($label) => {
+              // The label's own box always fills its column, so measure the text inside it.
+              const text = $label.find('.icon-label-text')[0];
+              const column = $label[0].parentElement!.getBoundingClientRect();
+
+              expect(text.scrollWidth, 'text is not clipped').to.be.at.most(text.clientWidth + 1);
+              expect(
+                text.getBoundingClientRect().right,
+                'text stays inside its column'
+              ).to.be.at.most(column.right + 1);
+            });
+        });
+      });
+    });
+  });
+
   // =========================================================================
   // SINGLE DEVICE DISCOVERY
   // =========================================================================

@@ -14,15 +14,21 @@ namespace TeensyRom.Core.Serial
     {
         private const int MaxInputLength = 4096;
 
+        // What a build adds straight after the version number: "-<tag>" for a tagged build, "*" for a
+        // build from a dirty tree, e.g. "v0.9-pr65*". Empty on a release build. The firmware says to read
+        // the version up to the first space or '(', and limits it to 40 columns. This also stops at any
+        // character a version can't hold, so stray bytes from a garbled reply stay out of it.
+        private const string VersionSuffixPattern = @"(?<suffix>[A-Za-z0-9.*-]{0,40})";
+
         // "FW:" label followed, anywhere later on the line, by a version token. The text between the
         // label and the version is the hardware variant.
         private static readonly Regex FwLabeledLineRegex = new(
-            @"FW:\s*(?<variant>[^\r\n]*?)\s*v(?<version>\d+(?:\.\d+){1,3})",
+            @"FW:\s*(?<variant>[^\r\n]*?)\s*v(?<version>\d+(?:\.\d+){1,3})" + VersionSuffixPattern,
             RegexOptions.NonBacktracking);
 
         // Pre-0.7.2.8 layout: the version sits on an unlabeled first line, e.g. "TeensyROM+ v0.7.2.7".
         private static readonly Regex FwUnlabeledLineRegex = new(
-            @"^(?<variant>TeensyROM\+?)\s+v(?<version>\d+(?:\.\d+){1,3})",
+            @"^(?<variant>TeensyROM\+?)\s+v(?<version>\d+(?:\.\d+){1,3})" + VersionSuffixPattern,
             RegexOptions.NonBacktracking);
 
         private static readonly Regex MinimalRegex = new(
@@ -78,7 +84,7 @@ namespace TeensyRom.Core.Serial
                     .Where(line => line.Length > 0)
                     .ToList();
 
-                var (isTeensyRom, hardwareVariant, firmwareVersion, isMinimal) = ParseFwLine(lines);
+                var (isTeensyRom, hardwareVariant, firmwareVersion, versionSuffix, isMinimal) = ParseFwLine(lines);
                 var (cpuMhz, temperatureC, chipId) = ParseTeensyLine(lines);
                 var (machine, videoStandard, todClockHz) = ParseMachineLine(lines);
                 var buildTimestamp = ParseBuildLine(lines);
@@ -89,6 +95,7 @@ namespace TeensyRom.Core.Serial
                     IsTeensyRom = isTeensyRom,
                     HardwareVariant = hardwareVariant,
                     FirmwareVersion = firmwareVersion,
+                    VersionSuffix = versionSuffix,
                     IsMinimalFirmware = isMinimal,
                     BuildTimestamp = buildTimestamp,
                     CpuMhz = cpuMhz,
@@ -118,7 +125,7 @@ namespace TeensyRom.Core.Serial
             return reply.FirmwareVersion >= floor;
         }
 
-        private static (bool IsTeensyRom, HardwareVariant Variant, Version? Version, bool IsMinimal) ParseFwLine(List<string> lines)
+        private static (bool IsTeensyRom, HardwareVariant Variant, Version? Version, string VersionSuffix, bool IsMinimal) ParseFwLine(List<string> lines)
         {
             foreach (var line in lines)
             {
@@ -138,14 +145,14 @@ namespace TeensyRom.Core.Serial
                 }
             }
 
-            return (false, HardwareVariant.Unknown, null, false);
+            return (false, HardwareVariant.Unknown, null, string.Empty, false);
         }
 
-        private static (bool IsTeensyRom, HardwareVariant Variant, Version? Version, bool IsMinimal) BuildFwResult(string line, Match match)
+        private static (bool IsTeensyRom, HardwareVariant Variant, Version? Version, string VersionSuffix, bool IsMinimal) BuildFwResult(string line, Match match)
         {
             if (!Version.TryParse(match.Groups["version"].Value, out var version))
             {
-                return (false, HardwareVariant.Unknown, null, false);
+                return (false, HardwareVariant.Unknown, null, string.Empty, false);
             }
 
             var variant = match.Groups["variant"].Value.Trim() switch
@@ -155,7 +162,7 @@ namespace TeensyRom.Core.Serial
                 _ => HardwareVariant.Unknown
             };
 
-            return (true, variant, version, MinimalRegex.IsMatch(line));
+            return (true, variant, version, match.Groups["suffix"].Value, MinimalRegex.IsMatch(line));
         }
 
         private static (int? CpuMhz, decimal? TemperatureC, string? ChipId) ParseTeensyLine(List<string> lines)

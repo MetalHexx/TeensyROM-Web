@@ -48,6 +48,7 @@ internal abstract class DeviceVerbCommand<T>(ICliOutput output, IEngineControl e
             ("Id", device.Id),
             ("State", device.State),
             ("Connection", device.Connection),
+            ("Firmware", device.FirmwareVersion),
             ("Online", device.IsOnline ? "yes" : "no"),
             ("SD", device.SdAvailable ? "available" : "not available"),
             ("USB", device.UsbAvailable ? "available" : "not available")

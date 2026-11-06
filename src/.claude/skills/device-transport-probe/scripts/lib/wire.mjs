@@ -142,7 +142,7 @@ export function decode(link, onEvent) {
       line = '';
       if (!text) continue;
       const fw = text.match(/FW: (.*)$/);
-      if (fw) { reply = { fw: fw[1], minimal: /minimal/i.test(text) }; continue; }
+      if (fw) { reply = { fw: fw[1], minimal: /\(minimal\)/i.test(text) }; continue; }
       const uid = text.match(/UID: (\d+)/);
       if (uid && reply) { onEvent({ type: 'reply', ...reply, uid: uid[1] }); reply = null; continue; }
       const boot = text.match(/^Boot: (complete|in progress)/);

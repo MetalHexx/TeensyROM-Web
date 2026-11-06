@@ -459,6 +459,17 @@ describe('DeviceItemComponent', () => {
       expect(fact('device-hardware-label')?.textContent).not.toContain('+');
     });
 
+    it('shows a long tagged firmware version in full, with nothing to cut it off', () => {
+      const fwVersion = '0.9-aaaaaaaaaaaaaaaaaaaaaaaa*';
+      fixture.componentRef.setInput('device', { ...mockDevice, fwVersion });
+      fixture.detectChanges();
+
+      const firmware = fact('device-firmware-label');
+
+      expect(firmware?.textContent).toContain(`Firmware: ${fwVersion}`);
+      expect(firmware?.querySelector('.truncate')).toBeNull();
+    });
+
     it('hides a fact whose value is unknown', () => {
       fixture.componentRef.setInput('device', {
         ...mockDevice,

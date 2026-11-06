@@ -12,6 +12,14 @@ namespace TeensyRom.Core.Serial
         public bool IsTeensyRom { get; init; }
         public HardwareVariant HardwareVariant { get; init; } = HardwareVariant.Unknown;
         public Version? FirmwareVersion { get; init; }
+        /// <summary>
+        /// What the build added after the version number: "-pr65" for a tagged build, "*" for a build from a
+        /// dirty tree, "-pr65*" for both. Empty on a release build. Display only: compatibility reads
+        /// <see cref="FirmwareVersion"/>.
+        /// </summary>
+        public string VersionSuffix { get; init; } = string.Empty;
+        /// <summary>The whole version as the firmware reports it, such as "0.9-pr65*"; empty when the reply has no version.</summary>
+        public string FirmwareVersionText => FirmwareVersion is null ? string.Empty : $"{FirmwareVersion}{VersionSuffix}";
         public bool IsMinimalFirmware { get; init; }
         public string BuildTimestamp { get; init; } = string.Empty;
         public int? CpuMhz { get; init; }
