@@ -201,6 +201,11 @@ export class DeckHand {
         hand.state = 'ignoring';
         return;
       }
+    } else if (!this.runtime.enterVarispeed(slot, hand.rateSource)) {
+      // Mid-throw, but a slip landing may have taken the record off the hand since the lift, and
+      // the throw's end will never come to bring it back to idle.
+      hand.state = 'ignoring';
+      return;
     }
 
     hand.anchorValue = value;

@@ -800,6 +800,50 @@ describe('DeckSlip', () => {
       expectLandedOnTheLine();
     });
 
+    /** A hand lifted over a live loop pushed in the hold throws, and the loop's landing inside that
+     *  throw takes the record off the hand. */
+    async function landInsideTheThrow(): Promise<void> {
+      await playing();
+      stroke();
+      h.deckService.toggleLiveLoop('A');
+      tick(2);
+      bend(PITCH_BEND_CENTRE, 500);
+      tick(2);
+      h.deckService.endLiveLoop('A');
+      tick(2);
+    }
+
+    it('a touch after a landing ended the throw takes the record back', async () => {
+      await landInsideTheThrow();
+
+      stroke();
+      const heldAt = position('A');
+      tick(3);
+
+      expect(deck().handHeld).toBe(true);
+      expect(position('A')).toBe(heldAt);
+    });
+
+    it('the strip takes slip again once the throw of that touch ends', async () => {
+      await landInsideTheThrow();
+      stroke();
+      // That touch took over a throw, so it started no departure and its lift throws too.
+      bend(PITCH_BEND_CENTRE, 1000);
+      for (let i = 0; i < 400 && engineVarispeed(); i++) {
+        tick();
+        await settle();
+      }
+      expect(engineVarispeed()).toBe(false);
+
+      stroke();
+      const line = slip.returnFrame('A');
+      expect(line).not.toBeNull();
+      bend(PITCH_BEND_CENTRE, 2000);
+
+      expect(position('A')).toBe(line);
+      expect(deck().handHeld).toBe(false);
+    });
+
     it('ending the live loop under a held hand leaves the hand the line, and the lift lands on it', async () => {
       await playing();
       h.deckService.toggleLiveLoop('A');
